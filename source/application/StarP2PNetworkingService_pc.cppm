@@ -50,7 +50,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> update() override;
   [[nodiscard]] std::expected<std::unique_ptr<P2PSocket>, StarException> connectToPeer(P2PNetworkingPeerId peerId) override;
 
-  [[nodiscard]] std::expected<void, StarException> addPendingJoin(String connectionString);
+  [[nodiscard]] std::expected<void, StarException> addPendingJoin(std::string_view connectionString);
 
 private:
   struct JoinUnavailable {
@@ -61,6 +61,16 @@ private:
     std::uint32_t capacity;
   };
   using JoinLocation = std::variant<JoinUnavailable, JoinLocal, HostAddressWithPort>;
+
+  struct DiscordPeer {
+    std::int64_t user;
+    std::int64_t lobby;
+    std::string_view secret;
+  };
+  using PeerTarget = std::variant<std::uint64_t, DiscordPeer>;
+  // Borrows the null-terminated invitation; caller holds m_mutex.
+  std::expected<PeerTarget, StarException> parsePeer(std::string_view target) const;
+  std::expected<void, StarException> queueInvitation(std::string_view command);
 
 #ifdef STAR_ENABLE_STEAM_INTEGRATION
 
@@ -125,8 +135,9 @@ private:
     Deque<ByteArray> incoming;
   };
 
-  std::expected<std::unique_ptr<P2PSocket>, StarException> discordConnectRemote(discord::UserId remoteUserId, discord::LobbyId lobbyId, String const& lobbySecret);
+  std::expected<std::unique_ptr<P2PSocket>, StarException> discordConnectRemote(DiscordPeer const& peer);
   void discordCloseSocket(DiscordP2PSocket& socket);
+  void discordReleaseLobby();
   void discordDisconnectCallbacks();
 
   void discordOnReceiveMessage(discord::LobbyId lobbyId, discord::UserId userId, discord::NetworkChannelId channel, std::span<std::uint8_t const> data);
@@ -162,6 +173,7 @@ private:
   std::shared_ptr<DiscordCallbackLifetime> m_discordLifetime = std::make_shared<DiscordCallbackLifetime>();
   std::uint64_t m_discordLobbyGeneration = 0;
   bool m_discordLobbiesAvailable = true;
+  bool m_discordHostDeferred = false;
   std::uint64_t m_discordConnectionGeneration = 0;
   
   List<std::pair<discord::UserId, String>> m_discordJoinRequests;
@@ -172,10 +184,15 @@ private:
   String m_discordActivityDetails;
   std::int64_t m_discordActivityStartTime = 0;
   std::optional<std::pair<std::uint16_t, std::uint16_t>> m_discordPartySize;
+  std::optional<discord::UserId> m_discordActivityJoinUser;
   bool m_discordForceUpdateActivity = false;
   bool m_discordUpdatingActivity = false;
-  // Hosted lobbies retain their secret; a remote membership has an empty secret.
-  std::optional<std::pair<discord::LobbyId, String>> m_discordServerLobby = {};
+  struct DiscordLobby {
+    discord::LobbyId id;
+    String secret; // Empty for remote memberships.
+    discord::UserId owner;
+  };
+  std::optional<DiscordLobby> m_discordServerLobby;
 
   int m_discordOnActivityJoinToken = -1;
   int m_discordOnActivityRequestToken = -1;

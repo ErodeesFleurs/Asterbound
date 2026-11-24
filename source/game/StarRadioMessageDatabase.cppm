@@ -47,8 +47,8 @@ public:
   [[nodiscard]] std::expected<RadioMessage, StarException> createRadioMessage(Json const& config, std::optional<String> const& uniqueId = {}) const;
 
 private:
-  explicit RadioMessageDatabase(Root& root);
-  Root& m_root;
+  explicit RadioMessageDatabase(Json defaults);
+  Json m_defaults;
   StringMap<RadioMessage> m_radioMessages;
 };
 

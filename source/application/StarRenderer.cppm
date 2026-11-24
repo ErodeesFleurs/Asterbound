@@ -21,6 +21,12 @@ struct RendererExceptionTag {
 };
 using RendererException = StarError<RendererExceptionTag, StarException>;
 
+// The backend guarantees that the previously selected output is still usable.
+struct OutputPreferenceRejectedTag {
+  static constexpr std::string_view name() { return "OutputPreferenceRejected"; }
+};
+using OutputPreferenceRejected = StarError<OutputPreferenceRejectedTag, RendererException>;
+
 // FNV-1a-64 of legacy GLSL bytes, treating CRLF as LF without changing other bytes.
 std::uint64_t legacyShaderSourceFingerprint(std::string_view source) noexcept;
 
@@ -183,6 +189,8 @@ struct RenderOutputSettings {
 [[nodiscard]] std::expected<RenderOutputSettings, StarException> renderOutputSettingsFromJson(Json const& config);
 [[nodiscard]] std::expected<double, StarException> validatedRenderFpsLimit(Json const& value);
 
+class Renderer;
+
 // Only changed preferences are decoded. A malformed field leaves its effective
 // value untouched; the four coupled output parameters are one field.
 struct RenderPreferences {
@@ -190,11 +198,27 @@ struct RenderPreferences {
   double fpsLimit = 0;
   bool vsync = true;
   bool hdr = true;
+  bool antiAliasing = false;
+  bool limitTextureAtlasSize = false;
+  bool useMultiTexturing = true;
+  bool hardwareCursor = true;
+  float interfaceScale = 0;
+  float zoomLevel = 3;
+  float cameraSpeedFactor = 1;
+  String outputNotice;
 
   [[nodiscard]] std::expected<List<std::string_view>, StarException> observe(Json const& config);
+  [[nodiscard]] std::expected<void, StarException> applyOutput(Renderer& renderer, RenderOutputSettings const& requested);
+  void resetBackend() {
+    if (m_appliedOutput) {
+      m_appliedOutput.reset();
+      m_observed.reset(); // Reconsider a persisted request on a new backend.
+    }
+  }
 
 private:
   std::shared_ptr<JsonObject const> m_observed;
+  std::optional<RenderOutputSettings> m_appliedOutput;
 };
 
 class Renderer {
@@ -233,7 +257,8 @@ public:
   virtual void setMultiTexturingEnabled(bool enabled) = 0;
   [[nodiscard]] virtual std::expected<void, StarException> setMultiSampling(unsigned multiSampling) = 0;
   [[nodiscard]] virtual std::expected<void, StarException> setMainHDR(bool enabled) = 0;
-  // Recoverable, transactional change: rejection leaves the previous output usable.
+  // Only OutputPreferenceRejected guarantees a usable old output. Other
+  // errors, including failed restoration, must reach the renderer boundary.
   [[nodiscard]] virtual std::expected<void, StarException> setOutputSettings(RenderOutputSettings const& settings) = 0;
   [[nodiscard]] virtual std::expected<std::shared_ptr<TextureGroup>, StarException> createTextureGroup(TextureGroupSize size = TextureGroupSize::Medium, TextureFiltering filtering = TextureFiltering::Nearest) = 0;
   [[nodiscard]] virtual std::expected<std::shared_ptr<RenderBuffer>, StarException> createRenderBuffer() = 0;
@@ -263,6 +288,7 @@ export module star.renderer;
 export namespace Star {
   using ::Star::RendererExceptionTag;
   using ::Star::RendererException;
+  using ::Star::OutputPreferenceRejected;
   using ::Star::legacyShaderSourceFingerprint;
   using ::Star::Texture;
   using ::Star::TexturePtr;

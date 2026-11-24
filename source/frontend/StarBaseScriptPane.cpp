@@ -281,26 +281,33 @@ Json const& BaseScriptPane::rawConfig() const { return m_rawConfig; }
 
 bool BaseScriptPane::interactive() const { return m_interactive; }
 
+std::expected<std::shared_ptr<Pane>, StarException> BaseScriptPane::buildScriptTooltip(Json const& value) {
+  if (value.is_type(Json::Type::String)) {
+    auto text = value.to_string();
+    if (!text) return std::unexpected(std::move(text.error()));
+    return SimpleTooltipBuilder::buildTooltip(context(), *text);
+  }
+  auto tooltip = Pane::create(context());
+  if (!tooltip) return std::unexpected(std::move(tooltip.error()));
+  auto constructed = m_reader->construct(value, **tooltip);
+  if (!constructed) {
+    // Only reject malformed authored layout. A missing renderer, for example,
+    // is not a bad tooltip and must still reach the caller.
+    auto& error = constructed.error();
+    if (error.is<WidgetParserException>() || error.is<JsonException>() || error.is<MapException>()
+        || error.is<GuiException>() || error.is<ColorException>() || error.is<AssetException>())
+      return std::shared_ptr<Pane>{};
+    return std::unexpected(std::move(error));
+  }
+  return std::move(*tooltip);
+}
+
 std::expected<std::shared_ptr<Pane>, StarException> BaseScriptPane::createTooltip(Vec2I const& screenPosition) {
   auto result = recover_lua_script_error(m_script.invoke<Json>("createTooltip", screenPosition));
   if (!result)
     return std::unexpected(std::move(result.error()));
-  if (*result && !(**result).is_null()) {
-    auto const& value = **result;
-    if (value.type() == Json::Type::String) {
-      auto text = value.to_string();
-      if (!text)
-        return std::unexpected(std::move(text.error()));
-      return SimpleTooltipBuilder::buildTooltip(context(), *text);
-    }
-    auto tooltip = Pane::create(context());
-    if (!tooltip)
-      return std::unexpected(std::move(tooltip.error()));
-    auto constructed = m_reader->construct(value, **tooltip);
-    if (!constructed)
-      return std::unexpected(std::move(constructed.error()));
-    return std::move(*tooltip);
-  }
+  if (*result && !(**result).is_null())
+    return buildScriptTooltip(**result);
   std::shared_ptr<Item> item;
   auto authoredItem = recover_lua_script_error(m_script.invoke<LuaValue>("tooltipItem", screenPosition));
   if (!authoredItem)

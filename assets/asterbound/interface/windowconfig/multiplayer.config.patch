@@ -26,8 +26,10 @@
   },
   "connectionError" : {
     "type" : "label",
-    "position" : [115, 17],
+    "position" : [115, 29],
     "hAnchor" : "mid",
+    "vAnchor" : "top",
+    "wrapWidth" : 190,
     "fontSize" : 8,
     "color" : [255, 172, 140],
     "value" : "",

@@ -1,6 +1,7 @@
 import std;
 import star.format;
 import star.json;
+import star.string;
 import star.list;
 import star.map;
 import star.image;
@@ -111,16 +112,58 @@ std::expected<List<std::string_view>, StarException> RenderPreferences::observe(
     else
       rejected.push_back(key);
   };
-  if (changed("renderOutput") || changed("renderExposure") || changed("hdrPaperWhite") || changed("hdrPeakLuminance"))
-    accept("renderOutput/renderExposure/hdrPaperWhite/hdrPeakLuminance", renderOutputSettingsFromJson(config), output);
+  if (changed("renderOutput") || changed("renderExposure") || changed("hdrPaperWhite") || changed("hdrPeakLuminance")) {
+    auto requested = renderOutputSettingsFromJson(config);
+    if (requested)
+      outputNotice.clear();
+    accept("renderOutput/renderExposure/hdrPaperWhite/hdrPeakLuminance", std::move(requested), output);
+  }
   if (changed("renderFpsLimit"))
     accept("renderFpsLimit", config.get("renderFpsLimit").and_then(validatedRenderFpsLimit), fpsLimit);
   if (changed("vsync"))
     accept("vsync", config.get_bool("vsync"), vsync);
   if (changed("hdr"))
     accept("hdr", config.get_bool("hdr", true), hdr);
+  auto boolean = [&](std::string_view key, bool fallback, bool& destination) {
+    if (changed(key))
+      accept(key, config.get_bool(key, fallback), destination);
+  };
+  boolean("antiAliasing", false, antiAliasing);
+  boolean("limitTextureAtlasSize", false, limitTextureAtlasSize);
+  boolean("useMultiTexturing", true, useMultiTexturing);
+  boolean("hardwareCursor", true, hardwareCursor);
+  auto scale = [&](std::string_view key, double fallback, double minimum, double maximum, float& destination, bool autoScale = false) {
+    if (!changed(key))
+      return;
+    auto value = config.get_double(key, fallback);
+    if (value && is_finite(*value) && ((autoScale && *value == 0) || (*value >= minimum && *value <= maximum)))
+      destination = static_cast<float>(*value);
+    else
+      rejected.push_back(key);
+  };
+  scale("interfaceScale", 0, 0.25, 64, interfaceScale, true);
+  scale("zoomLevel", 3, 0.25, 1000000, zoomLevel);
+  scale("cameraSpeedFactor", 1, 0.01, 30, cameraSpeedFactor);
   m_observed = std::move(*snapshot);
   return rejected;
+}
+
+std::expected<void, StarException> RenderPreferences::applyOutput(Renderer& renderer, RenderOutputSettings const& requested) {
+  if (m_appliedOutput != requested) {
+    if (auto result = renderer.setOutputSettings(requested); !result) {
+      if (result.error().is<OutputPreferenceRejected>()) {
+        output = m_appliedOutput.value_or(RenderOutputSettings{});
+        m_appliedOutput = output;
+        outputNotice = String(result.error().what());
+      }
+      return std::unexpected(std::move(result.error()));
+    }
+    m_appliedOutput = requested;
+    outputNotice.clear();
+  }
+  if (&output != &requested)
+    output = requested;
+  return {};
 }
 
 

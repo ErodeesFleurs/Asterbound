@@ -237,8 +237,11 @@ std::expected<void, StarException> GraphicsMenu::init(std::shared_ptr<UniverseCl
     auto status = requireChild<LabelWidget>("renderOutputStatusLabel");
     if (!status)
       return std::unexpected(std::move(status.error()));
-    if (auto result = apply(); !result)
-      return (*status)->setText(Star::format("^red;{}^reset;", result.error().what()));
+    if (auto result = apply(); !result) {
+      if (result.error().is<OutputPreferenceRejected>())
+        return (*status)->setText(Star::format("^red;{}^reset;", result.error().what()));
+      return std::unexpected(std::move(result.error()));
+    }
     if (auto result = (*status)->setText("Output settings applied."); !result)
       return std::unexpected(std::move(result.error()));
     return applyWindowSettings();
@@ -508,23 +511,27 @@ std::expected<void, StarException> GraphicsMenu::initConfig() {
       return std::unexpected(std::move(value.error()));
     m_localChanges.set(key, std::move(*value));
   }
-  // Stage usable defaults for rejected persisted preferences; opening the
-  // pane must not write the user's config. Apply still validates edits strictly.
-  for (std::string_view key : {"vsync", "hdr"}) {
-    if (!settings.get_bool(key))
-      m_localChanges.set(key, true);
-  }
-  if (!renderOutputSettingsFromJson(settings)) {
-    constexpr RenderOutputSettings defaults;
-    m_localChanges.set("renderOutput", "legacy");
-    m_localChanges.set("renderExposure", defaults.exposure);
-    m_localChanges.set("hdrPaperWhite", defaults.paperWhiteNits);
-    m_localChanges.set("hdrPeakLuminance", defaults.peakNits);
-  }
-  auto configured = settings.get("renderFpsLimit").and_then(validatedRenderFpsLimit);
-  auto rate = configured.value_or(0);
-  if (!configured)
-    m_localChanges.set("renderFpsLimit", rate);
+  // Use the same last-good values as the running client. Observe a copy so
+  // opening a menu between ticks cannot consume a runtime change or warning.
+  auto preferences = context().renderPreferences();
+  if (auto observed = preferences.observe(settings); !observed)
+    return std::unexpected(std::move(observed.error()));
+  m_localChanges.set("vsync", preferences.vsync);
+  m_localChanges.set("hdr", preferences.hdr);
+  m_localChanges.set("antiAliasing", preferences.antiAliasing);
+  m_localChanges.set("limitTextureAtlasSize", preferences.limitTextureAtlasSize);
+  m_localChanges.set("useMultiTexturing", preferences.useMultiTexturing);
+  m_localChanges.set("hardwareCursor", preferences.hardwareCursor);
+  m_localChanges.set("zoomLevel", preferences.zoomLevel);
+  m_localChanges.set("interfaceScale", preferences.interfaceScale);
+  m_localChanges.set("cameraSpeedFactor", preferences.cameraSpeedFactor);
+  constexpr std::array<std::string_view, 3> modes{"legacy", "sdr", "hdr10"};
+  m_localChanges.set("renderOutput", String(modes.at(static_cast<unsigned>(preferences.output.mode))));
+  m_localChanges.set("renderExposure", preferences.output.exposure);
+  m_localChanges.set("hdrPaperWhite", preferences.output.paperWhiteNits);
+  m_localChanges.set("hdrPeakLuminance", preferences.output.peakNits);
+  auto rate = preferences.fpsLimit;
+  m_localChanges.set("renderFpsLimit", rate);
   // Include the exact configured value, rather than rounding custom limits to a preset.
   m_renderFpsList = m_renderFpsPresets;
   auto it = std::lower_bound(m_renderFpsList.begin(), m_renderFpsList.end(), rate);
@@ -568,7 +575,10 @@ std::expected<void, StarException> GraphicsMenu::initConfig() {
   auto status = requireChild<LabelWidget>("renderOutputStatusLabel");
   if (!status)
     return std::unexpected(std::move(status.error()));
-  if (auto result = (*status)->setText("Legacy keeps original colors. SDR/HDR10 require Vulkan. HDR10 needs an HDR-enabled display."); !result)
+  auto const& notice = preferences.outputNotice;
+  if (auto result = (*status)->setText(notice.empty()
+        ? String("Legacy keeps original colors. SDR/HDR10 require Vulkan. HDR10 needs an HDR-enabled display.")
+        : Star::format("^red;{}^reset;", notice)); !result)
     return std::unexpected(std::move(result.error()));
   return {};
 }
@@ -617,7 +627,7 @@ std::expected<void, StarException> GraphicsMenu::syncGui() {
     auto it = std::lower_bound(values.begin(), values.end(), value);
     if (it != values.end())
       return (*slider)->setVal(std::min<std::size_t>(it - values.begin(), values.size() - 1), false);
-    return (*slider)->setVal(values.size() - 1);
+    return (*slider)->setVal(values.size() - 1, false);
   };
   if (auto result = updateFloatSlider("interfaceScaleSlider", m_interfaceScaleList, interfaceScale); !result)
     return std::unexpected(std::move(result.error()));
@@ -745,14 +755,15 @@ std::expected<void, StarException> GraphicsMenu::apply() {
     return std::unexpected(std::move(vsync.error()));
   auto output = renderOutputSettingsFromJson(Json(m_localChanges));
   if (!output)
-    return std::unexpected(std::move(output.error()));
+    return std::unexpected(OutputPreferenceRejected(output.error().what()));
   auto renderer = context().renderer();
   if (!renderer)
     return std::unexpected(std::move(renderer.error()));
   // Probe the real backend before persisting: unsupported HDR10 must leave the
   // previous working mode and configuration available for another selection.
-  if (auto result = renderer->get().setOutputSettings(*output); !result)
+  if (auto result = context().renderPreferences().applyOutput(renderer->get(), *output); !result)
     return std::unexpected(std::move(result.error()));
+  context().renderPreferences().outputNotice.clear();
   for (auto const& [key, value] : m_localChanges) {
     if (auto result = (*configuration)->set(key, value); !result)
       return std::unexpected(std::move(result.error()));

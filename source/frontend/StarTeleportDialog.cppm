@@ -68,8 +68,26 @@ public:
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<TeleportDialog>(); }
 
   using SendPaneEvent = std::function<std::expected<void, StarException>(String const&, String const&, Json)>;
+  struct Destination {
+    WarpAction warp;
+    std::optional<String> prerequisite;
+    String name;
+    String planet;
+    std::optional<String> icon;
+    bool deploy;
+    bool mission;
+  };
+  struct Request {
+    bool canBookmark;
+    bool canTeleport;
+    String bookmarkName;
+    bool includeParty;
+    bool includeBookmarks;
+    List<Destination> destinations;
+    [[nodiscard]] static std::expected<Request, StarException> parse(Json const& config);
+  };
   [[nodiscard]] static std::expected<std::shared_ptr<TeleportDialog>, StarException> create(GuiContext& guiContext, std::shared_ptr<UniverseClient> client,
-      SendPaneEvent sendPaneEvent, Json config, EntityId sourceEntityId, TeleportBookmark currentLocation);
+      SendPaneEvent sendPaneEvent, Request request, EntityId sourceEntityId, TeleportBookmark currentLocation);
   void detachInterface() { m_sendPaneEvent = {}; }
 
   [[nodiscard]] std::expected<void, StarException> tick(float dt) override;
@@ -80,7 +98,7 @@ public:
 
 private:
   TeleportDialog(GuiContext& guiContext, std::shared_ptr<UniverseClient> client, SendPaneEvent sendPaneEvent, EntityId sourceEntityId, TeleportBookmark currentLocation);
-  [[nodiscard]] std::expected<void, StarException> initialize(Json config);
+  [[nodiscard]] std::expected<void, StarException> initialize(Request request);
   EntityId m_sourceEntityId;
   std::shared_ptr<UniverseClient> m_client;
   SendPaneEvent m_sendPaneEvent;

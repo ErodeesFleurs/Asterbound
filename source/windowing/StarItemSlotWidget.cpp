@@ -304,16 +304,25 @@ std::expected<void, StarException> ItemSlotWidget::renderImpl() {
       if (*secondary) *icons = std::move(**secondary);
     }
     if (m_showRarity) {
-      auto rarity = enum_name<rarity_names>(m_item->rarity());
-      if (!rarity) return std::unexpected(std::move(rarity.error()));
-      auto value = m_item->instanceValue("rarityBorder", String(*rarity));
+      // The override is optional presentation data, never a reason to omit
+      // the item icon or count. Use the item's normal rarity when it is bad.
+      auto value = m_item->instanceValue("rarityBorder");
       if (!value) return std::unexpected(std::move(value.error()));
-      auto name = value->to_string();
+      auto name = [&]() -> std::expected<String, StarException> {
+        if (value->is_type(Json::Type::String)) {
+          auto custom = value->to_string();
+          if (!custom) return std::unexpected(std::move(custom.error()));
+          if (!custom->empty()) return custom;
+        }
+        auto rarity = enum_name<rarity_names>(m_item->rarity());
+        if (!rarity) return std::unexpected(std::move(rarity.error()));
+        return String(*rarity);
+      }();
       if (!name) return std::unexpected(std::move(name.error()));
       auto border = rarityBorder(std::move(*name));
       if (!border) return std::unexpected(std::move(border.error()));
-      auto result = context().drawInterfaceQuad(*border, Vec2F(screenPosition()));
-      if (!result) return std::unexpected(std::move(result.error()));
+      auto drawn = context().drawInterfaceQuad(*border, Vec2F(screenPosition()));
+      if (!drawn) return std::unexpected(std::move(drawn.error()));
     }
     if (m_showLinkIndicator) {
       auto result = context().drawInterfaceQuad("/interface/inventory/itemlinkindicator.png", Vec2F(screenPosition() - Vec2I(1, 1)));

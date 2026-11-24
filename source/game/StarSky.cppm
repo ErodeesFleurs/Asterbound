@@ -161,8 +161,8 @@ private:
     float starVelocityFactor = 0;
     float correctionPower = 0;
     float flyingTimer = 0;
-    float enterHyperspaceAudioLeadIn = 0;
-    float exitHyperspaceAudioLeadIn = 0;
+    std::optional<float> enterHyperspaceAudioLeadIn;
+    std::optional<float> exitHyperspaceAudioLeadIn;
     float dayTransitionTime = 0;
     float skyLevelExponent = 0;
     float flashTimer = 0;

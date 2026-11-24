@@ -93,6 +93,7 @@ protected:
   [[nodiscard]] std::expected<void, StarException> init(Json config, bool construct = true);
   std::shared_ptr<GuiReader> reader() override;
   [[nodiscard]] std::expected<void, StarException> construct(Json config);
+  [[nodiscard]] std::expected<std::shared_ptr<Pane>, StarException> buildScriptTooltip(Json const& value);
   [[nodiscard]] std::expected<void, StarException> renderImpl() override;
 
   Json m_config;

@@ -520,6 +520,39 @@ TEST_F(OpenGlRendererRegression, ProjectedDrawableEdgesAndVertices) {
   }
 }
 
+TEST_F(OpenGlRendererRegression, UnsupportedOutputKeepsLastGoodModeAndFrame) {
+  checked(renderer->loadConfig(json(R"({})")));
+  solid("window", R"({"includeVBTextures":false})");
+  RenderPreferences prefs;
+  RenderOutputSettings previous{RenderOutputMode::Legacy, 1, 250, 900};
+  checked(prefs.applyOutput(*renderer, previous));
+  auto saved = json(R"({"renderOutput":"hdr10","renderExposure":2,"hdrPaperWhite":250,"hdrPeakLuminance":900,"vsync":true,"renderFpsLimit":0})");
+  checked(prefs.observe(saved));
+  auto rejected = prefs.applyOutput(*renderer, prefs.output);
+  ASSERT_FALSE(rejected);
+  EXPECT_TRUE(rejected.error().is<OutputPreferenceRejected>());
+  EXPECT_FALSE(prefs.outputNotice.empty());
+  checked(prefs.observe(saved));
+  EXPECT_EQ(prefs.output, previous);
+  checked(prefs.applyOutput(*renderer, prefs.output));
+  checked(renderer->startFrame());
+  select("window");
+  pattern(Width, Height);
+  expectPattern(pixels());
+  checked(renderer->finishFrame());
+}
+
+TEST_F(VulkanRendererRegression, OutputChangeInsideFrameIsNotAPreferenceRejection) {
+  RenderPreferences prefs;
+  checked(renderer->startFrame());
+  auto rejected = prefs.applyOutput(*renderer, {RenderOutputMode::Sdr});
+  ASSERT_FALSE(rejected);
+  EXPECT_FALSE(rejected.error().is<OutputPreferenceRejected>());
+  EXPECT_TRUE(prefs.outputNotice.empty());
+  quad(Width, Height, {255, 0, 0, 255});
+  expectPixel(pixels(), Width, 2, 2, {255, 0, 0, 255});
+}
+
 TEST_F(OpenGlRendererRegression, RepeatedPingPongPassesSamplePreviousResult) {
   repeatedPasses();
 }

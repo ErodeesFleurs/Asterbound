@@ -369,63 +369,46 @@ std::expected<String, StarException> Sky::ambientNoise() const {
 
 std::expected<List<std::shared_ptr<AudioInstance>>, StarException> Sky::pullSounds() {
   List<std::shared_ptr<AudioInstance>> res;
+  if (m_sentSFX)
+    return res;
+
+  std::string_view cue;
   if (m_flyingType == FlyingType::Warp) {
-    if (m_warpPhase == WarpPhase::SpeedingUp && !m_sentSFX) {
-      float triggerTime = speedupTime() - m_numericSettings.enterHyperspaceAudioLeadIn;
-      if (triggerTime < 0 || !m_enterHyperspace) {
-        m_sentSFX = true;
-        return res;
-      }
-
-      if (m_flyingTimer >= triggerTime) {
-        auto assets = m_root.assets();
-        if (!assets) return std::unexpected(std::move(assets.error()));
-        auto path = m_settings.query_string("enterHyperspaceAudio");
-        if (!path) return std::unexpected(std::move(path.error()));
-        auto sfx = (*assets)->audio(*path);
-        if (!sfx) return std::unexpected(std::move(sfx.error()));
-        auto instance = AudioInstance::create(**sfx);
-        if (!instance) return std::unexpected(std::move(instance.error()));
-        m_sentSFX = true;
-        res.push_back(std::move(*instance));
-        return res;
-      }
-    } else if (m_warpPhase == WarpPhase::Maintain && !m_sentSFX) {
-      float triggerTime = m_numericSettings.flyingTimer - m_numericSettings.exitHyperspaceAudioLeadIn;
-      if (triggerTime < 0) {
-        m_sentSFX = true;
-        return res;
-      }
-
-      if (m_flyingTimer >= triggerTime) {
-        auto assets = m_root.assets();
-        if (!assets) return std::unexpected(std::move(assets.error()));
-        auto path = m_settings.query_string("exitHyperspaceAudio");
-        if (!path) return std::unexpected(std::move(path.error()));
-        auto sfx = (*assets)->audio(*path);
-        if (!sfx) return std::unexpected(std::move(sfx.error()));
-        auto instance = AudioInstance::create(**sfx);
-        if (!instance) return std::unexpected(std::move(instance.error()));
-        m_sentSFX = true;
-        res.push_back(std::move(*instance));
-        return res;
-      }
-    }
-  } else if (m_flyingType == FlyingType::Arriving) {
-    if (!m_sentSFX) {
-      auto assets = m_root.assets();
-      if (!assets) return std::unexpected(std::move(assets.error()));
-      auto path = m_settings.query_string("arrivalAudio");
-      if (!path) return std::unexpected(std::move(path.error()));
-      auto sfx = (*assets)->audio(*path);
-      if (!sfx) return std::unexpected(std::move(sfx.error()));
-      auto instance = AudioInstance::create(**sfx);
-      if (!instance) return std::unexpected(std::move(instance.error()));
-      m_sentSFX = true;
-      res.push_back(std::move(*instance));
+    std::optional<float> trigger;
+    if (m_warpPhase == WarpPhase::SpeedingUp) {
+      cue = "enterHyperspaceAudio";
+      if (m_enterHyperspace && m_numericSettings.enterHyperspaceAudioLeadIn)
+        trigger = speedupTime() - *m_numericSettings.enterHyperspaceAudioLeadIn;
+    } else if (m_warpPhase == WarpPhase::Maintain) {
+      cue = "exitHyperspaceAudio";
+      if (m_numericSettings.exitHyperspaceAudioLeadIn)
+        trigger = m_numericSettings.flyingTimer - *m_numericSettings.exitHyperspaceAudioLeadIn;
+    } else {
       return res;
     }
+    if (!trigger || *trigger < 0) {
+      m_sentSFX = true;
+      return res;
+    }
+    if (m_flyingTimer < *trigger)
+      return res;
+  } else if (m_flyingType == FlyingType::Arriving) {
+    cue = "arrivalAudio";
+  } else {
+    return res;
   }
+
+  m_sentSFX = true;
+  auto assets = m_root.assets();
+  if (!assets)
+    return std::unexpected(std::move(assets.error()));
+  auto instance = m_settings.get_string(String(cue))
+      .and_then([&](String const& path) { return (*assets)->audio(path); })
+      .and_then([](auto const& audio) { return AudioInstance::create(*audio); });
+  if (instance)
+    res.push_back(std::move(*instance));
+  else if (auto logged = m_root.logger().warn("Skipping sky cue '{}': {}", cue, instance.error().what()); !logged)
+    return std::unexpected(std::move(logged.error()));
   return res;
 }
 
@@ -834,12 +817,15 @@ std::expected<void, StarException> Sky::skyParametersUpdated() {
   auto flyingTimer = settings.query_float("flyingTimer");
   if (!flyingTimer) return std::unexpected(std::move(flyingTimer.error()));
   numeric.flyingTimer = *flyingTimer;
-  auto enterHyperspaceAudioLeadIn = settings.query_float("enterHyperspaceAudioLeadIn");
-  if (!enterHyperspaceAudioLeadIn) return std::unexpected(std::move(enterHyperspaceAudioLeadIn.error()));
-  numeric.enterHyperspaceAudioLeadIn = *enterHyperspaceAudioLeadIn;
-  auto exitHyperspaceAudioLeadIn = settings.query_float("exitHyperspaceAudioLeadIn");
-  if (!exitHyperspaceAudioLeadIn) return std::unexpected(std::move(exitHyperspaceAudioLeadIn.error()));
-  numeric.exitHyperspaceAudioLeadIn = *exitHyperspaceAudioLeadIn;
+  auto audio_lead_in = [&](String const& key) -> std::optional<float> {
+    auto lead = settings.query_float(key);
+    if (lead)
+      return *lead;
+    (void)m_root.logger().warn("Skipping sky cue with invalid '{}': {}", key, lead.error().what());
+    return {};
+  };
+  numeric.enterHyperspaceAudioLeadIn = audio_lead_in("enterHyperspaceAudioLeadIn");
+  numeric.exitHyperspaceAudioLeadIn = audio_lead_in("exitHyperspaceAudioLeadIn");
   auto dayTransitionTime = settings.query_float("dayTransitionTime");
   if (!dayTransitionTime) return std::unexpected(std::move(dayTransitionTime.error()));
   numeric.dayTransitionTime = *dayTransitionTime;

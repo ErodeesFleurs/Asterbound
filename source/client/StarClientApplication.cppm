@@ -193,10 +193,8 @@ private:
   // Main acknowledges presentation; only the application owner touches these.
   std::optional<PresentedCamera> m_preparedCamera;
   std::optional<PresentedCamera> m_inputCamera;
-  RenderPreferences m_renderPreferences;
   float m_appliedRenderFpsLimit = -1.0f;
   bool m_appliedVSync = true;
-  std::optional<RenderOutputSettings> m_appliedOutputSettings;
 
   unsigned m_framesSkipped = 0;
   float m_minInterfaceScale = 2;

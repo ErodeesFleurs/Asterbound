@@ -163,8 +163,8 @@ std::expected<void, StarException> PcPlatformServicesState::initialize() {
         discord::User user;
         auto res = discordCore->UserManager().GetCurrentUser(&user);
         if (res != discord::Result::Ok) {
-          discordError = ApplicationException::format("Could not get current Discord user (err {})", (int)res);
-          if (auto logged = this->logger.error("{}", discordError->what()); !logged)
+          discordCurrentUser.reset();
+          if (auto logged = this->logger.warn("Discord identity unavailable (err {}); presence will omit identity-dependent invitations", (int)res); !logged)
             discordError = std::move(logged.error());
         } else {
           discordCurrentUser = user;
@@ -276,19 +276,9 @@ std::expected<std::unique_ptr<PcPlatformServices>, StarException> PcPlatformServ
 
   if (provideP2PNetworking) {
     auto p2pNetworkingService = std::make_shared<PcP2PNetworkingService>(services->m_state);
-    for (auto& argument : platformArguments) {
-      auto connectArgument = argument.starts_with("+platform:connect:");
-      if (!connectArgument)
-        return std::unexpected(std::move(connectArgument.error()));
-      if (*connectArgument) {
-        if (auto logged = logger.info("PC platform services joining from command line argument '{}'", argument); !logged)
-          return std::unexpected(std::move(logged.error()));
-        auto joined = p2pNetworkingService->addPendingJoin(std::move(argument));
-        if (!joined)
-          return std::unexpected(std::move(joined.error()));
-      } else {
-        return std::unexpected(ApplicationException::format("Unrecognized PC platform services command line argument '{}'", argument));
-      }
+    for (auto const& argument : platformArguments) {
+      if (auto joined = p2pNetworkingService->addPendingJoin(argument.utf8()); !joined)
+        return std::unexpected(std::move(joined.error()));
     }
 
     services->m_p2pNetworkingService = p2pNetworkingService;

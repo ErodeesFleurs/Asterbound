@@ -46,6 +46,9 @@ public:
 
   // Returns a new AudioInstance if a new ambient sound is to be started.
   [[nodiscard]] std::expected<std::shared_ptr<AudioInstance>, StarException> update_ambient(std::shared_ptr<AmbientNoisesDescription const> const& current, bool day_time = false);
+  // On an audio asset/instance error only, identifies the offending entry in tracks.
+  [[nodiscard]] std::expected<std::shared_ptr<AudioInstance>, StarException> update_tracks(std::span<String const> tracks, int loops,
+      std::optional<std::reference_wrapper<std::size_t>> failed_index = {});
   [[nodiscard]] std::expected<std::shared_ptr<AudioInstance>, StarException> update_weather(std::span<String const> tracks);
   void stop_ambient(float fade_time);
   void cancel_all();

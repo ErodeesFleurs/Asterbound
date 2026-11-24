@@ -124,6 +124,31 @@ import star.player_factory;
 import star.entity_factory;
 
 namespace Star {
+namespace {
+
+std::expected<std::shared_ptr<String const>, StarException> storedName(Json const& player) {
+  auto identity = player.find("identity");
+  if (!identity)
+    return std::unexpected(std::move(identity.error()));
+  if (!*identity || (*identity)->get().is_null())
+    return {};
+  auto field = (*identity)->get().find("name");
+  if (!field)
+    return std::unexpected(std::move(field.error()));
+  if (!*field || (*field)->get().is_null())
+    return {};
+  return (*field)->get().string_ptr();
+}
+
+std::optional<String> searchableName(Json const& player) {
+  if (auto name = storedName(player); name && *name) {
+    if (auto normalized = Text::strip_escape_codes(**name).to_lower())
+      return std::move(*normalized);
+  }
+  return {};
+}
+
+}
 
 PlayerStorage::PlayerStorage(Root& root) : m_root(root) {}
 
@@ -237,6 +262,13 @@ std::expected<void, StarException> PlayerStorage::initialize(String const& stora
         continue;
       }
       auto validated = [&]() -> std::expected<void, StarException> {
+        auto name = storedName(entry.second);
+        if (!name)
+          return std::unexpected(std::move(name.error()));
+        if (*name) {
+          if (auto length = (*name)->size(); !length)
+            return std::unexpected(std::move(length.error()));
+        }
         auto entity = (*entityFactory)->disk_load_entity(EntityType::Player, entry.second);
         if (!entity)
           return std::unexpected(std::move(entity.error()));
@@ -343,14 +375,9 @@ std::expected<std::optional<Uuid>, StarException> PlayerStorage::playerUuidByNam
   for (auto& cache : m_savedPlayersCache) {
     if (except && *except == cache.first)
       continue;
-    auto playerName = cache.second.opt_query_string("identity.name");
-    if (!playerName)
-      return std::unexpected(std::move(playerName.error()));
-    if (!*playerName)
-      continue;
-    auto cleanName = Text::strip_escape_codes(**playerName).to_lower();
+    auto cleanName = searchableName(cache.second);
     if (!cleanName)
-      return std::unexpected(std::move(cleanName.error()));
+      continue;
     auto len = cleanName->size();
     if (!len)
       return std::unexpected(std::move(len.error()));
@@ -372,14 +399,9 @@ std::expected<List<Uuid>, StarException> PlayerStorage::playerUuidListByName(Str
   for (auto& cache : m_savedPlayersCache) {
     if (except && *except == cache.first)
       continue;
-    auto playerName = cache.second.opt_query_string("identity.name");
-    if (!playerName)
-      return std::unexpected(std::move(playerName.error()));
-    if (!*playerName)
-      continue;
-    auto cleanName = Text::strip_escape_codes(**playerName).to_lower();
+    auto cleanName = searchableName(cache.second);
     if (!cleanName)
-      return std::unexpected(std::move(cleanName.error()));
+      continue;
     if (cleanMatch->empty() || cleanName->utf8().rfind(cleanMatch->utf8()) != npos)
       list.push_back(cache.first);
   }

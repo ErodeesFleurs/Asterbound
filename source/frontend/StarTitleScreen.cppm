@@ -140,7 +140,8 @@ private:
   [[nodiscard]] std::expected<void, StarException> initialize(std::shared_ptr<UniverseClient> client);
   [[nodiscard]] std::expected<void, StarException> initMainMenu();
   [[nodiscard]] std::expected<void, StarException> positionUpdateButton(Vec2I const& viewport);
-  [[nodiscard]] std::expected<void, StarException> refreshUpdateButton(bool openFailed = false);
+  void refreshUpdateButton(bool openFailed = false);
+  void discardUpdateButton(StarException const& error);
   [[nodiscard]] std::expected<void, StarException> initCharSelectionMenu();
   [[nodiscard]] std::expected<void, StarException> initCharCreationMenu();
   [[nodiscard]] std::expected<void, StarException> initMultiPlayerMenu();
@@ -198,8 +199,9 @@ private:
   std::shared_ptr<Mixer> m_mixer;
 
   std::shared_ptr<Sky> m_skyBackdrop;
+  Vec4B m_skyBackdropDarken{0, 0, 0, 64};
 
-  std::shared_ptr<AmbientNoisesDescription const> m_music_track;
+  StringList m_dayMusic, m_nightMusic;
   std::shared_ptr<AudioInstance> m_current_music_track;
   AmbientManager m_music_track_manager;
 };

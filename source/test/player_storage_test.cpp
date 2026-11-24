@@ -1,13 +1,16 @@
 #include "gtest/gtest.h"
+#include "gtest/gtest-spi.h"
 
 import std;
 import star.algorithm;
+import star.byte_array;
 import star.codex;
 import star.configuration;
 import star.file;
 import star.format;
 import star.game_test;
 import star.json;
+import star.list;
 import star.player;
 import star.player_codexes;
 import star.player_factory;
@@ -167,6 +170,48 @@ const GameTestRegistration changedSaveRetry(
     ASSERT_TRUE(loaded);
     ASSERT_TRUE(*loaded);
     EXPECT_EQ((*loaded)->name(), String("Changed durable name"));
+  });
+
+const GameTestRegistration malformedName(
+  "PlayerStorageTest", "UnreadableNameDoesNotHideOtherCharactersOrRewriteTheSave", [](GameTest& fixture) {
+    PlayerStorageContext setup;
+    ASSERT_TRUE(setup.init(fixture.root()));
+    auto healthy = create_player(fixture.root(), "Healthy explorer");
+    auto damaged = create_player(fixture.root(), "Other explorer");
+    ASSERT_TRUE(healthy && damaged);
+    auto healthyId = (*healthy)->uuid();
+    auto damagedId = (*damaged)->uuid();
+    ASSERT_TRUE(healthyId && damagedId);
+    ASSERT_TRUE(setup.storage->savePlayer(*healthy));
+    ASSERT_TRUE(setup.storage->savePlayer(*damaged));
+    setup.storage.reset();
+
+    auto path = File::relative_to(setup.directory, damagedId->hex() + ".player");
+    auto saved = VersionedJson::read_file(path);
+    ASSERT_TRUE(saved);
+    // An otherwise intact binary player with a truncated UTF-8 name.
+    auto changed = saved->content.set_path("identity.name", String("Other \xc3"));
+    ASSERT_TRUE(changed);
+    saved->content = std::move(*changed);
+    ASSERT_TRUE(VersionedJson::write_file(*saved, path));
+    auto original = File::read_file(path);
+    ASSERT_TRUE(original);
+
+    std::expected<std::shared_ptr<PlayerStorage>, StarException> opened;
+    EXPECT_NONFATAL_FAILURE(opened = PlayerStorage::create(fixture.root(), setup.directory), damagedId->hex().utf8());
+    ASSERT_TRUE(opened) << opened.error().what();
+    EXPECT_EQ((*opened)->playerCount(), 1u);
+    auto all = (*opened)->playerUuidListByName("");
+    ASSERT_TRUE(all) << all.error().what();
+    EXPECT_EQ(*all, (List<Uuid>{*healthyId}));
+    auto match = (*opened)->playerUuidByName("HEALTHY");
+    ASSERT_TRUE(match) << match.error().what();
+    EXPECT_EQ(*match, *healthyId);
+    auto selected = (*opened)->loadPlayer(*healthyId);
+    ASSERT_TRUE(selected && *selected);
+    EXPECT_EQ((*selected)->name(), String("Healthy explorer"));
+    opened->reset();
+    EXPECT_EQ(File::read_file(path), *original);
   });
 
 const GameTestRegistration metadataRetry(

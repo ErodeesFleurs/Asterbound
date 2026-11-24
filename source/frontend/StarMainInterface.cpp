@@ -1429,24 +1429,22 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
     if (!displayed)
       return std::unexpected(std::move(displayed.error()));
   } else if (interactAction.type == InteractActionType::OpenTeleportDialog) {
-    if (m_teleportDialog)
-      m_teleportDialog->dismiss();
     auto teleportAllowed = m_client->canTeleport();
     if (!teleportAllowed)
       return std::unexpected(std::move(teleportAllowed.error()));
     if (!*teleportAllowed)
       return {};
     TeleportBookmark currentLocation;
+    auto reject = [&](StarException const& error) {
+      return context().root().logger().warn("Ignoring malformed OpenTeleportDialog: {}", error.what());
+    };
     auto config = (*assets)->fetch_json(interactAction.data);
     if (!config)
-      return std::unexpected(std::move(config.error()));
-    auto canBookmark = config->get_bool("canBookmark", false);
-    if (!canBookmark)
-      return std::unexpected(std::move(canBookmark.error()));
-    auto canTeleport = config->get_bool("canTeleport", true);
-    if (!canTeleport)
-      return std::unexpected(std::move(canTeleport.error()));
-    if (*canBookmark) {
+      return reject(config.error());
+    auto request = TeleportDialog::Request::parse(*config);
+    if (!request)
+      return reject(request.error());
+    if (request->canBookmark) {
       if (auto entity = world->entity(interactAction.entityId)) {
         if (auto uniqueEntityId = entity->uniqueId()) {
           auto worldTemplate = world->currentTemplate();
@@ -1465,28 +1463,36 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
             icon = "default";
             planetName = "???";
           }
-          auto name = config->get_string("bookmarkName", "");
-          if (!name)
-            return std::unexpected(std::move(name.error()));
           currentLocation = TeleportBookmark{.target = {playerWorld, SpawnTargetUniqueEntity(*uniqueEntityId)},
-                                             .targetName = planetName,
-                                             .bookmarkName = *name,
-                                             .icon = icon};
+                                             .targetName = std::move(planetName),
+                                             .bookmarkName = std::move(request->bookmarkName),
+                                             .icon = std::move(icon)};
           auto bookmarks = m_client->mainPlayer()->universeMap()->teleportBookmarks();
           if (!bookmarks)
             return std::unexpected(std::move(bookmarks.error()));
-          if (!bookmarks->contains(currentLocation) || !*canTeleport) {
+          if (!bookmarks->contains(currentLocation) || !request->canTeleport) {
             auto bookmark = currentLocation.toJson();
             if (!bookmark)
               return std::unexpected(std::move(bookmark.error()));
-            return sendPaneEvent("bookmarkEditor", "edit", JsonObject{
+            auto sent = sendPaneEvent("bookmarkEditor", "edit", JsonObject{
                 {"bookmark", std::move(*bookmark)}, {"sourceEntityId", interactAction.entityId},
                 {"sourceUniqueId", *uniqueEntityId}});
+            if (!sent) return std::unexpected(std::move(sent.error()));
+            if (auto previous = m_teleportDialog; previous && !previous->isDismissed()) {
+              // enqueue() alone does not establish the replacement editor.
+              auto flushed = recover_lua_script_error(m_uiController->invoke<Json>("flush"));
+              if (!flushed) return std::unexpected(std::move(flushed.error()));
+              auto editor = findRegisteredPane("bookmarkEditor");
+              if (!editor) return std::unexpected(std::move(editor.error()));
+              if (*editor && (*editor)->isDisplayed() && m_paneManager.isDisplayed(*editor))
+                previous->dismiss();
+            }
+            return {};
           }
         }
       }
     }
-    if (*canTeleport) {
+    if (request->canTeleport) {
       auto sendEvent = [this, lifetime = m_callbackStopSource.get_token(), session = uiSession()](
           String const& id, String const& event, Json payload) -> std::expected<void, StarException> {
         if (lifetime.stop_requested())
@@ -1495,15 +1501,22 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
           return {};
         return sendPaneEvent(id, event, std::move(payload));
       };
-      auto dialog = TeleportDialog::create(context(), m_client, std::move(sendEvent), interactAction.data, interactAction.entityId, currentLocation);
+      auto dialog = TeleportDialog::create(context(), m_client, std::move(sendEvent), std::move(*request), interactAction.entityId, std::move(currentLocation));
       if (!dialog)
         return std::unexpected(std::move(dialog.error()));
+      auto displayed = m_paneManager.displayPane(PaneLayer::ModalWindow, *dialog);
+      if (!displayed) {
+        // PaneManager registers the new pane before centering/displaying it.
+        auto removed = m_paneManager.dismissPane(*dialog);
+        if (!removed)
+          return std::unexpected(displayed.error().with_related(removed.error(), "Removing the undelivered teleport dialog also failed"));
+        return std::unexpected(std::move(displayed.error()));
+      }
+      if (m_teleportDialog)
+        m_teleportDialog->dismiss();
       m_teleportDialog = std::move(*dialog);
       std::erase_if(m_teleportDialogs, [](auto const& dialog) { return dialog.expired(); });
       m_teleportDialogs.emplace_back(m_teleportDialog);
-      auto displayed = m_paneManager.displayPane(PaneLayer::ModalWindow, m_teleportDialog);
-      if (!displayed)
-        return std::unexpected(std::move(displayed.error()));
     }
   } else if (interactAction.type == InteractActionType::ShowPopup) {
     auto reject = [&](StarException const& error) {

@@ -113,6 +113,11 @@ std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::upd
   std::span<String const> tracks;
   if (current)
     tracks = day_time ? current->day_sounds.tracks : current->night_sounds.tracks;
+  return update_tracks(tracks, current ? current->track_loops : 0);
+}
+
+std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::update_tracks(std::span<String const> tracks,
+    int loops, std::optional<std::reference_wrapper<std::size_t>> failed_index) {
 
   if (m_current_track) {
     if (m_current_track->finished()) {
@@ -148,17 +153,23 @@ std::expected<std::shared_ptr<AudioInstance>, StarException> AmbientManager::upd
       if (!assets)
         return std::unexpected(std::move(assets.error()));
       auto audio = (*assets)->try_audio(track);
-      if (!audio)
+      if (!audio) {
+        if (failed_index)
+          failed_index->get() = std::addressof(track) - tracks.data();
         return std::unexpected(std::move(audio.error()));
+      }
       if (!*audio)
         break;
       m_recent_tracks.push_back(track);
       auto instance = AudioInstance::create(**audio);
-      if (!instance)
+      if (!instance) {
+        if (failed_index)
+          failed_index->get() = std::addressof(track) - tracks.data();
         return std::unexpected(std::move(instance.error()));
+      }
       m_current_track = std::move(*instance);
       m_current_track_name = track;
-      m_current_track->set_loops(current->track_loops);
+      m_current_track->set_loops(loops);
       m_current_track->set_volume(0.0f);
       m_current_track->set_volume(m_volume, m_track_fade_in_time);
       m_delay = 0;

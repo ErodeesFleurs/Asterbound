@@ -105,6 +105,9 @@ import star.mixer;
 import star.ai_database;
 import star.ai_interface;
 import star.crafting_interface;
+import star.interaction_types;
+import star.teleport_dialog;
+import star.world_painter;
 import star.item_descriptor;
 import star.player_inventory;
 import star.player_log;
@@ -116,6 +119,7 @@ import star.label_widget;
 import star.ordered_set;
 import star.main_application;
 import star.player_storage;
+import star.char_selection;
 #endif
 #include "gtest/gtest.h"
 #include "gtest/gtest-spi.h"
@@ -711,6 +715,21 @@ void exercise_optional_ui_content(GameTest& fixture, Application const& applicat
   EXPECT_FALSE(cinema.muteMusic());
   EXPECT_FALSE(cinema.muteSfx());
   ASSERT_TRUE(application.renderer()->setScissorRect({}));
+  auto database = root.itemDatabase();
+  ASSERT_TRUE(database);
+  auto item = (*database)->fromJson(JsonObject{{"name", "perfectlygenericitem"}, {"count", 2},
+      {"parameters", JsonObject{{"rarityBorder", 17}}}});
+  ASSERT_TRUE(item && *item);
+  auto slot = ItemSlotWidget::create(**context, *item, {});
+  ASSERT_TRUE(slot) << slot.error().what();
+  // Visibility is updated after the border and icon are submitted. A
+  // successful but prematurely skipped render would leave this bar visible.
+  auto durability = (*slot)->requireChild<ProgressWidget>("durabilityBar");
+  ASSERT_TRUE(durability);
+  ASSERT_TRUE((*durability)->show());
+  (*slot)->showDurability(true);
+  ASSERT_TRUE((*slot)->render((*slot)->screenBoundRect()));
+  EXPECT_FALSE((*durability)->active());
   ASSERT_TRUE(cinema.load(definition));
   ASSERT_TRUE(cinema.loadOptional(std::unexpected(StarException("invalid cinematic asset"))));
   EXPECT_TRUE(cinema.completed());
@@ -745,6 +764,99 @@ const GameTestRegistration optional_ui_content("OptionalUiContent", "BadMediaDoe
 
 const GameTestRegistration sail_navigation("AiInterface", "PageSnapshotsAndSpeechReveal", [](GameTest& fixture) {
   run_surface_scenario(fixture, exercise_sail);
+});
+
+void exercise_teleport_replacement(GameTest& fixture, Application const& application) {
+  auto& root = fixture.root();
+  auto configuration = root.configuration();
+  ASSERT_TRUE(configuration);
+  ASSERT_TRUE((*configuration)->set("bindings", JsonObject{}));
+  // frontend_tests does not use ClientApplication's window defaults. The
+  // real MainInterface constructs its graphics menu before any interaction.
+  ASSERT_TRUE((*configuration)->set("fullscreenResolution", JsonArray{800, 600}));
+  ASSERT_TRUE((*configuration)->set("fullscreen", false));
+  ASSERT_TRUE((*configuration)->set("borderless", false));
+  ASSERT_TRUE((*configuration)->set("speechBubbles", true));
+  ASSERT_TRUE((*configuration)->set("interactiveHighlight", true));
+  ASSERT_TRUE((*configuration)->set("monochromeLighting", false));
+  auto input = Input::create(root);
+  auto voice = Voice::create(root, application.appController());
+  auto context = GuiContext::create(root, std::make_shared<Mixer>(root.logger(), 44100, 2), application.appController());
+  ASSERT_TRUE(input && voice && context);
+  (*context)->bindInput(**input);
+  (*context)->bindVoice(**voice);
+  ASSERT_TRUE((*context)->renderInit(application.renderer()));
+  auto painter = WorldPainter::create(root);
+  ASSERT_TRUE(painter) << painter.error().what();
+  (*painter)->camera().setScreenSize(application.renderer()->screenSize());
+  auto universe = TestUniverse::create(root, {800, 600});
+  ASSERT_TRUE(universe) << universe.error().what();
+  auto client = (*universe)->client();
+  auto player = client->mainPlayer();
+  player->log()->setIntroComplete(true);
+  ASSERT_TRUE((*universe)->warpPlayer(InstanceWorldId("outpost")));
+  auto allowed = client->canTeleport();
+  ASSERT_TRUE(allowed) << allowed.error().what();
+  ASSERT_TRUE(*allowed);
+  auto camera = LuaBindings::makeCameraCallbacks(root, (*painter)->camera());
+  ASSERT_TRUE(camera) << camera.error().what();
+  ASSERT_TRUE(client->setLuaCallbacks("camera", *camera));
+  auto cinema = Cinematic::create(**context);
+  ASSERT_TRUE(cinema) << cinema.error().what();
+  auto interface = MainInterface::create(**context, client, *painter, *cinema);
+  ASSERT_TRUE(interface) << interface.error().what();
+  auto open = [&](Json data) { return InteractAction(InteractActionType::OpenTeleportDialog, player->entityId(), std::move(data)); };
+  Json destination = JsonObject{{"warpAction", "OwnShip"}, {"name", "Ship"}};
+  Json valid = JsonObject{{"destinations", JsonArray{destination}}};
+  auto displayed = (*interface)->handleInteractAction(open(valid));
+  ASSERT_TRUE(displayed) << displayed.error().what();
+  auto& manager = (*interface)->paneManager();
+  auto previous = as<TeleportDialog>(manager.topPane({PaneLayer::ModalWindow}));
+  ASSERT_TRUE(previous);
+  auto expectDestination = [](TeleportDialog& dialog, String const& name) {
+    auto list = dialog.requireChild<ListWidget>("bookmarkList.bookmarkItemList");
+    ASSERT_TRUE(list) << list.error().what();
+    ASSERT_EQ((*list)->listSize(), 1u);
+    auto label = (*list)->itemAt(0)->requireChild<LabelWidget>("name");
+    ASSERT_TRUE(label) << label.error().what();
+    EXPECT_EQ((*label)->text(), name);
+  };
+  expectDestination(*previous, "Ship");
+  auto saved = player->universeMap()->toJson();
+  ASSERT_TRUE(saved);
+  auto world = client->player_world();
+  // Validate even a filtered-out row, before a bookmark editor or replacement
+  // pane can take ownership. Deliver a valid request from the same player batch.
+  Json bad = JsonObject{{"canBookmark", true}, {"destinations", JsonArray{destination,
+      JsonObject{{"prerequisiteQuest", "uncompleted"}, {"warpAction", "OwnShip"}, {"name", JsonArray{}}}}}};
+  ASSERT_TRUE(player->interact(open(std::move(bad))));
+  Json replacement = JsonObject{{"destinations", JsonArray{JsonObject{{"warpAction", "Return"}, {"name", "Return trip"}}}}};
+  ASSERT_TRUE(player->interact(open(std::move(replacement))));
+  auto actions = player->pullInteractActions();
+  ASSERT_TRUE(actions);
+  ASSERT_EQ(actions->size(), 2u);
+  ASSERT_TRUE((*interface)->handleInteractAction(std::move((*actions)[0])));
+  EXPECT_EQ(manager.topPane({PaneLayer::ModalWindow}), previous);
+  EXPECT_FALSE(previous->isDismissed());
+  expectDestination(*previous, "Ship");
+  ASSERT_TRUE((*interface)->handleInteractAction(std::move((*actions)[1])));
+  auto next = as<TeleportDialog>(manager.topPane({PaneLayer::ModalWindow}));
+  ASSERT_TRUE(next);
+  EXPECT_NE(previous, next);
+  EXPECT_TRUE(previous->isDismissed());
+  EXPECT_FALSE(next->isDismissed());
+  expectDestination(*next, "Return trip");
+  auto after = player->universeMap()->toJson();
+  ASSERT_TRUE(after);
+  EXPECT_EQ(*after, *saved);
+  EXPECT_EQ(client->player_world(), world);
+  EXPECT_FALSE(player->isTeleporting());
+  interface->reset();
+  ASSERT_TRUE((*universe)->close());
+}
+
+const GameTestRegistration teleport_replacement("TeleportDialog", "RejectedRequestKeepsOldPaneAndNextActionOpens", [](GameTest& fixture) {
+  run_surface_scenario(fixture, exercise_teleport_replacement);
 });
 
 void exercise_crafting(GameTest& fixture, Application const& application) {
@@ -1018,6 +1130,61 @@ const GameTestRegistration item_slot_indicator("ItemSlotWidget", "NewIndicatorRe
   ASSERT_TRUE((*looping)->update(2.0f));
   EXPECT_TRUE((*looping)->indicating_new());
 });
+
+#if defined(__linux__)
+void exercise_stale_character_selection(GameTest& fixture, Application const& application) {
+  auto& root = fixture.root();
+  auto directory = File::temporary_directory(root.random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto config = root.configuration();
+  ASSERT_TRUE(config);
+  ASSERT_TRUE((*config)->set("bindings", JsonObject{}));
+  auto input = Input::create(root);
+  ASSERT_TRUE(input);
+  auto context = GuiContext::create(root, std::make_shared<Mixer>(root.logger(), 44100, 2), application.appController());
+  ASSERT_TRUE(context) << context.error().what();
+  (*context)->bindInput(**input);
+  ASSERT_TRUE((*context)->renderInit(application.renderer()));
+  auto storage = PlayerStorage::create(root, File::relative_to(*directory, "player"));
+  ASSERT_TRUE(storage) << storage.error().what();
+  auto factory = root.playerFactory();
+  ASSERT_TRUE(factory);
+  auto removed = (*factory)->create();
+  auto remaining = (*factory)->create();
+  ASSERT_TRUE(removed && remaining);
+  for (auto const& player : {*removed, *remaining}) {
+    ASSERT_TRUE(player->finalizeCreation());
+    ASSERT_TRUE((*storage)->savePlayer(player));
+  }
+  auto removedId = (*removed)->uuid();
+  auto remainingId = (*remaining)->uuid();
+  ASSERT_TRUE(removedId && remainingId);
+  ASSERT_TRUE((*storage)->moveToFront(*removedId));
+
+  std::shared_ptr<Player> selected;
+  auto pane = CharSelectionPane::create(**context, *storage,
+      []() -> std::expected<void, StarException> { ADD_FAILURE() << "Unexpected create"; return {}; },
+      [&](std::shared_ptr<Player> const& player) -> std::expected<void, StarException> { selected = player; return {}; },
+      [](Uuid) -> std::expected<void, StarException> { ADD_FAILURE() << "Unexpected delete"; return {}; });
+  ASSERT_TRUE(pane) << pane.error().what();
+  ASSERT_TRUE((*pane)->show());
+  auto first = (*pane)->requireChild<ButtonWidget>("charSelector1");
+  ASSERT_TRUE(first);
+  ASSERT_TRUE((*storage)->deletePlayer(*removedId));
+  ASSERT_TRUE((*first)->setPressed(true));
+  auto staleClick = (*first)->setPressed(false);
+  ASSERT_TRUE(staleClick) << staleClick.error().what();
+  EXPECT_FALSE(selected);
+  ASSERT_TRUE((*first)->setPressed(true));
+  ASSERT_TRUE((*first)->setPressed(false));
+  ASSERT_TRUE(selected);
+  EXPECT_EQ(selected->uuid(), *remainingId);
+}
+
+const GameTestRegistration staleCharacterSelection("CharSelectionPane", "StaleClickRefreshesWithoutSelectingAnotherSave",
+    [](GameTest& fixture) { run_surface_scenario(fixture, exercise_stale_character_selection); });
+#endif
 
 const GameTestRegistration stack_page_visibility("StackWidget", "PageSelectionPreservesVisibleChild", [](GameTest& fixture) {
   auto configuration = fixture.root().configuration();
@@ -2015,11 +2182,40 @@ const GameTestRegistration paneErrorDefaults(
     auto malformed = ScriptTestPane::create(*setup->context, JsonObject{
       {"gui", JsonObject{{"broken", JsonObject{{"type", "missingWidgetType"}}}}}});
     EXPECT_FALSE(malformed);
-    ASSERT_TRUE(pane.evaluate("function createTooltip() return {broken = {type = 'missingWidgetType'}} end"));
+    // Measuring a textured widget needs renderInit, but not a native window or its display scale.
+    ASSERT_TRUE(pane.evaluate(R"LUA(
+      function createTooltip()
+        local image = "/interface/fuel/fuelgauge.png"
+        return {meter = {type = "progress", background = image, progressSet = {inner = image}}}
+      end
+    )LUA"));
     auto tooltip = pane.createTooltip({});
-    EXPECT_FALSE(tooltip);
-    EXPECT_TRUE(pane.scriptsInitialized());
+    ASSERT_FALSE(tooltip);
+    EXPECT_TRUE(tooltip.error().is<GuiContextException>()) << tooltip.error().what();
     ASSERT_TRUE(pane.dismissed());
+
+    auto manager = PaneManager::create(*setup->context);
+    ASSERT_TRUE(manager);
+    pane.setAnchor(PaneAnchor::BottomLeft);
+    pane.setSize({32, 32});
+    ASSERT_TRUE((*manager)->displayPane(PaneLayer::Window, setup->pane, {}));
+    ASSERT_TRUE(pane.evaluate(R"LUA(
+      storage.hovers = 0
+      storage.ticks = 0
+      function createTooltip()
+        storage.hovers = storage.hovers + 1
+        return {broken = {type = 'missingWidgetType'}}
+      end
+      function update() storage.ticks = storage.ticks + 1 end
+    )LUA"));
+    ASSERT_TRUE((*manager)->update(10.0f));
+    auto counts = pane.evaluate("return {storage.hovers, storage.ticks}");
+    ASSERT_TRUE(counts && *counts);
+    EXPECT_EQ(**counts, (JsonArray{1, 1}));
+    EXPECT_FALSE((*manager)->topPane({PaneLayer::Tooltip}));
+    EXPECT_TRUE((*manager)->isDisplayed(setup->pane));
+    EXPECT_TRUE(pane.scriptsInitialized());
+    ASSERT_TRUE((*manager)->dismissAllPanes());
   });
 
 

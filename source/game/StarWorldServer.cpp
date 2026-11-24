@@ -1278,23 +1278,16 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           messageRejected = true;
       } else if (entityMessagePacket->message == "queueRadioMessage" && !entityMessagePacket->args.empty()) {
         Json const& configArg = entityMessagePacket->args[0];
-        bool valid = false;
         auto radioDatabase = this->root().radioMessageDatabase();
-        if (!radioDatabase) {
-          auto rejected = rejectMessage(Star::format("invalid radio message: {}", radioDatabase.error().what()));
+        if (!radioDatabase)
+          return std::unexpected(std::move(radioDatabase.error()));
+        auto radioMessage = (*radioDatabase)->createRadioMessage(configArg);
+        if (!radioMessage) {
+          auto rejected = rejectMessage(Star::format("invalid radio message: {}", radioMessage.error().what()));
           if (!rejected)
             return std::unexpected(std::move(rejected.error()));
           continue;
         }
-        auto radioMessage = (*radioDatabase)->createRadioMessage(configArg);
-        if (radioMessage)
-          valid = true; else {
-          auto result136 = rejectMessage(Star::format("invalid radio message: {}", radioMessage.error().what()));
-          if (!result136)
-            return std::unexpected(std::move(result136.error()));
-        }
-        if (!valid)
-          messageRejected = true;
       }
 
       if (messageRejected)

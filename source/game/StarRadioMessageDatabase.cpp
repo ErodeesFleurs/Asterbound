@@ -33,13 +33,18 @@ extern std::expected<EnumMap<RadioMessageType>, StarException> const RadioMessag
     {RadioMessageType::Tutorial, "tutorial"},
 });
 
-RadioMessageDatabase::RadioMessageDatabase(Root& root) : m_root(root) {}
+RadioMessageDatabase::RadioMessageDatabase(Json defaults) : m_defaults(std::move(defaults)) {}
 
 std::expected<std::shared_ptr<RadioMessageDatabase>, StarException> RadioMessageDatabase::create(Root& root) {
-  auto result = std::shared_ptr<RadioMessageDatabase>(new RadioMessageDatabase(root));
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
+  if (!RadioMessageTypeNames)
+    return std::unexpected(RadioMessageTypeNames.error());
+  auto defaults = (*assets)->json("/radiomessages.config:messageDefaults");
+  if (!defaults)
+    return std::unexpected((*assets)->with_asset_context(std::move(defaults.error()), "/radiomessages.config", "Loading radio message defaults"));
+  auto result = std::shared_ptr<RadioMessageDatabase>(new RadioMessageDatabase(std::move(*defaults)));
   auto files = (*assets)->scan_extension("radiomessages");
   if (!files)
     return std::unexpected(std::move(files.error()));
@@ -83,15 +88,7 @@ std::expected<RadioMessage, StarException> RadioMessageDatabase::createRadioMess
   }
   if (!config.is_type(Json::Type::Object))
     return std::unexpected(RadioMessageDatabaseException("Invalid radio message specification; expected message name or configuration."));
-  if (!RadioMessageTypeNames)
-    return std::unexpected(RadioMessageTypeNames.error());
-  auto assets = m_root.assets();
-  if (!assets)
-    return std::unexpected(std::move(assets.error()));
-  auto defaults = (*assets)->json("/radiomessages.config:messageDefaults");
-  if (!defaults)
-    return std::unexpected((*assets)->with_asset_context(std::move(defaults.error()), "/radiomessages.config", "Loading radio message defaults"));
-  auto mergedConfig = json_merge(*defaults, config);
+  auto mergedConfig = json_merge(m_defaults, config);
   RadioMessage message;
   auto configuredId = mergedConfig.get_string("messageId", "");
   if (!configuredId)

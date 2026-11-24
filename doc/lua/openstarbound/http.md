@@ -122,9 +122,9 @@ end
 
 HTTP requests require domain trust for security. When a script attempts to make a request to an untrusted domain:
 
-1. If no trust dialog is available, the promise fails without contacting the host.
+1. If the trust dialog is unavailable or its layout cannot present the approval controls, the promise fails without contacting the host. The client then processes the next host.
 2. Otherwise, the client shows one host at a time, in order. Requests waiting for the same host share a decision.
-3. Allowing a host submits its waiting requests. Only “Remember” on the current approval saves trust.
+3. Allowing a host submits its waiting requests. “Remember” starts unchecked for each approval. If saving a requested trust decision fails, the affected requests fail rather than proceeding without it.
 4. Denying or closing the dialog fails the waiting requests. Cancelling the last request for a host retires
    that approval; an old dialog cannot approve a later request, even for the same host.
 

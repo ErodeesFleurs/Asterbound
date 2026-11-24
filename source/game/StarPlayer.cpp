@@ -1432,12 +1432,13 @@ std::expected<void, StarException> Player::destroy(std::optional<std::reference_
   m_state = State::Idle;
   m_emoteState = HumanoidEmote::Idle;
   if (render_callback && m_deathParticleBurst.get()) {
-    auto particlesResult = humanoid()->particles(*m_deathParticleBurst.get());
-    if (!particlesResult)
-      return std::unexpected(std::move(particlesResult.error()));
-    auto particles = std::move(*particlesResult);
-    if (auto result = render_callback->get().add_particles(std::move(particles), position()); !result)
-      return std::unexpected(std::move(result.error()));
+    auto const& burst = *m_deathParticleBurst.get();
+    auto particles = humanoid()->particles(burst);
+    if (!particles) {
+      (void)root().logger().warn("Skipping player death particles '{}': {}", burst, particles.error().what());
+    } else if (auto added = render_callback->get().add_particles(std::move(*particles), position()); !added) {
+      (void)root().logger().warn("Skipping player death particles '{}': {}", burst, added.error().what());
+    }
   }
   if (isMaster()) {
     m_log->addDeathCount(1);
@@ -1848,8 +1849,12 @@ MessageResponseResult Player::receiveMessage(ConnectionId fromConnection, String
       auto value = std::move(*valueResult);
       delay = value;
     }
-    if (auto result = queueRadioMessage(args[0], delay); !result)
-      return std::unexpected(std::move(result.error()));
+    auto checked = process_radio_message(args[0], delay);
+    if (!checked)
+      return std::unexpected(std::move(checked.error()));
+    if (*checked)
+      return ChainableJsonMessageResponse(RpcPromise<Json>::make_failed(std::move(**checked)));
+    return ChainableJsonMessageResponse(Json{});
   } else if (message == "warp") {
     std::optional<String> animation;
     if (args.size() > 1) {
@@ -4868,66 +4873,48 @@ std::expected<std::optional<RadioMessage>, StarException> Player::pullPendingRad
 }
 
 std::expected<void, StarException> Player::queueRadioMessage(Json const& messageConfig, float delay) {
-  auto decoded = [&]() -> std::expected<std::optional<RadioMessage>, StarException> {
-    auto databaseResult = root().radioMessageDatabase();
-    if (!databaseResult)
-      return std::unexpected(std::move(databaseResult.error()));
-    auto database = std::move(*databaseResult);
-    auto messageResult = database->createRadioMessage(messageConfig);
-    if (!messageResult)
-      return std::unexpected(std::move(messageResult.error()));
-    auto message = std::move(*messageResult);
-    while (message.speciesAiMessage.contains(shipSpecies()) || message.speciesMessage.contains(species()))
-      message = message.speciesAiMessage.value(shipSpecies(), message.speciesMessage.value(species()));
-    if (message.type == RadioMessageType::Tutorial) {
-      auto configurationResult = root().configuration();
-      if (!configurationResult)
-        return std::unexpected(std::move(configurationResult.error()));
-      auto configuration = std::move(*configurationResult);
-      auto tutorialResult = configuration->get("tutorialMessages");
-      if (!tutorialResult)
-        return std::unexpected(std::move(tutorialResult.error()));
-      auto tutorial = std::move(*tutorialResult);
-      auto enabledResult = tutorial.to_bool();
-      if (!enabledResult)
-        return std::unexpected(std::move(enabledResult.error()));
-      auto enabled = std::move(*enabledResult);
-      if (!enabled)
-        return std::optional<RadioMessage>{};
-    }
-    if (!message.portraitImage.empty()) {
-      auto firstResult = message.portraitImage[0];
-      if (!firstResult)
-        return std::unexpected(std::move(firstResult.error()));
-      auto first = std::move(*firstResult);
-      if (first != '/') {
-        auto ai = root().ai_database();
-        if (!ai)
-          return std::unexpected(std::move(ai.error()));
-        auto portrait = (*ai)->portrait_image(shipSpecies(), message.portraitImage);
-        if (!portrait)
-          return std::unexpected(std::move(portrait.error()));
-        message.portraitImage = std::move(*portrait);
-      }
-    }
-    return std::optional<RadioMessage>{std::move(message)};
-  }();
-  if (!decoded) {
-    if (!decoded.error().is<RadioMessageDatabaseException>())
-      return std::unexpected(std::move(decoded.error()));
-    auto descriptionResult = messageConfig.repr();
-    if (!descriptionResult)
-      return std::unexpected(std::move(descriptionResult.error()));
-    auto description = std::move(*descriptionResult);
-    if (auto result = root().logger().error_exception(Star::format("Couldn't queue radio message '{}'", description),
-                                                      ExceptionDiagnostic(decoded.error()));
-        !result)
-      return std::unexpected(std::move(result.error()));
-    return {};
+  auto checked = process_radio_message(messageConfig, delay);
+  if (!checked)
+    return std::unexpected(std::move(checked.error()));
+  if (*checked)
+    (void)root().logger().warn("Couldn't queue radio message: {}", **checked);
+  return {};
+}
+
+std::expected<std::optional<String>, StarException> Player::process_radio_message(Json const& config, float delay) {
+  auto database = root().radioMessageDatabase();
+  if (!database)
+    return std::unexpected(std::move(database.error()));
+  auto decoded = (*database)->createRadioMessage(config);
+  if (!decoded)
+    return Star::format("invalid radio message: {}", decoded.error().what());
+  auto& message = *decoded;
+  while (message.speciesAiMessage.contains(shipSpecies()) || message.speciesMessage.contains(species()))
+    message = message.speciesAiMessage.value(shipSpecies(), message.speciesMessage.value(species()));
+  if (message.type == RadioMessageType::Tutorial) {
+    auto configuration = root().configuration();
+    if (!configuration)
+      return std::unexpected(std::move(configuration.error()));
+    auto enabled = (*configuration)->get("tutorialMessages").and_then([](Json const& value) { return value.to_bool(); });
+    if (!enabled)
+      return std::unexpected(std::move(enabled.error()));
+    if (!*enabled)
+      return {};
   }
-  if (!*decoded)
-    return {};
-  auto message = std::move(**decoded);
+  if (!message.portraitImage.empty()) {
+    auto first = message.portraitImage[0];
+    if (!first)
+      return std::unexpected(std::move(first.error()));
+    if (*first != '/') {
+      auto ai = root().ai_database();
+      if (!ai)
+        return std::unexpected(std::move(ai.error()));
+      auto portrait = (*ai)->portrait_image(shipSpecies(), message.portraitImage);
+      if (!portrait)
+        return std::unexpected(std::move(portrait.error()));
+      message.portraitImage = std::move(*portrait);
+    }
+  }
   if (m_log->radioMessages().contains(message.messageId))
     return {};
   if (message.type == RadioMessageType::Mission) {
@@ -4950,7 +4937,9 @@ std::expected<void, StarException> Player::queueRadioMessage(Json const& message
     m_delayed_radio_messages.push_back(std::pair<GameTimer, RadioMessage>{GameTimer(delay), std::move(message)});
     return {};
   }
-  return queueRadioMessage(std::move(message));
+  if (auto queued = queueRadioMessage(std::move(message)); !queued)
+    return std::unexpected(std::move(queued.error()));
+  return {};
 }
 
 std::expected<void, StarException> Player::queueRadioMessage(RadioMessage message) {

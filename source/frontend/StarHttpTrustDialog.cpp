@@ -47,11 +47,13 @@ std::expected<void, StarException> HttpTrustDialog::display_request(String const
   auto constructed = reader.construct(*layout, *this);
   if (!constructed)
     return std::unexpected(std::move(constructed.error()));
-  auto label = fetchChild<LabelWidget>("domain");
+  auto label = requireChild<LabelWidget>("domain");
   if (!label)
     return std::unexpected(std::move(label.error()));
-  if (!*label)
-    return std::unexpected(GUIBuilderException("Missing HTTP trust domain label"));
+  auto checkbox = requireChild<ButtonWidget>("rememberCheckbox");
+  if (!checkbox)
+    return std::unexpected(std::move(checkbox.error()));
+  (*checkbox)->setChecked(false);
   auto text = (*label)->setText(Star::format("^green;{}^reset;", domain));
   if (!text)
     return std::unexpected(std::move(text.error()));
@@ -62,19 +64,14 @@ std::expected<void, StarException> HttpTrustDialog::display_request(String const
 }
 
 std::expected<void, StarException> HttpTrustDialog::respond(bool allow) {
-  auto checkbox = fetchChild<ButtonWidget>("rememberCheckbox");
-  if (!checkbox)
-    return std::unexpected(std::move(checkbox.error()));
-  if (!*checkbox)
-    return std::unexpected(GUIBuilderException("Missing HTTP trust remember checkbox"));
-  if (!reply_)
+  auto reply = std::exchange(reply_, {});
+  if (!reply)
     return {};
-  auto result = reply_(allow, (*checkbox)->isChecked());
-  if (!result)
-    return result;
-  reply_ = {};
+  auto checkbox = fetchChild<ButtonWidget>("rememberCheckbox");
   dismiss();
-  return {};
+  if (!checkbox || !*checkbox)
+    return reply(false, false);
+  return reply(allow, allow && (*checkbox)->isChecked());
 }
 
 std::expected<void, StarException> HttpTrustDialog::dismissed() {

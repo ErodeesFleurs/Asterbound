@@ -89,7 +89,6 @@ import star.asset_source;
 import star.assets;
 import star.root_base;
 import star.root;
-import star.configuration;
 import star.animation;
 
 namespace Star {
@@ -108,15 +107,8 @@ std::expected<void, StarException> WorldPainter::initialize() {
   auto assets = m_root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
   m_assets = *assets;
-  auto configuration = m_root.configuration();
-  if (!configuration) return std::unexpected(std::move(configuration.error()));
-  auto zoom_json = (*configuration)->get("zoomLevel");
-  if (!zoom_json) return std::unexpected(std::move(zoom_json.error()));
-  auto zoom = zoom_json->to_float();
-  if (!zoom) return std::unexpected(std::move(zoom.error()));
   m_camera.setScreenSize({800, 600});
   m_camera.setCenterWorldPosition(Vec2F());
-  m_camera.setPixelRatio(*zoom);
 
   auto highlight_config = m_assets->json("/highlights.config");
   if (!highlight_config) return std::unexpected(std::move(highlight_config.error()));
@@ -201,13 +193,6 @@ void WorldPainter::update(float dt) {
 
 std::expected<void, StarException> WorldPainter::render(WorldRenderData& render_data, std::function<std::expected<bool, StarException>()> light_waiter) {
   m_camera.setScreenSize(m_renderer->screenSize());
-  auto configuration = m_root.configuration();
-  if (!configuration) return std::unexpected(std::move(configuration.error()));
-  auto zoom_json = (*configuration)->get("zoomLevel");
-  if (!zoom_json) return std::unexpected(std::move(zoom_json.error()));
-  auto zoom = zoom_json->to_float();
-  if (!zoom) return std::unexpected(std::move(zoom.error()));
-  m_camera.setTargetPixelRatio(*zoom);
   auto assets = m_root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
   m_assets = *assets;

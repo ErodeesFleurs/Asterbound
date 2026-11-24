@@ -4,6 +4,9 @@ import std;
 import star.logging;
 import star.string;
 import star.list;
+import star.byte_array;
+import star.host_address;
+import star.rpc_promise;
 import star.p2p_networking_service;
 import star.platform_services_pc;
 
@@ -34,6 +37,7 @@ public:
     std::vector<DiscordLobbyId> disconnectedNetworks;
     std::vector<DiscordLobbyId> deletedLobbies;
     std::vector<DiscordActivity> activities;
+    std::vector<std::pair<DiscordUserId, EDiscordActivityJoinRequestReply>> replies;
   };
 
   DiscordApi() {
@@ -46,6 +50,7 @@ public:
     user.get_current_user = getCurrentUser;
     activity.register_command = registerCommand;
     activity.update_activity = updateActivity;
+    activity.send_request_reply = sendRequestReply;
     lobby.get_lobby_create_transaction = getCreateTransaction;
     lobby.create_lobby = createLobby;
     lobby.delete_lobby = deleteLobby;
@@ -71,8 +76,12 @@ public:
     return future.wait_for(std::chrono::seconds(5)) == std::future_status::ready;
   }
 
-  void publishUser() {
-    enqueue([this] { params.user_events->on_current_user_update(params.event_data); });
+  void publishUser(EDiscordResult result = DiscordResult_Ok, DiscordUserId id = 7) {
+    enqueue([this, result, id] {
+      userResult = result;
+      userId = id;
+      params.user_events->on_current_user_update(params.event_data);
+    });
   }
 
   bool completeCreation(EDiscordResult result) {
@@ -120,6 +129,9 @@ public:
   EDiscordResult registrationResult = DiscordResult_Ok;
 
 private:
+  // Used exclusively inside the SDK callback thread.
+  EDiscordResult userResult = DiscordResult_Ok;
+  DiscordUserId userId = 7;
   static void DISCORD_API destroy(IDiscordCore*) {
     std::lock_guard lock(active->mutex);
     EXPECT_TRUE(active->callbacks.empty());
@@ -155,8 +167,10 @@ private:
     return &active->lobby;
   }
   static EDiscordResult DISCORD_API getCurrentUser(IDiscordUserManager*, DiscordUser* out) {
+    if (active->userResult != DiscordResult_Ok)
+      return active->userResult;
     *out = {};
-    out->id = 7;
+    out->id = active->userId;
     std::strcpy(out->username, "regression-user");
     return DiscordResult_Ok;
   }
@@ -168,6 +182,14 @@ private:
     std::lock_guard lock(active->mutex);
     active->calls.activities.push_back(*value);
     active->pendingActivities.push_back({data, callback});
+  }
+  static void DISCORD_API sendRequestReply(IDiscordActivityManager*, DiscordUserId id,
+      EDiscordActivityJoinRequestReply reply, void* data, void(DISCORD_API* callback)(void*, EDiscordResult)) {
+    {
+      std::lock_guard lock(active->mutex);
+      active->calls.replies.emplace_back(id, reply);
+    }
+    active->enqueue([data, callback] { callback(data, DiscordResult_NotFound); });
   }
   static EDiscordResult DISCORD_API getCreateTransaction(IDiscordLobbyManager*,
       IDiscordLobbyTransaction** out) {
@@ -435,4 +457,143 @@ TEST_F(DiscordLobbyTest, OtherCreationFailuresRemainDiagnosedAtThePlatformBounda
   auto updated = platform->update();
   ASSERT_FALSE(updated);
   EXPECT_TRUE(platform->update());
+}
+
+TEST_F(DiscordLobbyTest, InvalidInvitationsPreservePendingDestination) {
+  api.enqueue([&] {
+    auto join = api.params.activity_events->on_activity_join;
+    join(api.params.event_data, "connect:address_127.0.0.1:21025");
+    join(api.params.event_data, "connect:address_127.0.0.1:not-a-port");
+    join(api.params.event_data, "connect:discord_9_42_");
+    join(api.params.event_data, "connect:unknown_9");
+  });
+  ASSERT_TRUE(api.synchronize());
+  ASSERT_TRUE(platform->update());
+  auto pending = networking->pullPendingJoin();
+  auto destination = std::get_if<Star::HostAddressWithPort>(&pending);
+  ASSERT_NE(destination, nullptr);
+  EXPECT_EQ(destination->port(), 21025);
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(networking->pullPendingJoin()));
+}
+
+TEST_F(DiscordLobbyTest, UndeliverableRepliesAreConsumedOnce) {
+  for (auto decision : {Star::P2PJoinRequestReply::Yes, Star::P2PJoinRequestReply::Ignore}) {
+    api.enqueue([&] {
+      DiscordUser requester{};
+      requester.id = 9;
+      api.params.activity_events->on_activity_join_request(api.params.event_data, &requester);
+    });
+    ASSERT_TRUE(api.synchronize());
+    auto request = networking->pullJoinRequest();
+    ASSERT_TRUE(request);
+    ASSERT_TRUE(request->second.fulfill(decision));
+    ASSERT_TRUE(networking->update());
+    ASSERT_TRUE(api.synchronize());
+    ASSERT_TRUE(platform->update());
+    ASSERT_TRUE(networking->update());
+  }
+  EXPECT_EQ(api.snapshot().replies, (std::vector<std::pair<DiscordUserId, EDiscordActivityJoinRequestReply>>{
+    {9, DiscordActivityJoinRequestReply_Yes}, {9, DiscordActivityJoinRequestReply_Ignore}}));
+}
+
+TEST_F(DiscordLobbyTest, IdentityLossWithdrawsSecretWithoutDisconnectingPeer) {
+  ASSERT_TRUE(networking->setJoinLocal(8));
+  ASSERT_TRUE(api.completeCreation(DiscordResult_Ok));
+  ASSERT_TRUE(api.synchronize());
+  networking->setAcceptingP2PConnections(true);
+  api.enqueue([&] { api.params.lobby_events->on_member_connect(api.params.event_data, 42, 9); });
+  ASSERT_TRUE(api.synchronize());
+  auto peers = networking->acceptP2PConnections();
+  ASSERT_EQ(peers.size(), 1u);
+
+  auto publish = [&] { return networking->setActivityData("Hosting", "On ship", 123, {}); };
+  ASSERT_TRUE(publish());
+  api.publishUser(DiscordResult_NotFound);
+  ASSERT_TRUE(api.synchronize());
+  ASSERT_TRUE(platform->update());
+  ASSERT_TRUE(api.completeActivity(DiscordResult_Ok)); // Old secret was already in flight.
+  ASSERT_TRUE(api.synchronize());
+  ASSERT_TRUE(publish());
+  auto activities = api.snapshot().activities;
+  ASSERT_EQ(activities.size(), 2u);
+  EXPECT_STREQ(activities[0].secrets.join, "connect:discord_7_42_test-lobby-secret");
+  EXPECT_STREQ(activities[1].secrets.join, "");
+  ASSERT_TRUE(api.completeActivity(DiscordResult_Ok));
+
+  api.enqueue([&] {
+    auto events = api.params.lobby_events;
+    events->on_member_update(api.params.event_data, 42, 10);
+    uint8_t payload = 42;
+    events->on_network_message(api.params.event_data, 42, 10, 0, &payload, 1);
+    events->on_network_message(api.params.event_data, 42, 9, 0, &payload, 1);
+  });
+  ASSERT_TRUE(api.synchronize());
+  ASSERT_TRUE(platform->update());
+  EXPECT_TRUE(networking->acceptP2PConnections().empty());
+  EXPECT_TRUE(peers.front()->isOpen());
+  auto received = peers.front()->receiveMessage();
+  ASSERT_TRUE(received && *received);
+  EXPECT_EQ((**received).size(), 1u);
+
+  api.enqueue([&] { api.params.lobby_events->on_member_disconnect(api.params.event_data, 42, 9); });
+  ASSERT_TRUE(api.synchronize());
+  ASSERT_TRUE(platform->update());
+  EXPECT_FALSE(peers.front()->isOpen());
+  api.publishUser();
+  ASSERT_TRUE(api.synchronize());
+  ASSERT_TRUE(publish());
+  activities = api.snapshot().activities;
+  ASSERT_EQ(activities.size(), 3u);
+  EXPECT_STREQ(activities.back().secrets.join, "connect:discord_7_42_test-lobby-secret");
+}
+
+TEST_F(DiscordLobbyTest, ClosedAdmissionDrainsLobbyAfterLastSocket) {
+  networking->setAcceptingP2PConnections(true);
+  ASSERT_TRUE(networking->setJoinLocal(8));
+  ASSERT_TRUE(api.completeCreation(DiscordResult_Ok));
+  ASSERT_TRUE(api.synchronize());
+  api.enqueue([&] {
+    for (int id : {8, 9})
+      api.params.lobby_events->on_member_connect(api.params.event_data, 42, id);
+  });
+  ASSERT_TRUE(api.synchronize());
+  auto peers = networking->acceptP2PConnections();
+  ASSERT_EQ(peers.size(), 2u);
+
+  networking->setAcceptingP2PConnections(false);
+  ASSERT_TRUE(networking->setJoinUnavailable());
+  ASSERT_TRUE(networking->setActivityData("Hosting", "On ship", 123, {}));
+  auto calls = api.snapshot();
+  ASSERT_EQ(calls.activities.size(), 1u);
+  EXPECT_STREQ(calls.activities.front().secrets.join, "");
+  EXPECT_TRUE(calls.disconnectedNetworks.empty());
+  api.enqueue([&] {
+    api.params.lobby_events->on_member_connect(api.params.event_data, 42, 10);
+    api.params.lobby_events->on_member_disconnect(api.params.event_data, 42, 8);
+    uint8_t payload = 1;
+    api.params.lobby_events->on_network_message(api.params.event_data, 42, 9, 0, &payload, 1);
+  });
+  ASSERT_TRUE(api.synchronize());
+  ASSERT_TRUE(platform->update());
+  EXPECT_TRUE(networking->acceptP2PConnections().empty());
+  EXPECT_FALSE(peers[0]->isOpen());
+  EXPECT_TRUE(peers[1]->isOpen());
+  auto received = peers[1]->receiveMessage();
+  ASSERT_TRUE(received && *received);
+  EXPECT_TRUE(api.snapshot().deletedLobbies.empty());
+  peers.clear();
+  ASSERT_TRUE(api.synchronize());
+  calls = api.snapshot();
+  EXPECT_EQ(calls.disconnectedNetworks, (std::vector<DiscordLobbyId>{42}));
+  EXPECT_EQ(calls.deletedLobbies, (std::vector<DiscordLobbyId>{42}));
+  EXPECT_TRUE(platform->update());
+}
+
+TEST_F(DiscordLobbyTest, RemoteJoinFailureIsReportedByItsSocket) {
+  auto connection = networking->connectToPeer(Star::P2PNetworkingPeerId("discord_9_42_test-secret"));
+  ASSERT_TRUE(connection);
+  ASSERT_TRUE(api.synchronize());
+  EXPECT_TRUE(platform->update());
+  EXPECT_FALSE((*connection)->isOpen());
+  EXPECT_FALSE((*connection)->receiveMessage());
 }

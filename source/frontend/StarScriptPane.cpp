@@ -193,7 +193,6 @@ import star.item_grid_widget;
 import star.image_widget;
 
 import star.player_lua_bindings;
-import star.simple_tooltip;
 import star.item_tooltip;
 import star.config_lua_bindings;
 import star.celestial_lua_bindings;
@@ -271,22 +270,8 @@ std::expected<std::shared_ptr<Pane>, StarException> ScriptPane::createTooltip(Ve
   auto result = recover_lua_script_error(m_script.invoke<Json>("createTooltip", screenPosition));
   if (!result)
     return std::unexpected(std::move(result.error()));
-  if (*result && !(**result).is_null()) {
-    auto const& value = **result;
-    if (value.type() == Json::Type::String) {
-      auto text = value.to_string();
-      if (!text)
-        return std::unexpected(std::move(text.error()));
-      return SimpleTooltipBuilder::buildTooltip(context(), *text);
-    }
-    auto tooltip = Pane::create(context());
-    if (!tooltip)
-      return std::unexpected(std::move(tooltip.error()));
-    auto constructed = m_reader->construct(value, **tooltip);
-    if (!constructed)
-      return std::unexpected(std::move(constructed.error()));
-    return std::move(*tooltip);
-  }
+  if (*result && !(**result).is_null())
+    return buildScriptTooltip(**result);
   std::shared_ptr<Item> item;
   if (auto child = getChildAt(screenPosition)) {
     if (auto itemSlot = as<ItemSlotWidget>(child))

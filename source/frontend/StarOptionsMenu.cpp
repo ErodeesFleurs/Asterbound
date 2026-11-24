@@ -431,8 +431,6 @@ std::expected<void, StarException> OptionsMenu::syncGuiToConf() {
   }
   for (auto const& [key, button] : {
       std::pair{std::string_view("tutorialMessages"), std::ref(*m_tutorialMessagesButton)},
-      std::pair{std::string_view("clientIPJoinable"), std::ref(*m_clientIPJoinableButton)},
-      std::pair{std::string_view("clientP2PJoinable"), std::ref(*m_clientP2PJoinableButton)},
       std::pair{std::string_view("allowAssetsMismatch"), std::ref(*m_allowAssetsMismatchButton)}}) {
     auto setting = m_localChanges.get(key);
     if (!setting)
@@ -441,6 +439,15 @@ std::expected<void, StarException> OptionsMenu::syncGuiToConf() {
     if (!value)
       return std::unexpected(std::move(value.error()));
     button.get().setChecked(*value);
+  }
+  // Only explicit permission enables an incoming connection.
+  for (auto const& [key, button] : {
+      std::pair{std::string_view("clientIPJoinable"), std::ref(*m_clientIPJoinableButton)},
+      std::pair{std::string_view("clientP2PJoinable"), std::ref(*m_clientP2PJoinableButton)}}) {
+    auto setting = m_localChanges.get(key);
+    if (!setting)
+      return std::unexpected(std::move(setting.error()));
+    button.get().setChecked(setting->get() == Json(true));
   }
   auto headRotationSetting = m_localChanges.get("humanoidHeadRotation");
   if (!headRotationSetting)

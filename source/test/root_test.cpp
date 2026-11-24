@@ -58,6 +58,9 @@ import star.item_database;
 import star.inventory_types;
 import star.player_inventory;
 import star.player;
+import star.player_types;
+import star.humanoid;
+import star.particle;
 import star.player_factory;
 import star.player_log;
 import star.radio_message_database;
@@ -88,6 +91,9 @@ import star.message_types;
 import star.uuid;
 import star.mixer;
 import star.world_client;
+import star.sky;
+import star.sky_parameters;
+import star.sky_types;
 import star.world_render_data;
 import star.entity_rendering_types;
 import star.warping;
@@ -610,7 +616,9 @@ const GameTestRegistration presentation_message_failures("WorldClientTest", "Pre
     {"playCinematic", {}}, {"playCinematic", {Json{}}}, {"playCinematic", {JsonObject{}, 1}},
     {"playAltMusic", {Json(JsonArray{path, JsonObject{}})}}, {"playAltMusic", {path, "slow"}},
     {"playAltMusic", {path, 0, 1e30}}, {"playAltMusic", {path + ":subpath"}},
-    {"stopAltMusic", {Json(JsonArray{})}}
+    {"stopAltMusic", {Json(JsonArray{})}},
+    {"queueRadioMessage", {JsonObject{{"messageId", "radio-invalid"}, {"text", JsonArray{}}}}},
+    {"queueRadioMessage", {JsonObject{{"messageId", "radio-invalid"}, {"speciesMessage", 3}}}}
   };
 
   // The relay must answer the original calling client's UUID (even for null
@@ -641,11 +649,13 @@ const GameTestRegistration presentation_message_failures("WorldClientTest", "Pre
       }
       if (auto result = send("unhandled-presentation-test-message", {}); !result)
         return result;
+      if (auto result = send("queueRadioMessage", {JsonObject{{"messageId", "radio-after-errors"}, {"important", true}, {"portraitImage", ""}, {"text", "Received"}}}); !result)
+        return result;
       return send("playCinematic", {JsonObject{{"test", true}}});
     });
     ASSERT_TRUE(sent) << sent.error().what();
   }
-  ASSERT_EQ(from_server.size(), std::size(invalid) + 2);
+  ASSERT_EQ(from_server.size(), std::size(invalid) + 3);
   while (std::chrono::steady_clock::now() < deadline) {
     if (std::ranges::all_of(from_client, [](auto const& p) { return p.finished() == true; }) &&
         std::ranges::all_of(from_server, [](auto const& p) { return p.finished() == true; }))
@@ -665,6 +675,12 @@ const GameTestRegistration presentation_message_failures("WorldClientTest", "Pre
   auto unhandled = from_server[std::size(invalid)].error();
   ASSERT_TRUE(unhandled && *unhandled);
   EXPECT_EQ(**unhandled, "Message not handled by entity");
+  auto radio_response = from_server[std::size(invalid) + 1].result();
+  ASSERT_TRUE(radio_response && *radio_response);
+  EXPECT_TRUE((**radio_response).is_null());
+  auto queued = player->pullPendingRadioMessage();
+  ASSERT_TRUE(queued && *queued);
+  EXPECT_EQ((**queued).messageId, "radio-after-errors");
   auto accepted = from_server.back().result();
   ASSERT_TRUE(accepted && *accepted);
   EXPECT_TRUE((**accepted).is_null());
@@ -683,6 +699,118 @@ const GameTestRegistration presentation_message_failures("WorldClientTest", "Pre
   EXPECT_EQ(pending->fade_time, 0.25f);
   // Unrelated native errors are not mistaken for a rejected cosmetic RPC.
   EXPECT_FALSE(world->sendEntityMessage(player->entityId(), "recordEvent", {}));
+});
+
+const GameTestRegistration missing_death_burst("WorldClientTest", "MissingPlayerDeathBurstPreservesDropsAndRemoval", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  auto universe = TestUniverse::create(root, {100, 100});
+  ASSERT_TRUE(universe);
+  auto close = make_scope_exit([&] { EXPECT_TRUE((*universe)->close()); });
+  auto uuid = (*universe)->client()->mainPlayer()->uuid();
+  ASSERT_TRUE(uuid);
+  ASSERT_TRUE((*universe)->warpPlayer(ClientShipWorldId(*uuid)));
+  auto world = (*universe)->worldClient();
+  ASSERT_EQ(world->disableDeathDrops(), false);
+  auto factory = root.playerFactory();
+  ASSERT_TRUE(factory);
+  auto created = (*factory)->create();
+  ASSERT_TRUE(created);
+  auto player = std::move(*created);
+  auto const& client = (*universe)->client();
+  player->set_client_context(client->client_context());
+  player->setStatistics(client->statistics());
+  player->setUniverseClient(std::ref(*client));
+  ASSERT_TRUE(player->finalizeCreation());
+  ASSERT_TRUE(player->setModeType(PlayerMode::Hardcore));
+  auto items = root.itemDatabase();
+  ASSERT_TRUE(items);
+  auto descriptor = ItemDescriptor::create("dirtmaterial", 1);
+  ASSERT_TRUE(descriptor);
+  auto item = (*items)->item(*descriptor);
+  ASSERT_TRUE(item && *item);
+  ASSERT_TRUE(player->inventory()->setSwapSlotItem(*item));
+  String const burst = "unconfigured-test-death-burst";
+  ASSERT_TRUE(player->setHumanoidParameter("deathParticles", Json(burst)));
+  ASSERT_TRUE(player->refreshHumanoidParameters());
+  ASSERT_TRUE(world->addEntity(player));
+  ASSERT_EQ(player->humanoid()->defaultDeathParticles(), burst);
+  ASSERT_FALSE(player->humanoid()->particles(burst));
+
+  auto const deaths = player->log()->deathCount();
+  auto const id = player->entityId();
+  std::shared_ptr<EntityCreatePacket> birth;
+  for (auto const& packet : world->getOutgoingPackets())
+    if (auto create = as<EntityCreatePacket>(packet); create && create->entityId == id)
+      birth = std::move(create);
+  ASSERT_TRUE(birth);
+  ASSERT_TRUE(world->removeEntity(id, true));
+  EXPECT_FALSE(world->entity(id));
+  EXPECT_FALSE(player->inWorld());
+  EXPECT_EQ(player->log()->deathCount(), deaths + 1);
+  EXPECT_FALSE(player->inventory()->swapSlotItem());
+  std::shared_ptr<EntityDestroyPacket> death;
+  bool sent_drop = false;
+  for (auto const& packet : world->getOutgoingPackets()) {
+    if (auto spawn = as<SpawnEntityPacket>(packet))
+      sent_drop |= spawn->entityType == EntityType::ItemDrop;
+    if (auto create = as<EntityCreatePacket>(packet))
+      sent_drop |= create->entityType == EntityType::ItemDrop;
+    if (auto remove = as<EntityDestroyPacket>(packet); remove && remove->entityId == id && remove->death)
+      death = std::move(remove);
+  }
+  EXPECT_TRUE(sent_drop);
+  ASSERT_TRUE(death);
+
+  // Replay the actual master packets through the replica's immediate or
+  // interpolated death path, including its final network state.
+  ASSERT_TRUE(world->handleIncomingPackets({birth}));
+  auto replica = world->entity(id);
+  ASSERT_TRUE(replica && replica->isSlave());
+  ASSERT_TRUE(world->handleIncomingPackets({death}));
+  for (unsigned tick = 0; tick < 120 && replica->inWorld(); ++tick)
+    ASSERT_TRUE(world->update(1.0f / 60.0f));
+  EXPECT_FALSE(replica->inWorld());
+  EXPECT_FALSE(world->entity(id));
+});
+
+const GameTestRegistration missing_flight_cues("SkyPresentationTest", "BadCuesAreConsumedAcrossFlightStages", [](GameTest& fixture) {
+  auto sky = Sky::create(fixture.root());
+  ASSERT_TRUE(sky);
+  SkyParameters destination;
+  destination.seed = 1234;
+  destination.settings = JsonObject{
+    {"disembarkPath", JsonArray{}}, {"arrivalPath", JsonArray{}},
+    {"hyperspaceSpeedupTime", 1}, {"flyingTimer", 1}, {"hyperspaceSlowdownTime", 1},
+    {"enterHyperspaceAudioLeadIn", 1}, {"exitHyperspaceAudioLeadIn", 1},
+    {"enterHyperspaceAudio", false}, {"exitHyperspaceAudio", false}, {"arrivalAudio", false}};
+  auto consume = [&](String const& cue) {
+    auto first = (*sky)->pullSounds();
+    ASSERT_TRUE(first);
+    EXPECT_TRUE(first->empty());
+    // Repair only the cue in the same phase: it must not play late.
+    auto repaired = destination;
+    repaired.settings = json_merge(destination.settings, JsonObject{{cue, "/sfx/interface/voice_on.ogg"}});
+    ASSERT_TRUE((*sky)->jumpTo(repaired));
+    auto second = (*sky)->pullSounds();
+    ASSERT_TRUE(second);
+    EXPECT_TRUE(second->empty());
+  };
+  ASSERT_TRUE((*sky)->startFlying(true, false, destination.settings));
+  ASSERT_TRUE((*sky)->update(0.1));
+  ASSERT_EQ((*sky)->warpPhase(), WarpPhase::SpeedingUp);
+  consume("enterHyperspaceAudio");
+  ASSERT_TRUE((*sky)->update(1));
+  ASSERT_EQ((*sky)->warpPhase(), WarpPhase::Maintain);
+  consume("exitHyperspaceAudio");
+  ASSERT_TRUE((*sky)->stopFlyingAt(destination));
+  ASSERT_TRUE((*sky)->update(1));
+  ASSERT_EQ((*sky)->warpPhase(), WarpPhase::SlowingDown);
+  ASSERT_TRUE((*sky)->update(1));
+  ASSERT_EQ((*sky)->flyingType(), FlyingType::Arriving);
+  consume("arrivalAudio");
+  ASSERT_TRUE((*sky)->update(1));
+  EXPECT_FALSE((*sky)->flying());
+  EXPECT_EQ((*sky)->seed(), destination.seed);
 });
 
 const GameTestRegistration vanished_warp_target("UniverseServerTest", "ReturnsAfterSpawnTargetDisappearsDuringWarp", [](GameTest& fixture) {
@@ -1092,7 +1220,13 @@ const GameTestRegistration lua_http_cancellation("RootTest", "LuaHttpCancellatio
   auto third = session->approval();
   ASSERT_TRUE(third);
   EXPECT_EQ(third->domain, String("third.example"));
-  ASSERT_TRUE(session->resolve_approval(third->id, false, false));
+  // A preference edit while a prompt is open must not turn a failed Remember
+  // into authorization, a stuck queue, or a native UI callback failure.
+  ASSERT_TRUE((*configuration)->set_path("safe.luaHttp.trustedSites", Json(false)));
+  ASSERT_TRUE(session->resolve_approval(third->id, true, true));
+  ASSERT_TRUE(lua("assert(third:failed() and not third:cancelled() and reissued:status() == 'pending')"));
+  EXPECT_EQ((*configuration)->get_path("safe.luaHttp.trustedSites"), Json(false));
+  ASSERT_TRUE((*configuration)->set_path("safe.luaHttp.trustedSites", JsonArray{}));
   auto reissued = session->approval();
   ASSERT_TRUE(reissued);
   ASSERT_EQ(reissued->domain, first->domain);

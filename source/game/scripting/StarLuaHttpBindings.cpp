@@ -256,7 +256,6 @@ std::expected<void, StarException> LuaHttpSession::resolve_approval(std::uint64_
       })) {
     if (auto saved = m_impl->trusted(domain, true); !saved) {
       failure = request_error(saved.error());
-      result = std::unexpected(std::move(saved.error()));
     }
   }
   for (auto& request : group.requests) {

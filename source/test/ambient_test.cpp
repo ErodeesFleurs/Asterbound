@@ -31,6 +31,29 @@ TEST(AmbientConfigTest, TrackConfiguration) {
   EXPECT_FALSE(AmbientTrackGroup::create(JsonObject{{"tracks", JsonArray{"valid", 42}}}));
 }
 
+const GameTestRegistration ambient_track_failure("AmbientTest", "FailedTrackDoesNotBlockNextSelection", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  auto assets = root.assets();
+  ASSERT_TRUE(assets);
+  String const healthy = "/sfx/interface/voice_on.ogg";
+  ASSERT_TRUE((*assets)->audio(healthy));
+  // A sub-path isn't an audio asset. This is a terminal error rather than an
+  // asynchronous load still waiting for the asset worker.
+  StringList tracks{healthy + ":frame", healthy};
+  AmbientManager manager(root);
+  std::size_t failed = 2;
+  std::span<String const> playlist(tracks);
+  EXPECT_FALSE(manager.update_tracks(playlist.first(1), 0, std::ref(failed)));
+  ASSERT_EQ(failed, 0u);
+  tracks.erase(tracks.begin() + failed);
+  auto sample = manager.update_tracks(tracks, 0, std::ref(failed));
+  ASSERT_TRUE(sample && *sample);
+  EXPECT_EQ((*sample)->loops(), 0);
+  auto strict = std::make_shared<AmbientNoisesDescription const>(AmbientTrackGroup{}, AmbientTrackGroup({healthy + ":frame"}));
+  manager.cancel_all();
+  EXPECT_FALSE(manager.update_ambient(strict, false));
+});
+
 const GameTestRegistration ambient_voice_lifecycle("AmbientTest", "VoiceLifecycle", [](GameTest& fixture) {
   auto& root = fixture.root();
   auto assets = root.assets();

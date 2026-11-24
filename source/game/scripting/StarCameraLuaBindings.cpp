@@ -22,6 +22,7 @@ import star.listener;
 import std;
 import star.format;
 
+import star.math_common;
 import star.world_geometry;
 
 import star.asset_source;
@@ -48,6 +49,10 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeCameraCallbacks(Root
       !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("setPixelRatio", [&root, &camera](float pixelRatio, std::optional<bool> smooth) -> std::expected<void, StarException> {
+    // The direct setter changes the displayed transform before the next
+    // configuration observation, so reject invalid zoom here as well.
+    if (!is_finite(pixelRatio) || pixelRatio < 0.25f || pixelRatio > 1000000.f)
+      return std::unexpected(StarException("camera pixel ratio must be finite and between 0.25 and 1000000"));
     if (smooth.value_or(false))
       camera.setTargetPixelRatio(pixelRatio);
     else

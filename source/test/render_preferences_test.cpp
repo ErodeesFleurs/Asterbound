@@ -64,3 +64,35 @@ TEST(RenderPreferences, InvalidColdConfigurationUsesDefaultsWithoutMaskingInvali
   EXPECT_TRUE(prefs.hdr);
   EXPECT_FALSE(prefs.observe(JsonArray{}));
 }
+
+TEST(RenderPreferences, DisplayAndCameraFieldsKeepIndependentLastGoodValues) {
+  RenderPreferences prefs;
+  JsonObject fields{{"renderOutput", "legacy"}, {"renderExposure", 0}, {"hdrPaperWhite", 203}, {"hdrPeakLuminance", 1000},
+                    {"vsync", true}, {"renderFpsLimit", 0}, {"antiAliasing", true}, {"limitTextureAtlasSize", true},
+                    {"useMultiTexturing", false}, {"interfaceScale", 1.5}, {"zoomLevel", 2.75}, {"cameraSpeedFactor", 0.5}};
+  auto initial = prefs.observe(fields);
+  ASSERT_TRUE(initial && initial->empty());
+  fields.set("limitTextureAtlasSize", JsonObject{});
+  fields.set("useMultiTexturing", "true");
+  fields.set("antiAliasing", 0);
+  fields.set("interfaceScale", -0.5);
+  fields.set("zoomLevel", std::numeric_limits<double>::max());
+  fields.set("cameraSpeedFactor", 0);
+  fields.set("hardwareCursor", false);
+  auto rejected = prefs.observe(fields);
+  ASSERT_TRUE(rejected);
+  EXPECT_EQ(rejected->size(), 6u);
+  EXPECT_TRUE(prefs.antiAliasing);
+  EXPECT_TRUE(prefs.limitTextureAtlasSize);
+  EXPECT_FALSE(prefs.useMultiTexturing);
+  EXPECT_FALSE(prefs.hardwareCursor);
+  EXPECT_EQ(prefs.interfaceScale, 1.5f);
+  EXPECT_EQ(prefs.zoomLevel, 2.75f);
+  EXPECT_EQ(prefs.cameraSpeedFactor, 0.5f);
+  fields.set("interfaceScale", 0);
+  fields.set("zoomLevel", 4);
+  auto corrected = prefs.observe(fields);
+  ASSERT_TRUE(corrected && corrected->empty());
+  EXPECT_EQ(prefs.interfaceScale, 0);
+  EXPECT_EQ(prefs.zoomLevel, 4);
+}

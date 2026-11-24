@@ -928,8 +928,11 @@ std::expected<void, StarException> OpenGlRenderer::setOutputSettings(RenderOutpu
   auto valid = validateRenderOutputSettings(settings);
   if (!valid)
     return std::unexpected(std::move(valid.error()));
-  if (settings.mode != RenderOutputMode::Legacy)
-    return std::unexpected(RendererException("Linear tone-mapped and HDR10 output require the Vulkan renderer; select -renderer vulkan or renderOutput=legacy"));
+  if (settings.mode != RenderOutputMode::Legacy) {
+    if (auto status = checkGlError("checking previous display output"); !status)
+      return std::unexpected(std::move(status.error()));
+    return std::unexpected(OutputPreferenceRejected("Linear tone-mapped and HDR10 output require the Vulkan renderer; select -renderer vulkan or renderOutput=legacy"));
+  }
   return {};
 }
 

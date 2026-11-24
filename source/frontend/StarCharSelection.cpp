@@ -226,7 +226,11 @@ std::expected<void, StarException> CharSelectionPane::show() {
 }
 
 std::expected<void, StarException> CharSelectionPane::shiftCharacters(int shift) {
-  m_downScroll = std::max<int>(std::min<int>(m_downScroll + shift, m_filteredList.size() - 3), 0);
+  auto last = m_filteredList.size() > 3 ? m_filteredList.size() - 3 : 0;
+  if (shift < 0 && m_downScroll > 0)
+    --m_downScroll;
+  else if (shift > 0 && m_downScroll < last)
+    ++m_downScroll;
   return updateCharacterPlates();
 }
 
@@ -234,27 +238,29 @@ std::expected<void, StarException> CharSelectionPane::selectCharacter(unsigned b
   if (m_downScroll + buttonIndex < m_filteredList.size()) {
     auto playerUuid = m_filteredList[m_downScroll + buttonIndex];
     auto player = m_playerStorage->loadPlayer(playerUuid);
-    if (!player)
-      return std::unexpected(std::move(player.error()));
-    if (!*player)
-      return std::unexpected(GuiException("Selected character could not be loaded"));
+    if (!player || !*player) {
+      if (!player)
+        EmergencyLog::warn("Cannot select character {}: {}", playerUuid.hex(), player.error().what());
+      // loadPlayer can quarantine a previously listed save. Never reinterpret
+      // this click as selecting the next character (or creating a new one).
+      return updateCharacterPlates();
+    }
     if ((*player)->isPermaDead() && !(*player)->isAdmin()) {
-      auto assets = context().root().assets();
-      if (!assets)
-        return std::unexpected(std::move(assets.error()));
-      auto soundsConfig = (*assets)->json("/interface.config:buttonClickFailSound");
-      if (!soundsConfig)
-        return std::unexpected(std::move(soundsConfig.error()));
-      auto sounds = soundsConfig->to_array();
-      if (!sounds)
-        return std::unexpected(std::move(sounds.error()));
-      auto sound = context().root().random().sample_value(*sounds, "").and_then([](Json const& value) { return value.to_string(); });
-      if (!sound)
-        return std::unexpected(std::move(sound.error()));
-      if (!sound->empty()) {
-        if (auto result = context().playAudio(*sound); !result)
-          return std::unexpected(std::move(result.error()));
-      }
+      auto rejected = [&]() -> std::expected<void, StarException> {
+        auto assets = context().root().assets();
+        if (!assets) return std::unexpected(std::move(assets.error()));
+        auto soundsConfig = (*assets)->json("/interface.config:buttonClickFailSound");
+        if (!soundsConfig) return std::unexpected(std::move(soundsConfig.error()));
+        auto sounds = soundsConfig->array_ptr();
+        if (!sounds) return std::unexpected(std::move(sounds.error()));
+        auto sound = context().root().random().sample_value(**sounds, "").and_then([](Json const& value) { return value.to_string(); });
+        if (!sound) return std::unexpected(std::move(sound.error()));
+        if (!sound->empty())
+          return context().playOptionalAudio(*sound);
+        return {};
+      }();
+      if (!rejected)
+        EmergencyLog::warn("Cannot play rejected character selection sound: {}", rejected.error().what());
       return {};
     }
     return m_selectCallback(*player);
@@ -263,38 +269,46 @@ std::expected<void, StarException> CharSelectionPane::selectCharacter(unsigned b
 }
 
 std::expected<void, StarException> CharSelectionPane::updateCharacterPlates() {
+  auto filtered = m_playerStorage->playerUuidListByName(m_search);
+  if (!filtered)
+    return std::unexpected(std::move(filtered.error()));
+  m_filteredList = std::move(*filtered);
+  auto last = m_filteredList.size() > 3 ? m_filteredList.size() - 3 : 0;
+  m_downScroll = std::min<std::size_t>(m_downScroll, last);
   auto updatePlayerLine = [this](String const& name, unsigned scrollPosition) -> std::expected<void, StarException> {
-    auto filtered = m_playerStorage->playerUuidListByName(m_search);
-    if (!filtered)
-      return std::unexpected(std::move(filtered.error()));
-    m_filteredList = std::move(*filtered);
     auto selector = requireChild<LargeCharPlateWidget>(name);
     if (!selector)
       return std::unexpected(std::move(selector.error()));
-    if (!m_filteredList.empty() && scrollPosition < m_filteredList.size()) {
+    while (scrollPosition < m_filteredList.size()) {
       auto playerUuid = m_filteredList[scrollPosition];
       auto player = m_playerStorage->loadPlayer(playerUuid);
-      if (!player)
-        return std::unexpected(std::move(player.error()));
-      if (*player) {
-        if (auto result = (*selector)->show(); !result)
-          return std::unexpected(std::move(result.error()));
+      if (player && *player) {
         (*player)->humanoid()->setFacingDirection(Direction::Right);
-        if (auto result = (*selector)->setPlayer(*player); !result)
+        if (auto result = (*selector)->setPlayer(*player); !result) {
+          EmergencyLog::warn("Cannot preview character {}: {}", playerUuid.hex(), result.error().what());
+          m_filteredList.erase(m_filteredList.begin() + scrollPosition);
+          continue;
+        }
+        if (auto result = (*selector)->show(); !result)
           return std::unexpected(std::move(result.error()));
         if (!m_readOnly) {
           if (auto result = (*selector)->enableDelete([this, playerUuid](Widget&) { return m_deleteCallback(playerUuid); }); !result)
-            return std::unexpected(std::move(result.error()));
+            EmergencyLog::warn("Cannot display delete button for {}: {}", playerUuid.hex(), result.error().what());
+        } else {
+          (*selector)->disableDelete();
         }
         return {};
       }
+      if (!player)
+        EmergencyLog::warn("Cannot load character preview {}: {}", playerUuid.hex(), player.error().what());
+      m_filteredList.erase(m_filteredList.begin() + scrollPosition);
     }
-    if (auto result = (*selector)->setPlayer({}); !result)
-      return std::unexpected(std::move(result.error()));
     (*selector)->disableDelete();
-    if (m_readOnly)
+    if (auto cleared = (*selector)->setPlayer({}); !cleared) {
+      EmergencyLog::warn("Cannot clear character plate: {}", cleared.error().what());
       return (*selector)->hide();
-    return {};
+    }
+    return (*selector)->setVisibility(!m_readOnly);
   };
   for (unsigned i = 0; i < 4; ++i) {
     if (auto result = updatePlayerLine(Star::format("charSelector{}", i + 1), m_downScroll + i); !result)
@@ -308,7 +322,7 @@ std::expected<void, StarException> CharSelectionPane::updateCharacterPlates() {
   auto down = requireChild("playerDownButton");
   if (!down)
     return std::unexpected(std::move(down.error()));
-  return (*down)->setVisibility(m_downScroll < m_filteredList.size() - 3);
+  return (*down)->setVisibility(m_filteredList.size() > 3 && m_downScroll < m_filteredList.size() - 3);
 }
 
 std::expected<void, StarException> CharSelectionPane::setReadOnly(bool readOnly) {

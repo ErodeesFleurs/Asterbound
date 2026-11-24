@@ -542,12 +542,6 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
     m_root->timing().server_time_step = 1.0f / *rate;
   }
   appController->setTargetUpdateRate(update_rate);
-  if (auto applied = apply_render_settings(settings); !applied)
-    return std::unexpected(std::move(applied.error()));
-  auto hardware = settings.get("hardwareCursor", {}).and_then([](Json const& value) { return value.opt_bool(); });
-  if (!hardware)
-    return std::unexpected(std::move(hardware.error()));
-  appController->setCursorHardware(hardware->value_or(true));
   // Must precede anything that can load assets.
   auto mods = loadMods();
   if (!mods)
@@ -563,6 +557,11 @@ std::expected<void, StarException> ClientApplication::applicationInit(std::share
   if (!gui)
     return std::unexpected(std::move(gui.error()));
   m_guiContext = std::move(*gui);
+  if (auto applied = apply_render_settings(settings); !applied)
+    return std::unexpected(std::move(applied.error()));
+  auto const& preferences = m_guiContext->renderPreferences();
+  appController->setCursorHardware(preferences.hardwareCursor);
+  m_worldPainter->camera().setPixelRatio(preferences.zoomLevel);
   auto input = Input::create(*m_root);
   if (!input)
     return std::unexpected(std::move(input.error()));
@@ -641,18 +640,12 @@ std::expected<void, StarException> ClientApplication::renderInit(std::shared_ptr
     return std::unexpected(std::move(configResult.error()));
   auto const& config = *configResult;
   auto settings = config->current_configuration();
-  m_appliedOutputSettings.reset();
+  m_guiContext->renderPreferences().resetBackend();
   if (auto applied = apply_render_settings(settings); !applied)
     return std::unexpected(std::move(applied.error()));
-  auto limit = settings.get("limitTextureAtlasSize", {}).and_then([](Json const& value) { return value.opt_bool(); });
-  if (!limit)
-    return std::unexpected(std::move(limit.error()));
-  if (limit->value_or(false))
-    renderer->setSizeLimitEnabled(true);
-  auto multi = settings.get("useMultiTexturing", {}).and_then([](Json const& value) { return value.opt_bool(); });
-  if (!multi)
-    return std::unexpected(std::move(multi.error()));
-  renderer->setMultiTexturingEnabled(multi->value_or(true));
+  auto const& preferences = m_guiContext->renderPreferences();
+  renderer->setSizeLimitEnabled(preferences.limitTextureAtlasSize);
+  renderer->setMultiTexturingEnabled(preferences.useMultiTexturing);
   auto gui = m_guiContext->renderInit(renderer);
   if (!gui)
     return std::unexpected(std::move(gui.error()));
@@ -844,9 +837,10 @@ std::expected<void, StarException> ClientApplication::update() {
           return std::unexpected(std::move(changed.error()));
       }
       if (auto request = service->pullJoinRequest()) {
-        auto queued = m_mainInterface->queueJoinRequest(*request);
-        if (!queued)
-          return std::unexpected(std::move(queued.error()));
+        auto handled = m_mainInterface ? m_mainInterface->queueJoinRequest(std::move(*request))
+                                       : request->second.fulfill(P2PJoinRequestReply::Ignore);
+        if (!handled)
+          return std::unexpected(std::move(handled.error()));
       }
       auto updated = service->update();
       if (!updated)
@@ -926,43 +920,65 @@ std::expected<void, StarException> ClientApplication::update_http() {
   }
   if (!next)
     return {};
+  auto deny = [&](StarException const& error) -> std::expected<void, StarException> {
+    // Settle this generation even when displaying or logging the prompt fails.
+    auto denied = http_session->resolve_approval(next->id, false, false);
+    if (!denied)
+      return denied;
+    return logger().warn_exception("HTTP approval unavailable; request denied", ExceptionDiagnostic(error));
+  };
   auto dialog = manager.registeredPane<HttpTrustDialog>(pane);
   if (!dialog)
-    return std::unexpected(std::move(dialog.error()));
+    return deny(dialog.error());
   auto prepared = (*dialog)->display_request(next->domain,
     [session = std::weak_ptr(http_session), id = next->id](bool allow, bool remember) -> std::expected<void, StarException> {
       if (auto owner = session.lock())
         return owner->resolve_approval(id, allow, remember);
       return {};
     });
-  if (!prepared)
-    return prepared;
+  if (!prepared) {
+    (*dialog)->removeAllChildren();
+    return deny(prepared.error());
+  }
   auto shown = manager.displayRegisteredPane(pane);
-  if (!shown)
-    return std::unexpected(std::move(shown.error()));
+  if (!shown) {
+    // displayPane can have inserted the pane before its displayed() failed.
+    auto removed = manager.dismissRegisteredPane(pane);
+    if (!removed)
+      return std::unexpected(std::move(removed.error()));
+    if (!*removed) {
+      if (auto cleared = (*dialog)->dismissed(); !cleared)
+        return cleared;
+    }
+    return deny(shown.error());
+  }
   displayed_approval = next->id;
   return {};
 }
 
 std::expected<void, StarException> ClientApplication::apply_render_settings(Json const& settings) {
-  auto rejected = m_renderPreferences.observe(settings);
+  auto& preferences = m_guiContext->renderPreferences();
+  auto rejected = preferences.observe(settings);
   if (!rejected)
     return std::unexpected(std::move(rejected.error()));
   for (auto key : *rejected) {
     if (auto logged = logger().warn("Ignoring invalid {} preference; keeping previous display setting", key); !logged)
       return std::unexpected(std::move(logged.error()));
   }
-  if (auto renderer = Application::renderer(); renderer && m_appliedOutputSettings != m_renderPreferences.output) {
-    if (auto applied = renderer->setOutputSettings(m_renderPreferences.output); !applied)
-      return std::unexpected(std::move(applied.error()));
-    m_appliedOutputSettings = m_renderPreferences.output;
+  if (auto renderer = Application::renderer()) {
+    if (auto applied = preferences.applyOutput(*renderer, preferences.output); !applied) {
+      if (!applied.error().is<OutputPreferenceRejected>())
+        return std::unexpected(std::move(applied.error()));
+      if (auto logged = logger().warn("Keeping previous display output: {}", preferences.outputNotice); !logged)
+        return std::unexpected(std::move(logged.error()));
+    }
   }
-  if (m_appliedVSync != m_renderPreferences.vsync) {
-    if (auto applied = appController()->setVSyncEnabled(m_renderPreferences.vsync); !applied)
+  if (m_appliedVSync != preferences.vsync) {
+    if (auto applied = appController()->setVSyncEnabled(preferences.vsync); !applied)
       return std::unexpected(std::move(applied.error()));
-    m_appliedVSync = m_renderPreferences.vsync;
+    m_appliedVSync = preferences.vsync;
   }
-  float rate = static_cast<float>(m_renderPreferences.fpsLimit);
+  float rate = static_cast<float>(preferences.fpsLimit);
   if (m_appliedRenderFpsLimit != rate) {
     appController()->setTargetRenderRate(rate);
     m_appliedRenderFpsLimit = rate;
@@ -973,29 +989,20 @@ std::expected<void, StarException> ClientApplication::apply_render_settings(Json
 std::expected<void, StarException> ClientApplication::render() {
   m_preparedCamera.reset();
   m_framesSkipped = 0;
-  auto configResult = m_root->configuration();
-  if (!configResult)
-    return std::unexpected(std::move(configResult.error()));
-  auto settings = (*configResult)->current_configuration();
+  auto const& preferences = m_guiContext->renderPreferences();
   auto& renderer = Application::renderer();
 
-  auto aa = settings.get("antiAliasing", {}).and_then([](Json const& value) { return value.opt_bool(); });
-  if (!aa)
-    return std::unexpected(std::move(aa.error()));
-  auto sampling = renderer->setMultiSampling(aa->value_or(false) ? 4 : 0);
+  auto sampling = renderer->setMultiSampling(preferences.antiAliasing ? 4 : 0);
   if (!sampling)
     return std::unexpected(std::move(sampling.error()));
-  auto mainHdr = renderer->setMainHDR(m_renderPreferences.hdr);
+  auto mainHdr = renderer->setMainHDR(preferences.hdr);
   if (!mainHdr)
     return std::unexpected(std::move(mainHdr.error()));
   auto effect = renderer->switchEffectConfig("interface");
   if (!effect)
     return std::unexpected(std::move(effect.error()));
-  auto scale = settings.get("interfaceScale", {}).and_then([](Json const& value) { return value.opt_float(); });
-  if (!scale)
-    return std::unexpected(std::move(scale.error()));
-  if (scale->value_or(0.0f) != 0) {
-    m_guiContext->setInterfaceScale(**scale);
+  if (preferences.interfaceScale != 0) {
+    m_guiContext->setInterfaceScale(preferences.interfaceScale);
   } else {
     auto width = m_guiContext->windowWidth();
     if (!width)
@@ -1338,8 +1345,13 @@ std::expected<void, StarException> ClientApplication::changeState(MainAppState n
     if (auto prepared = prepareTitleServices(); !prepared)
       return prepared;
   }
-  if (newState == MainAppState::Title)
+  if (newState == MainAppState::Title) {
+    if (oldState > MainAppState::Title) {
+      if (auto reset = m_titleScreen->resetState(); !reset)
+        return reset;
+    }
     return prepareTitleForm();
+  }
   if (newState > MainAppState::Title)
     return startSession(newState);
   return {};
@@ -1398,7 +1410,7 @@ std::expected<void, StarException> ClientApplication::teardownTransition(MainApp
     }
   }
   if (oldState > MainAppState::Title && newState == MainAppState::Title) {
-    remember(m_titleScreen->resetState());
+    m_currentRemoteJoin.reset();
     m_mainMixer->set_universe_client({});
   }
   if (oldState >= MainAppState::Title && newState < MainAppState::Title) {
@@ -1624,29 +1636,40 @@ std::expected<bool, StarException> ClientApplication::connectMultiPlayer() {
   auto pending = take_optional(m_pendingMultiPlayerConnection);
   if (!pending)
     return std::unexpected(std::move(pending.error()));
+  auto rejected = [&](String message) -> std::expected<bool, StarException> {
+    // Reuse session cleanup, but do not re-enter Main or refill the user's form.
+    auto oldState = std::exchange(m_state, MainAppState::Title);
+    auto restored = teardownTransition(oldState, m_state);
+    if (!restored)
+      return std::unexpected(std::move(restored.error()));
+    auto displayed = m_titleScreen->showConnectionError("address", message);
+    if (!displayed)
+      return std::unexpected(std::move(displayed.error()));
+    return false;
+  };
   std::unique_ptr<PacketSocket> packetSocket;
   auto opened = std::visit(
     [&]<typename Server>(Server const& server) -> std::expected<bool, StarException> {
       if constexpr (std::same_as<Server, HostAddressWithPort>) {
         auto socket = TcpSocket::connect_to(server).and_then(
           [&](auto tcp) { return TcpPacketSocket::open(m_root->logger(), std::move(tcp)); });
-        if (!socket)
-          return setError(Star::format("Join failed! Error connecting to '{}'", server), ExceptionDiagnostic(socket.error()))
-            .transform([] { return false; });
+        if (!socket) {
+          if (auto logged = logger().warn_exception(Star::format("Could not connect to {}", server), ExceptionDiagnostic(socket.error())); !logged)
+            return std::unexpected(std::move(logged.error()));
+          return rejected("Could not connect to server.");
+        }
         packetSocket = std::move(*socket);
       } else if constexpr (std::same_as<Server, P2PNetworkingPeerId>) {
         if (auto service = appController()->p2pNetworkingService()) {
           auto peer = service->connectToPeer(server);
           if (!peer)
-            return setError("Cannot join peer", ExceptionDiagnostic(peer.error())).transform([] { return false; });
+            return rejected(Star::format("Cannot join peer: {}", peer.error().what()));
           auto socket = P2PPacketSocket::open(m_root->logger(), std::move(*peer));
           if (!socket)
-            return setError("Cannot join peer", ExceptionDiagnostic(socket.error())).transform([] { return false; });
+            return rejected(Star::format("Cannot open peer connection: {}", socket.error().what()));
           packetSocket = std::move(*socket);
         } else {
-          return setError("Internal error, no p2p networking service when joining p2p networking peer").transform([] {
-            return false;
-          });
+          return rejected("Peer networking service is unavailable.");
         }
       } else {
         static_assert(std::same_as<Server, void>, "Unhandled multiplayer transport");
@@ -1665,10 +1688,13 @@ std::expected<bool, StarException> ClientApplication::connectMultiPlayer() {
     return std::unexpected(std::move(mismatch.error()));
   auto connected = m_universeClient->connect(UniverseConnection(std::move(packetSocket)), *mismatch, pending->account,
                                              pending->password, pending->forceLegacy);
-  if (!connected)
-    return setError("Join failed", ExceptionDiagnostic(connected.error())).transform([] { return false; });
+  if (!connected) {
+    if (auto logged = logger().warn_exception("Multiplayer connection failed", ExceptionDiagnostic(connected.error())); !logged)
+      return std::unexpected(std::move(logged.error()));
+    return rejected(Star::format("Join failed: {}", connected.error().what()));
+  }
   if (*connected)
-    return setError(**connected).transform([] { return false; });
+    return rejected(**connected);
   if (std::holds_alternative<HostAddressWithPort>(pending->server))
     m_currentRemoteJoin = std::get<HostAddressWithPort>(pending->server);
   else
@@ -1995,9 +2021,12 @@ std::expected<void, StarException> ClientApplication::updateTitle(float dt) {
       if (!config)
         return std::unexpected(std::move(config.error()));
       if (port_text->empty()) {
-        auto default_port = (*config)->get("gameServerPort").and_then([](Json j) { return j.to_uint(); });
+        auto configured = (*config)->get("gameServerPort");
+        if (!configured)
+          return std::unexpected(std::move(configured.error()));
+        auto default_port = configured->to_uint();
         if (!default_port)
-          return std::unexpected(std::move(default_port.error()));
+          return m_titleScreen->showConnectionError("port", "Default port is invalid. Enter a port.");
         *port_text = Star::to_string(*default_port);
       }
       auto port = HostAddressWithPort::parse_port(port_text->utf8());
@@ -2041,28 +2070,28 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
     if (!configResult)
       return std::unexpected(std::move(configResult.error()));
     auto config = *configResult;
-    auto clientIPJoinable = config->get("clientIPJoinable").and_then([](Json j) { return j.to_bool(); });
-    if (!clientIPJoinable)
-      return std::unexpected(std::move(clientIPJoinable.error()));
-    auto clientP2PJoinable = config->get("clientP2PJoinable").and_then([](Json j) { return j.to_bool(); });
-    if (!clientP2PJoinable)
-      return std::unexpected(std::move(clientP2PJoinable.error()));
+    // Join permissions are opt-in: only the literal boolean true grants access.
+    auto settings = config->current_configuration().object_ptr();
+    if (!settings)
+      return std::unexpected(std::move(settings.error()));
+    bool clientIPJoinable = (*settings)->value("clientIPJoinable") == Json(true);
+    bool clientP2PJoinable = (*settings)->value("clientP2PJoinable") == Json(true);
     std::optional<std::pair<std::uint16_t, std::uint16_t>> party = std::make_pair(m_universeClient->players(), m_universeClient->maxPlayers());
 
     if (m_state == MainAppState::MultiPlayer) {
       if (p2pNetworkingService) {
         p2pNetworkingService->setAcceptingP2PConnections(false);
-        auto join = *clientP2PJoinable && m_currentRemoteJoin
+        auto join = clientP2PJoinable && m_currentRemoteJoin
             ? p2pNetworkingService->setJoinRemote(*m_currentRemoteJoin)
             : p2pNetworkingService->setJoinUnavailable();
         if (!join)
           return std::unexpected(std::move(join.error()));
       }
     } else {
-      m_universeServer->setListeningTcp(*clientIPJoinable);
+      m_universeServer->setListeningTcp(clientIPJoinable);
       if (p2pNetworkingService) {
-        p2pNetworkingService->setAcceptingP2PConnections(*clientP2PJoinable);
-        if (*clientP2PJoinable) {
+        p2pNetworkingService->setAcceptingP2PConnections(clientP2PJoinable);
+        if (clientP2PJoinable) {
           if (auto join = p2pNetworkingService->setJoinLocal(m_universeServer->maxClients()); !join)
             return std::unexpected(std::move(join.error()));
         } else {
@@ -2248,10 +2277,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
     if (m_cameraZoomDirection != 0) {
       const float threshold = 0.01f;
       bool goingIn = m_cameraZoomDirection == 1;
-      auto zoom = config->get("zoomLevel").and_then([](Json j) { return j.to_float(); });
-      if (!zoom)
-        return std::unexpected(std::move(zoom.error()));
-      float curZoom = *zoom,
+      float curZoom = m_guiContext->renderPreferences().zoomLevel,
             newZoom = std::max(
               1.f,
               curZoom * std::powf(1.f + static_cast<float>(m_cameraZoomDirection) * 0.5f, std::min(1.f, dt * 5.f))),
@@ -2263,8 +2289,10 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
         newZoom = std::lerp(intZoom, intNewZoom, std::clamp(std::abs(intZoom - newZoom) - 1.f, 0.f, 1.f));
         m_cameraZoomDirection = 0;
       }
-      if (auto saved = config->set("zoomLevel", std::min(1000000.f, newZoom)); !saved)
+      newZoom = std::min(1000000.f, newZoom);
+      if (auto saved = config->set("zoomLevel", newZoom); !saved)
         return std::unexpected(std::move(saved.error()));
+      m_guiContext->renderPreferences().zoomLevel = newZoom;
     }
 
     if (m_controllerInput && m_controllerLeftStick.magnitude_squared() > 0.01f)
@@ -2468,11 +2496,7 @@ std::expected<void, StarException> ClientApplication::updateCamera(float dt) {
   WorldCamera& camera = m_worldPainter->camera();
   camera.beginUpdate();
   camera.setScreenSize(Application::renderer()->screenSize());
-  auto zoom = m_root->configuration().and_then([](auto config) { return config->get("zoomLevel"); })
-      .and_then([](Json value) { return value.to_float(); });
-  if (!zoom)
-    return std::unexpected(std::move(zoom.error()));
-  camera.setTargetPixelRatio(*zoom);
+  camera.setTargetPixelRatio(m_guiContext->renderPreferences().zoomLevel);
   camera.update(dt);
 
   if (m_mainInterface->fixedCamera() || dt <= 0.0f) {
@@ -2488,11 +2512,7 @@ std::expected<void, StarException> ClientApplication::updateCamera(float dt) {
   const float triggerRadius = 100.0f;
   const float deadzone = 0.1f;
   const float panFactor = 1.5f;
-  auto speed = m_root->configuration().and_then([](auto config) { return config->get("cameraSpeedFactor"); })
-      .and_then([](Json j) { return j.to_float(); });
-  if (!speed)
-    return std::unexpected(std::move(speed.error()));
-  float cameraSpeedFactor = 30.0f / *speed;
+  float cameraSpeedFactor = 30.0f / m_guiContext->renderPreferences().cameraSpeedFactor;
   cameraSpeedFactor /= (dt * 60.f);
 
   auto cameraPosition = m_player->cameraPosition();

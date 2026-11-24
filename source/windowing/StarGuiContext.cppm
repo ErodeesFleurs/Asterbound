@@ -18,6 +18,7 @@ import star.asset_path;
 import star.input_event;
 import star.vector;
 import star.set;
+import star.renderer;
 
 namespace Star {
 class Image;
@@ -77,6 +78,7 @@ public:
   [[nodiscard]] std::expected<Vec2U, StarException> windowInterfaceSize() const;
   float interfaceScale() const;
   void setInterfaceScale(float interfaceScale);
+  RenderPreferences& renderPreferences() { return m_renderPreferences; }
   std::optional<Vec2I> mousePosition(InputEvent const& event, float pixelRatio) const;
   std::optional<Vec2I> mousePosition(InputEvent const& event) const;
   Set<InterfaceAction> actions(InputEvent const& event) const;
@@ -155,6 +157,7 @@ private:
   KeyBindings m_keyBindings;
 
   float m_interfaceScale;
+  RenderPreferences m_renderPreferences;
 
   bool m_shiftHeld;
 };

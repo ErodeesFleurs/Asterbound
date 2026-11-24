@@ -627,6 +627,7 @@ public:
 
 private:
   explicit Player(Root& root);
+  [[nodiscard]] std::expected<std::optional<String>, StarException> process_radio_message(Json const& config, float delay);
   [[nodiscard]] std::expected<void, StarException> initialize(std::shared_ptr<PlayerConfig> config, Uuid uuid);
   [[nodiscard]] std::expected<void, StarException> net_load(ByteArray const& store, NetCompatibilityRules rules);
   [[nodiscard]] std::expected<void, StarException> installHumanoid();

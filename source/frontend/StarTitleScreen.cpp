@@ -221,6 +221,35 @@ import star.player_storage;
 import star.sky;
 
 namespace Star {
+namespace {
+
+StringList titleTracks(Json const& music, String const& phase) {
+  StringList result;
+  auto group = music.find(phase);
+  if (!group || !*group)
+    return result;
+  auto config = (*group)->get().find("tracks");
+  if (!config || !*config) {
+    if (!config)
+      EmergencyLog::warn("Ignoring invalid {} title playlist: {}", phase, config.error().what());
+    return result;
+  }
+  auto tracks = (*config)->get().array_ptr();
+  if (!tracks) {
+    EmergencyLog::warn("Ignoring invalid {} title playlist: {}", phase, tracks.error().what());
+    return result;
+  }
+  result.reserve((*tracks)->size());
+  for (auto const& value : **tracks) {
+    if (auto path = value.string_ptr())
+      result.push_back(AssetPath::relative_to("/", **path));
+    else
+      EmergencyLog::warn("Skipping invalid track in {} title playlist: {}", phase, path.error().what());
+  }
+  return result;
+}
+
+}
 
 TitleScreen::TitleScreen(GuiContext& context, std::shared_ptr<PlayerStorage> playerStorage, std::shared_ptr<Mixer> mixer)
   : m_guiContext(context), m_titleState(TitleState::Quit), m_playerStorage(std::move(playerStorage)),
@@ -285,9 +314,6 @@ std::expected<void, StarException> TitleScreen::initialize(std::shared_ptr<Unive
   if (!cursor)
     return std::unexpected(std::move(cursor.error()));
   m_cursor = std::move(*cursor);
-  auto assets = m_guiContext.root().assets();
-  if (!assets)
-    return std::unexpected(std::move(assets.error()));
   auto database = CelestialMasterDatabase::create(m_guiContext.root());
   if (!database)
     return std::unexpected(std::move(database.error()));
@@ -319,15 +345,6 @@ std::expected<void, StarException> TitleScreen::initialize(std::shared_ptr<Unive
   if (!sky)
     return std::unexpected(std::move(sky.error()));
   m_skyBackdrop = std::move(*sky);
-  auto music_config = (*assets)->json("/interface/windowconfig/title.config:music");
-  if (!music_config)
-    return std::unexpected(std::move(music_config.error()));
-  if (auto object = music_config->object_ptr(); !object)
-    return std::unexpected(std::move(object.error()));
-  auto music = AmbientNoisesDescription::create(*music_config, "/");
-  if (!music)
-    return std::unexpected(std::move(music.error()));
-  m_music_track = std::make_shared<AmbientNoisesDescription const>(std::move(*music));
   if (auto r = initMainMenu(); !r) return std::unexpected(std::move(r.error()));
   if (auto r = initCharSelectionMenu(); !r) return std::unexpected(std::move(r.error()));
   if (auto r = initCharCreationMenu(); !r) return std::unexpected(std::move(r.error()));
@@ -337,10 +354,11 @@ std::expected<void, StarException> TitleScreen::initialize(std::shared_ptr<Unive
   auto configuration = m_guiContext.root().configuration();
   if (!configuration) return std::unexpected(std::move(configuration.error()));
   auto automatic = (*configuration)->get("checkForUpdates", true).and_then([](Json const& value) { return value.to_bool(); });
-  if (!automatic) return std::unexpected(std::move(automatic.error()));
-  if (*automatic)
+  if (!automatic)
+    EmergencyLog::warn("Not checking for updates automatically: invalid checkForUpdates: {}", automatic.error().what());
+  else if (*automatic && m_updateButton)
     m_releaseCheck.start();
-  if (auto r = refreshUpdateButton(); !r) return std::unexpected(std::move(r.error()));
+  refreshUpdateButton();
   return resetState();
 }
 
@@ -354,9 +372,6 @@ std::expected<void, StarException> TitleScreen::renderInit(std::shared_ptr<Rende
 }
 
 std::expected<void, StarException> TitleScreen::render(float interpolation) {
-  auto assets = m_guiContext.root().assets();
-  if (!assets)
-    return std::unexpected(std::move(assets.error()));
   float pixelRatio = m_guiContext.interfaceScale();
   auto windowSize = m_guiContext.windowSize();
   if (!windowSize)
@@ -375,13 +390,7 @@ std::expected<void, StarException> TitleScreen::render(float interpolation) {
   if (auto r = m_environmentPainter->renderSky(screenSize, *skyRenderData); !r) return std::unexpected(std::move(r.error()));
   if (auto r = m_environmentPainter->renderFrontOrbiters(orbiterAndPlanetRatio, screenSize, *skyRenderData); !r) return std::unexpected(std::move(r.error()));
   if (auto r = m_renderer->flush(); !r) return std::unexpected(std::move(r.error()));
-  auto darkenConfig = (*assets)->json("/interface/windowconfig/title.config:skyBackdropDarken");
-  if (!darkenConfig)
-    return std::unexpected(std::move(darkenConfig.error()));
-  auto darken = json_to_color(*darkenConfig);
-  if (!darken)
-    return std::unexpected(std::move(darken.error()));
-  m_renderer->render(renderFlatRect(RectF(0, 0, screenSize[0], screenSize[1]), darken->to_rgba(), 0.0f));
+  m_renderer->render(renderFlatRect(RectF(0, 0, screenSize[0], screenSize[1]), m_skyBackdropDarken, 0.0f));
   if (auto r = m_renderer->flush(); !r) return std::unexpected(std::move(r.error()));
   auto interfaceSize = m_guiContext.windowInterfaceSize();
   if (!interfaceSize)
@@ -416,17 +425,17 @@ std::expected<bool, StarException> TitleScreen::handleInputEvent(InputEvent cons
 std::expected<void, StarException> TitleScreen::update(float dt) {
   if (auto r = m_cursor->update(dt); !r) return std::unexpected(std::move(r.error()));
   auto const& controller = m_guiContext.applicationController();
-  if (m_releaseCheck.poll() || (m_releaseCheck.state() == ReleaseCheck::State::Available && controller
-      && m_updateState != controller->standaloneUpdateState())) {
-    if (auto r = refreshUpdateButton(); !r) return std::unexpected(std::move(r.error()));
-  }
+  if (m_releaseCheck.poll() || (m_updateButton && m_releaseCheck.state() == ReleaseCheck::State::Available && controller
+      && m_updateState != controller->standaloneUpdateState()))
+    refreshUpdateButton();
   auto size = m_guiContext.windowSize();
   if (!size) return std::unexpected(std::move(size.error()));
   Vec2I viewport(Vec2F(*size) / m_guiContext.interfaceScale());
   for (auto const& p : m_rightAnchoredButtons)
     p.first->setPosition(Vec2I(viewport[0], 0) + p.second);
-  if (m_titleState == TitleState::Main) {
-    if (auto r = positionUpdateButton(viewport); !r) return std::unexpected(std::move(r.error()));
+  if (m_titleState == TitleState::Main && m_updateButton) {
+    if (auto r = positionUpdateButton(viewport); !r)
+      discardUpdateButton(r.error());
   }
   m_mainMenu->determineSizeFromChildren();
   m_backgroundMenu->determineSizeFromChildren();
@@ -436,15 +445,34 @@ std::expected<void, StarException> TitleScreen::update(float dt) {
   if (auto r = m_backgroundMenu->update(dt); !r) return std::unexpected(std::move(r.error()));
   if (auto r = m_paneManager->update(dt); !r) return std::unexpected(std::move(r.error()));
   if (auto r = recover_lua_script_error(m_scriptComponent->update(dt)); !r) return std::unexpected(std::move(r.error()));
-  if (!finishedState()) {
-    auto sample = m_music_track_manager.update_ambient(m_music_track, m_skyBackdrop->isDayTime());
-    if (!sample)
-      return std::unexpected(std::move(sample.error()));
-    if (*sample) {
+  if (!finishedState() && (!m_dayMusic.empty() || !m_nightMusic.empty())) {
+    auto& tracks = m_skyBackdrop->isDayTime() ? m_dayMusic : m_nightMusic;
+    std::size_t failed = npos;
+    auto sample = m_music_track_manager.update_tracks(tracks, 0, std::ref(failed));
+    if (!sample && failed != npos) {
+      // Copy before erasing: the same path may be weighted or used in both playlists.
+      auto path = tracks[failed];
+      EmergencyLog::warn("Skipping title music '{}': {}", path, sample.error().what());
+      for (auto* playlist : {&m_dayMusic, &m_nightMusic})
+        playlist->erase(std::remove(playlist->begin(), playlist->end(), path), playlist->end());
+      return {};
+    }
+    if (sample && !*sample)
+      return {};
+    auto played = [&]() -> std::expected<void, StarException> {
+      if (!sample)
+        return std::unexpected(std::move(sample.error()));
+      (*sample)->set_mixer_group(MixerGroup::Music);
+      return m_mixer->play(*sample);
+    }();
+    if (played) {
       m_current_music_track = std::move(*sample);
-      m_current_music_track->set_mixer_group(MixerGroup::Music);
-      m_current_music_track->set_loops(0);
-      if (auto r = m_mixer->play(m_current_music_track); !r) return std::unexpected(std::move(r.error()));
+    } else {
+      EmergencyLog::warn("Disabling title music: {}", played.error().what());
+      m_music_track_manager.cancel_all();
+      m_current_music_track.reset();
+      m_dayMusic.clear();
+      m_nightMusic.clear();
     }
   }
   return {};
@@ -582,6 +610,18 @@ std::expected<void, StarException> TitleScreen::initMainMenu() {
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto config = (*assets)->json("/interface/windowconfig/title.config");
   if (!config) return std::unexpected(std::move(config.error()));
+  auto darken = config->get("skyBackdropDarken").and_then([](Json const& value) { return json_to_color(value); });
+  if (darken)
+    m_skyBackdropDarken = darken->to_rgba();
+  else
+    EmergencyLog::warn("Ignoring title skyBackdropDarken: {}", darken.error().what());
+  auto music = config->get("music");
+  if (music && music->is_type(Json::Type::Object)) {
+    m_dayMusic = titleTracks(*music, "day");
+    m_nightMusic = titleTracks(*music, "night");
+  } else {
+    EmergencyLog::warn("Ignoring title music: expected a playlist object");
+  }
   StringMap<WidgetCallbackFunc> buttonCallbacks;
   buttonCallbacks["singleplayer"] = [this](Widget&) { return switchState(TitleState::SinglePlayerSelectCharacter); };
   buttonCallbacks["multiplayer"] = [this](Widget&) { return switchState(TitleState::MultiPlayerSelectCharacter); };
@@ -622,20 +662,38 @@ std::expected<void, StarException> TitleScreen::initMainMenu() {
       auto const& controller = m_guiContext.applicationController();
       if (controller && controller->standaloneUpdateState() != StandaloneUpdateState::Unsupported) {
         controller->startStandaloneUpdate(m_releaseCheck.latest_version());
-        return refreshUpdateButton();
+        refreshUpdateButton();
+        return {};
       }
-      return refreshUpdateButton(!controller || !controller->openReleasePage());
+      refreshUpdateButton(!controller || !controller->openReleasePage());
+      return {};
     }
     if (m_releaseCheck.state() != ReleaseCheck::State::Checking)
       m_releaseCheck.start();
-    return refreshUpdateButton();
+    refreshUpdateButton();
+    return {};
   });
   auto updateLayout = (*assets)->json("/interface/title/updatebutton.config");
-  if (!updateLayout) return std::unexpected(std::move(updateLayout.error()));
-  if (auto r = reader.construct(*updateLayout, *m_mainMenu); !r) return std::unexpected(std::move(r.error()));
-  auto updateButton = m_mainMenu->requireChild<ButtonWidget>("updates");
-  if (!updateButton) return std::unexpected(std::move(updateButton.error()));
-  m_updateButton = std::move(*updateButton);
+  auto update = [&]() -> std::expected<void, StarException> {
+    if (!updateLayout)
+      return std::unexpected(std::move(updateLayout.error()));
+    // Build off-menu so that even a partially constructed optional layout cannot
+    // cover the main menu's input targets on failure.
+    auto staging = Pane::create(m_guiContext);
+    if (!staging) return std::unexpected(std::move(staging.error()));
+    if (auto r = reader.construct(*updateLayout, **staging); !r) return r;
+    auto button = (*staging)->requireChild<ButtonWidget>("updates");
+    if (!button) return std::unexpected(std::move(button.error()));
+    while ((*staging)->numChildren()) {
+      auto child = (*staging)->getChildNum(0);
+      if (!child) return std::unexpected(std::move(child.error()));
+      if (auto r = m_mainMenu->addChild((*child)->name(), *child); !r) return r;
+    }
+    m_updateButton = std::move(*button);
+    return {};
+  }();
+  if (!update)
+    discardUpdateButton(update.error());
   m_mainMenu->setAnchor(PaneAnchor::BottomLeft);
   m_mainMenu->lockPosition();
   (*backMenu)->determineSizeFromChildren();
@@ -672,7 +730,20 @@ std::expected<void, StarException> TitleScreen::initMainMenu() {
   return {};
 }
 
-std::expected<void, StarException> TitleScreen::refreshUpdateButton(bool openFailed) {
+void TitleScreen::discardUpdateButton(StarException const& error) {
+  EmergencyLog::warn("Ignoring update button: {}", error.what());
+  if (m_updateButton) {
+    // A caption can fail inside this button's own input callback.
+    m_updateButton->setEnabled(false);
+    if (auto hidden = m_updateButton->hide(); !hidden)
+      EmergencyLog::warn("Could not hide update button: {}", hidden.error().what());
+    m_updateButton.reset();
+  }
+}
+
+void TitleScreen::refreshUpdateButton(bool openFailed) {
+  if (!m_updateButton)
+    return;
   String key;
   auto state = m_releaseCheck.state();
   bool enabled = true;
@@ -696,14 +767,13 @@ std::expected<void, StarException> TitleScreen::refreshUpdateButton(bool openFai
     case ReleaseCheck::State::Failed: key = "failed"; break;
   }
   auto caption = m_updateButton->data().get_string(key);
-  if (!caption) return std::unexpected(std::move(caption.error()));
+  if (!caption) return discardUpdateButton(caption.error());
   if (state == ReleaseCheck::State::Available && !openFailed) {
     caption = caption->replace("<version>", m_releaseCheck.latest_version());
-    if (!caption) return std::unexpected(std::move(caption.error()));
+    if (!caption) return discardUpdateButton(caption.error());
   }
   m_updateButton->setText(*caption);
   m_updateButton->setEnabled(enabled);
-  return {};
 }
 
 std::expected<void, StarException> TitleScreen::positionUpdateButton(Vec2I const& viewport) {

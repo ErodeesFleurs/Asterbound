@@ -28,7 +28,17 @@ import star.bi_map;
 namespace Star {
 namespace {
 template <typename T> using Result = std::expected<T, StarException>;
+struct SurfaceFormatUnavailableTag {
+  static constexpr std::string_view name() { return "SurfaceFormatUnavailable"; }
+};
+using SurfaceFormatUnavailable = StarError<SurfaceFormatUnavailableTag, RendererException>;
+struct VulkanAllocationFailureTag {
+  static constexpr std::string_view name() { return "VulkanAllocationFailure"; }
+};
+using VulkanAllocationFailure = StarError<VulkanAllocationFailureTag, RendererException>;
 std::unexpected<StarException> vkError(std::string_view operation, VkResult result) {
+  if (result == VK_ERROR_OUT_OF_HOST_MEMORY || result == VK_ERROR_OUT_OF_DEVICE_MEMORY)
+    return std::unexpected<StarException>(VulkanAllocationFailure::format("Vulkan {} failed ({})", operation, static_cast<int>(result)));
   return std::unexpected<StarException>(RendererException::format("Vulkan {} failed ({})", operation, static_cast<int>(result)));
 }
 #define VK_REQUIRE(expression) do { auto vkResult = (expression); if (vkResult != VK_SUCCESS) return vkError(#expression, vkResult); } while (false)
@@ -849,7 +859,7 @@ Result<Target> VulkanRenderer::State::makeTarget(Vec2U dimensions, VkFormat form
   VkFormatProperties properties;
   vkGetPhysicalDeviceFormatProperties(device->physical, format, &properties);
   if (!(properties.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT))
-    return std::unexpected(RendererException::format("Vulkan framebuffer format {} does not support alpha blending", static_cast<int>(format)));
+    return std::unexpected(SurfaceFormatUnavailable::format("Vulkan framebuffer format {} does not support alpha blending", static_cast<int>(format)));
   auto color = makeImage(device, dimensions, format, sampleCount, addressing, filtering);
   if (!color) return std::unexpected(std::move(color.error()));
   Target target{*color, *color};
@@ -893,7 +903,7 @@ Result<void> VulkanRenderer::State::recreateSwapchain() {
   if (formats.size() == 1 && formats[0].format == VK_FORMAT_UNDEFINED) formats[0].format = VK_FORMAT_B8G8R8A8_UNORM;
   bool hdrOutput = outputSettings.mode == RenderOutputMode::Hdr10;
   if (hdrOutput && !device->swapchainColorspace)
-    return std::unexpected(RendererException("HDR10 requires VK_EXT_swapchain_colorspace; use SDR or a Vulkan driver/window system exposing HDR output"));
+    return std::unexpected(SurfaceFormatUnavailable("HDR10 requires VK_EXT_swapchain_colorspace; use SDR or a Vulkan driver/window system exposing HDR output"));
   auto chosen = std::find_if(formats.begin(), formats.end(), [hdrOutput](auto const& format) {
     if (hdrOutput)
       return (format.format == VK_FORMAT_A2B10G10R10_UNORM_PACK32 || format.format == VK_FORMAT_A2R10G10B10_UNORM_PACK32)
@@ -901,13 +911,13 @@ Result<void> VulkanRenderer::State::recreateSwapchain() {
     return (format.format == VK_FORMAT_B8G8R8A8_UNORM || format.format == VK_FORMAT_R8G8B8A8_UNORM) && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
   });
   if (chosen == formats.end())
-    return std::unexpected(RendererException(hdrOutput
+    return std::unexpected(SurfaceFormatUnavailable(hdrOutput
         ? "HDR10 unavailable: this Vulkan surface does not advertise HDR10 ST2084 with a 10-bit UNORM format; enable HDR in a capable display/compositor or select SDR"
         : "Vulkan surface has no non-sRGB RGBA8/BGRA8 presentation format"));
   VkFormatProperties formatSupport;
   vkGetPhysicalDeviceFormatProperties(device->physical, chosen->format, &formatSupport);
   if (!(formatSupport.optimalTilingFeatures & VK_FORMAT_FEATURE_BLIT_DST_BIT))
-    return std::unexpected(RendererException("Vulkan presentation format cannot receive a color blit"));
+    return std::unexpected(SurfaceFormatUnavailable("Vulkan presentation format cannot receive a color blit"));
   VK_REQUIRE(vkGetPhysicalDeviceSurfacePresentModesKHR(device->physical, device->surface, &count, nullptr));
   std::vector<VkPresentModeKHR> modes(count);
   VK_REQUIRE(vkGetPhysicalDeviceSurfacePresentModesKHR(device->physical, device->surface, &count, modes.data()));
@@ -1929,12 +1939,20 @@ Result<void> VulkanRenderer::setOutputSettings(RenderOutputSettings const& setti
     state.outputSettings = previous;
     // A failure before retirement leaves the old output intact. Afterwards,
     // rollback needs a fresh swapchain, never another acquire of the retired one.
-    if (hadSwapchain && !state.swapchain) {
+    bool allocationFailed = result.error().is<VulkanAllocationFailure>();
+    bool unavailable = result.error().is<SurfaceFormatUnavailable>() || allocationFailed;
+    if (hadSwapchain && (!state.swapchain || (unavailable && state.dirtySwapchain))) {
       auto restored = state.recreateSwapchain();
       if (restored && hadGui && !state.gui)
         restored = state.initializeGui();
       if (!restored)
         return std::unexpected(RendererException::format("Vulkan output change failed: {}; restoring the previous output also failed: {}", result.error().what(), restored.error().what()));
+      return std::unexpected(OutputPreferenceRejected(result.error().what()));
+    }
+    if (unavailable && hadSwapchain) {
+      if (allocationFailed)
+        VK_REQUIRE(vkDeviceWaitIdle(state.device->logical));
+      return std::unexpected(OutputPreferenceRejected(result.error().what()));
     }
   }
   return result;
