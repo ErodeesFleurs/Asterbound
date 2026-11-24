@@ -178,13 +178,13 @@ std::expected<std::shared_ptr<PlayerConfig>, StarException> PlayerConfig::create
       return std::unexpected(std::move(vector.error()));
     field.second.get() = *vector;
   }
-  auto splashConfig = json.get("splashConfig");
-  if (!splashConfig)
-    return std::unexpected(std::move(splashConfig.error()));
-  auto splash = EntitySplashConfig::create(root, *splashConfig);
+  auto splash_config = json.get("splashConfig");
+  if (!splash_config)
+    return std::unexpected(std::move(splash_config.error()));
+  auto splash = EntitySplashConfig::create(root, *splash_config);
   if (!splash)
     return std::unexpected(std::move(splash.error()));
-  config->splashConfig = std::move(*splash);
+  config->splash_config = std::move(*splash);
   for (auto const& field : {
       std::pair{std::string_view{"effectsAnimator"}, std::ref(config->effectsAnimator)},
       std::pair{std::string_view{"bodyMaterialKind"}, std::ref(config->bodyMaterialKind)}}) {

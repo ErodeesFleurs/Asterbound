@@ -505,7 +505,7 @@ variant.nametagColor = std::move(*result87);
 if (!result88) return std::unexpected(std::move(result88.error()));
 auto result89 = EntitySplashConfig::create(m_root, std::move(*result88));
 if (!result89) return std::unexpected(std::move(result89.error()));
-variant.splashConfig = std::move(*result89);
+  variant.splash_config = std::move(*result89);
 
   return variant;
 }
@@ -731,7 +731,7 @@ variant.nametagColor = std::move(*result149);
 if (!result150) return std::unexpected(std::move(result150.error()));
 auto result151 = EntitySplashConfig::create(m_root, std::move(*result150));
 if (!result151) return std::unexpected(std::move(result151.error()));
-variant.splashConfig = std::move(*result151);
+  variant.splash_config = std::move(*result151);
 
   return variant;
 }
@@ -935,7 +935,7 @@ variant.nametagColor = std::move(*result203);
 if (!result204) return std::unexpected(std::move(result204.error()));
 auto result205 = EntitySplashConfig::create(m_root, std::move(*result204));
 if (!result205) return std::unexpected(std::move(result205.error()));
-variant.splashConfig = std::move(*result205);
+  variant.splash_config = std::move(*result205);
 
   return variant;
 }

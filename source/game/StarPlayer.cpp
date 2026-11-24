@@ -1255,16 +1255,13 @@ std::expected<List<Drawable>, StarException> Player::drawables(float interpolati
 
 
 std::expected<List<Particle>, StarException> Player::particles() {
-  List<Particle> particles;
-  auto currentWorldResult = world();
-  if (!currentWorldResult)
-    return std::unexpected(std::move(currentWorldResult.error()));
-  auto& currentWorld = currentWorldResult->get();
-  auto splashResult = m_config->splashConfig.doSplash(position(), m_movementController->velocity(), currentWorld);
-  if (!splashResult)
-    return std::unexpected(std::move(splashResult.error()));
-  auto splash = std::move(*splashResult);
-  particles.append_range(std::move(splash));
+  auto current_world = world();
+  if (!current_world)
+    return std::unexpected(std::move(current_world.error()));
+  auto generated = m_config->splash_config.generate_particles(position(), m_movementController->velocity(), current_world->get());
+  if (!generated)
+    return std::unexpected(std::move(generated.error()));
+  auto particles = std::move(*generated);
   particles.append_range(std::exchange(m_callbackParticles, {}));
   particles.append_range(m_humanoidDynamicTarget.pullNewParticles());
   particles.append_range(m_techController->pullNewParticles());

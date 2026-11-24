@@ -52,79 +52,93 @@ import star.assets;
 import star.configuration;
 import star.root;
 
+import star.string;
+import star.math_common;
 import star.liquids_database;
 
 namespace Star {
 
-EntitySplashConfig::EntitySplashConfig() = default;
-
 std::expected<EntitySplashConfig, StarException> EntitySplashConfig::create(Root& root, Json const& config) {
-  EntitySplashConfig splash;
+  auto read_particle = [&](String const& key) -> std::expected<Particle, StarException> {
+    auto value = config.find(key);
+    if (!value) return std::unexpected(std::move(value.error()));
+    if (!*value || !(**value).get().is_type(Json::Type::Object))
+      return std::unexpected(JsonException::format("{} must be an object", key));
+    return Particle::create(root, (**value).get());
+  };
   auto speed = config.get_float("splashSpeedMin");
   if (!speed) return std::unexpected(std::move(speed.error()));
-  splash.splashSpeedMin = *speed;
+  if (!is_finite(*speed)) return std::unexpected(JsonException("splashSpeedMin must be finite"));
   auto level = config.get_float("splashMinWaterLevel");
   if (!level) return std::unexpected(std::move(level.error()));
-  splash.splashMinWaterLevel = *level;
-  auto bottomJson = config.get("splashBottomSensor");
-  if (!bottomJson) return std::unexpected(std::move(bottomJson.error()));
-  auto bottom = json_to_vec2f(*bottomJson);
+  if (!is_finite(*level)) return std::unexpected(JsonException("splashMinWaterLevel must be finite"));
+  auto bottom_json = config.get("splashBottomSensor");
+  if (!bottom_json) return std::unexpected(std::move(bottom_json.error()));
+  auto bottom = json_to_vec2f(*bottom_json);
   if (!bottom) return std::unexpected(std::move(bottom.error()));
-  splash.splashBottomSensor = *bottom;
-  auto topJson = config.get("splashTopSensor");
-  if (!topJson) return std::unexpected(std::move(topJson.error()));
-  auto top = json_to_vec2f(*topJson);
+  if (!is_finite((*bottom)[0]) || !is_finite((*bottom)[1]))
+    return std::unexpected(JsonException("splashBottomSensor must be finite"));
+  auto top_json = config.get("splashTopSensor");
+  if (!top_json) return std::unexpected(std::move(top_json.error()));
+  auto top = json_to_vec2f(*top_json);
   if (!top) return std::unexpected(std::move(top.error()));
-  splash.splashTopSensor = *top;
+  if (!is_finite((*top)[0]) || !is_finite((*top)[1]))
+    return std::unexpected(JsonException("splashTopSensor must be finite"));
   auto count = config.get_int("numSplashParticles");
   if (!count) return std::unexpected(std::move(count.error()));
-  splash.numSplashParticles = *count;
+  if (*count < 0 || !std::in_range<int>(*count))
+    return std::unexpected(JsonException("numSplashParticles must be a nonnegative int"));
   auto factor = config.get_float("splashYVelocityFactor");
   if (!factor) return std::unexpected(std::move(factor.error()));
-  splash.splashYVelocityFactor = *factor;
-  auto particleJson = config.get("splashParticle");
-  if (!particleJson) return std::unexpected(std::move(particleJson.error()));
-  auto particleObject = particleJson->to_object();
-  if (!particleObject) return std::unexpected(std::move(particleObject.error()));
-  auto particle = Particle::create(root, *particleObject);
+  if (!is_finite(*factor)) return std::unexpected(JsonException("splashYVelocityFactor must be finite"));
+  auto particle = read_particle("splashParticle");
   if (!particle) return std::unexpected(std::move(particle.error()));
-  splash.splashParticle = std::move(*particle);
-  auto varianceJson = config.get("splashParticleVariance");
-  if (!varianceJson) return std::unexpected(std::move(varianceJson.error()));
-  auto varianceObject = varianceJson->to_object();
-  if (!varianceObject) return std::unexpected(std::move(varianceObject.error()));
-  auto variance = Particle::create(root, *varianceObject);
+  auto variance = read_particle("splashParticleVariance");
   if (!variance) return std::unexpected(std::move(variance.error()));
-  splash.splashParticleVariance = std::move(*variance);
-  return splash;
+  return EntitySplashConfig{
+    .splash_speed_min = *speed,
+    .splash_bottom_sensor = *bottom,
+    .splash_top_sensor = *top,
+    .splash_min_water_level = *level,
+    .num_splash_particles = static_cast<int>(*count),
+    .splash_particle = std::move(*particle),
+    .splash_particle_variance = std::move(*variance),
+    .splash_y_velocity_factor = *factor
+  };
 }
 
-std::expected<List<Particle>, StarException> EntitySplashConfig::doSplash(Vec2F position, Vec2F velocity, World& world) const {
+std::expected<List<Particle>, StarException> EntitySplashConfig::generate_particles(Vec2F position, Vec2F velocity, World& world) const {
   List<Particle> particles;
-  if (std::fabs(velocity[1]) >= splashSpeedMin) {
-    auto liquidDb = world.root().liquidsDatabase();
-    if (!liquidDb)
-      return std::unexpected(std::move(liquidDb.error()));
-    Vec2I bottom = Vec2I::floor(position + splashBottomSensor);
-    Vec2I top = Vec2I::floor(position + splashTopSensor);
-    if (world.liquidLevel(bottom).level - world.liquidLevel(top).level >= splashMinWaterLevel) {
-      LiquidId liquidType;
-      auto bottomLiquid = world.liquidLevel(bottom);
-      auto topLiquid = world.liquidLevel(top);
-      if (bottomLiquid.level > 0 && static_cast<int>(bottomLiquid.liquid))
-        liquidType = bottomLiquid.liquid;
-      else
-        liquidType = topLiquid.liquid;
-      Color particleColor = Color::rgba((*liquidDb)->liquidSettings(liquidType)->liquidColor);
-      for (int i = 0; i < numSplashParticles; ++i) {
-        Particle newSplashParticle = splashParticle;
-        newSplashParticle.position = position;
-        newSplashParticle.velocity[1] = std::fabs(velocity[1]) * splashYVelocityFactor;
-        newSplashParticle.color = particleColor;
-        newSplashParticle.applyVariance(world.root(), splashParticleVariance);
-        particles.push_back(newSplashParticle);
-      }
-    }
+  if (num_splash_particles <= 0) return particles;
+  auto const speed = std::fabs(velocity[1]);
+  if (!(speed >= splash_speed_min)) return particles;
+
+  auto const bottom = Vec2I::floor(position + splash_bottom_sensor);
+  auto const top = Vec2I::floor(position + splash_top_sensor);
+  auto const bottom_liquid = world.liquidLevel(bottom);
+  auto const top_liquid = bottom == top ? bottom_liquid : world.liquidLevel(top);
+  if (!(bottom_liquid.level - top_liquid.level >= splash_min_water_level)) return particles;
+
+  auto const liquid = bottom_liquid.level > 0 && bottom_liquid.liquid != EmptyLiquidId
+    ? bottom_liquid.liquid : top_liquid.liquid;
+  if (liquid == EmptyLiquidId) return particles;
+  auto& root = world.root();
+  auto database = root.liquidsDatabase();
+  if (!database) return std::unexpected(std::move(database.error()));
+  auto settings = (*database)->liquidSettings(liquid);
+  if (!settings)
+    return std::unexpected(LiquidException::format("Unknown splash liquid {} at probes bottom ({}, {}), top ({}, {})",
+      liquid, bottom[0], bottom[1], top[0], top[1]));
+
+  auto const color = Color::rgba(settings->liquidColor);
+  auto const y_velocity = speed * splash_y_velocity_factor;
+  particles.reserve(static_cast<std::size_t>(num_splash_particles));
+  for (int i = 0; i < num_splash_particles; ++i) {
+    auto& particle = particles.emplace_back(splash_particle);
+    particle.position = position;
+    particle.velocity[1] = y_velocity;
+    particle.color = color;
+    particle.applyVariance(root, splash_particle_variance);
   }
   return particles;
 }

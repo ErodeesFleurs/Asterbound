@@ -16,6 +16,12 @@ import star.root;
 import star.vector;
 import star.string;
 import star.liquid_types;
+import star.color;
+import star.entity_splash;
+import star.list;
+import star.particle;
+import star.random;
+import star.world_server;
 #include "gtest/gtest.h"
 
 using namespace Star;
@@ -74,6 +80,114 @@ struct Star::ValueHash<CustomLiquidId> {
 };
 
 namespace {
+Json splash_config() {
+  return JsonObject{{"splashSpeedMin", 4}, {"splashMinWaterLevel", 0.5f},
+                    {"splashBottomSensor", JsonArray{-0.5f, 0}}, {"splashTopSensor", JsonArray{0, 0.5f}},
+                    {"numSplashParticles", 3}, {"splashYVelocityFactor", 2},
+                    {"splashParticle", JsonObject{{"type", "text"}, {"text", "splash"},
+                                                 {"velocity", JsonArray{3, -9}}, {"timeToLive", 7}}},
+                    {"splashParticleVariance", JsonObject{{"position", JsonArray{2, 1}},
+                                                         {"velocity", JsonArray{1, 2}}, {"timeToLive", 3}}}};
+}
+
+const GameTestRegistration splash_config_errors("EntitySplashTest", "RejectsMalformedConfig", [](GameTest& fixture) {
+  auto config = splash_config();
+  for (auto const& [key, value] : JsonObject{{"splashSpeedMin", false}, {"splashMinWaterLevel", "bad"},
+                                            {"splashBottomSensor", JsonArray{1}}, {"splashTopSensor", false},
+                                            {"splashYVelocityFactor", "bad"}, {"splashParticle", false},
+                                            {"splashParticleVariance", JsonObject{{"type", "unknown"}}}}) {
+    auto changed = config.set(key, value);
+    ASSERT_TRUE(changed);
+    EXPECT_FALSE(EntitySplashConfig::create(fixture.root(), *changed)) << key.utf8();
+  }
+  for (std::int64_t count : std::array<std::int64_t, 2>{-1, std::int64_t{std::numeric_limits<int>::max()} + 1}) {
+    auto changed = config.set("numSplashParticles", count);
+    ASSERT_TRUE(changed);
+    EXPECT_FALSE(EntitySplashConfig::create(fixture.root(), *changed)) << count;
+  }
+});
+
+const GameTestRegistration splash_world_cases("EntitySplashTest", "WorldSensorsParticleOrderAndRandomStream", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  auto file = File::ephemeral_file(root.random());
+  ASSERT_TRUE(file);
+  auto created = WorldServer::create(root, Vec2U(2048, 2048), *file);
+  ASSERT_TRUE(created) << created.error().what();
+  auto& world = **created;
+  auto close = make_scope_exit([&] { EXPECT_TRUE(world.close()); });
+  Vec2F position(1024.25f, 1024.75f);
+  Vec2I bottom(1023, 1024), top(1024, 1025);
+  ASSERT_TRUE(world.generateRegion(RectI::with_size(bottom, Vec2I(4, 4))));
+  auto database = root.liquidsDatabase();
+  ASSERT_TRUE(database);
+  auto water = (*database)->liquidId("water");
+  auto lava = (*database)->liquidId("lava");
+  ASSERT_TRUE(water && lava);
+  auto config = EntitySplashConfig::create(root, splash_config());
+  ASSERT_TRUE(config) << config.error().what();
+  ASSERT_TRUE(world.setLiquid(bottom, *water, 0.75f, 1));
+  ASSERT_TRUE(world.setLiquid(top, *lava, 0.25f, 1));
+  constexpr std::uint64_t seed = 31097;
+  auto expect_empty = [&](float speed) {
+    root.random().seed(seed);
+    auto particles = config->generate_particles(position, {99, speed}, world);
+    ASSERT_TRUE(particles) << particles.error().what();
+    EXPECT_TRUE(particles->empty());
+    EXPECT_EQ(root.random().next_u32(), RandomService(seed).next_u32());
+  };
+  expect_empty(3.99f);
+  config->splash_min_water_level = 0.51f;
+  expect_empty(-4);
+  config->splash_min_water_level = 0.5f;
+  auto expect_batch = [&](float speed, LiquidId id) {
+    root.random().seed(seed);
+    auto particles = config->generate_particles(position, {99, speed}, world);
+    ASSERT_TRUE(particles) << particles.error().what();
+    ASSERT_EQ(particles->size(), 3u);
+    auto next_draw = root.random().next_u32();
+    RandomService reference(seed);
+    for (unsigned i = 0; i < 3 * 11; ++i)
+      reference.uniform_float();
+    EXPECT_EQ(next_draw, reference.next_u32());
+    root.random().seed(seed);
+    auto settings = (*database)->liquidSettings(id);
+    ASSERT_TRUE(settings);
+    for (auto const& particle : *particles) {
+      auto expected = config->splash_particle;
+      expected.position = position;
+      expected.velocity = {3, std::fabs(speed) * 2};
+      expected.color = Color::rgba(settings->liquidColor);
+      expected.applyVariance(root, config->splash_particle_variance);
+      auto expected_json = expected.toJson();
+      auto actual_json = particle.toJson();
+      ASSERT_TRUE(expected_json && actual_json);
+      EXPECT_EQ(*actual_json, *expected_json);
+    }
+  };
+  expect_batch(4, *water);
+  expect_batch(-4, *water);
+  config->splash_top_sensor = config->splash_bottom_sensor;
+  expect_empty(4);
+  config->splash_min_water_level = 0;
+  auto zero_variance = Particle::create(root, JsonObject{});
+  ASSERT_TRUE(zero_variance);
+  config->splash_particle_variance = std::move(*zero_variance);
+  expect_batch(4, *water);
+  config->num_splash_particles = 0;
+  expect_empty(4);
+  config->num_splash_particles = 3;
+  ASSERT_TRUE(world.setLiquid(bottom, EmptyLiquidId, 0, 0));
+  expect_empty(4);
+  config->splash_top_sensor = {0, 0.5f};
+  config->splash_min_water_level = -0.25f;
+  expect_batch(4, *lava);
+  auto unknown = std::numeric_limits<LiquidId>::max();
+  ASSERT_FALSE((*database)->isValidLiquidId(unknown));
+  ASSERT_TRUE(world.setLiquid(bottom, unknown, 1, 1));
+  auto failed = config->generate_particles(position, {0, 4}, world);
+  EXPECT_FALSE(failed);
+});
+
 struct UnhashableLiquidId {
   bool operator==(UnhashableLiquidId const&) const = default;
 };

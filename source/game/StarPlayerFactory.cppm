@@ -83,7 +83,7 @@ struct PlayerConfig {
 
   String bodyMaterialKind;
 
-  EntitySplashConfig splashConfig;
+  EntitySplashConfig splash_config;
 
   Json companionsConfig;
 

@@ -91,7 +91,7 @@ struct NpcVariant {
 
   Vec3B nametagColor;
 
-  EntitySplashConfig splashConfig;
+  EntitySplashConfig splash_config;
 };
 
 class NpcDatabase {

@@ -619,6 +619,15 @@ with a conservative earliest-timestamp bound; negative smear, TTL changes and
 failed-insertion timestamps must remain covered. Filtered cleanup still visits
 every entry. Revisiting evicted cells re-executes their deterministic callbacks.
 
+### Entity splash particles
+
+Run `game_tests --gtest_filter='EntitySplashTest.*'` with real assets.
+Zero particles disables emission. Threshold equality can emit on either
+direction of vertical motion, including coincident wet probes at a zero
+level-difference threshold. Empty liquid emits nothing; unknown nonempty IDs
+are errors. Compare ordered particle fields and the next RNG value, including
+for a template with zero variance.
+
 ### Entity rendering
 
 Verify world-space particle birth on the logic tick separately from drawable,

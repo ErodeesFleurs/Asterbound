@@ -1160,12 +1160,12 @@ if (!result250) return std::unexpected(std::move(result250.error()));
   auto result251 = render_callback.add_audios(m_statusController->pullNewAudios());
 if (!result251) return std::unexpected(std::move(result251.error()));
 
-  auto result252 = world();
-if (!result252) return std::unexpected(std::move(result252.error()));
-auto result253 = m_npcVariant.splashConfig.doSplash(position(), m_movementController->velocity(), result252->get());
-if (!result253) return std::unexpected(std::move(result253.error()));
-auto result254 = render_callback.add_particles(std::move(*result253));
-if (!result254) return std::unexpected(std::move(result254.error()));
+  auto current_world = world();
+  if (!current_world) return std::unexpected(std::move(current_world.error()));
+  auto splash = m_npcVariant.splash_config.generate_particles(position(), m_movementController->velocity(), current_world->get());
+  if (!splash) return std::unexpected(std::move(splash.error()));
+  if (auto submitted = render_callback.add_particles(std::move(*splash)); !submitted)
+    return std::unexpected(std::move(submitted.error()));
   auto result261 = m_effectEmitter->collectRenderEvents(render_callback);
 if (!result261) return std::unexpected(std::move(result261.error()));
 
