@@ -288,7 +288,7 @@ std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create
       return std::unexpected(std::move(drawables.error()));
     for (auto& drawable : *drawables) {
       if (drawable.is_image()) {
-        auto metadata = root.imageMetadataDatabase();
+        auto metadata = root.image_metadata_database();
         if (!metadata)
           return std::unexpected(std::move(metadata.error()));
         auto added = drawable.image_part().add_directives(**metadata, Directives(String(Star::format("?hueshift={}", materialHueToDegrees(item->m_materialHueShift)))), false);
@@ -504,7 +504,7 @@ std::expected<void, StarException> MaterialItem::render(RenderCallback& render_c
     color.set_alpha_f(alpha * pulseA * 0.95f);
     auto addIndicator = [&](String const& path) -> std::expected<void, StarException> {
       Vec2F basePosition = Vec2F(0.5f, 0.5f);
-      auto metadata = root().imageMetadataDatabase();
+      auto metadata = root().image_metadata_database();
       if (!metadata)
         return std::unexpected(std::move(metadata.error()));
       auto indicator = Drawable::make_image(**metadata, path, 1.0f / tile_pixels, true, basePosition);
@@ -885,7 +885,7 @@ std::expected<std::reference_wrapper<List<Drawable> const>, StarException> Mater
           return std::unexpected(std::move(taken.error()));
         drawables.append_range(std::move(*taken));
       }
-      auto metadata = root().imageMetadataDatabase();
+      auto metadata = root().image_metadata_database();
       if (!metadata)
         return std::unexpected(std::move(metadata.error()));
       auto boundBox = Drawable::bound_box_all(**metadata, drawables, true);

@@ -349,9 +349,9 @@ std::expected<void, StarException> Parallax::buildLayer(Json const& layerSetting
 
   ParallaxLayer layer;
   RandomSource rnd(m_seed + m_layers.size());
-  auto imgMetadata = m_root.imageMetadataDatabase();
-  if (!imgMetadata)
-    return std::unexpected(std::move(imgMetadata.error()));
+  auto image_metadata = m_root.image_metadata_database();
+  if (!image_metadata)
+    return std::unexpected(std::move(image_metadata.error()));
 
   auto baseCount = layerSettings.get_int("baseCount", 1);
   if (!baseCount)
@@ -425,7 +425,7 @@ std::expected<void, StarException> Parallax::buildLayer(Json const& layerSetting
   if (!noRandomOffset)
     return std::unexpected(std::move(noRandomOffset.error()));
   if (!*noRandomOffset) {
-    auto size = (*imgMetadata)->imageSize(layer.textures[0]);
+    auto size = (*image_metadata)->image_size(layer.textures[0]);
     if (!size)
       return std::unexpected(std::move(size.error()));
     auto offset = rnd.uniform_int((*size)[0]);

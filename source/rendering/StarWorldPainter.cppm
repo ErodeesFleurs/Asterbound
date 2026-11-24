@@ -140,7 +140,7 @@ private:
   // Updated every frame
 
   std::shared_ptr<Assets const> m_assets;
-  std::shared_ptr<ImageMetadataDatabase const> m_imageMetadata;
+  std::shared_ptr<ImageMetadataDatabase const> m_image_metadata;
   RectF m_worldScreenRect;
 
   Vec2F m_previousCameraCenter;

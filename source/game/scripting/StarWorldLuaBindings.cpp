@@ -1403,7 +1403,7 @@ namespace LuaBindings {
       if (!portrait) return std::unexpected(std::move(portrait.error()));
       auto& cache = *portraitCache;
       if (cache.entity.lock() != entity || cache.mode != modeName || cache.drawables != *portrait) {
-        auto metadata = world.root().imageMetadataDatabase();
+        auto metadata = world.root().image_metadata_database();
         if (!metadata) return std::unexpected(std::move(metadata.error()));
         auto bounds = Drawable::bound_box_all(**metadata, *portrait, true);
         if (!bounds) return std::unexpected(std::move(bounds.error()));

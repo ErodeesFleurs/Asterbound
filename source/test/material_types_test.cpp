@@ -56,7 +56,7 @@ const GameTestRegistration material_falling_behavior("MaterialDatabaseTest", "Fa
 
 const GameTestRegistration
   materialRuleJoinNames("MaterialRenderProfile", "RuleJoinNamesPreserveDefaultsCaseAndErrors", [](GameTest& fixture) {
-    auto metadata = fixture.root().imageMetadataDatabase();
+    auto metadata = fixture.root().image_metadata_database();
     ASSERT_TRUE(metadata) << metadata.error().what();
     auto makeSpec = [](Json rule) -> Json {
       return JsonObject{{"representativePiece", ""},

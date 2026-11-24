@@ -42,9 +42,9 @@ Returns the pixel dimensions of the specified image asset.
 
 ---
 
-#### `List<Vec2I>` root.imageSpaces(`String` imagePath, `Vec2F` worldPosition, `float` spaceScan, `bool` flip)
+#### `List<Vec2I>` root.imageSpaces(`String` imagePath, `Vec2F` pixelPosition, `float` spaceScan, `bool` flip)
 
-Returns a list of the world tile spaces the image would occupy if placed at the given position using the specified spaceScan value (the portion of a space that must be non-transparent for that space to count as filled).
+Returns the occupied tiles in row order (bottom to top, then left to right within each row). `pixelPosition` is the image origin in pixels, not tiles; fractional offsets affect the result. `spaceScan` is the minimum fraction of the tile’s pixels with nonzero alpha. At zero, all tiles in the scan rectangle qualify. `flip` mirrors the image horizontally. The position and threshold must be finite.
 
 ---
 

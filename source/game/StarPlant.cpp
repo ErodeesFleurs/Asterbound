@@ -860,13 +860,11 @@ std::expected<void, StarException> Plant::initialize(GrassVariant const& config,
   // If this is a ceiling plant, offset the image so that the [0, 0] space is
   // at the top
   if (config.ceiling) {
-    auto result425 = this->root().imageMetadataDatabase();
-if (!result425) return std::unexpected(std::move(result425.error()));
-auto imgMetadata = std::move(*result425);
-    auto result426 = imgMetadata->imageSize(imageName);
-if (!result426) return std::unexpected(std::move(result426.error()));
-float imageHeight = std::move(*result426)[1];
-    offset = Vec2F(0.0f, 1.0f - imageHeight / tile_pixels);
+    auto metadata = root().image_metadata_database();
+    if (!metadata) return std::unexpected(std::move(metadata.error()));
+    auto size = (*metadata)->image_size(imageName);
+    if (!size) return std::unexpected(std::move(size.error()));
+    offset = Vec2F(0.0f, 1.0f - static_cast<float>(size->y()) / tile_pixels);
   }
 
   PlantPiece piece;
@@ -1206,9 +1204,8 @@ RectF Plant::interactiveBoundBox() const {
 }
 
 std::expected<void, StarException> Plant::scanSpacesAndRoots() {
-  auto result624 = this->root().imageMetadataDatabase();
-if (!result624) return std::unexpected(std::move(result624.error()));
-auto imageMetadataDatabase = std::move(*result624);
+  auto metadata = root().image_metadata_database();
+  if (!metadata) return std::unexpected(std::move(metadata.error()));
 
   // build spaces
   Set<Vec2I> spaces;
@@ -1217,13 +1214,12 @@ auto imageMetadataDatabase = std::move(*result624);
   spaces.add({0, 0});
 
   for (auto& piece : m_pieces) {
-    auto result625 = imageMetadataDatabase->imageSize(piece.image);
-if (!result625) return std::unexpected(std::move(result625.error()));
-piece.imageSize = std::move(*result625);
-    auto result626 = imageMetadataDatabase->imageSpaces(piece.image, piece.offset * tile_pixels, PlantScanThreshold, piece.flip);
-if (!result626) return std::unexpected(std::move(result626.error()));
-piece.spaces = Set<Vec2I>::from(
-        std::move(*result626));
+    auto size = (*metadata)->image_size(piece.image);
+    if (!size) return std::unexpected(std::move(size.error()));
+    piece.imageSize = *size;
+    auto occupied = (*metadata)->image_spaces(piece.image, piece.offset * tile_pixels, PlantScanThreshold, piece.flip);
+    if (!occupied) return std::unexpected(std::move(occupied.error()));
+    piece.spaces = Set<Vec2I>::from(std::move(*occupied));
     spaces.insert_range(piece.spaces);
   }
 
@@ -1379,7 +1375,7 @@ std::expected<void, StarException> Plant::render(RenderCallback& render_callback
     if ((m_ceiling && offset[1] <= m_tileDamageY) || (!m_ceiling && offset[1] + size[1] >= m_tileDamageY))
       offset[0] += damageXOffset;
 
-    auto result603 = this->root().imageMetadataDatabase();
+    auto result603 = this->root().image_metadata_database();
 if (!result603) return std::unexpected(std::move(result603.error()));
 auto result1283 = Drawable::make_image(*std::move(*result603), plantPiece.imagePath, 1.0f / tile_pixels, false, offset);
 if (!result1283) return std::unexpected(std::move(result1283.error()));

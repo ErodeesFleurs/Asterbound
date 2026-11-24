@@ -645,15 +645,15 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
     auto animationPosition = std::move(*animationPositionResult);
     m_animationPosition = animationPosition / tile_pixels;
     m_networkedAnimator->setFlipped(false);
-    auto imageMetadataResult = root().imageMetadataDatabase();
-    if (!imageMetadataResult)
-      return std::unexpected(std::move(imageMetadataResult.error()));
-    auto imageMetadata = std::move(*imageMetadataResult);
+    auto image_metadata_result = root().image_metadata_database();
+    if (!image_metadata_result)
+      return std::unexpected(std::move(image_metadata_result.error()));
+    auto image_metadata = std::move(*image_metadata_result);
     auto drawablesResult = m_networkedAnimator->drawables();
     if (!drawablesResult)
       return std::unexpected(std::move(drawablesResult.error()));
     auto drawables = std::move(*drawablesResult);
-    auto boundsResult = Drawable::bound_box_all(*imageMetadata, drawables, false);
+    auto boundsResult = Drawable::bound_box_all(*image_metadata, drawables, false);
     if (!boundsResult)
       return std::unexpected(std::move(boundsResult.error()));
     auto bounds = std::move(*boundsResult);
@@ -1308,7 +1308,7 @@ std::expected<List<Drawable>, StarException> Object::cursorHintDrawables() const
     auto placementImage = std::move(*placementImageResult);
     if (m_direction.get() == Direction::Left)
       placementImage += "?flipx";
-    auto metadataResult = root().imageMetadataDatabase();
+    auto metadataResult = root().image_metadata_database();
     if (!metadataResult)
       return std::unexpected(std::move(metadataResult.error()));
     auto metadata = std::move(*metadataResult);
@@ -2373,7 +2373,7 @@ std::expected<List<Drawable>, StarException> Object::orientationDrawables(std::s
     return std::unexpected(std::move(orientationEntryResult.error()));
   auto const& orientation = orientationEntryResult->get();
   if (!m_orientationDrawablesCache || orientationIndex != m_orientationDrawablesCache->first) {
-    auto metadataResult = root().imageMetadataDatabase();
+    auto metadataResult = root().image_metadata_database();
     if (!metadataResult)
       return std::unexpected(std::move(metadataResult.error()));
     auto metadata = std::move(*metadataResult);

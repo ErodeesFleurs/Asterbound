@@ -145,7 +145,7 @@ std::expected<std::shared_ptr<Item>, StarException> Flashlight::clone() const {
 }
 
 std::expected<List<Drawable>, StarException> Flashlight::drawables() const {
-  auto metadata = root().imageMetadataDatabase();
+  auto metadata = root().image_metadata_database();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
   auto drawable = Drawable::make_image(**metadata, m_image, 1.0f / tile_pixels, true, -m_handPosition / tile_pixels);

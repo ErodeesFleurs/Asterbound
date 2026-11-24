@@ -192,7 +192,7 @@ std::expected<void, StarException> ConfirmationDialog::displayConfirmation(Json 
         auto array = image.second.to_array();
         if (!array)
           return std::unexpected(std::move(array.error()));
-        auto metadata = context().root().imageMetadataDatabase();
+        auto metadata = context().root().image_metadata_database();
         if (!metadata)
           return std::unexpected(std::move(metadata.error()));
         List<Drawable> drawables;

@@ -681,7 +681,7 @@ std::expected<std::optional<Drawable>, StarException> LuaConverter<Drawable>::to
       auto root = lua_execution_root(v.stack().engine());
       if (!root)
         return std::unexpected(std::move(root.error()));
-      auto metadata = root->get().imageMetadataDatabase();
+      auto metadata = root->get().image_metadata_database();
       if (!metadata)
         return std::unexpected(std::move(metadata.error()));
       auto converted = Drawable::make_image(**metadata, std::move(*image), 1.0f, !transformation && centered.value_or(true), Vec2F(), color.value_or(Color::palette_white));

@@ -52,7 +52,7 @@ std::expected<void, StarException> applyAnimatorJsonDrawables(NetworkedAnimator&
   // Keep this execution scope alive through the mutation, including empty lists.
   auto root = lua_execution_root(engine);
   if (!root) return std::unexpected(std::move(root.error()));
-  auto metadata = root->get().imageMetadataDatabase();
+  auto metadata = root->get().image_metadata_database();
   if (!metadata) return std::unexpected(std::move(metadata.error()));
   List<Drawable> drawables;
   for (auto const& config : drawablesConfig) {

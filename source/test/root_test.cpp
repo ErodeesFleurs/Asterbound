@@ -271,7 +271,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
     ASSERT_NO_FATAL_FAILURE(expectCatalog("dungeonDefinitions", root.dungeonDefinitions()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("emoteProcessor", root.emoteProcessor()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("speciesDatabase", root.speciesDatabase()));
-    ASSERT_NO_FATAL_FAILURE(expectCatalog("imageMetadataDatabase", root.imageMetadataDatabase()));
+    ASSERT_NO_FATAL_FAILURE(expectCatalog("image_metadata_database", root.image_metadata_database()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("versioningDatabase", root.versioningDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("questTemplateDatabase", root.questTemplateDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("aiDatabase", root.ai_database()));

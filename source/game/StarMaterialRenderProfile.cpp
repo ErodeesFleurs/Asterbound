@@ -159,7 +159,7 @@ std::expected<std::reference_wrapper<std::pair<String, Vec2F> const>, StarExcept
   return crackingFrames.at(std::clamp<unsigned>(damageLevel * crackingFrames.size(), 0, crackingFrames.size() - 1));
 }
 
-std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(ImageMetadataDatabase const& imageMetadata, Json const& spec, String const& relativePath) {
+std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(ImageMetadataDatabase const& image_metadata, Json const& spec, String const& relativePath) {
   MaterialRenderProfile profile;
   auto transparent = spec.get_bool("lightTransparent", false);
   if (!transparent) return std::unexpected(std::move(transparent.error()));
@@ -293,10 +293,10 @@ std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(I
     if (!colorStrideConfig) return std::unexpected(std::move(colorStrideConfig.error()));
     auto colorStride = json_to_vec2f(*colorStrideConfig);
     if (!colorStride) return std::unexpected(std::move(colorStride.error()));
-    auto imageSize = imageMetadata.imageSize(piece->texture);
-    if (!imageSize) return std::unexpected(std::move(imageSize.error()));
-    auto imageHeight = (*imageSize)[1];
-    auto flip = [imageHeight](RectF const& rect) { return RectF::with_size(Vec2F(rect.x_min(), imageHeight - rect.y_max()), rect.size()); };
+    auto image_size = image_metadata.image_size(piece->texture);
+    if (!image_size) return std::unexpected(std::move(image_size.error()));
+    auto image_height = (*image_size)[1];
+    auto flip = [image_height](RectF const& rect) { return RectF::with_size(Vec2F(rect.x_min(), image_height - rect.y_max()), rect.size()); };
     for (unsigned v = 0; v < *variants; ++v) {
       auto i = DefaultMaterialColorVariant;
       auto rect = RectF::with_size(*position + *variantStride * v, *size);

@@ -385,7 +385,7 @@ std::expected<void, StarException> TeamClient::pullFullUpdate() {
         if (!portraitJson) return std::unexpected(std::move(portraitJson.error()));
         auto portraitEntries = portraitJson->to_array();
         if (!portraitEntries) return std::unexpected(std::move(portraitEntries.error()));
-        auto metadata = self.m_root.imageMetadataDatabase();
+        auto metadata = self.m_root.image_metadata_database();
         if (!metadata) return std::unexpected(std::move(metadata.error()));
         List<Drawable> portrait;
         for (auto const& value : *portraitEntries) {

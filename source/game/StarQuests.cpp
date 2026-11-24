@@ -394,7 +394,7 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, J
   auto portraitsJson = store->get("portraits", JsonObject{});
   if (!portraitsJson) return std::unexpected(std::move(portraitsJson.error()));
   auto portraits = json_to_map_v<StringMap<List<Drawable>>>(*portraitsJson, [&root](Json const& portrait) -> std::expected<List<Drawable>, StarException> {
-    auto metadata = root.imageMetadataDatabase();
+    auto metadata = root.image_metadata_database();
     if (!metadata) return std::unexpected(std::move(metadata.error()));
     auto array = portrait.to_array();
     if (!array) return std::unexpected(std::move(array.error()));
@@ -1040,7 +1040,7 @@ std::expected<LuaCallbacks, StarException> Quest::makeQuestCallbacks(Player& pla
       }
       return {};
     }
-    auto metadata = quest.m_root.imageMetadataDatabase();
+    auto metadata = quest.m_root.image_metadata_database();
     if (!metadata) return std::unexpected(std::move(metadata.error()));
     List<Drawable> result;
     result.reserve(portrait->size());

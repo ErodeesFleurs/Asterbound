@@ -93,7 +93,7 @@ std::expected<void, StarException> SliderBarWidget::initialize(String const& gri
   auto assets = context().root().assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto metadata = context().root().imageMetadataDatabase();
+  auto metadata = context().root().image_metadata_database();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
   auto config = (*assets)->json("/interface.config:slider");
@@ -137,14 +137,14 @@ std::expected<void, StarException> SliderBarWidget::initialize(String const& gri
     auto padding = config->get_int("defaultPadding");
     if (!padding)
       return std::unexpected(std::move(padding.error()));
-    auto leftSize = (*metadata)->imageSize(*leftBase);
-    if (!leftSize)
-      return std::unexpected(std::move(leftSize.error()));
-    auto gridSize = (*metadata)->imageSize(grid);
-    if (!gridSize)
-      return std::unexpected(std::move(gridSize.error()));
-    float gridOffset = (*leftSize)[0] + *padding;
-    float rightOffset = gridOffset + (*gridSize)[0] + *padding;
+    auto left_size = (*metadata)->image_size(*leftBase);
+    if (!left_size)
+      return std::unexpected(std::move(left_size.error()));
+    auto grid_size = (*metadata)->image_size(grid);
+    if (!grid_size)
+      return std::unexpected(std::move(grid_size.error()));
+    float gridOffset = (*left_size)[0] + *padding;
+    float rightOffset = gridOffset + (*grid_size)[0] + *padding;
     Json spinner = JsonObject{{"spinner", JsonObject{{"type", "spinner"},
         {"leftBase", *leftBase}, {"leftHover", *leftHover},
         {"rightBase", *rightBase}, {"rightHover", *rightHover},

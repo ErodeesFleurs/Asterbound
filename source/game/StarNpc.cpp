@@ -1215,7 +1215,7 @@ if (!result238) return std::unexpected(std::move(result238.error()));
       drawable.translate(position());
       if (drawable.is_image())
         {
-    auto result243 = this->root().imageMetadataDatabase();
+    auto result243 = this->root().image_metadata_database();
     if (!result243) return std::unexpected(std::move(result243.error()));
     auto result244 = drawable.image_part().add_directives_group(*std::move(*result243), humanoidDirectives, true);
     if (!result244) return std::unexpected(std::move(result244.error()));

@@ -48,9 +48,9 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
   auto autoassetsResult1 = root.assets();
   if (!autoassetsResult1) return std::unexpected(std::move(autoassetsResult1.error()));
   auto assets = std::move((*autoassetsResult1));
-  auto autoimgMetadataResult1 = root.imageMetadataDatabase();
-  if (!autoimgMetadataResult1) return std::unexpected(std::move(autoimgMetadataResult1.error()));
-  auto imgMetadata = std::move((*autoimgMetadataResult1));
+  auto metadata_result = root.image_metadata_database();
+  if (!metadata_result) return std::unexpected(std::move(metadata_result.error()));
+  auto image_metadata = std::move((*metadata_result));
   auto autosettingsResult1 = assets->json(configPath);
   if (!autosettingsResult1) return std::unexpected(std::move(autosettingsResult1.error()));
   auto settings = std::move((*autosettingsResult1));
@@ -76,10 +76,10 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     auto fullbright = std::move((*autofullbrightResult1));
     Overlay overlay{.min = position, .image = std::move(image), .fullbright = fullbright};
     result.m_backgroundOverlays.push_back(overlay);
-    auto autoimageSizeResult1 = imgMetadata->imageSize(overlay.image);
-    if (!autoimageSizeResult1) return std::unexpected(std::move(autoimageSizeResult1.error()));
-    auto imageSize = std::move((*autoimageSizeResult1));
-    result.m_region.combine(RectI::with_size(Vec2I::floor(overlay.min), Vec2I::ceil(Vec2F(imageSize) / tile_pixels)));
+    auto size_result = image_metadata->image_size(overlay.image);
+    if (!size_result) return std::unexpected(std::move(size_result.error()));
+    auto image_size = std::move((*size_result));
+    result.m_region.combine(RectI::with_size(Vec2I::floor(overlay.min), Vec2I::ceil(Vec2F(image_size) / tile_pixels)));
   }
   auto autoforegroundOverlaysResult1 = settings.get_array("foregroundOverlays", JsonArray());
   if (!autoforegroundOverlaysResult1) return std::unexpected(std::move(autoforegroundOverlaysResult1.error()));
@@ -99,10 +99,10 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     auto fullbright = std::move((*autofullbrightResult1));
     Overlay overlay{.min = position, .image = std::move(image), .fullbright = fullbright};
     result.m_foregroundOverlays.push_back(overlay);
-    auto autoimageSizeResult1 = imgMetadata->imageSize(overlay.image);
-    if (!autoimageSizeResult1) return std::unexpected(std::move(autoimageSizeResult1.error()));
-    auto imageSize = std::move((*autoimageSizeResult1));
-    result.m_region.combine(RectI::with_size(Vec2I::floor(overlay.min), Vec2I::ceil(Vec2F(imageSize) / tile_pixels)));
+    auto size_result = image_metadata->image_size(overlay.image);
+    if (!size_result) return std::unexpected(std::move(size_result.error()));
+    auto image_size = std::move((*size_result));
+    result.m_region.combine(RectI::with_size(Vec2I::floor(overlay.min), Vec2I::ceil(Vec2F(image_size) / tile_pixels)));
   }
   auto autoblockPositionResult1 = settings.get_array("blocksPosition", JsonArray{0, 0});
   if (!autoblockPositionResult1) return std::unexpected(std::move(autoblockPositionResult1.error()));

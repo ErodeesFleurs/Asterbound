@@ -135,7 +135,7 @@ struct MaterialRenderProfile {
 };
 
 [[nodiscard]]
-std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(ImageMetadataDatabase const& imageMetadata, Json const& spec, String const& relativePath = "");
+std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(ImageMetadataDatabase const& image_metadata, Json const& spec, String const& relativePath = "");
 
 }
 

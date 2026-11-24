@@ -103,7 +103,7 @@ std::expected<void, StarException> LoungeableObject::render(RenderCallback& rend
     auto lounging = std::move(*loungingResult);
     if (!lounging.empty()) {
       if (auto orientation = currentOrientation()) {
-        auto metadataResult = root().imageMetadataDatabase();
+        auto metadataResult = root().image_metadata_database();
         if (!metadataResult)
           return std::unexpected(std::move(metadataResult.error()));
         auto metadata = std::move(*metadataResult);

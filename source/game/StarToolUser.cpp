@@ -363,12 +363,12 @@ ItemDescriptor ToolUser::altHandItemDescriptor() const {
     nearWhite.set_alpha_f(m_objectPreviewInnerAlpha);
     ImageOperation op = BorderImageOperation{m_beamGunGlowBorder, nearWhite.to_rgba(), favoriteColorTrans.to_rgba(), false, false};
 
-    auto imageMetadata = m_root.get().imageMetadataDatabase();
-    if (!imageMetadata) return std::unexpected(std::move(imageMetadata.error()));
+    auto image_metadata = m_root.get().image_metadata_database();
+    if (!image_metadata) return std::unexpected(std::move(image_metadata.error()));
     auto operation = image_operation_to_string(op);
     for (Drawable& drawable : drawables) {
       if (drawable.is_image()) {
-        auto applied = drawable.image_part().add_directives(**imageMetadata, operation, true);
+        auto applied = drawable.image_part().add_directives(**image_metadata, operation, true);
         if (!applied) return std::unexpected(std::move(applied.error()));
       }
       drawable.color = opacityMask;

@@ -101,7 +101,7 @@ std::expected<std::shared_ptr<Companion>, StarException> Companion::create(Root&
     return std::unexpected(std::move(portrait.error()));
   if (portrait->empty())
     return companion;
-  auto metadata = root.imageMetadataDatabase();
+  auto metadata = root.image_metadata_database();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
   for (auto const& entry : *portrait) {

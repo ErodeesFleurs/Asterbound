@@ -187,7 +187,7 @@ public:
   [[nodiscard]] std::expected<std::shared_ptr<StatisticsDatabase const>, StarException> statisticsDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<EmoteProcessor const>, StarException> emoteProcessor();
   [[nodiscard]] std::expected<std::shared_ptr<SpeciesDatabase const>, StarException> speciesDatabase();
-  [[nodiscard]] std::expected<std::shared_ptr<ImageMetadataDatabase const>, StarException> imageMetadataDatabase();
+  [[nodiscard]] std::expected<std::shared_ptr<ImageMetadataDatabase const>, StarException> image_metadata_database();
   [[nodiscard]] std::expected<std::shared_ptr<VersioningDatabase const>, StarException> versioningDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<QuestTemplateDatabase const>, StarException> questTemplateDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<AiDatabase const>, StarException> ai_database();
@@ -352,8 +352,8 @@ private:
   std::shared_ptr<SpeciesDatabase> m_speciesDatabase;
   std::mutex m_speciesDatabaseMutex;
 
-  std::shared_ptr<ImageMetadataDatabase> m_imageMetadataDatabase;
-  std::mutex m_imageMetadataDatabaseMutex;
+  std::shared_ptr<ImageMetadataDatabase> m_image_metadata_database;
+  std::mutex m_image_metadata_database_mutex;
 
   std::shared_ptr<VersioningDatabase> m_versioningDatabase;
   std::mutex m_versioningDatabaseMutex;

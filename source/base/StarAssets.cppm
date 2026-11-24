@@ -11,6 +11,8 @@ import star.bi_map;
 import star.thread;
 import star.io_device;
 import star.list;
+import star.image;
+import star.vector;
 import star.image_processing;
 import star.hash;
 import star.data_stream;
@@ -281,6 +283,10 @@ public:
   // root.  May return the same ImageConstPtr for different paths if the paths
   // are equivalent or they are aliases of other image paths.
   [[nodiscard]] std::expected<std::shared_ptr<Image const>, StarException> image(AssetPath const& path) const;
+  // For an unqualified path, inspect its stored Image or PNG header without
+  // executing patches. No hint means callers must use the normal image loader.
+  [[nodiscard]] std::expected<std::optional<std::pair<Vec2U, PixelFormat>>, StarException>
+  image_size_hint(String const& path) const;
   // Load images using background processing.
   [[nodiscard]] std::expected<void, StarException> queue_images(asset_path_range auto const& paths) const {
     return queue_batch(AssetType::Image, paths);

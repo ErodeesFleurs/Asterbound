@@ -49,7 +49,7 @@ std::expected<std::shared_ptr<CodexItem>, StarException> CodexItem::create(
   auto icon_path = item->instanceValue("codexIcon").and_then([](Json const& value) { return value.to_string(); });
   if (!icon_path)
     return std::unexpected(std::move(icon_path.error()));
-  auto metadata = root.imageMetadataDatabase();
+  auto metadata = root.image_metadata_database();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
   auto icon = Drawable::make_image(**metadata, *icon_path, 1.0f, true, Vec2F());

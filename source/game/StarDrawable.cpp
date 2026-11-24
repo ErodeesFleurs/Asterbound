@@ -35,10 +35,10 @@ namespace Star {
 
 static std::expected<std::reference_wrapper<Drawable::ImagePart>, StarException> commit_centered_directives(
     Drawable::ImagePart& part, ImageMetadataDatabase const& image_metadata, AssetPath&& candidate) {
-  auto old_size = image_metadata.imageSize(part.image);
+  auto old_size = image_metadata.image_size(part.image);
   if (!old_size)
     return std::unexpected(std::move(old_size.error()));
-  auto new_size = image_metadata.imageSize(candidate);
+  auto new_size = image_metadata.image_size(candidate);
   if (!new_size)
     return std::unexpected(std::move(new_size.error()));
   if (*old_size != *new_size)
@@ -113,7 +113,7 @@ static std::expected<Drawable, StarException> make_image_drawable(ImageMetadataD
   Mat3F transformation = Mat3F::identity();
   Vec2F original_size;
   if (centered || !processing.empty()) {
-    auto size = image_metadata.imageSize(image);
+    auto size = image_metadata.image_size(image);
     if (!size)
       return std::unexpected(std::move(size.error()));
     original_size = Vec2F(*size);
@@ -127,7 +127,7 @@ static std::expected<Drawable, StarException> make_image_drawable(ImageMetadataD
   if (!processing.empty()) {
     for (auto const& directives : processing)
       image.directives += directives;
-    auto processed_size = image_metadata.imageSize(image);
+    auto processed_size = image_metadata.image_size(image);
     if (!processed_size)
       return std::unexpected(std::move(processed_size.error()));
     transformation *= Mat3F::translation((original_size - Vec2F(*processed_size)) / 2);
@@ -248,7 +248,7 @@ std::expected<Drawable, StarException> Drawable::create(ImageMetadataDatabase co
           if (!centered)
             return std::unexpected(std::move(centered.error()));
           if (*centered) {
-            auto size = image_metadata.imageSize(image_path);
+            auto size = image_metadata.image_size(image_path);
             if (!size)
               return std::unexpected(std::move(size.error()));
             transformation.translate(-Vec2F(*size) / 2);
@@ -390,13 +390,13 @@ std::expected<RectF, StarException> Drawable::bound_box(ImageMetadataDatabase co
     auto const& image = std::get<ImagePart>(part);
     RectF image_region = RectF::null();
     if (crop_images) {
-      auto non_empty_region = image_metadata.nonEmptyRegion(image.image);
+      auto non_empty_region = image_metadata.non_empty_region(image.image);
       if (!non_empty_region)
         return std::unexpected(std::move(non_empty_region.error()));
       if (!non_empty_region->is_null())
         image_region = RectF(*non_empty_region);
     } else {
-      auto size = image_metadata.imageSize(image.image);
+      auto size = image_metadata.image_size(image.image);
       if (!size)
         return std::unexpected(std::move(size.error()));
       image_region = RectF::with_size(Vec2F(), Vec2F(*size));

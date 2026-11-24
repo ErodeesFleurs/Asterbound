@@ -196,9 +196,9 @@ std::expected<void, StarException> WorldPainter::render(WorldRenderData& render_
   auto assets = m_root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
   m_assets = *assets;
-  auto image_metadata = m_root.imageMetadataDatabase();
+  auto image_metadata = m_root.image_metadata_database();
   if (!image_metadata) return std::unexpected(std::move(image_metadata.error()));
-  m_imageMetadata = *image_metadata;
+  m_image_metadata = *image_metadata;
   if (auto result = m_tilePainter->setup(m_camera, render_data); !result)
     return std::unexpected(std::move(result.error()));
 
@@ -384,7 +384,7 @@ std::expected<void, StarException> WorldPainter::renderParticles(WorldRenderData
 
     } else if (particle.type == Particle::Type::Textured || particle.type == Particle::Type::Animated) {
       auto drawableResult = particle.type == Particle::Type::Textured
-          ? Drawable::make_image(*m_imageMetadata, particle.image, 1.0f / tile_pixels, true, Vec2F(0, 0))
+          ? Drawable::make_image(*m_image_metadata, particle.image, 1.0f / tile_pixels, true, Vec2F(0, 0))
           : particle.animation->drawable(1.0f / tile_pixels);
       if (!drawableResult) return std::unexpected(std::move(drawableResult.error()));
       Drawable drawable = std::move(*drawableResult);
@@ -392,7 +392,7 @@ std::expected<void, StarException> WorldPainter::renderParticles(WorldRenderData
       if (particle.flip && particle.flippable)
         drawable.scale(Vec2F(-1, 1));
       if (drawable.is_image() && particle.type != Particle::Type::Animated) {
-        if (auto result = drawable.image_part().add_directives_group(*m_imageMetadata, particle.directives, true); !result)
+        if (auto result = drawable.image_part().add_directives_group(*m_image_metadata, particle.directives, true); !result)
           return std::unexpected(std::move(result.error()));
       }
       drawable.fullbright = particle.fullbright;
@@ -427,7 +427,7 @@ std::expected<void, StarException> WorldPainter::renderBars(WorldRenderData& ren
     offset += m_entityBarSpacing;
     if (bar.icon) {
       auto iconDrawPosition = position - (m_entityBarSize / 2).round() + m_entityBarIconOffset;
-      auto drawable = Drawable::make_image(*m_imageMetadata, *bar.icon, 1.0f / tile_pixels, true, iconDrawPosition);
+      auto drawable = Drawable::make_image(*m_image_metadata, *bar.icon, 1.0f / tile_pixels, true, iconDrawPosition);
       if (!drawable) return std::unexpected(std::move(drawable.error()));
       if (auto result = draw_drawable(*drawable); !result) return std::unexpected(std::move(result.error()));
     }
@@ -458,7 +458,7 @@ std::expected<void, StarException> WorldPainter::draw_entity_layer(List<Drawable
       auto highlight_drawable = Drawable(drawable);
       highlight_drawable.fullbright = true;
       highlight_drawable.color = Color::rgba_f(1, 1, 1, highlight_effect.level * drawable.color.alpha_f());
-      if (auto result = highlight_drawable.image_part().add_directives(*m_imageMetadata, highlight_directives, true);
+      if (auto result = highlight_drawable.image_part().add_directives(*m_image_metadata, highlight_directives, true);
           !result)
         return std::unexpected(std::move(result.error()));
       return draw_drawable(highlight_drawable);
@@ -501,7 +501,7 @@ std::expected<void, StarException> WorldPainter::draw_drawable(Drawable const& d
     return {};
   }
 
-  auto bounds = drawable.bound_box(*m_imageMetadata, false);
+  auto bounds = drawable.bound_box(*m_image_metadata, false);
   if (!bounds) return std::unexpected(std::move(bounds.error()));
   RectF screen_bounds((bounds->min() - drawable.position) * scale + position,
       (bounds->max() - drawable.position) * scale + position);

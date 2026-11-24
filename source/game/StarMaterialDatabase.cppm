@@ -54,7 +54,7 @@ class ImageMetadataDatabase;
 class MaterialDatabase {
 public:
   [[nodiscard]]
-  static std::expected<std::shared_ptr<MaterialDatabase>, StarException> create(std::shared_ptr<Assets const> const& assets, std::shared_ptr<ParticleDatabase const> const& particles, ImageMetadataDatabase const& imageMetadata, Logger& logger, RandomService& random);
+  static std::expected<std::shared_ptr<MaterialDatabase>, StarException> create(std::shared_ptr<Assets const> const& assets, std::shared_ptr<ParticleDatabase const> const& particles, ImageMetadataDatabase const& image_metadata, Logger& logger, RandomService& random);
 
   StringList materialNames() const;
   bool isMetaMaterialName(String const& name) const;
@@ -165,7 +165,7 @@ public:
 private:
   explicit MaterialDatabase(RandomService& random) : m_random(random) {}
   [[nodiscard]]
-  std::expected<void, StarException> load(std::shared_ptr<Assets const> const& assets, std::shared_ptr<ParticleDatabase const> const& particles, ImageMetadataDatabase const& imageMetadata, Logger& logger);
+  std::expected<void, StarException> load(std::shared_ptr<Assets const> const& assets, std::shared_ptr<ParticleDatabase const> const& particles, ImageMetadataDatabase const& image_metadata, Logger& logger);
   RandomService& m_random;
   struct MetaMaterialInfo {
     MetaMaterialInfo(String name, MaterialId id, CollisionKind collisionKind, bool blocksLiquidFlow);

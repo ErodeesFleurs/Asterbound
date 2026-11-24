@@ -697,9 +697,9 @@ std::expected<void, StarException> ChatBubbleManager::add_chat_actions(List<Chat
 }
 
 std::expected<RectF, StarException> ChatBubbleManager::bubble_image_rect(Vec2F screen_pos, BubbleImage const& image, float pixel_ratio) {
-  auto metadata = m_gui_context.get().root().imageMetadataDatabase();
+  auto metadata = m_gui_context.get().root().image_metadata_database();
   if (!metadata) return std::unexpected(std::move(metadata.error()));
-  auto size = (*metadata)->imageSize(std::get<0>(image));
+  auto size = (*metadata)->image_size(std::get<0>(image));
   if (!size) return std::unexpected(std::move(size.error()));
   return RectF::with_size(screen_pos + std::get<1>(image) * pixel_ratio, Vec2F(*size) * pixel_ratio);
 }

@@ -104,7 +104,7 @@ private:
   }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("addJsonDrawable", [&self = *this](Json config, std::optional<String> layerName) -> std::expected<void, StarException> {
-    auto metadata = self.m_host.root().imageMetadataDatabase();
+    auto metadata = self.m_host.root().image_metadata_database();
     if (!metadata)
       return std::unexpected(std::move(metadata.error()));
     auto drawable = Drawable::create(**metadata, config);

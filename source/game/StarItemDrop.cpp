@@ -646,7 +646,7 @@ std::expected<void, StarException> ItemDrop::render(RenderCallback& render_callb
     if (!directives)
       return std::unexpected(std::move(directives.error()));
     if (Directives dropDirectives = *directives) {
-      auto metadata = root().imageMetadataDatabase();
+      auto metadata = root().image_metadata_database();
       if (!metadata)
         return std::unexpected(std::move(metadata.error()));
       for (auto& drawable : generated) {

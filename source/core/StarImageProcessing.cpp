@@ -612,6 +612,16 @@ static std::expected<PixelRect, StarException> apply_blend(BlendImageOperation c
   return changed;
 }
 
+std::expected<Vec2U, StarException> bordered_image_size(Vec2U const& size, unsigned pixels) {
+  auto extent = Vector<std::uint64_t, 2>(size) + Vector<std::uint64_t, 2>::filled(std::uint64_t(pixels) * 2);
+  if (extent[0] > std::numeric_limits<int>::max() || extent[1] > std::numeric_limits<int>::max())
+    return std::unexpected(ImageOperationException("Border image extent is not representable"));
+  auto border_size = Vec2U(extent);
+  if (!Image::size_bytes(border_size, PixelFormat::RGBA32))
+    return std::unexpected(ImageOperationException("Border image byte size is not representable"));
+  return border_size;
+}
+
 std::expected<void, StarException> process_image_operation(ImageOperation const& operation, Image& image,
                                                            ImageReferenceCallback ref_callback) {
   if (auto error = (std::holds_alternative<ErrorImageOperation>(operation) ? std::optional{std::cref(std::get<ErrorImageOperation>(operation))} : std::nullopt))
@@ -742,14 +752,10 @@ std::expected<void, StarException> process_image_operation(ImageOperation const&
     });
 
   } else if (auto op = (std::holds_alternative<BorderImageOperation>(operation) ? std::optional{std::cref(std::get<BorderImageOperation>(operation))} : std::nullopt)) {
-    auto extent =
-      Vector<std::uint64_t, 2>(image.size()) + Vector<std::uint64_t, 2>::filled(std::uint64_t(op->get().pixels) * 2);
-    if (extent[0] > std::numeric_limits<int>::max() || extent[1] > std::numeric_limits<int>::max())
-      return std::unexpected(ImageOperationException("Border image extent is not representable"));
-    auto border_size = Vec2U(extent);
-    if (!Image::size_bytes(border_size, PixelFormat::RGBA32))
-      return std::unexpected(ImageOperationException("Border image byte size is not representable"));
-    Image border_image(border_size, PixelFormat::RGBA32);
+    auto border_size = bordered_image_size(image.size(), op->get().pixels);
+    if (!border_size)
+      return std::unexpected(std::move(border_size.error()));
+    Image border_image(*border_size, PixelFormat::RGBA32);
     auto copied = border_image.copy_into(Vec2U::filled(op->get().pixels), image);
     if (!copied)
       return std::unexpected(std::move(copied.error()));

@@ -1971,6 +1971,33 @@ std::expected<ByteArray, StarException> Assets::read(String const& path) const {
   return std::unexpected(AssetException(Star::format("No such asset '{}'", path)));
 }
 
+std::expected<std::optional<std::pair<Vec2U, PixelFormat>>, StarException> Assets::image_size_hint(String const& path) const {
+  auto key = CaseInsensitiveStringView::create(path);
+  if (!key)
+    return std::unexpected(std::move(key.error()));
+  auto file = m_files.find_ref(*key);
+  if (!file || !file->get().patch_sources.empty())
+    return std::nullopt;
+  auto const& descriptor = file->get();
+  auto stored = descriptor.source->image(descriptor.source_name);
+  if (!stored)
+    return std::unexpected(std::move(stored.error()));
+  if (*stored)
+    return std::pair{(*stored)->size(), (*stored)->pixel_format()};
+  auto device = descriptor.source->open(descriptor.source_name);
+  if (!device)
+    return std::unexpected(std::move(device.error()));
+  auto png = Image::is_png(*device);
+  if (!png)
+    return std::unexpected(std::move(png.error()));
+  if (!*png)
+    return std::nullopt;
+  auto metadata = Image::read_png_metadata(m_logger, std::move(*device));
+  if (!metadata)
+    return std::unexpected(std::move(metadata.error()));
+  return std::pair{std::get<0>(*metadata), std::get<1>(*metadata)};
+}
+
 std::expected<std::shared_ptr<Image const>, StarException> Assets::read_image(String const& path) const {
   auto key = CaseInsensitiveStringView::create(path);
   if (!key)

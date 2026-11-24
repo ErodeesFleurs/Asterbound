@@ -554,7 +554,7 @@ std::expected<void, StarException> Cinematic::render() {
       auto frame = Star::to_string(static_cast<int>(values.frame) % panel->animationFrames);
       auto alphaColor = Color::rgba_f(1.0f, 1.0f, 1.0f, values.alpha);
       for (auto const& d : panel->drawables) {
-        auto metadata = m_guiContext.get().root().imageMetadataDatabase();
+        auto metadata = m_guiContext.get().root().image_metadata_database();
         if (!metadata)
           return std::unexpected(std::move(metadata.error()));
         auto image = d.get_string("image");

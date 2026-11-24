@@ -287,7 +287,7 @@ std::expected<float, StarException> BeamItem::getAngle(float angle) {
 }
 
 std::expected<List<Drawable>, StarException> BeamItem::drawables() const {
-  auto metadata = beamRoot().imageMetadataDatabase();
+  auto metadata = beamRoot().image_metadata_database();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
   auto drawable = Drawable::make_image(**metadata, m_image, 1.0f / tile_pixels, true, -handPosition() / tile_pixels);
@@ -367,7 +367,7 @@ std::expected<List<Drawable>, StarException> BeamItem::beamDrawables() const {
           ImageOperation op = HueShiftImageOperation::hue_shift_degrees(120);
           endImage = Star::format("{}?{}", endImage, image_operation_to_string(op));
         }
-        auto metadata = beamRoot().imageMetadataDatabase();
+        auto metadata = beamRoot().image_metadata_database();
         if (!metadata)
           return std::unexpected(std::move(metadata.error()));
         auto ball = Drawable::make_image(**metadata, endImage, 1.0f / tile_pixels, true, m_beam_curve.dest());

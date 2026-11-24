@@ -287,7 +287,7 @@ std::expected<void, StarException> InspectionTool::update(float, FireMode fireMo
 }
 
 std::expected<List<Drawable>, StarException> InspectionTool::drawables() const {
-  auto metadata = root().imageMetadataDatabase();
+  auto metadata = root().image_metadata_database();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
   auto drawable = Drawable::make_image(**metadata, m_image, 1.0f / tile_pixels, true, -m_handPosition);

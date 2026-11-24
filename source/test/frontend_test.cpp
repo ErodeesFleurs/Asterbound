@@ -4874,7 +4874,7 @@ const GameTestRegistration drawableGeometry("LuaDrawable", "SerializedImagesPres
   ASSERT_TRUE(luaRoot) << luaRoot.error().what();
   auto context = (*luaRoot)->create_context(StringList{});
   ASSERT_TRUE(context) << context.error().what();
-  auto metadata = fixture.root().imageMetadataDatabase();
+  auto metadata = fixture.root().image_metadata_database();
   ASSERT_TRUE(metadata) << metadata.error().what();
   auto native = Drawable::create(**metadata, JsonObject{
       {"image", "/objects/outpost/techlab/techlabscientistportrait.png"},

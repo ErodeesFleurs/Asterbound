@@ -141,7 +141,7 @@ std::expected<std::shared_ptr<InstrumentItem>, StarException> InstrumentItem::cr
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
   item->m_activeCooldown = 0;
-  auto metadata = root.imageMetadataDatabase();
+  auto metadata = root.image_metadata_database();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
   auto image = item->instanceValue("image").and_then([](Json const& value) { return value.to_string(); });

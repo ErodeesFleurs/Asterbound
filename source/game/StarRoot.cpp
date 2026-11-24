@@ -282,10 +282,10 @@ std::expected<void, StarException> Root::initialize() {
           }
         }
         {
-          std::unique_lock locker(m_imageMetadataDatabaseMutex);
-          if (std::shared_ptr<ImageMetadataDatabase> imgMetaDb = m_imageMetadataDatabase) {
+          std::unique_lock locker(m_image_metadata_database_mutex);
+          if (std::shared_ptr<ImageMetadataDatabase> metadata = m_image_metadata_database) {
             locker.unlock();
-            imgMetaDb->cleanup();
+            metadata->cleanup();
           }
         }
 
@@ -403,7 +403,7 @@ std::expected<void, StarException> Root::reload() {
     std::lock_guard particleDatabaseLock(m_particleDatabaseMutex);
     std::lock_guard versioningDatabaseLock(m_versioningDatabaseMutex);
     std::lock_guard functionDatabaseLock(m_functionDatabaseMutex);
-    std::lock_guard imageMetadataDatabaseLock(m_imageMetadataDatabaseMutex);
+    std::lock_guard image_metadata_database_lock(m_image_metadata_database_mutex);
     std::lock_guard tenantDatabaseLock(m_tenantDatabaseMutex);
     std::lock_guard nameGeneratorLock(m_nameGeneratorMutex);
     std::lock_guard dance_database_lock(m_dance_database_mutex);
@@ -450,7 +450,7 @@ std::expected<void, StarException> Root::reload() {
     m_particleDatabase.reset();
     m_versioningDatabase.reset();
     m_functionDatabase.reset();
-    m_imageMetadataDatabase.reset();
+    m_image_metadata_database.reset();
     m_tenantDatabase.reset();
     m_nameGenerator.reset();
     m_dance_database.reset();
@@ -508,7 +508,7 @@ std::expected<void, StarException> Root::fullyLoad() {
   add(&Root::particleDatabase);
   add(&Root::versioningDatabase);
   add(&Root::functionDatabase);
-  add(&Root::imageMetadataDatabase);
+  add(&Root::image_metadata_database);
   add(&Root::tenantDatabase);
   add(&Root::nameGenerator);
   add(&Root::dance_database);
@@ -785,7 +785,7 @@ std::expected<std::shared_ptr<MaterialDatabase const>, StarException> Root::mate
       if (!a) return std::unexpected(std::move(a.error()));
       auto particles = particleDatabase();
       if (!particles) return std::unexpected(std::move(particles.error()));
-      auto metadata = imageMetadataDatabase();
+      auto metadata = image_metadata_database();
       if (!metadata) return std::unexpected(std::move(metadata.error()));
       return MaterialDatabase::create(*a, *particles, **metadata, logger(), random());
     });
@@ -864,8 +864,8 @@ std::expected<std::shared_ptr<SpeciesDatabase const>, StarException> Root::speci
   return loadMember(m_speciesDatabase, m_speciesDatabaseMutex, "SpeciesDatabase", *this);
 }
 
-std::expected<std::shared_ptr<ImageMetadataDatabase const>, StarException> Root::imageMetadataDatabase() {
-  return loadMemberFunction<ImageMetadataDatabase>(m_imageMetadataDatabase, m_imageMetadataDatabaseMutex, "ImageMetadataDatabase",
+std::expected<std::shared_ptr<ImageMetadataDatabase const>, StarException> Root::image_metadata_database() {
+  return loadMemberFunction<ImageMetadataDatabase>(m_image_metadata_database, m_image_metadata_database_mutex, "ImageMetadataDatabase",
     [this]() -> std::expected<std::shared_ptr<ImageMetadataDatabase>, StarException> {
       return std::make_shared<ImageMetadataDatabase>(*this);
     });

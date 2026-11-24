@@ -398,9 +398,9 @@ if (!result310) return std::unexpected(std::move(result310.error()));
         m_time = 0;
     }
 
-    auto result311 = this->root().imageMetadataDatabase();
+    auto result311 = this->root().image_metadata_database();
 if (!result311) return std::unexpected(std::move(result311.error()));
-auto imgMetadata = std::move(*result311);
+auto image_metadata = std::move(*result311);
 
     bool condition314 = static_cast<bool>(m_time <= 0);
 if (!condition314) {
@@ -433,7 +433,7 @@ auto result318 = result317->get().to_array();
 if (!result318) return std::unexpected(std::move(result318.error()));
 auto option = std::move(*result318);
 for (auto const& drop : option) {
-  auto result319 = imgMetadata->imageSize(plantPiece.image);
+  auto result319 = image_metadata->image_size(plantPiece.image);
   if (!result319)
     return std::unexpected(std::move(result319.error()));
   auto size = std::move(*result319);
@@ -520,31 +520,29 @@ JsonArray particleOptions = std::move(*result297);
 
   Particle particle;
 
-  auto result298 = this->root().imageMetadataDatabase();
-if (!result298) return std::unexpected(std::move(result298.error()));
-auto imgMetadata = std::move(*result298);
-
-  auto result299 = imgMetadata->imageSize(piece.image);
-if (!result299) return std::unexpected(std::move(result299.error()));
-Vec2F imageSize = Vec2F(std::move(*result299)) / tile_pixels;
+  auto metadata = root().image_metadata_database();
+  if (!metadata) return std::unexpected(std::move(metadata.error()));
+  auto size = (*metadata)->image_size(piece.image);
+  if (!size) return std::unexpected(std::move(size.error()));
+  auto image_size = Vec2F(*size) / tile_pixels;
   auto result300 = particleConfig.get_float("density", 1);
 if (!result300) return std::unexpected(std::move(result300.error()));
-float density = (imageSize.x() * imageSize.y()) / std::move(*result300);
+  float density = (image_size.x() * image_size.y()) / std::move(*result300);
 
-  auto result301 = imgMetadata->imageSpaces(piece.image, piece.offset * tile_pixels, Plant::PlantScanThreshold, piece.flip);
-if (!result301) return std::unexpected(std::move(result301.error()));
-auto spaces = Set<Vec2I>::from(std::move(*result301));
+  auto occupied = (*metadata)->image_spaces(piece.image, piece.offset * tile_pixels, Plant::PlantScanThreshold, piece.flip);
+  if (!occupied) return std::unexpected(std::move(occupied.error()));
+  auto spaces = Set<Vec2I>::from(std::move(*occupied));
   if (spaces.empty())
     return {};
 
   while (density > 0) {
-    auto offsetX = this->root().random().normal_float(imageSize.x() / 8.0f, 0);
+    auto offsetX = this->root().random().normal_float(image_size.x() / 8.0f, 0);
     if (!offsetX)
       return std::unexpected(std::move(offsetX.error()));
-    auto offsetY = this->root().random().normal_float(imageSize.y() / 8.0f, 0);
+    auto offsetY = this->root().random().normal_float(image_size.y() / 8.0f, 0);
     if (!offsetY)
       return std::unexpected(std::move(offsetY.error()));
-    Vec2F particlePos = piece.offset + Vec2F(imageSize) / 2.0f + Vec2F(*offsetX, *offsetY);
+    Vec2F particlePos = piece.offset + Vec2F(image_size) / 2.0f + Vec2F(*offsetX, *offsetY);
 
     if (!spaces.contains(Vec2I(particlePos.floor())))
       continue;
@@ -694,7 +692,7 @@ std::expected<void, StarException> PlantDrop::render(RenderCallback& render_call
     : samplePresentationRotation(m_movementController->rotation(), alpha);
   if (m_time > 0 && !m_spawnedDrops.get()) {
     for (auto const& plantPiece : m_pieces) {
-      auto result293 = this->root().imageMetadataDatabase();
+      auto result293 = this->root().image_metadata_database();
 if (!result293) return std::unexpected(std::move(result293.error()));
 auto result1284 = Drawable::make_image(*std::move(*result293), plantPiece.image, 1.0f / tile_pixels, false, plantPiece.offset);
 if (!result1284) return std::unexpected(std::move(result1284.error()));

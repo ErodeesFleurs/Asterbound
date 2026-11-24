@@ -73,12 +73,12 @@ TabSetWidget::TabSetWidget(GuiContext& context, TabSetConfig const& config)
 
 std::expected<std::shared_ptr<TabSetWidget>, StarException> TabSetWidget::create(GuiContext& context, TabSetConfig const& config) {
   auto tabs = std::shared_ptr<TabSetWidget>(new TabSetWidget(context, config));
-  auto metadata = context.root().imageMetadataDatabase();
+  auto metadata = context.root().image_metadata_database();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
   for (auto image : {std::cref(config.tabButtonBaseImage), std::cref(config.tabButtonHoverImage), std::cref(config.tabButtonPressedImage),
            std::cref(config.tabButtonBaseImageSelected), std::cref(config.tabButtonHoverImageSelected), std::cref(config.tabButtonPressedImageSelected)}) {
-    auto size = (*metadata)->imageSize(image.get());
+    auto size = (*metadata)->image_size(image.get());
     if (!size)
       return std::unexpected(std::move(size.error()));
     tabs->m_tabHeight = std::max<int>(tabs->m_tabHeight, size->y());

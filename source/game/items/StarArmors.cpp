@@ -300,7 +300,7 @@ std::expected<void, StarException> ArmorItem::refreshIconDrawables() {
     return std::unexpected(std::move(drawables.error()));
   for (auto& drawable : *drawables) {
     if (drawable.is_image()) {
-      auto metadata = root().imageMetadataDatabase();
+      auto metadata = root().image_metadata_database();
       if (!metadata)
         return std::unexpected(std::move(metadata.error()));
       auto removed = drawable.image_part().remove_directives(**metadata, true);

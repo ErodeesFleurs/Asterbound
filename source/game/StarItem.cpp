@@ -80,7 +80,7 @@ std::expected<void, StarException> Item::initialize(Json config, String director
     return std::unexpected(std::move(rarityValue.error()));
   m_rarity = *rarityValue;
 
-  auto metadata = root().imageMetadataDatabase();
+  auto metadata = root().image_metadata_database();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
   auto loadIcon = [&](Json const& icon) -> std::expected<List<Drawable>, StarException> {
@@ -386,7 +386,7 @@ void Item::setPrice(std::uint64_t price) {
 }
 
 std::expected<void, StarException> Item::setIconDrawables(List<Drawable> drawables) {
-  auto metadata = root().imageMetadataDatabase();
+  auto metadata = root().image_metadata_database();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
   auto boundBox = Drawable::bound_box_all(**metadata, drawables, true);
@@ -410,7 +410,7 @@ std::expected<void, StarException> Item::setSecondaryIconDrawables(std::optional
     m_secondaryIconDrawables.reset();
     return {};
   }
-  auto metadata = root().imageMetadataDatabase();
+  auto metadata = root().image_metadata_database();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
   auto boundBox = Drawable::bound_box_all(**metadata, *drawables, true);

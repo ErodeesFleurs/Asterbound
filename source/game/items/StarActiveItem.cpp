@@ -878,7 +878,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
         auto image = config.opt_string("image");
         if (!image)
           return std::unexpected(std::move(image.error()));
-        auto metadata = root().imageMetadataDatabase();
+        auto metadata = root().image_metadata_database();
         if (!metadata)
           return std::unexpected(std::move(metadata.error()));
         if (*image) {
@@ -896,7 +896,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       auto image = icon.to_string();
       if (!image)
         return std::unexpected(std::move(image.error()));
-      auto metadata = root().imageMetadataDatabase();
+      auto metadata = root().image_metadata_database();
       if (!metadata)
         return std::unexpected(std::move(metadata.error()));
       auto drawable = Drawable::make_image(**metadata, AssetPath::relative_to(directory(), *image), 1.0f, true, Vec2F());

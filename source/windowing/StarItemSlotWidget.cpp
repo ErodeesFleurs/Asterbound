@@ -162,9 +162,9 @@ std::expected<std::shared_ptr<ItemSlotWidget>, StarException> ItemSlotWidget::cr
   widget->m_durabilityOffset = *offset;
   Vec2I backingSize;
   if (!backing_image.empty()) {
-    auto metadata = context.root().imageMetadataDatabase();
+    auto metadata = context.root().image_metadata_database();
     if (!metadata) return std::unexpected(std::move(metadata.error()));
-    auto size = (*metadata)->imageSize(backing_image);
+    auto size = (*metadata)->image_size(backing_image);
     if (!size) return std::unexpected(std::move(size.error()));
     backingSize = Vec2I(*size);
   }

@@ -285,10 +285,10 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
   if (!materialDatabaseResult)
     return std::unexpected(std::move(materialDatabaseResult.error()));
   auto materialDatabase = std::move(*materialDatabaseResult);
-  auto imageMetadataResult = root.imageMetadataDatabase();
-  if (!imageMetadataResult)
-    return std::unexpected(std::move(imageMetadataResult.error()));
-  auto imageMetadata = std::move(*imageMetadataResult);
+  auto image_metadata_result = root.image_metadata_database();
+  if (!image_metadata_result)
+    return std::unexpected(std::move(image_metadata_result.error()));
+  auto image_metadata = std::move(*image_metadata_result);
   List<std::shared_ptr<ObjectOrientation>> res;
   auto source_configs = configList.array_ptr();
   if (!source_configs)
@@ -361,7 +361,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
         if (!drawableConfigResult)
           return std::unexpected(std::move(drawableConfigResult.error()));
         auto drawableConfig = std::move(*drawableConfigResult);
-        auto drawableResult = Drawable::create(*imageMetadata, drawableConfig);
+        auto drawableResult = Drawable::create(*image_metadata, drawableConfig);
         if (!drawableResult)
           return std::unexpected(std::move(drawableResult.error()));
         auto drawable = std::move(*drawableResult);
@@ -374,7 +374,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
         return std::unexpected(std::move(imageResult.error()));
       auto image = std::move(*imageResult);
       auto drawableResult =
-        Drawable::make_image(*imageMetadata, AssetPath::relative_to(path, image), 1.0 / tile_pixels, false, {});
+        Drawable::make_image(*image_metadata, AssetPath::relative_to(path, image), 1.0 / tile_pixels, false, {});
       if (!drawableResult)
         return std::unexpected(std::move(drawableResult.error()));
       auto drawable = std::move(*drawableResult);
@@ -449,7 +449,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
           if (!thresholdResult)
             return std::unexpected(std::move(thresholdResult.error()));
           auto threshold = std::move(*thresholdResult);
-          auto scannedResult = imageMetadata->imageSpaces(image, imagePosition + (layer.position + layer.image_part().transformation.transform_point(Vec2F())) * tile_pixels, threshold, orientation->flipImages);
+          auto scannedResult = image_metadata->image_spaces(image, imagePosition + (layer.position + layer.image_part().transformation.transform_point(Vec2F())) * tile_pixels, threshold, orientation->flipImages);
           if (!scannedResult)
             return std::unexpected(std::move(scannedResult.error()));
           auto scanned = std::move(*scannedResult);
@@ -1384,10 +1384,10 @@ std::expected<List<Drawable>, StarException> ObjectDatabase::cursorHintDrawables
     return std::unexpected(std::move(configResult.error()));
   auto config = std::move(*configResult);
   auto mergeConfig = json_merge(config->config, parameters);
-  auto imageMetadataResult = m_root.imageMetadataDatabase();
-  if (!imageMetadataResult)
-    return std::unexpected(std::move(imageMetadataResult.error()));
-  auto imageMetadata = std::move(*imageMetadataResult);
+  auto image_metadata_result = m_root.image_metadata_database();
+  if (!image_metadata_result)
+    return std::unexpected(std::move(image_metadata_result.error()));
+  auto image_metadata = std::move(*image_metadata_result);
   auto placementImageResult = mergeConfig.opt_string("placementImage");
   if (!placementImageResult)
     return std::unexpected(std::move(placementImageResult.error()));
@@ -1403,7 +1403,7 @@ std::expected<List<Drawable>, StarException> ObjectDatabase::cursorHintDrawables
     if (!imagePositionResult)
       return std::unexpected(std::move(imagePositionResult.error()));
     auto imagePosition = std::move(*imagePositionResult);
-    auto drawableResult = Drawable::make_image(*imageMetadata, AssetPath::relative_to(config->path, *placementImage),
+    auto drawableResult = Drawable::make_image(*image_metadata, AssetPath::relative_to(config->path, *placementImage),
                                               1.0 / tile_pixels, false, Vec2F(position) + imagePosition / tile_pixels);
     if (!drawableResult)
       return std::unexpected(std::move(drawableResult.error()));
@@ -1436,7 +1436,7 @@ std::expected<List<Drawable>, StarException> ObjectDatabase::cursorHintDrawables
       auto taggedImage = AssetPath::join(image).replace_tags(*image_keys, true, "default");
       image = std::move(taggedImage);
       if (orientation->flipImages) {
-        auto boundsResult = drawable.bound_box(*imageMetadata, false);
+        auto boundsResult = drawable.bound_box(*image_metadata, false);
         if (!boundsResult)
           return std::unexpected(std::move(boundsResult.error()));
         auto bounds = std::move(*boundsResult);

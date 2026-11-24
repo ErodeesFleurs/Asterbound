@@ -4,14 +4,17 @@ import star.assets;
 import star.asset_path;
 import star.buffer;
 import star.byte_array;
+import star.directives;
 import star.file;
 import star.format;
 import star.game_test;
 import star.font;
 import star.image;
+import star.image_metadata_database;
 import star.io_device;
 import star.list;
 import star.logging;
+import star.rect;
 import star.root;
 import star.string;
 import star.vector;
@@ -83,6 +86,82 @@ void expectIndependentImage(std::weak_ptr<Image const> const& result, std::weak_
   EXPECT_NE(result.lock().get(), source.lock().get());
 }
 }// namespace
+
+const GameTestRegistration metadata_directive_alpha(
+  "ImageMetadataTest", "DirectiveAlphaMatchesLoadedPixels", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    ASSERT_TRUE(writeReferenceCacheAssets(fixture, *directory));
+    auto settings = fixture.rootSettings();
+    settings.assetDirectories.clear();
+    settings.assetSources = {*directory};
+    settings.storageDirectory = File::relative_to(*directory, "storage");
+    settings.runtimeConfigFile = {};
+    settings.logFile = {};
+    settings.includeUGC = false;
+    settings.assetsSettings.missing_image = {};
+    auto root = Root::create(std::move(settings));
+    ASSERT_TRUE(root) << root.error().what();
+    auto assets = (*root)->assets();
+    ASSERT_TRUE(assets) << assets.error().what();
+
+    AssetPath const base("/base.png"); // 2x2 opaque white; all four pixels occupy one tile.
+    AssetPath const tinted("/base.png?setcolor=112233");
+    AssetPath const padded("/base.png?border=2;ffffff00?setcolor=445566");
+    AssetPath const replaced("/base.png?setcolor=ff0000?replace;ff0000=ffffff00");
+    AssetPath split("/base.png?setcolor=ff0000");
+    split.directives.append(Directives("prefix??replace;ff0000=ffffff00"));
+    auto trailing = split;
+    trailing.directives.append(Directives("?brightness=10?setcolor=abcdef"));
+    auto partial = AssetPath("/base.png?setcolor=ff0000");
+    partial.directives.append(Directives("prefix??replace;ff0000=ffffff00?setcolor=abcdef"));
+
+    std::array paths{base, tinted, padded, replaced, split, trailing, partial};
+    for (bool reverse : {false, true}) {
+      ImageMetadataDatabase metadata(**root);
+      if (reverse)
+        std::ranges::reverse(paths);
+      for (auto const& path : paths) {
+        SCOPED_TRACE(AssetPath::join(path).utf8());
+        auto image = (*assets)->image(path);
+        ASSERT_TRUE(image) << image.error().what();
+        ASSERT_EQ((*image)->size(), path == padded ? Vec2U(6, 6) : Vec2U(2, 2));
+        RectU expected_region = RectU::null();
+        List<Vec2I> expected_spaces;
+        for (unsigned y = 0; y < (*image)->height(); ++y) {
+          for (unsigned x = 0; x < (*image)->width(); ++x) {
+            auto pixel = (*image)->get(x, y);
+            ASSERT_TRUE(pixel);
+            if ((*pixel)[3]) {
+              expected_region.combine(RectU::with_size({x, y}, {1, 1}));
+              if (expected_spaces.empty())
+                expected_spaces.push_back({0, 0});
+            }
+          }
+        }
+        EXPECT_EQ(expected_spaces.empty(), !(path == base || path == tinted || path == padded));
+        EXPECT_EQ(metadata.non_empty_region(path), expected_region);
+        EXPECT_EQ(metadata.image_spaces(path, {}, 1.0f / 64, false), expected_spaces);
+      }
+    }
+
+    ImageMetadataDatabase metadata(**root);
+    ASSERT_EQ(metadata.non_empty_region(split), RectU::null());
+    ASSERT_EQ(metadata.image_spaces(split, {}, 1.0f / 64, false), List<Vec2I>{});
+    AssetPath invalid = split;
+    invalid.directives.append(Directives("?badoperation?setcolor=abcdef"));
+    ASSERT_FALSE((*assets)->image(invalid));
+    EXPECT_FALSE(metadata.non_empty_region(invalid));
+    EXPECT_FALSE(metadata.image_spaces(invalid, {}, 1.0f / 64, false));
+
+    // Fresh color suffixes can still borrow the primed geometry after the
+    // source becomes unavailable; flattening the prefix groups loses this key.
+    ASSERT_TRUE(File::write_file(String("not PNG"), File::relative_to(*directory, "base.png")));
+    (*assets)->hot_reload();
+    EXPECT_EQ(metadata.non_empty_region(partial), RectU::null());
+    EXPECT_EQ(metadata.image_spaces(trailing, {}, 1.0f / 64, false), List<Vec2I>{});
+  });
 
 const GameTestRegistration
   assetsReferenceCacheRetainsBlendAndMask("AssetsTest", "ReferenceCacheRetainsBlendAndMask", [](GameTest& fixture) {

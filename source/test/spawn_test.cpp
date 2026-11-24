@@ -417,7 +417,7 @@ const GameTestRegistration presentation_removal_lifecycle(
     ASSERT_TRUE(parameters_data);
     auto parameters = net_load_visitable_world_parameters(std::move(*parameters_data));
     ASSERT_TRUE(parameters && *parameters);
-    auto metadata = root.imageMetadataDatabase();
+    auto metadata = root.image_metadata_database();
     ASSERT_TRUE(metadata);
     auto image = Drawable::make_image(**metadata, "/rendering/sprites/error.png", 1.0f, false, newborn.position);
     ASSERT_TRUE(image);

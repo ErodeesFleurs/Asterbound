@@ -188,7 +188,7 @@ void Animation::clear_tags() {
 std::expected<Drawable, StarException> Animation::drawable(float pixel_size) const {
   if (m_frame < 0 || (!m_append_frame && m_frame_template.empty()))
     return Drawable();
-  auto image_metadata = m_root.get().imageMetadataDatabase();
+  auto image_metadata = m_root.get().image_metadata_database();
   if (!image_metadata)
     return std::unexpected(std::move(image_metadata.error()));
   auto drawable = Drawable::make_animation_image(**image_metadata, m_image, pixel_size, m_centered,

@@ -185,7 +185,7 @@ std::expected<std::shared_ptr<Item>, StarException> TillingTool::clone() const {
 }
 
 std::expected<List<Drawable>, StarException> TillingTool::drawables() const {
-  auto metadata = root().imageMetadataDatabase();
+  auto metadata = root().image_metadata_database();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
   auto const& image = m_frameTiming == 0

@@ -1208,7 +1208,7 @@ std::expected<List<Drawable>, StarException> Player::drawables(float interpolati
       for (auto& drawable : rendered) {
         drawable.translate(position() + m_techController->parentOffset());
         if (drawable.is_image()) {
-          auto metadataResult = root().imageMetadataDatabase();
+          auto metadataResult = root().image_metadata_database();
           if (!metadataResult)
             return std::unexpected(std::move(metadataResult.error()));
           auto metadata = std::move(*metadataResult);

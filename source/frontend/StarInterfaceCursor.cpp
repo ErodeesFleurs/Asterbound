@@ -77,10 +77,10 @@ std::expected<void, StarException> InterfaceCursor::selectCursor(String const& c
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto imageMetadata = root.imageMetadataDatabase();
-  if (!imageMetadata)
-    return std::unexpected(std::move(imageMetadata.error()));
-  auto loaded = loadCursor(configFile, **assets, **imageMetadata);
+  auto image_metadata = root.image_metadata_database();
+  if (!image_metadata)
+    return std::unexpected(std::move(image_metadata.error()));
+  auto loaded = loadCursor(configFile, **assets, **image_metadata);
   if (loaded || !optional)
     return loaded;
   m_rejectedOverride = configFile;
@@ -106,11 +106,11 @@ std::expected<void, StarException> InterfaceCursor::loadCursor(String const& con
     auto image = config->get_string("image");
     if (!image)
       return std::unexpected(std::move(image.error()));
-    auto imageSize = metadata.imageSize(*image);
-    if (!imageSize)
-      return std::unexpected(std::move(imageSize.error()));
+    auto image_size = metadata.image_size(*image);
+    if (!image_size)
+      return std::unexpected(std::move(image_size.error()));
     drawable = std::move(*image);
-    size = Vec2I(*imageSize);
+    size = Vec2I(*image_size);
   } else {
     auto animationJson = config->get("animation");
     if (!animationJson)
@@ -141,7 +141,7 @@ std::expected<void, StarException> InterfaceCursor::loadCursor(String const& con
 std::expected<Drawable, StarException> InterfaceCursor::drawable() const {
   if (std::holds_alternative<String>(m_drawable)) {
     auto const& image = std::get<String>(m_drawable);
-    auto metadata = m_guiContext.get().root().imageMetadataDatabase();
+    auto metadata = m_guiContext.get().root().image_metadata_database();
     if (!metadata)
       return std::unexpected(std::move(metadata.error()));
     return Drawable::make_image(**metadata, image, 1.0f, false, {});

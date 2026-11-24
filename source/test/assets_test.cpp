@@ -438,7 +438,7 @@ const GameTestRegistration assets_filtered_scans("AssetsTest", "FilteredScanOrde
 
 const GameTestRegistration animation_drawable_transform(
   "AssetsTest", "AnimationImageMatchesCenteredDirectiveComposition", [](GameTest& fixture) {
-    auto metadata = fixture.root().imageMetadataDatabase();
+    auto metadata = fixture.root().image_metadata_database();
     ASSERT_TRUE(metadata) << metadata.error().what();
     AssetPath const image("/humanoid/human/malebody.png?flipx");
     DirectivesGroup const border(String("?border=3;ff0000"));
@@ -459,6 +459,80 @@ const GameTestRegistration animation_drawable_transform(
     }
   });
 
+const GameTestRegistration metadata_occupancy("AssetsTest", "MetadataOccupancyQueryOrderAndLimits", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(File::create_directory(overlay));
+  Image pattern(8, 8, PixelFormat::RGBA32);
+  for (unsigned y = 0; y < 8; ++y)
+    for (unsigned x = 0; x < 8; ++x)
+      ASSERT_TRUE(pattern.set(x, y, Vec4B(7, 11, 3, x <= y ? 1 : 0)));
+  auto buffer = std::make_shared<Buffer>();
+  ASSERT_TRUE(pattern.write_png(fixture.root().logger(), buffer));
+  auto bytes = buffer->take_data();
+  ASSERT_TRUE(File::write_file(bytes, File::relative_to(overlay, "pattern.png")));
+  ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(overlay, "preload.config")));
+  auto settings = fixture.rootSettings();
+  settings.assetDirectories.clear();
+  settings.assetSources = {overlay};
+  settings.storageDirectory = File::relative_to(*directory, "storage");
+  settings.runtimeConfigFile = {};
+  settings.logFile = {};
+  settings.includeUGC = false;
+  auto root = Root::create(std::move(settings));
+  ASSERT_TRUE(root);
+  AssetPath path("/pattern.png");
+  auto assets = (*root)->assets();
+  ASSERT_TRUE(assets);
+  auto pixels = (*assets)->image(path);
+  ASSERT_TRUE(pixels) << pixels.error().what();
+  ASSERT_EQ((*pixels)->size(), Vec2U(8, 8));
+  for (float direction : {-1.f, 1.f}) {
+    ImageMetadataDatabase database(**root);
+    for (float x : {direction * 0.25f, direction * -0.25f, direction * 0.5f, direction * -0.5f}) {
+      Vec2F position(x, -0.5f);
+      for (bool flip : {false, true}) {
+        for (float limit : {-1.f, 0.f, 1.f / 64, 0.51f, 1.f, 1.25f}) {
+          List<Vec2I> expected;
+          for (int ty = -1; ty <= 0; ++ty) {
+            for (int tx = x < 0 ? -1 : 0; tx <= (x < 0 ? 0 : 1); ++tx) {
+              unsigned count = 0;
+              for (int dy = 0; dy < 8; ++dy) {
+                for (int dx = 0; dx < 8; ++dx) {
+                  int px = static_cast<int>(std::round(tx * 8 + dx - x));
+                  int py = static_cast<int>(std::round(ty * 8 + dy - position[1]));
+                  if (px < 0 || px >= 8 || py < 0 || py >= 8)
+                    continue;
+                  auto sample = (*pixels)->get(flip ? 7 - px : px, py);
+                  ASSERT_TRUE(sample);
+                  count += (*sample)[3] != 0;
+                }
+              }
+              if (count / 64.f >= limit)
+                expected.emplace_back(tx, ty);
+            }
+          }
+          auto actual = database.image_spaces(path, position, limit, flip);
+          ASSERT_TRUE(actual) << actual.error().what();
+          EXPECT_EQ(*actual, expected);
+        }
+      }
+    }
+    // Materialize incoming IEEE bytes at runtime even in finite-math builds.
+    for (volatile std::uint32_t bits : {0x7fc00000u, 0x7f800000u, 0xff800000u}) {
+      auto value = std::bit_cast<float>(static_cast<std::uint32_t>(bits));
+      EXPECT_FALSE(database.image_spaces(path, {value, 0}, 0, false));
+      EXPECT_FALSE(database.image_spaces(path, {0, value}, 0, false));
+      EXPECT_FALSE(database.image_spaces(path, {}, value, false));
+    }
+    for (float value : {-0x1p35f, 0x1p34f})
+      EXPECT_FALSE(database.image_spaces(path, {value, 0}, 0, false));
+    EXPECT_TRUE(database.image_spaces(path, {-0x1p34f, 0}, 0, false));
+  }
+});
+
 const GameTestRegistration drawable_directives_retry(
   "DrawableTest", "DirectivesRetryAndUncenteredFastPath", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
@@ -471,6 +545,12 @@ const GameTestRegistration drawable_directives_retry(
     auto png = pngTestBytes(fixture.root().logger());
     ASSERT_TRUE(png);
     ASSERT_TRUE(File::write_file(*png, File::relative_to(overlay, "sample.png")));
+    ASSERT_TRUE(File::write_file(*png, File::relative_to(overlay, "patched.png")));
+    ASSERT_TRUE(File::write_file(String("function patch(image) return image:subImage({0,0},{1,1}) end"),
+                                 File::relative_to(overlay, "patched.png.patch.lua")));
+    ASSERT_TRUE(File::write_file(String(R"({"scripts":{"postLoad":["/generate.lua"]}})"), File::relative_to(overlay, "_metadata")));
+    ASSERT_TRUE(File::write_file(String("assets.add('/memory.png', assets.image('/sample.png'))"),
+                                 File::relative_to(overlay, "generate.lua")));
     ASSERT_TRUE(File::write_file(frames, frames_path));
     ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(overlay, "preload.config")));
     auto settings = fixture.rootSettings();
@@ -485,9 +565,33 @@ const GameTestRegistration drawable_directives_retry(
     ASSERT_TRUE(root) << root.error().what();
     auto assets = (*root)->assets();
     ASSERT_TRUE(assets) << assets.error().what();
-    auto database = (*root)->imageMetadataDatabase();
+    auto database = (*root)->image_metadata_database();
     ASSERT_TRUE(database);
     auto const& metadata = **database;
+    for (bool base_first : {false, true}) {
+      ImageMetadataDatabase cold(**root);
+      for (String const& base : StringList{"/memory.png", "/patched.png"}) {
+        auto image = (*assets)->image(base);
+        ASSERT_TRUE(image) << image.error().what();
+        EXPECT_EQ((*image)->size(), base == "/memory.png" ? Vec2U(2, 2) : Vec2U(1, 1));
+        if (base_first)
+          EXPECT_EQ(cold.image_size(base), (*image)->size());
+        for (String const& suffix : StringList{"?border=2;ffffff", "?scalenearest=0.25", "?scale=0;2", "?scale=-1;2",
+                                             "?scalenearest=1000000000?crop=0;0;1;1"}) {
+          AssetPath derived(base + suffix);
+          auto actual = (*assets)->image(derived);
+          ASSERT_TRUE(actual) << actual.error().what();
+          EXPECT_EQ(cold.image_size(derived), (*actual)->size());
+        }
+        EXPECT_EQ(cold.image_size(base), (*image)->size());
+      }
+    }
+    for (String const& suffix : StringList{"?border=4294967295;ffffff", "?border=1000000000;ffffff",
+                                         "?scalenearest=1000000000", "?scalebicubic=1000000000?crop=0;0;1;1"}) {
+      AssetPath invalid(String("/sample.png") + suffix);
+      EXPECT_FALSE((*assets)->image(invalid));
+      EXPECT_FALSE(metadata.image_size(invalid));
+    }
     auto transform = Mat3F::translation({4, 7}) * Mat3F::scaling({2, -3});
     Drawable::ImagePart const original{"/sample.png:tile?border=1;ffffff", transform};
     Directives border("?border=2;ffffff");
@@ -496,7 +600,7 @@ const GameTestRegistration drawable_directives_retry(
     auto single = original, grouped = original, removed = original;
 
     // Only the original path has a cached size. Every candidate must read frames.
-    ASSERT_EQ(metadata.imageSize(original.image), Vec2U(4, 4));
+    ASSERT_EQ(metadata.image_size(original.image), Vec2U(4, 4));
     ASSERT_TRUE(File::write_file(String("{"), frames_path));
     (*assets)->hot_reload();
     EXPECT_FALSE(single.add_directives(metadata, border, true));
@@ -519,7 +623,7 @@ const GameTestRegistration drawable_directives_retry(
     EXPECT_EQ(removed.transformation, transform * Mat3F::translation({1, 1}));
 
     Drawable::ImagePart missing{"/missing.png", transform};
-    ASSERT_FALSE(metadata.imageSize(missing.image));
+    ASSERT_FALSE(metadata.image_size(missing.image));
     ASSERT_TRUE(missing.remove_directives(metadata, true));
     ASSERT_TRUE(missing.add_directives(metadata, Directives{}, true));
     ASSERT_TRUE(missing.add_directives_group(metadata, DirectivesGroup{}, true));
@@ -532,7 +636,7 @@ const GameTestRegistration drawable_directives_retry(
   });
 
 const GameTestRegistration drawable_gradient_wire("DrawableTest", "GradientJsonAndLegacyWire", [](GameTest& fixture) {
-  auto metadata = fixture.root().imageMetadataDatabase();
+  auto metadata = fixture.root().image_metadata_database();
   ASSERT_TRUE(metadata);
   auto solid = Drawable::make_line({{1, 2}, {-3, 4}}, 2.5f, Color::rgba(87, 220, 255, 204), {8, -9});
   solid.fullbright = true;

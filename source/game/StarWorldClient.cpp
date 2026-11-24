@@ -1180,7 +1180,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
           }
           Color color = Color::rgb_f(
             0.8f + static_cast<float>(std::sin(self.m_currentTime * std::numbers::pi * 2.0)) * 0.2f, 0.0f, 0.0f);
-          auto result66 = self.root().imageMetadataDatabase();
+          auto result66 = self.root().image_metadata_database();
           if (!result66)
             return std::unexpected(std::move(result66.error()));
           auto result67 = Drawable::make_image(*(std::move(*result66)), image, 1.0f / tile_pixels, true, entity->position(), color);
@@ -1199,7 +1199,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
           for (auto& d : layer.second) {
             if (d.is_image()) {
               if (!image_metadata) {
-                auto metadata = self.root().imageMetadataDatabase();
+                auto metadata = self.root().image_metadata_database();
                 if (!metadata)
                   return std::unexpected(std::move(metadata.error()));
                 image_metadata = std::move(*metadata);
@@ -1446,7 +1446,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
   });
   
   auto overlay_to_drawable = [&self = *this](WorldStructure::Overlay const& overlay) -> std::expected<Drawable, StarException> {
-    auto result88 = self.root().imageMetadataDatabase();
+    auto result88 = self.root().image_metadata_database();
     if (!result88)
       return std::unexpected(std::move(result88.error()));
     auto result89 = Drawable::make_image(*(std::move(*result88)), overlay.image, 1.0f / tile_pixels, false, overlay.min);

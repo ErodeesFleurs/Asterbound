@@ -1952,7 +1952,7 @@ struct HumanoidImageLayers {
       std::initializer_list<std::reference_wrapper<Directives const>> directives = {},
       std::optional<std::reference_wrapper<DirectivesGroup const>> mask = {}) {
     if (!metadata) {
-      auto acquired = root.imageMetadataDatabase();
+      auto acquired = root.image_metadata_database();
       if (!acquired) return std::unexpected(std::move(acquired.error()));
       metadata = std::move(*acquired);
     }
@@ -2428,7 +2428,7 @@ std::expected<List<Drawable>, StarException> Humanoid::render_portrait(PortraitM
 }
 
 std::expected<List<Drawable>, StarException> Humanoid::render_skull() const {
-  auto checked541 = m_root.imageMetadataDatabase();
+  auto checked541 = m_root.image_metadata_database();
 if (!checked541) return std::unexpected(std::move(checked541.error()));
 auto checked542 = m_root.speciesDatabase();
 if (!checked542) return std::unexpected(std::move(checked542.error()));

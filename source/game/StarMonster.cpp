@@ -1008,7 +1008,7 @@ std::expected<void, StarException> Monster::render(RenderCallback& render_callba
   for (auto& drawable : std::move(*result154)) {
       if (drawable.is_image())
         {
-    auto result155 = this->root().imageMetadataDatabase();
+    auto result155 = this->root().image_metadata_database();
     if (!result155) return std::unexpected(std::move(result155.error()));
     auto result156 = drawable.image_part().add_directives_group(*std::move(*result155), m_statusController->parentDirectives(), true);
     if (!result156) return std::unexpected(std::move(result156.error()));
@@ -1462,7 +1462,7 @@ auto monsterSkillInfo = std::move(*result240);
 
 std::expected<List<Drawable>, StarException> Monster::portrait(PortraitMode) const {
   if (m_monsterVariant.portraitIcon) {
-    auto result241 = this->root().imageMetadataDatabase();
+    auto result241 = this->root().image_metadata_database();
 if (!result241) return std::unexpected(std::move(result241.error()));
 auto result242 = Drawable::make_image(*std::move(*result241), *m_monsterVariant.portraitIcon, 1.0f, true, Vec2F());
 if (!result242) return std::unexpected(std::move(result242.error()));

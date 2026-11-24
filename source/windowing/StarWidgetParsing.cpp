@@ -476,7 +476,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::imageHandler(S
     auto drawableConfigs = config.get_array("drawables");
     if (!drawableConfigs)
       return std::unexpected(std::move(drawableConfigs.error()));
-    auto metadata = m_context.root().imageMetadataDatabase();
+    auto metadata = m_context.root().image_metadata_database();
     if (!metadata)
       return std::unexpected(std::move(metadata.error()));
     List<Drawable> drawables;
@@ -629,7 +629,7 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::spinnerHandler
   auto assets = m_context.root().assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto metadata = m_context.root().imageMetadataDatabase();
+  auto metadata = m_context.root().image_metadata_database();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
   auto leftBaseConfig = (*assets)->json("/interface.config:spinner.leftBase");
@@ -656,16 +656,16 @@ std::expected<WidgetConstructResult, StarException> WidgetParser::spinnerHandler
   auto rightHover = rightHoverConfig->to_string();
   if (!rightHover)
     return std::unexpected(std::move(rightHover.error()));
-  auto imageSize = (*metadata)->imageSize(*leftBase);
-  if (!imageSize)
-    return std::unexpected(std::move(imageSize.error()));
+  auto image_size = (*metadata)->image_size(*leftBase);
+  if (!image_size)
+    return std::unexpected(std::move(image_size.error()));
   auto paddingConfig = (*assets)->json("/interface.config:spinner.defaultPadding");
   if (!paddingConfig)
     return std::unexpected(std::move(paddingConfig.error()));
   auto padding = paddingConfig->to_int();
   if (!padding)
     return std::unexpected(std::move(padding.error()));
-  auto upOffset = config.get_float("upOffset", static_cast<float>((*imageSize)[0]) + *padding);
+  auto upOffset = config.get_float("upOffset", static_cast<float>((*image_size)[0]) + *padding);
   if (!upOffset)
     return std::unexpected(std::move(upOffset.error()));
   auto leftBaseImage = config.get_string("leftBase", *leftBase);

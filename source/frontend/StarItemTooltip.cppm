@@ -504,7 +504,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
                   return std::unexpected(std::move(toArrayResult835.error()));
                 for (auto const& drawable : std::move(*toArrayResult835))
                   {
-                  auto image_metadata = context.root().imageMetadataDatabase();
+                  auto image_metadata = context.root().image_metadata_database();
                   if (!image_metadata)
                     return std::unexpected(std::move(image_metadata.error()));
                   auto decoded_drawable = Drawable::create(*std::move(*image_metadata), drawable);

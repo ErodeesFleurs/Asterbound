@@ -407,7 +407,7 @@ std::expected<Json, StarException> TeamManager::updateStatus(Json const& argumen
     if (*hasPortrait) {
       auto portraitJson = arguments.get("portrait");
       if (!portraitJson) return std::unexpected(std::move(portraitJson.error()));
-      auto metadata = m_root.imageMetadataDatabase();
+      auto metadata = m_root.image_metadata_database();
       if (!metadata) return std::unexpected(std::move(metadata.error()));
       auto portrait = json_to_list<Drawable>(*portraitJson, [&](Json const& value) { return Drawable::create(**metadata, value); });
       if (!portrait) return std::unexpected(std::move(portrait.error()));

@@ -163,7 +163,7 @@ std::expected<std::shared_ptr<UnlockItem>, StarException> UnlockItem::create(Roo
   auto image = item->instanceValue("image").and_then([](Json const& value) { return value.to_string(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
-  auto metadata = root.imageMetadataDatabase();
+  auto metadata = root.image_metadata_database();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
   auto drawable =

@@ -89,7 +89,7 @@ bool ImageWidget::interactive() const {
 std::expected<void, StarException> ImageWidget::setImage(String const& image) {
   if (image.empty())
     return setDrawables({});
-  auto metadata = context().root().imageMetadataDatabase();
+  auto metadata = context().root().image_metadata_database();
   if (!metadata) return std::unexpected(std::move(metadata.error()));
   auto drawable = Drawable::make_image(**metadata, image, 1.0f, false, Vec2F());
   if (!drawable) return std::unexpected(std::move(drawable.error()));
@@ -171,7 +171,7 @@ std::expected<void, StarException> ImageWidget::transform_drawables() {
   if (m_rotation != 0)
     Drawable::rotate_all(m_drawables, m_rotation);
 
-  auto metadata = context().root().imageMetadataDatabase();
+  auto metadata = context().root().image_metadata_database();
   if (!metadata) return std::unexpected(std::move(metadata.error()));
   auto bounds = Drawable::bound_box_all(**metadata, m_drawables, m_trim);
   if (!bounds) return std::unexpected(std::move(bounds.error()));

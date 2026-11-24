@@ -1665,7 +1665,7 @@ const GameTestRegistration humanoid_dance_playback(
     })"), File::relative_to(overlay, "loopprobe.dance")));
     auto root = human_animation_root(fixture, *directory);
     ASSERT_TRUE(root) << root.error().what();
-    auto metadata = (*root)->imageMetadataDatabase();
+    auto metadata = (*root)->image_metadata_database();
     ASSERT_TRUE(metadata);
     HumanoidIdentity identity;
     identity.personality.head_offset = {1, 2};
@@ -1788,7 +1788,7 @@ const GameTestRegistration humanoid_dance_playback(
         if (first) {
           auto body = find_sprite(*shown, "/humanoid/human/malebody.png");
           ASSERT_TRUE(body);
-          auto body_size = (*metadata)->imageSize(body->get().image);
+          auto body_size = (*metadata)->image_size(body->get().image);
           ASSERT_TRUE(body_size);
           auto body_center = body->get().transformation.transform_point(Vec2F(*body_size) / 2);
           for (bool front : {false, true}) {
@@ -1798,7 +1798,7 @@ const GameTestRegistration humanoid_dance_playback(
             auto const& matrix = arm->get().transformation;
             float rotation = front ? .5f : -.25f;
             near(matrix.transform_direction(Vec2F(1, 0)), Vec2F(1.f / tile_pixels, 0).rotate(rotation));
-            auto arm_size = (*metadata)->imageSize(arm->get().image);
+            auto arm_size = (*metadata)->image_size(arm->get().image);
             ASSERT_TRUE(arm_size);
             // The offset is translated before the arm is rotated about the origin.
             auto offset = (front ? Vec2F(2, 3) : Vec2F(-3, 2)) / tile_pixels;

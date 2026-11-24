@@ -672,12 +672,12 @@ std::expected<void, StarException> Projectile::render(RenderCallback& render_cal
   if (frame == getFrame())
     frame = frameAt(std::lerp(m_previousAnimationTimer, m_animationTimer, alpha), std::lerp(m_previousTimeToLive, m_timeToLive, alpha));
   String image = Star::format("{}:{}{}", m_config->image, frame, m_imageSuffix);
-  auto result902 = this->root().imageMetadataDatabase();
+  auto result902 = this->root().image_metadata_database();
 if (!result902) return std::unexpected(std::move(result902.error()));
 auto result1280 = Drawable::make_image(*std::move(*result902), image, 1.0f / tile_pixels, true, Vec2F());
 if (!result1280) return std::unexpected(std::move(result1280.error()));
 Drawable drawable = std::move(*result1280);
-  auto result903 = this->root().imageMetadataDatabase();
+  auto result903 = this->root().image_metadata_database();
 if (!result903) return std::unexpected(std::move(result903.error()));
   auto directivesResult = drawable.image_part().add_directives(**result903, m_imageDirectives, true);
   if (!directivesResult)

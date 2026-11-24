@@ -241,7 +241,7 @@ std::expected<LuaMethods<LuaCanvas>, StarException> LuaUserDataMethods<LuaCanvas
   if (auto registered = registerCanvasMethod("drawJsonDrawable",
                                              [](std::shared_ptr<CanvasWidget> canvas, Json config,
                                                 std::optional<Vec2F> position) -> std::expected<void, StarException> {
-                                               auto metadata = canvas->context().root().imageMetadataDatabase();
+                                               auto metadata = canvas->context().root().image_metadata_database();
                                                if (!metadata)
                                                  return std::unexpected(std::move(metadata.error()));
                                                auto drawable = Drawable::create(**metadata, config);
@@ -255,7 +255,7 @@ std::expected<LuaMethods<LuaCanvas>, StarException> LuaUserDataMethods<LuaCanvas
   if (auto registered = registerCanvasMethod("drawJsonDrawables",
                                              [](std::shared_ptr<CanvasWidget> canvas, JsonArray configs,
                                                 std::optional<Vec2F> position) -> std::expected<void, StarException> {
-                                               auto metadata = canvas->context().root().imageMetadataDatabase();
+                                               auto metadata = canvas->context().root().image_metadata_database();
                                                if (!metadata)
                                                  return std::unexpected(std::move(metadata.error()));
                                                for (auto const& config : configs) {
@@ -284,7 +284,7 @@ std::expected<LuaMethods<LuaCanvas>, StarException> LuaUserDataMethods<LuaCanvas
         [](std::shared_ptr<CanvasWidget> canvas, String image, Vec2F position,
            std::variant<std::monostate, Vec2F, float> scale, std::optional<Color> color,
            std::optional<float> rotation) -> std::expected<void, StarException> {
-          auto metadata = canvas->context().root().imageMetadataDatabase();
+          auto metadata = canvas->context().root().image_metadata_database();
           if (!metadata)
             return std::unexpected(std::move(metadata.error()));
           auto drawable = Drawable::make_image(**metadata, image, 1.0, true, {0.0, 0.0}, color.value_or(Color::palette_white));

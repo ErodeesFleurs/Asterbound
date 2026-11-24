@@ -38,14 +38,14 @@ import star.math_common;
 import star.algorithm;
 namespace Star {
 
-std::expected<std::shared_ptr<MaterialDatabase>, StarException> MaterialDatabase::create(std::shared_ptr<Assets const> const& assets, std::shared_ptr<ParticleDatabase const> const& pdb, ImageMetadataDatabase const& imageMetadata, Logger& logger, RandomService& random) {
+std::expected<std::shared_ptr<MaterialDatabase>, StarException> MaterialDatabase::create(std::shared_ptr<Assets const> const& assets, std::shared_ptr<ParticleDatabase const> const& pdb, ImageMetadataDatabase const& image_metadata, Logger& logger, RandomService& random) {
   auto result = std::shared_ptr<MaterialDatabase>(new MaterialDatabase(random));
-  auto loaded = result->load(assets, pdb, imageMetadata, logger);
+  auto loaded = result->load(assets, pdb, image_metadata, logger);
   if (!loaded) return std::unexpected(std::move(loaded.error()));
   return result;
 }
 
-std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets const> const& assets, std::shared_ptr<ParticleDatabase const> const& pdb, ImageMetadataDatabase const& imageMetadata, Logger& logger) {
+std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets const> const& assets, std::shared_ptr<ParticleDatabase const> const& pdb, ImageMetadataDatabase const& image_metadata, Logger& logger) {
   {
     auto value = BiMap<String, ModId>::create({{"metamod:none", NoModId}, {"metamod:biome", BiomeModId}, {"metamod:undergroundbiome", UndergroundBiomeModId}});
     if (!value) return std::unexpected(std::move(value.error()));
@@ -237,7 +237,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
         if (!parameters)
           return std::unexpected(std::move(parameters.error()));
         auto merged = json_merge(*renderTemplate, *parameters);
-        auto profile = parseMaterialRenderProfile(imageMetadata, merged, file);
+        auto profile = parseMaterialRenderProfile(image_metadata, merged, file);
         if (!profile)
           return std::unexpected(std::move(profile.error()));
         material.materialRenderProfile = std::make_shared<MaterialRenderProfile>(std::move(*profile));
@@ -432,7 +432,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
         if (!parameters)
           return std::unexpected(std::move(parameters.error()));
         auto merged = json_merge(*renderTemplate, *parameters);
-        auto profile = parseMaterialRenderProfile(imageMetadata, merged, file);
+        auto profile = parseMaterialRenderProfile(image_metadata, merged, file);
         if (!profile)
           return std::unexpected(std::move(profile.error()));
         mod.modRenderProfile = std::make_shared<MaterialRenderProfile>(std::move(*profile));

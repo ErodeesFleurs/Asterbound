@@ -152,9 +152,9 @@ namespace Star::LuaBindings {
     [[nodiscard]] std::expected<Json, StarException> loadVersionedJson(Root& root, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog, Json const& versionedJson, String const& expectedIdentifier);
     [[nodiscard]] std::expected<double, StarException> evalFunction(Root& root, String const& arg1, double arg2);
     [[nodiscard]] std::expected<double, StarException> evalFunction2(Root& root, String const& arg1, double arg2, double arg3);
-    [[nodiscard]] std::expected<Vec2U, StarException> imageSize(Root& root, String const& arg1);
-    [[nodiscard]] std::expected<List<Vec2I>, StarException> imageSpaces(Root& root, String const& arg1, Vec2F const& arg2, float arg3, bool arg4);
-    [[nodiscard]] std::expected<RectU, StarException> nonEmptyRegion(Root& root, String const& arg1);
+    [[nodiscard]] std::expected<Vec2U, StarException> image_size(Root& root, String const& arg1);
+    [[nodiscard]] std::expected<List<Vec2I>, StarException> image_spaces(Root& root, String const& arg1, Vec2F const& arg2, float arg3, bool arg4);
+    [[nodiscard]] std::expected<RectU, StarException> non_empty_region(Root& root, String const& arg1);
     [[nodiscard]] std::expected<Json, StarException> npcConfig(Root& root, String const& arg1);
     [[nodiscard]] std::expected<float, StarException> projectileGravityMultiplier(Root& root, String const& arg1);
     [[nodiscard]] std::expected<Json, StarException> projectileConfig(Root& root, String const& arg1);
@@ -338,19 +338,19 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
       !r)
     return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.register_callback_with_signature<std::expected<Vec2U, StarException>, String>(
-        "imageSize", [&root](String const& path) { return RootCallbacks::imageSize(root, path); });
+        "imageSize", [&root](String const& path) { return RootCallbacks::image_size(root, path); });
       !r)
     return std::unexpected(std::move(r.error()));
   if (auto r =
         callbacks.register_callback_with_signature<std::expected<List<Vec2I>, StarException>, String, Vec2F, float, bool>(
           "imageSpaces",
-          [&root](String const& path, Vec2F const& position, float fillLimit, bool flip) {
-            return RootCallbacks::imageSpaces(root, path, position, fillLimit, flip);
+          [&root](String const& path, Vec2F const& position, float fill_limit, bool flip) {
+            return RootCallbacks::image_spaces(root, path, position, fill_limit, flip);
           });
       !r)
     return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.register_callback_with_signature<std::expected<RectU, StarException>, String>(
-        "nonEmptyRegion", [&root](String const& path) { return RootCallbacks::nonEmptyRegion(root, path); });
+        "nonEmptyRegion", [&root](String const& path) { return RootCallbacks::non_empty_region(root, path); });
       !r)
     return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.register_callback_with_signature<std::expected<Json, StarException>, String>(
@@ -968,23 +968,23 @@ std::expected<double, StarException> LuaBindings::RootCallbacks::evalFunction2(R
   return (*function)->evaluate(arg2, arg3);
 }
 
-std::expected<Vec2U, StarException> LuaBindings::RootCallbacks::imageSize(Root& root, String const& arg1) {
-  auto database = root.imageMetadataDatabase();
+std::expected<Vec2U, StarException> LuaBindings::RootCallbacks::image_size(Root& root, String const& arg1) {
+  auto database = root.image_metadata_database();
   if (!database) return std::unexpected(std::move(database.error()));
-  return (*database)->imageSize(arg1);
+  return (*database)->image_size(arg1);
 }
 
-std::expected<List<Vec2I>, StarException> LuaBindings::RootCallbacks::imageSpaces(
+std::expected<List<Vec2I>, StarException> LuaBindings::RootCallbacks::image_spaces(
     Root& root, String const& arg1, Vec2F const& arg2, float arg3, bool arg4) {
-  auto database = root.imageMetadataDatabase();
+  auto database = root.image_metadata_database();
   if (!database) return std::unexpected(std::move(database.error()));
-  return (*database)->imageSpaces(arg1, arg2, arg3, arg4);
+  return (*database)->image_spaces(arg1, arg2, arg3, arg4);
 }
 
-std::expected<RectU, StarException> LuaBindings::RootCallbacks::nonEmptyRegion(Root& root, String const& arg1) {
-  auto database = root.imageMetadataDatabase();
+std::expected<RectU, StarException> LuaBindings::RootCallbacks::non_empty_region(Root& root, String const& arg1) {
+  auto database = root.image_metadata_database();
   if (!database) return std::unexpected(std::move(database.error()));
-  return (*database)->nonEmptyRegion(arg1);
+  return (*database)->non_empty_region(arg1);
 }
 
 std::expected<Json, StarException> LuaBindings::RootCallbacks::npcConfig(Root& root, String const& arg1) {

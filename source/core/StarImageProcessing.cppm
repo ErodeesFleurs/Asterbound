@@ -128,6 +128,8 @@ struct BorderImageOperation {
   bool include_transparent;
 };
 
+[[nodiscard]] std::expected<Vec2U, StarException> bordered_image_size(Vec2U const& size, unsigned pixels);
+
 struct ScaleImageOperation {
   enum Mode {
     Nearest,
@@ -201,6 +203,7 @@ using ::Star::add_image_operation_references;
 using ::Star::AlphaMaskImageOperation;
 using ::Star::BlendImageOperation;
 using ::Star::BorderImageOperation;
+using ::Star::bordered_image_size;
 using ::Star::BrightnessMultiplyImageOperation;
 using ::Star::color_directives_from_config;
 using ::Star::ColorLookupTables;
