@@ -49,6 +49,9 @@ class BackArmor;
 struct Dance;
 struct DanceStep;
 
+template <typename T>
+concept humanoid_pose_animator = std::same_as<T, NetworkedAnimator> || std::same_as<T, NetworkedAnimator::Sample>;
+
 enum class HumanoidEmote {
   Idle,
   Blabbering,
@@ -169,7 +172,6 @@ public:
 
     int stateSeq(float timer, State state) const;
     int emoteStateSeq(float timer, HumanoidEmote state) const;
-    int danceSeq(float timer, std::shared_ptr<Dance> dance) const;
     int genericSeq(float timer, float cycle, unsigned frames, bool cyclic) const;
 
     Array<float, STATESIZE> stateCycle;
@@ -255,7 +257,7 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> setState(State state);
   [[nodiscard]] std::expected<void, StarException> setEmoteState(HumanoidEmote state);
-  [[nodiscard]] std::expected<void, StarException> setDance(std::optional<String> const& dance);
+  [[nodiscard]] std::expected<void, StarException> set_dance(std::optional<String> const& name);
   void setFacingDirection(Direction facingDirection);
   [[nodiscard]] std::expected<void, StarException> setMovingBackwards(bool movingBackwards);
   void setHeadRotation(float headRotation);
@@ -266,8 +268,8 @@ public:
 
   State state() const;
   HumanoidEmote emoteState() const;
-  std::optional<String> dance() const;
-  [[nodiscard]] std::expected<bool, StarException> danceCyclicOrEnded() const;
+  std::optional<String> const& dance() const;
+  [[nodiscard]] std::expected<bool, StarException> dance_cyclic_or_ended() const;
   Direction facingDirection() const;
   bool movingBackwards() const;
 
@@ -286,8 +288,8 @@ public:
   [[nodiscard]] std::expected<void, StarException> animate(float dt, std::optional<std::reference_wrapper<NetworkedAnimator::DynamicTarget>> dynamicTarget);
 
   // Logical pose is committed by ticks; visual queries use an explicit sampled view.
-  [[nodiscard]] std::expected<void, StarException> prepareAnimatorPose();
-  [[nodiscard]] std::expected<void, StarException> prepareAnimatorPose(NetworkedAnimator::Sample& sample, bool withItems = true);
+  [[nodiscard]] std::expected<void, StarException> prepare_animator_pose();
+  [[nodiscard]] std::expected<void, StarException> prepare_animator_pose(NetworkedAnimator::Sample& sample, bool with_items = true);
 
   // Reset animation time to 0.0f
   [[nodiscard]] std::expected<void, StarException> resetAnimation();
@@ -398,15 +400,23 @@ private:
   [[nodiscard]] std::expected<int, StarException> getArmStateSequence(float interpolation = 1.f) const;
   int getBodyStateSequence(float interpolation = 1.f) const;
 
-  [[nodiscard]] std::expected<std::optional<std::shared_ptr<Dance>>, StarException> getDance() const;
+  struct CachedDance {
+    std::shared_ptr<Dance const> definition;
+    std::uint64_t generation = 0;
+  };
+  [[nodiscard]] std::expected<CachedDance, StarException> load_dance(String const& name) const;
+  [[nodiscard]] std::expected<std::optional<std::reference_wrapper<Dance const>>, StarException> current_dance() const;
+  [[nodiscard]] std::expected<std::optional<std::reference_wrapper<DanceStep const>>, StarException> sample_dance_step(float interpolation) const;
 
   [[nodiscard]] std::expected<void, StarException> refreshAnimationState(bool startNew = false);
-  template <typename Animator>
-  [[nodiscard]] std::expected<void, StarException> applyAnimatorPose(Animator& animator, HandDrawingInfo const& frontHand, HandDrawingInfo const& backHand,
-      float frontAngle, float backAngle, float headRotation, DanceStep const* danceStep, bool withItems);
+  Vec2F base_head_offset() const;
+  template <humanoid_pose_animator Animator>
+  [[nodiscard]] std::expected<void, StarException> apply_animator_pose(Animator& animator, HandDrawingInfo const& front_hand,
+      HandDrawingInfo const& back_hand, float front_angle, float back_angle, float head_rotation,
+      std::optional<std::reference_wrapper<DanceStep const>> dance_step, bool with_items);
 
-  template <typename Animator>
-  [[nodiscard]] std::expected<void, StarException> prepareAnimatorPose(Animator& animator, float interpolation, bool withItems);
+  template <humanoid_pose_animator Animator>
+  [[nodiscard]] std::expected<void, StarException> prepare_animator_pose(Animator& animator, float interpolation, bool with_items);
 
   Json m_baseConfig;
   Json m_mergeConfig;
@@ -470,6 +480,7 @@ private:
   State m_state;
   HumanoidEmote m_emoteState;
   std::optional<String> m_dance;
+  mutable CachedDance m_cached_dance;
   Direction m_facingDirection;
   bool m_movingBackwards = false;
   float m_headRotation = 0.0f;
@@ -488,10 +499,10 @@ private:
 
   float m_animationTimer = 0.0f;
   float m_emoteAnimationTimer = 0.0f;
-  float m_danceTimer = 0.0f;
+  float m_dance_timer = 0;
   float m_previousAnimationTimer = 0;
   float m_previousEmoteAnimationTimer = 0;
-  float m_previousDanceTimer = 0;
+  float m_previous_dance_timer = 0;
   struct PresentationPose {
     float headRotation = 0;
     float rotation = 0;
@@ -599,6 +610,7 @@ export namespace Star {
   using ::Star::LegsArmor;
   using ::Star::BackArmor;
   using ::Star::Humanoid;
+  using ::Star::humanoid_pose_animator;
   using ::Star::Dance;
   using ::Star::HumanoidEmote;
   using ::Star::HumanoidEmoteNames;

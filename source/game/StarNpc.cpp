@@ -188,7 +188,6 @@ if (!result4) return std::unexpected(std::move(result4.error()));
 auto result5 = std::move(*result4).to_float();
 if (!result5) return std::unexpected(std::move(result5.error()));
 m_emoteCooldownTimer = GameTimer(std::move(*result5));
-  m_danceCooldownTimer = GameTimer(0.0f);
   auto result6 = assets->json("/npcs/npc.config:blinkInterval");
 if (!result6) return std::unexpected(std::move(result6.error()));
 auto result7 = json_to_vec2f(std::move(*result6));
@@ -593,7 +592,7 @@ if (!result114) return std::unexpected(std::move(result114.error()));
   auto pose = humanoid();
   if (!pose)
     return std::unexpected(std::move(pose.error()));
-  return (*pose)->prepareAnimatorPose();
+  return (*pose)->prepare_animator_pose();
 }
 
 std::expected<void, StarException> Npc::uninit() {
@@ -947,12 +946,10 @@ if (!result185) return std::unexpected(std::move(result185.error()));
   if (!result188) return std::unexpected(std::move(result188.error()));
 
 }
-      if (loungeAnchor->get().dance)
-        {
-  auto result189 = setDance(loungeAnchor->get().dance);
-  if (!result189) return std::unexpected(std::move(result189.error()));
-
-}
+      if (loungeAnchor->get().dance) {
+        auto result = set_dance(loungeAnchor->get().dance);
+        if (!result) return result;
+      }
       auto result190 = m_statusController->setPersistentEffects("lounging", loungeAnchor->get().statusEffects);
 if (!result190) return std::unexpected(std::move(result190.error()));
 
@@ -1095,8 +1092,7 @@ if (!result208) return std::unexpected(std::move(result208.error()));
 
     if (m_emoteCooldownTimer.tick(dt))
       m_emoteState = HumanoidEmote::Idle;
-    if (m_danceCooldownTimer.tick(dt))
-      m_dance = {};
+    m_dance.tick(dt);
 
     if (m_chat_message_updated) {
       auto result225 = this->root().emoteProcessor();
@@ -1124,7 +1120,7 @@ if (!result229) return std::unexpected(std::move(result229.error()));
 
     auto result230 = humanoid();
 if (!result230) return std::unexpected(std::move(result230.error()));
-auto result231 = std::move(*result230)->setDance(m_dance);
+auto result231 = std::move(*result230)->set_dance(m_dance.name);
 if (!result231) return std::unexpected(std::move(result231.error()));
 
 
@@ -1805,10 +1801,7 @@ if (!result386) return std::unexpected(std::move(result386.error()));
 });
 if (!result388) return std::unexpected(std::move(result388.error()));
 
-  auto result390 = callbacks.register_callback("dance", [this](std::optional<String> const& danceName) -> std::expected<void, StarException> { auto result389 = setDance(danceName);
-if (!result389) return std::unexpected(std::move(result389.error()));
-   return {};
-});
+  auto result390 = callbacks.register_callback("dance", [this](std::optional<String> const& name) { return set_dance(name); });
 if (!result390) return std::unexpected(std::move(result390.error()));
 
   auto result391 = callbacks.register_callback("setInteractive", [this](bool interactive) { m_isInteractive.set(interactive); });
@@ -2009,7 +2002,7 @@ if (!result438) return std::unexpected(std::move(result438.error()));
   auto result439 = m_netGroup.add_net_element(m_humanoidEmoteStateNetState);
 if (!result439) return std::unexpected(std::move(result439.error()));
 
-  auto result440 = m_netGroup.add_net_element(m_humanoidDanceNetState);
+  auto result440 = m_netGroup.add_net_element(m_humanoid_dance_net_state);
 if (!result440) return std::unexpected(std::move(result440.error()));
 
 
@@ -2121,7 +2114,7 @@ if (!result467) return std::unexpected(std::move(result467.error()));
 m_humanoidEmoteStateNetState.set(std::move(*result467)->emoteState());
   auto result468 = humanoid();
 if (!result468) return std::unexpected(std::move(result468.error()));
-m_humanoidDanceNetState.set(std::move(*result468)->dance());
+m_humanoid_dance_net_state.set(std::move(*result468)->dance());
 
   if (m_identityUpdated) {
     m_identityNetState.push(m_npcVariant.humanoidIdentity);
@@ -2145,7 +2138,7 @@ if (!result472) return std::unexpected(std::move(result472.error()));
 
   auto result473 = humanoid();
 if (!result473) return std::unexpected(std::move(result473.error()));
-auto result474 = std::move(*result473)->setDance(m_humanoidDanceNetState.get());
+auto result474 = std::move(*result473)->set_dance(m_humanoid_dance_net_state.get());
 if (!result474) return std::unexpected(std::move(result474.error()));
 
 
@@ -2230,20 +2223,9 @@ void Npc::addEmote(HumanoidEmote const& emote) {
   m_emoteCooldownTimer.reset();
 }
 
-std::expected<void, StarException> Npc::setDance(std::optional<String> const& danceName) {
+std::expected<void, StarException> Npc::set_dance(std::optional<String> const& dance_name) {
   assert(!isSlave());
-  m_dance = danceName;
-
-  if (danceName.has_value()) {
-    auto result484 = this->root().danceDatabase();
-if (!result484) return std::unexpected(std::move(result484.error()));
-auto danceDatabase = std::move(*result484);
-    auto result485 = danceDatabase->getDance(*danceName);
-if (!result485) return std::unexpected(std::move(result485.error()));
-std::shared_ptr<Dance> dance = std::move(*result485);
-    m_danceCooldownTimer = GameTimer(dance->duration);
-  }
-  return {};
+  return m_dance.set(root(), dance_name);
 }
 
 bool Npc::isInteractive() const {
@@ -2370,7 +2352,7 @@ auto result500 = humanoid();
 if (!result500) return std::unexpected(std::move(result500.error()));
 auto animator = (*result500)->networkedAnimator();
 auto humanoidSample = animator->get().sample(interpolation);
-auto prepared = (*result500)->prepareAnimatorPose(humanoidSample);
+auto prepared = (*result500)->prepare_animator_pose(humanoidSample);
 if (!prepared) return std::unexpected(std::move(prepared.error()));
 auto result501 = humanoidSample.lightSources();
 if (!result501) return std::unexpected(std::move(result501.error()));

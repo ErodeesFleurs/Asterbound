@@ -389,7 +389,7 @@ void NetworkedAnimator::Sample::setLocalTag(String name, std::optional<String> v
   m_presentation->tags.set(std::move(name), {true, std::move(value)});
 }
 
-void NetworkedAnimator::Sample::setPartDrawables(String const& name, List<Drawable> const* drawables) {
+void NetworkedAnimator::Sample::set_part_drawables(String const& name, std::optional<std::reference_wrapper<List<Drawable> const>> drawables) {
   m_presentation->drawables.set(name, {true, drawables});
 }
 
@@ -423,16 +423,6 @@ std::expected<Mat3F, StarException> NetworkedAnimator::Sample::getLocalTransform
   auto group = m_animator.m_transformationGroups.get(name);
   if (!group) return std::unexpected(std::move(group.error()));
   return m_presentation->groups[group->get().presentationIndex].localTransform;
-}
-
-List<Drawable> const* NetworkedAnimator::partDrawables(String const& name, Sample const* sample) const {
-  if (sample) {
-    if (auto override = sample->m_presentation->drawables.find_ref(name); override && override->get().active)
-      return override->get().drawables;
-  }
-  if (auto drawables = m_partDrawables.find_ref(name))
-    return &drawables->get();
-  return nullptr;
 }
 
 NetworkedAnimator::DynamicTarget::~DynamicTarget() {
@@ -1570,6 +1560,15 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
   if (!partCount)
     return List<std::pair<Drawable, float>>{};
 
+  auto part_drawables = [&](String const& name) -> std::optional<std::reference_wrapper<List<Drawable> const>> {
+    if (sample) {
+      auto override = sample->m_presentation->drawables.find_ref(name);
+      if (override && override->get().active)
+        return override->get().drawables;
+    }
+    return m_partDrawables.find_ref(name);
+  };
+
   List<Directives> baseProcessingDirectives = { m_processingDirectives.get() };
   for (auto& pair : m_effects) {
     auto const& effectState = pair.second;
@@ -1648,8 +1647,8 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
       maybeZLevel = *z;
     }
 
-    if (auto drawables = partDrawables(partName, sample))
-      drawableCount += drawables->size();
+    if (auto drawables = part_drawables(partName))
+      drawableCount += drawables->get().size();
     parts.push_back(std::make_tuple(std::cref(activePart), std::cref(partName), maybeZLevel.value_or(0.0f)));
     return {};
   };
@@ -1807,8 +1806,8 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
       drawables.push_back({std::move(drawable), std::get<2>(entry)});
     }
 
-    if (auto attached = partDrawables(partName, sample)) {
-      for (auto const& attachedDrawable : *attached) {
+    if (auto attached = part_drawables(partName)) {
+      for (auto const& attachedDrawable : attached->get()) {
         Drawable drawable = attachedDrawable;
         drawable.transform(transformation);
         drawables.push_back({std::move(drawable), std::get<2>(entry)});

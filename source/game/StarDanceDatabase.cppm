@@ -1,62 +1,59 @@
 module;
 import star.format;
-import star.json;
-import star.ordered_map;
-import star.bi_map;
-import star.thread;
-import star.io_device;
+import star.game_timers;
 import star.list;
-import star.image_processing;
-import star.hash;
-import star.data_stream;
-import star.string_view;
-import star.directives;
-import star.asset_path;
-import star.ref_ptr;
-import star.logging;
-import star.listener;
 import std;
 import star.string;
-
-
-import star.asset_source;
-import star.assets;
-
 import star.vector;
+
 namespace Star {
+class Assets;
+class Logger;
+class Root;
 
 struct DanceStep {
-  std::optional<String> bodyFrame;
-  std::optional<String> frontArmFrame;
-  std::optional<String> backArmFrame;
-  Vec2F headOffset;
-  Vec2F frontArmOffset;
-  Vec2F backArmOffset;
-  float frontArmRotation;
-  float backArmRotation;
+  std::optional<String> body_frame;
+  std::optional<String> front_arm_frame;
+  std::optional<String> back_arm_frame;
+  Vec2F head_offset;
+  Vec2F front_arm_offset;
+  Vec2F back_arm_offset;
+  float front_arm_rotation = 0;
+  float back_arm_rotation = 0;
 };
 
 struct Dance {
   String name;
   List<String> states;
-  float cycle;
-  bool cyclic;
-  float duration;
+  float cycle = 0;
+  bool cyclic = false;
+  float duration = 0;
   List<DanceStep> steps;
+
+  [[nodiscard]] std::optional<std::reference_wrapper<DanceStep const>> step_at(float timer) const&;
+  std::optional<std::reference_wrapper<DanceStep const>> step_at(float) const&& = delete;
+};
+
+struct TimedDance {
+  std::optional<String> name;
+  GameTimer timer;
+
+  [[nodiscard]] std::expected<void, StarException> set(Root& root, std::optional<String> const& requested);
+  void tick(float dt);
 };
 
 class DanceDatabase {
-public:
-  [[nodiscard]] static std::expected<std::shared_ptr<DanceDatabase>, StarException> create(std::shared_ptr<Assets const> assets, Logger& logger);
+  struct ConstructionKey { explicit ConstructionKey() = default; };
 
-  [[nodiscard]] std::expected<std::shared_ptr<Dance>, StarException> getDance(String const& name) const;
+public:
+  DanceDatabase(ConstructionKey, Logger& logger) : m_logger(logger) {}
+  [[nodiscard]] static std::expected<std::shared_ptr<DanceDatabase>, StarException> create(Assets const& assets, Logger& logger);
+
+  [[nodiscard]] std::expected<std::shared_ptr<Dance const>, StarException> get_dance(String const& name) const;
 
 private:
-  explicit DanceDatabase(Logger& logger) : m_logger(logger) {}
-  [[nodiscard]] static std::expected<std::shared_ptr<Dance>, StarException> readDance(Assets const& assets, String const& path);
-
   Logger& m_logger;
-  StringMap<std::shared_ptr<Dance>> m_dances;
+  StringMap<std::shared_ptr<Dance const>> m_dances;
 };
 
 }
@@ -66,5 +63,6 @@ export module star.dance_database;
 export namespace Star {
   using ::Star::DanceStep;
   using ::Star::Dance;
+  using ::Star::TimedDance;
   using ::Star::DanceDatabase;
 }

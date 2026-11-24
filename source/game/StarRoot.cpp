@@ -406,7 +406,7 @@ std::expected<void, StarException> Root::reload() {
     std::lock_guard imageMetadataDatabaseLock(m_imageMetadataDatabaseMutex);
     std::lock_guard tenantDatabaseLock(m_tenantDatabaseMutex);
     std::lock_guard nameGeneratorLock(m_nameGeneratorMutex);
-    std::lock_guard danceDatabaseLock(m_danceDatabaseMutex);
+    std::lock_guard dance_database_lock(m_dance_database_mutex);
     std::lock_guard spawnTypeDatabaseLock(m_spawnTypeDatabaseMutex);
     std::lock_guard radioMessageDatabaseLock(m_radioMessageDatabaseMutex);
     std::lock_guard collection_database_lock(m_collection_database_mutex);
@@ -453,7 +453,8 @@ std::expected<void, StarException> Root::reload() {
     m_imageMetadataDatabase.reset();
     m_tenantDatabase.reset();
     m_nameGenerator.reset();
-    m_danceDatabase.reset();
+    m_dance_database.reset();
+    m_dance_database_generation.fetch_add(1, std::memory_order_relaxed);
     m_spawnTypeDatabase.reset();
     m_radioMessageDatabase.reset();
     m_collection_database.reset();
@@ -510,7 +511,7 @@ std::expected<void, StarException> Root::fullyLoad() {
   add(&Root::imageMetadataDatabase);
   add(&Root::tenantDatabase);
   add(&Root::nameGenerator);
-  add(&Root::danceDatabase);
+  add(&Root::dance_database);
   add(&Root::spawnTypeDatabase);
   add(&Root::radioMessageDatabase);
   add(&Root::collection_database);
@@ -906,9 +907,11 @@ std::expected<std::shared_ptr<TenantDatabase const>, StarException> Root::tenant
   return loadMember(m_tenantDatabase, m_tenantDatabaseMutex, "TenantDatabase", *this);
 }
 
-std::expected<std::shared_ptr<DanceDatabase const>, StarException> Root::danceDatabase() {
-  return loadMemberFunction<DanceDatabase>(m_danceDatabase, m_danceDatabaseMutex, "DanceDatabase", [this] {
-    return assets().and_then([this](auto const& a) { return DanceDatabase::create(a, logger()); });
+std::expected<std::shared_ptr<DanceDatabase const>, StarException> Root::dance_database() {
+  return loadMemberFunction<DanceDatabase>(m_dance_database, m_dance_database_mutex, "DanceDatabase", [this] {
+    return assets().and_then([this](std::shared_ptr<Assets const> const& source) {
+      return DanceDatabase::create(*source, logger());
+    });
   });
 }
 

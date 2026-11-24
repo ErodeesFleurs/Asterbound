@@ -86,6 +86,8 @@ import star.byte_array;
 import star.data_stream_extra;
 import star.encode;
 
+import star.dance_database;
+
 #include "gtest/gtest.h"
 
 using namespace Star;
@@ -236,7 +238,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
     ASSERT_NO_FATAL_FAILURE(expectCatalog("stagehandDatabase", root.stagehandDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("behavior_database", root.behavior_database()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("tenantDatabase", root.tenantDatabase()));
-    ASSERT_NO_FATAL_FAILURE(expectCatalog("danceDatabase", root.danceDatabase()));
+    ASSERT_NO_FATAL_FAILURE(expectCatalog("dance_database", root.dance_database()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("spawnTypeDatabase", root.spawnTypeDatabase()));
   };
   ASSERT_NO_FATAL_FAILURE(expectCatalogs("before reload"));
@@ -387,6 +389,32 @@ const GameTestRegistration codex_catalog("CodexCatalog", "EmptyDefaultsRelativeI
   if (!json) return std::unexpected(std::move(json.error()));
   return json->get_string("rootIsolationOwner");
 }
+
+const GameTestRegistration timed_dance("DanceTest", "RefreshAndFailedReplacement", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto settings = isolationSettings(fixture.rootSettings(), *directory, "dance");
+  ASSERT_TRUE(settings) << settings.error().what();
+  auto overlay = File::relative_to(*directory, "assets");
+  settings->assetSources = {overlay}; // No assetmissing fallback: exercise a real lookup failure.
+  ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(overlay, "preload.config")));
+  ASSERT_TRUE(File::write_file(String(R"({"name":"pose","states":[],"steps":[],"duration":2,"cycle":1,"cyclic":false})"),
+                               File::relative_to(overlay, "pose.dance")));
+  auto root = Root::create(std::move(*settings));
+  ASSERT_TRUE(root) << root.error().what();
+  TimedDance playback;
+  ASSERT_TRUE(playback.set(**root, String("pose")));
+  playback.tick(1.5f);
+  ASSERT_TRUE(playback.set(**root, String("pose")));
+  playback.tick(1.0f);
+  ASSERT_EQ(playback.name, std::optional<String>("pose"));
+  ASSERT_FALSE(playback.set(**root, String("missing")));
+  playback.tick(0.75f);
+  EXPECT_EQ(playback.name, std::optional<String>("pose"));
+  playback.tick(0.25f);
+  EXPECT_FALSE(playback.name);
+});
 
 const GameTestRegistration secure_identity("RootTest", "SecureIdentityStability", [](GameTest& fixture) {
   auto directory = File::temporary_directory(fixture.root().random());

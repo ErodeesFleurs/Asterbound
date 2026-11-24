@@ -1357,12 +1357,12 @@ std::expected<bool, StarException> UniverseClient::switchPlayer(Uuid const& uuid
       if (!configResult)
         return std::unexpected(std::move(configResult.error()));
       auto config = std::move(*configResult);
-      auto danceResult = config.opt_string("swapDance");
-      if (!danceResult)
-        return std::unexpected(std::move(danceResult.error()));
-      auto dance = std::move(*danceResult);
+      auto dance_result = config.opt_string("swapDance");
+      if (!dance_result)
+        return std::unexpected(std::move(dance_result.error()));
+      auto dance = std::move(*dance_result);
       if (dance) {
-        auto operation29 = m_mainPlayer->humanoid()->setDance(*dance);
+        auto operation29 = m_mainPlayer->humanoid()->set_dance(*dance);
         if (!operation29)
           return std::unexpected(std::move(operation29.error()));
       }

@@ -20,6 +20,17 @@ The animation must contain these transformation groups as they are used for some
 - `personalityHeadOffset`
 - `personalityArmOffset`
 
+In a `.dance` file, `cycle` is the time in seconds for one pass through `steps`;
+`duration` is how long a player or NPC dance request stays active. Repeating the
+same request refreshes its duration without restarting the humanoid's phase.
+An empty `steps` array contributes no pose and does not hide held items.
+
+A step can be a six-element array `[bodyFrame, frontArmFrame, backArmFrame,
+headOffset, frontArmOffset, backArmOffset]`, or an object using those keys.
+Object steps also accept `frontArmRotation` and `backArmRotation` in radians.
+If the back angle is omitted it inherits the front angle, as in older assets;
+set it to `0` explicitly to rotate only the front arm.
+
 The animation must contain these stateTypes and states for some hardcoded behavior that happens locally to the client.
 - `bodyDance`
     - `idle` set whenever the player/npc is not dancing or the dance step does not define a body frame

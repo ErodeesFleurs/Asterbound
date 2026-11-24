@@ -2490,8 +2490,24 @@ const GameTestRegistration recoverableDatabaseProvider(
                                  File::relative_to(*directory, "_metadata")));
     ASSERT_TRUE(File::write_file(String("{}"), File::relative_to(*directory, "broken.dance")));
     ASSERT_TRUE(
-      File::write_file(String(R"({"name":"assetmissing","states":[],"cycle":1,"cyclic":true,"duration":1,"steps":[]})"),
+      File::write_file(String(R"({"name":"assetmissing","states":[],"cycle":0,"cyclic":true,"duration":1,"steps":[]})"),
                        File::relative_to(*directory, "fallback.dance")));
+    struct InvalidDance {
+      std::string_view name, cycle, duration, steps;
+    };
+    constexpr InvalidDance invalid[] = {
+      {"zero_cycle", "0", "1", "[{}]"}, {"negative_cycle", "-1", "1", "[{}]"},
+      {"huge_cycle", "1e100", "1", "[{}]"}, {"negative_duration", "1", "-1", "[]"},
+      {"huge_duration", "1", "1e100", "[]"}, {"short_step", "1", "1", "[[null,null,null,null,null]]"},
+      {"bad_angle", "1", "1", R"([{"backArmRotation":"oops"}])"},
+      {"huge_angle", "1", "1", R"([{"frontArmRotation":1e100}])"},
+      {"huge_offset", "1", "1", R"([{"headOffset":[1e100,0]}])"},
+    };
+    for (auto const& entry : invalid) {
+      auto config = Star::format(R"({{"name":"{}","states":["idle"],"cycle":{},"cyclic":true,"duration":{},"steps":{}}})",
+                                 entry.name, entry.cycle, entry.duration, entry.steps);
+      ASSERT_TRUE(File::write_file(String(std::move(config)), File::relative_to(*directory, String(entry.name) + ".dance")));
+    }
     class Errors : public LogSink {
     public:
       Errors() { set_level(LogLevel::Error); }
@@ -2509,16 +2525,101 @@ const GameTestRegistration recoverableDatabaseProvider(
     settings.worker_pool_size = 1;
     auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {*directory});
     ASSERT_TRUE(assets);
-    auto database = DanceDatabase::create(*assets, logger);
+    auto database = DanceDatabase::create(**assets, logger);
     ASSERT_TRUE(database);
     EXPECT_NE(errors->messages.find("/broken.dance"), std::string::npos);
     EXPECT_NE(errors->messages.find("JsonException"), std::string::npos);
     EXPECT_NE(errors->messages.find("Dance Recovery Provider"), std::string::npos);
     EXPECT_NE(errors->messages.find(directory->utf8()), std::string::npos);
-    auto recovered = (*database)->getDance("broken");
+    auto recovered = (*database)->get_dance("broken");
     ASSERT_TRUE(recovered);
     EXPECT_EQ((*recovered)->name, "assetmissing");
+    EXPECT_FALSE((*recovered)->step_at(0));
+    for (auto const& entry : invalid) {
+      SCOPED_TRACE(entry.name);
+      EXPECT_NE(errors->messages.find(Star::format("/{}.dance", entry.name)), std::string::npos);
+      auto result = (*database)->get_dance(String(entry.name));
+      ASSERT_TRUE(result);
+      EXPECT_EQ(*result, *recovered);
+    }
   });
+
+#pragma float_control(precise, on, push)
+const GameTestRegistration dance_step_formats(
+  "AssetsTest", "DanceStepFormatsAndFrameBoundaries", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
+    ASSERT_TRUE(File::write_file(String(R"({
+      "name":"poses","states":["idle"],"cycle":1,"cyclic":true,"duration":0.25,
+      "steps":[
+        ["idle.1",null,"idle.4",[1,2],null,[3,4]],
+        {"frontArmFrame":"front","frontArmOffset":[5,6],"frontArmRotation":0.25},
+        {"backArmRotation":-0.5},
+        {"frontArmRotation":0.5,"backArmRotation":-0.25}
+      ]
+    })"), File::relative_to(*directory, "poses.dance")));
+    Logger logger;
+    Assets::Settings settings{};
+    settings.worker_pool_size = 1;
+    auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {*directory});
+    ASSERT_TRUE(assets);
+    auto database = DanceDatabase::create(**assets, logger);
+    ASSERT_TRUE(database);
+    auto poses = (*database)->get_dance("poses");
+    ASSERT_TRUE(poses);
+    auto const& dance = **poses;
+    ASSERT_EQ(dance.steps.size(), 4u);
+    auto first = dance.step_at(-std::numeric_limits<float>::max());
+    ASSERT_TRUE(first);
+    EXPECT_EQ(first->get().body_frame, String("idle.1"));
+    EXPECT_FALSE(first->get().front_arm_frame);
+    EXPECT_EQ(first->get().back_arm_frame, String("idle.4"));
+    EXPECT_EQ(first->get().head_offset, Vec2F(1, 2));
+    EXPECT_EQ(first->get().front_arm_offset, Vec2F{});
+    EXPECT_EQ(first->get().back_arm_offset, Vec2F(3, 4));
+    EXPECT_EQ(first->get().front_arm_rotation, 0.f);
+    EXPECT_EQ(first->get().back_arm_rotation, 0.f);
+    auto front = dance.step_at(0.25f);
+    ASSERT_TRUE(front);
+    EXPECT_EQ(front->get().front_arm_frame, String("front"));
+    EXPECT_EQ(front->get().front_arm_offset, Vec2F(5, 6));
+    EXPECT_EQ(front->get().front_arm_rotation, 0.25f);
+    EXPECT_EQ(front->get().back_arm_rotation, 0.25f);
+    auto back = dance.step_at(0.5f);
+    ASSERT_TRUE(back);
+    EXPECT_EQ(back->get().front_arm_rotation, 0.f);
+    EXPECT_EQ(back->get().back_arm_rotation, -0.5f);
+    auto both = dance.step_at(1.75f);
+    ASSERT_TRUE(both);
+    EXPECT_EQ(both->get().front_arm_rotation, 0.5f);
+    EXPECT_EQ(both->get().back_arm_rotation, -0.25f);
+    auto wrapped = dance.step_at(1.f);
+    ASSERT_TRUE(wrapped);
+    EXPECT_EQ(wrapped->get().body_frame, first->get().body_frame);
+    constexpr float nan = std::numeric_limits<float>::quiet_NaN();
+    constexpr float infinity = std::numeric_limits<float>::infinity();
+    EXPECT_FALSE(dance.step_at(nan));
+    EXPECT_FALSE(dance.step_at(infinity));
+
+    Dance once;
+    once.steps.resize(2);
+    once.steps[1].body_frame = "last";
+    once.cycle = std::numeric_limits<float>::max();
+    for (float timer : {once.cycle * 0.75f, once.cycle}) {
+      auto last = once.step_at(timer);
+      ASSERT_TRUE(last);
+      EXPECT_EQ(last->get().body_frame, String("last"));
+    }
+    once.cycle = 1;
+    auto ended = once.step_at(std::numeric_limits<float>::max());
+    ASSERT_TRUE(ended);
+    EXPECT_EQ(ended->get().body_frame, String("last"));
+    once.cycle = 0;
+    EXPECT_FALSE(once.step_at(0));
+  });
+#pragma float_control(pop)
 
 const GameTestRegistration memory_reader_lifetime(
   "AssetsTest", "MemoryReadersPinBytesAndPixelsAcrossReplacementAndDestruction", [](GameTest&) {

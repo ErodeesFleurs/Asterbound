@@ -145,7 +145,7 @@ public:
     [[nodiscard]] std::expected<bool, StarException> hasState(String const& type, std::optional<String> const& state = {}) const;
     [[nodiscard]] std::expected<bool, StarException> setLocalState(String const& type, String const& state, bool startNew = false, bool reverse = false);
     void setLocalTag(String name, std::optional<String> value = {});
-    void setPartDrawables(String const& name, List<Drawable> const* drawables);
+    void set_part_drawables(String const& name, std::optional<std::reference_wrapper<List<Drawable> const>> drawables);
     [[nodiscard]] std::expected<void, StarException> resetLocalTransformationGroup(String const& name);
     [[nodiscard]] std::expected<void, StarException> rotateLocalTransformationGroup(String const& name, float rotation, Vec2F const& center = Vec2F());
     [[nodiscard]] std::expected<void, StarException> translateLocalTransformationGroup(String const& name, Vec2F const& translation);
@@ -340,7 +340,6 @@ private:
   [[nodiscard]] std::expected<List<Drawable>, StarException> queryDrawables(Vec2F const& translate, Sample const* sample) const;
   [[nodiscard]] std::expected<List<std::pair<Drawable, float>>, StarException> queryDrawablesWithZLevel(Vec2F const& translate, Sample const* sample) const;
   [[nodiscard]] std::expected<List<LightSource>, StarException> queryLightSources(Vec2F const& translate, Sample const* sample) const;
-  List<Drawable> const* partDrawables(String const& name, Sample const* sample) const;
   explicit NetworkedAnimator(Root& root);
 
   struct RotationGroup {
@@ -523,7 +522,7 @@ private:
     };
     struct Attachment {
       bool active = false;
-      List<Drawable> const* drawables = nullptr;
+      std::optional<std::reference_wrapper<List<Drawable> const>> drawables;
     };
     unsigned users = 0;
     AnimatedPartSet::Sample parts;

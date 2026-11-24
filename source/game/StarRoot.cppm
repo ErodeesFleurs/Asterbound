@@ -195,7 +195,10 @@ public:
   [[nodiscard]] std::expected<std::shared_ptr<CodexDatabase const>, StarException> codex_database();
   [[nodiscard]] std::expected<std::shared_ptr<BehaviorDatabase const>, StarException> behavior_database();
   [[nodiscard]] std::expected<std::shared_ptr<TenantDatabase const>, StarException> tenantDatabase();
-  [[nodiscard]] std::expected<std::shared_ptr<DanceDatabase const>, StarException> danceDatabase();
+  [[nodiscard]] std::expected<std::shared_ptr<DanceDatabase const>, StarException> dance_database();
+  [[nodiscard]] std::uint64_t dance_database_generation() const noexcept {
+    return m_dance_database_generation.load(std::memory_order_relaxed);
+  }
   [[nodiscard]] std::expected<std::shared_ptr<SpawnTypeDatabase const>, StarException> spawnTypeDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<RadioMessageDatabase const>, StarException> radioMessageDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<CollectionDatabase const>, StarException> collection_database();
@@ -373,8 +376,9 @@ private:
   std::shared_ptr<TenantDatabase> m_tenantDatabase;
   std::mutex m_tenantDatabaseMutex;
 
-  std::shared_ptr<DanceDatabase> m_danceDatabase;
-  std::mutex m_danceDatabaseMutex;
+  std::shared_ptr<DanceDatabase> m_dance_database;
+  std::mutex m_dance_database_mutex;
+  std::atomic<std::uint64_t> m_dance_database_generation{0};
 
   std::shared_ptr<SpawnTypeDatabase> m_spawnTypeDatabase;
   std::mutex m_spawnTypeDatabaseMutex;

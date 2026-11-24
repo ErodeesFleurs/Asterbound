@@ -821,7 +821,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("dance", [&player](std::optional<String> const& dance) -> std::expected<void, StarException> {
-    return player.setDance(dance);
+    return player.set_dance(dance);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 

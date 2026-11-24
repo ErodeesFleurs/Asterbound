@@ -674,9 +674,9 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
       return std::unexpected(std::move(result.error()));
   }
 
-  m_humanoidDanceNetState.set_compatibility_version(13);
+  m_humanoid_dance_net_state.set_compatibility_version(13);
   {
-    if (auto result = m_netGroup.add_net_element(m_humanoidDanceNetState); !result)
+    if (auto result = m_netGroup.add_net_element(m_humanoid_dance_net_state); !result)
       return std::unexpected(std::move(result.error()));
   }
 
@@ -1123,7 +1123,7 @@ std::expected<void, StarException> Player::init(World& world, EntityId entityId,
     return std::unexpected(std::move(result.error()));
   if (auto result = updateHumanoidDirectives(); !result)
     return std::unexpected(std::move(result.error()));
-  return humanoid()->prepareAnimatorPose();
+  return humanoid()->prepare_animator_pose();
 }
 
 std::expected<void, StarException> Player::uninit() {
@@ -1351,7 +1351,7 @@ std::expected<List<LightSource>, StarException> Player::presentationLightSources
   auto tech = std::move(*techResult);
   lights.append_range(std::move(tech));
   auto humanoidSample = humanoid()->networkedAnimator()->get().sample(interpolation);
-  if (auto prepared = humanoid()->prepareAnimatorPose(humanoidSample); !prepared)
+  if (auto prepared = humanoid()->prepare_animator_pose(humanoidSample); !prepared)
     return std::unexpected(std::move(prepared.error()));
   auto humanoidLightsResult = humanoidSample.lightSources();
   if (!humanoidLightsResult)
@@ -1916,8 +1916,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
     m_controlMovementState.reset();
     if (m_emoteCooldownTimer.tick(dt))
       m_emoteState = HumanoidEmote::Idle;
-    if (m_danceCooldownTimer.tick(dt))
-      m_dance = {};
+    m_dance.tick(dt);
 
     if (m_chat_message_updated) {
       auto emoteProcessorResult = root().emoteProcessor();
@@ -2234,22 +2233,21 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
 
   auto loungeAnchor = as<LoungeAnchor>(m_movementController->entity_anchor());
   if (loungeAnchor && loungeAnchor->dance) {
-    if (auto result = humanoid()->setDance(*loungeAnchor->dance); !result)
+    if (auto result = humanoid()->set_dance(*loungeAnchor->dance); !result)
       return std::unexpected(std::move(result.error()));
-  } else if (m_dance) {
-    if (auto result = humanoid()->setDance(m_dance); !result)
+  } else if (m_dance.name) {
+    if (auto result = humanoid()->set_dance(m_dance.name); !result)
       return std::unexpected(std::move(result.error()));
   } else {
-    bool clearDance = !suppressedItems && (m_tools->primaryHandItem() || m_tools->altHandItem());
-    if (!clearDance) {
-      auto cyclicOrEndedResult = humanoid()->danceCyclicOrEnded();
-      if (!cyclicOrEndedResult)
-        return std::unexpected(std::move(cyclicOrEndedResult.error()));
-      auto cyclicOrEnded = std::move(*cyclicOrEndedResult);
-      clearDance = cyclicOrEnded || m_movementController->running();
+    bool clear_dance = !suppressedItems && (m_tools->primaryHandItem() || m_tools->altHandItem());
+    if (!clear_dance) {
+      auto cyclic_or_ended = humanoid()->dance_cyclic_or_ended();
+      if (!cyclic_or_ended)
+        return std::unexpected(std::move(cyclic_or_ended.error()));
+      clear_dance = *cyclic_or_ended || m_movementController->running();
     }
-    if (clearDance) {
-      if (auto result = humanoid()->setDance({}); !result)
+    if (clear_dance) {
+      if (auto result = humanoid()->set_dance({}); !result)
         return std::unexpected(std::move(result.error()));
     }
   }
@@ -3797,7 +3795,7 @@ std::expected<void, StarException> Player::processStateChanges(float dt) {
       return std::unexpected(std::move(result.error()));
 
   }
-  return humanoid()->prepareAnimatorPose();
+  return humanoid()->prepare_animator_pose();
 }
 
 std::expected<String, StarException> Player::getFootstepSound(Vec2I const& sensor) const {
@@ -3892,7 +3890,7 @@ std::expected<void, StarException> Player::getNetStates(bool initial) {
     return std::unexpected(std::move(emoteResult.error()));
   auto const& emote = emoteResult->get();
   m_emoteState = emote;
-  m_dance = m_humanoidDanceNetState.get();
+  m_dance.name = m_humanoid_dance_net_state.get();
   return getNetArmorSecrets();
 }
 
@@ -3939,7 +3937,7 @@ std::expected<void, StarException> Player::setNetStates() {
     return std::unexpected(std::move(emoteResult.error()));
   auto const& emote = emoteResult->get();
   m_emoteNetState.set(emote);
-  m_humanoidDanceNetState.set(m_dance);
+  m_humanoid_dance_net_state.set(m_dance.name);
   return {};
 }
 
@@ -4454,24 +4452,11 @@ void Player::addEmote(HumanoidEmote const& emote, std::optional<float> emoteCool
   m_emoteState = emote;
   m_emoteCooldownTimer = GameTimer(emoteCooldown.value_or(m_emoteCooldown));
 }
-std::expected<void, StarException> Player::setDance(std::optional<String> const& danceName) {
-  if constexpr (Star::debug_enabled) {
-    Star::star_assert_failed((!isSlave()));
-  }
+std::expected<void, StarException> Player::set_dance(std::optional<String> const& dance_name) {
+  if constexpr (Star::debug_enabled)
+    Star::star_assert_failed(!isSlave());
   assert(!isSlave());
-  m_dance = danceName;
-  if (danceName) {
-    auto databaseResult = root().danceDatabase();
-    if (!databaseResult)
-      return std::unexpected(std::move(databaseResult.error()));
-    auto database = std::move(*databaseResult);
-    auto danceResult = database->getDance(*danceName);
-    if (!danceResult)
-      return std::unexpected(std::move(danceResult.error()));
-    auto dance = std::move(*danceResult);
-    m_danceCooldownTimer = GameTimer(dance->duration);
-  }
-  return {};
+  return m_dance.set(root(), dance_name);
 }
 
 std::pair<HumanoidEmote, float> Player::currentEmote() const {
@@ -5179,7 +5164,7 @@ std::expected<void, StarException> Player::refreshHumanoidParameters() {
   }
   if (auto result = updateHumanoidDirectives(); !result)
     return std::unexpected(std::move(result.error()));
-  return humanoid()->prepareAnimatorPose();
+  return humanoid()->prepare_animator_pose();
 }
 
 std::expected<void, StarException> Player::setAnimationParameter(String name, Json value) {

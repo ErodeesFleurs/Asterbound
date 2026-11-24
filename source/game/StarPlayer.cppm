@@ -75,6 +75,7 @@ import star.inventory_types;
 import star.movement_controller;
 import star.platformer_astar_types;
 import star.game_timers;
+import star.dance_database;
 import star.actor_movement_controller;
 import star.celestial_coordinate;
 import star.quest_descriptor;
@@ -507,7 +508,7 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> add_chat_message(String const& message, Json const& config = {});
   void addEmote(HumanoidEmote const& emote, std::optional<float> emoteCooldown = {});
-  [[nodiscard]] std::expected<void, StarException> setDance(std::optional<String> const & danceName);
+  [[nodiscard]] std::expected<void, StarException> set_dance(std::optional<String> const& dance_name);
   std::pair<HumanoidEmote, float> currentEmote() const;
 
   State currentState() const;
@@ -678,8 +679,7 @@ private:
   std::optional<Humanoid::State> m_controlMovementState;
   std::optional<Humanoid::State> m_movementAnimationState;
 
-  std::optional<String> m_dance;
-  GameTimer m_danceCooldownTimer;
+  TimedDance m_dance;
 
   float m_footstepTimer;
   float m_teleportTimer;
@@ -794,7 +794,7 @@ private:
   NetElementString m_chat_message_net_state;
   NetElementEvent m_new_chat_message_net_state;
   NetElementString m_emoteNetState;
-  NetElementData<std::optional<String>> m_humanoidDanceNetState;
+  NetElementData<std::optional<String>> m_humanoid_dance_net_state;
 };
 
 }

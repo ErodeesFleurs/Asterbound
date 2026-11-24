@@ -68,6 +68,7 @@ import star.movement_controller;
 import star.platformer_astar_types;
 import star.anchorable_entity;
 import star.game_timers;
+import star.dance_database;
 import star.actor_movement_controller;
 import star.drawable;
 import star.animation;
@@ -323,7 +324,7 @@ private:
 
   [[nodiscard]] std::expected<void, StarException> add_chat_message(String const& message, Json const& config, String const& portrait = "");
   void addEmote(HumanoidEmote const& emote);
-  [[nodiscard]] std::expected<void, StarException> setDance(std::optional<String> const& danceName);
+  [[nodiscard]] std::expected<void, StarException> set_dance(std::optional<String> const& dance_name);
 
   [[nodiscard]] std::expected<bool, StarException> setItemSlot(String const& slot, ItemDescriptor itemDescriptor);
 
@@ -349,7 +350,7 @@ private:
 
   NetElementEnum<Humanoid::State> m_humanoidStateNetState;
   NetElementEnum<HumanoidEmote> m_humanoidEmoteStateNetState;
-  NetElementData<std::optional<String>> m_humanoidDanceNetState;
+  NetElementData<std::optional<String>> m_humanoid_dance_net_state;
 
   NetElementData<HumanoidIdentity> m_identityNetState;
   NetElementEvent m_refreshedHumanoidParameters;
@@ -378,8 +379,7 @@ private:
 
   HumanoidEmote m_emoteState;
   GameTimer m_emoteCooldownTimer;
-  std::optional<String> m_dance;
-  GameTimer m_danceCooldownTimer;
+  TimedDance m_dance;
   GameTimer m_blinkCooldownTimer;
   Vec2F m_blinkInterval;
 

@@ -28,6 +28,7 @@ import star.status_types;
 import star.game_test;
 import star.game_types;
 import star.humanoid;
+import star.image_metadata_database;
 import star.item;
 import star.item_database;
 import star.item_descriptor;
@@ -107,6 +108,26 @@ struct PlayerWorldContext {
   std::shared_ptr<Player> player;
   bool initialized = false;
 };
+
+// Vanilla species use the legacy renderer; opt in through the real builder,
+// which supplies the state tables and attachment points for animator rendering.
+std::expected<std::unique_ptr<Root>, StarException> human_animation_root(GameTest& fixture, String const& directory) {
+  auto overlay = File::relative_to(directory, "assets");
+  if (auto made = File::create_directories(File::relative_to(overlay, "species")); !made)
+    return std::unexpected(std::move(made.error()));
+  if (auto wrote = File::write_file(String(R"([
+    {"op":"add","path":"/buildScripts","value":["/humanoid/asterbound/build.lua"]}
+  ])"), File::relative_to(overlay, "species/human.species.patch")); !wrote)
+    return std::unexpected(std::move(wrote.error()));
+  auto settings = fixture.rootSettings();
+  settings.assetSources.push_back(overlay);
+  settings.storageDirectory = File::relative_to(directory, "storage");
+  settings.runtimeConfigFile = {};
+  settings.logDirectory = {};
+  settings.logFile = {};
+  settings.includeUGC = false;
+  return Root::create(std::move(settings));
+}
 }// namespace
 
 const GameTestRegistration self_damage_history(
@@ -737,7 +758,7 @@ const GameTestRegistration animatorSemanticSampling(
       ASSERT_TRUE(logicalLocal);
       EXPECT_EQ(*logicalState, "walk");
       EXPECT_EQ(*logicalLocal, Mat3F::identity());
-      sample.setPartDrawables("body", nullptr);
+      sample.set_part_drawables("body", std::nullopt);
       auto hidden = sample.drawables();
       auto untouchedDrawables = other.drawables();
       ASSERT_TRUE(hidden);
@@ -1188,25 +1209,10 @@ const GameTestRegistration authoredAnimationGroupSampling(
 
 const GameTestRegistration humanoidTickOwnedPose(
   "HumanoidRenderTest", "TickPoseAndFreshLightSamplesDoNotDependOnPreviousRender", [](GameTest& fixture) {
-    // Vanilla species are legacy by default. Exercise the actual authored
-    // builder rather than using its incomplete base animation by itself.
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-    auto overlay = File::relative_to(*directory, "assets");
-    ASSERT_TRUE(File::create_directories(File::relative_to(overlay, "species")));
-    ASSERT_TRUE(File::write_file(String(R"([
-      {"op":"add","path":"/buildScripts","value":["/humanoid/asterbound/build.lua"]}
-    ])"),
-                                 File::relative_to(overlay, "species/human.species.patch")));
-    auto settings = fixture.rootSettings();
-    settings.assetSources.push_back(overlay);
-    settings.storageDirectory = File::relative_to(*directory, "storage");
-    settings.runtimeConfigFile = {};
-    settings.logDirectory = {};
-    settings.logFile = {};
-    settings.includeUGC = false;
-    auto createdRoot = Root::create(std::move(settings));
+    auto createdRoot = human_animation_root(fixture, *directory);
     ASSERT_TRUE(createdRoot) << createdRoot.error().what();
     auto& root = **createdRoot;
     auto baseHumanoid = Humanoid::create(root, HumanoidIdentity{}, JsonObject{{"useAnimation", true}});
@@ -1258,7 +1264,7 @@ const GameTestRegistration humanoidTickOwnedPose(
       List<LightSource> sampledLights;
       {
         auto sample = animator.sample(alpha);
-        ASSERT_TRUE(humanoid.prepareAnimatorPose(sample));
+        ASSERT_TRUE(humanoid.prepare_animator_pose(sample));
         auto freshLights = sample.lightSources();
         ASSERT_TRUE(freshLights);
         ASSERT_EQ(freshLights->size(), 2u);
@@ -1288,5 +1294,171 @@ const GameTestRegistration humanoidTickOwnedPose(
       EXPECT_EQ(*preservedArmor, *armor);
       EXPECT_EQ(*preservedHead, *logicalHead);
       EXPECT_EQ(*preservedArm, *logicalArm);
+    }
+  });
+
+const GameTestRegistration humanoid_dance_playback(
+  "HumanoidRenderTest", "DancePoseItemsTimingAndReloadOnBothRenderers", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto overlay = File::relative_to(*directory, "assets");
+    ASSERT_TRUE(File::create_directories(overlay));
+    auto dance_path = File::relative_to(overlay, "renderprobe.dance");
+    ASSERT_TRUE(File::write_file(String(R"({
+      "name":"renderprobe","states":["idle"],"cycle":1,"duration":2,"cyclic":false,
+      "steps":[{"bodyFrame":"idle.2","frontArmFrame":"idle.3","backArmFrame":"rotation?flipx",
+                "headOffset":[5,-3],"frontArmOffset":[2,3],"backArmOffset":[-3,2],
+                "frontArmRotation":0.5,"backArmRotation":-0.25},{}]
+    })"), dance_path));
+    ASSERT_TRUE(File::write_file(String(R"({
+      "name":"emptyprobe","states":["idle"],"cycle":1,"duration":1,"cyclic":true,"steps":[]
+    })"), File::relative_to(overlay, "emptyprobe.dance")));
+    ASSERT_TRUE(File::write_file(String(R"({
+      "name":"loopprobe","states":["idle"],"cycle":1,"duration":4,"cyclic":true,
+      "steps":[{"bodyFrame":"idle.2"},{"bodyFrame":"idle.3"}]
+    })"), File::relative_to(overlay, "loopprobe.dance")));
+    auto root = human_animation_root(fixture, *directory);
+    ASSERT_TRUE(root) << root.error().what();
+    auto metadata = (*root)->imageMetadataDatabase();
+    ASSERT_TRUE(metadata);
+    HumanoidIdentity identity;
+    identity.personality.headOffset = {1, 2};
+    std::array<std::shared_ptr<Humanoid>, 2> models;
+    auto find_sprite = [](List<Drawable> const& drawables, String const& path)
+        -> std::optional<std::reference_wrapper<Drawable::ImagePart const>> {
+      for (auto const& drawable : drawables)
+        if (drawable.isImage() && drawable.imagePart().image.base_path == path)
+          return std::cref(drawable.imagePart());
+      return {};
+    };
+    auto check_pose = [&](List<Drawable> const& drawables, String const& body_frame, bool held) {
+      auto body = find_sprite(drawables, "/humanoid/human/malebody.png");
+      ASSERT_TRUE(body);
+      EXPECT_EQ(body->get().image.sub_path, body_frame);
+      EXPECT_EQ(std::ranges::count_if(drawables, &Drawable::isLine), held ? 2 : 0);
+    };
+    auto near = [](Vec2F actual, Vec2F expected) {
+      EXPECT_NEAR(actual[0], expected[0], 1e-5f);
+      EXPECT_NEAR(actual[1], expected[1], 1e-5f);
+    };
+    for (std::size_t i = 0; i != models.size(); ++i) {
+      bool animated = i != 0;
+      SCOPED_TRACE(animated ? "animator" : "legacy");
+      auto made = Humanoid::create(**root, identity, JsonObject{{"useAnimation", animated}});
+      ASSERT_TRUE(made) << made.error().what();
+      models[i] = std::move(*made);
+      auto& model = *models[i];
+      auto config = model.humanoidConfig(false);
+      ASSERT_TRUE(config);
+      EXPECT_EQ(config->contains("animation"), animated);
+      model.setFacingDirection(Direction::Right);
+      for (auto hand : {ToolHand::Primary, ToolHand::Alt}) {
+        model.setHandFrameOverrides(hand, "rotation", "rotation");
+        model.setHandParameters(hand, true, 0, 0, false, false, false);
+        model.setHandDrawables(hand, {Drawable::makeLine(Line2F({0, 0}, {1, 0}), 1, Color::palette_white)});
+      }
+      auto idle = model.render();
+      ASSERT_TRUE(idle) << idle.error().what();
+      check_pose(*idle, "idle.1", true);
+      auto idle_head = find_sprite(*idle, "/humanoid/human/malehead.png");
+      ASSERT_TRUE(idle_head);
+
+      ASSERT_TRUE(model.set_dance("renderprobe"));
+      ASSERT_TRUE(model.animate(.25f, {}));
+      auto animator = model.networkedAnimator();
+      if (animated) {
+        ASSERT_TRUE(animator);
+        EXPECT_EQ(animator->get().state("bodyDance"), "idle.2"); // exact authored state
+        EXPECT_EQ(animator->get().state("backArmDance"), "dance"); // custom frame tag
+      }
+      ASSERT_TRUE(model.animate(.75f, {})); // presentation spans [.25, 1]
+      for (float alpha : {.25f, .75f, .25f}) {
+        auto shown = model.render(true, true, alpha);
+        ASSERT_TRUE(shown) << shown.error().what();
+        bool first = alpha == .25f;
+        check_pose(*shown, first ? "idle.2" : "idle.1", false);
+        auto head = find_sprite(*shown, "/humanoid/human/malehead.png");
+        ASSERT_TRUE(head);
+        auto delta = head->get().transformation.transform_point(Vec2F{}) - idle_head->get().transformation.transform_point(Vec2F{});
+        near(delta, ((first ? Vec2F(5, -3) : Vec2F{}) - identity.personality.headOffset) / tile_pixels);
+        if (first) {
+          auto body = find_sprite(*shown, "/humanoid/human/malebody.png");
+          ASSERT_TRUE(body);
+          auto body_size = (*metadata)->imageSize(body->get().image);
+          ASSERT_TRUE(body_size);
+          auto body_center = body->get().transformation.transform_point(Vec2F(*body_size) / 2);
+          for (bool front : {false, true}) {
+            auto arm = find_sprite(*shown, front ? String("/humanoid/human/frontarm.png") : String("/humanoid/human/backarm.png"));
+            ASSERT_TRUE(arm);
+            EXPECT_EQ(arm->get().image.sub_path, front ? String("idle.3") : String("rotation"));
+            auto const& matrix = arm->get().transformation;
+            float rotation = front ? .5f : -.25f;
+            near(matrix.transform_direction(Vec2F(1, 0)), Vec2F(1.f / tile_pixels, 0).rotate(rotation));
+            auto arm_size = (*metadata)->imageSize(arm->get().image);
+            ASSERT_TRUE(arm_size);
+            // The offset is translated before the arm is rotated about the origin.
+            auto offset = (front ? Vec2F(2, 3) : Vec2F(-3, 2)) / tile_pixels;
+            near(matrix.transform_point(Vec2F(*arm_size) / 2) - body_center, offset.rotate(rotation));
+          }
+        }
+        if (animated) {
+          auto sample = animator->get().sample(alpha);
+          ASSERT_TRUE(model.prepare_animator_pose(sample));
+          EXPECT_EQ(sample.applyPartTags("body", "<bodyDanceFrame>|<frontArmDanceFrame>|<backArmDanceFrame>"),
+                    first ? String("idle.2|idle.3|rotation?flipx") : String("default|default|default"));
+          EXPECT_EQ(sample.state("bodyDance"), first ? String("idle.2") : String("idle"));
+          EXPECT_EQ(sample.state("frontArmDance"), first ? String("idle.3") : String("idle"));
+          EXPECT_EQ(sample.state("backArmDance"), first ? String("dance") : String("idle"));
+          EXPECT_EQ(animator->get().state("bodyDance"), "idle");
+        }
+      }
+      ASSERT_TRUE(model.set_dance("renderprobe")); // same name preserves phase
+      ASSERT_TRUE(model.animate(1.f, {}));
+      EXPECT_EQ(model.dance_cyclic_or_ended(), false); // duration, not cycle
+      ASSERT_TRUE(model.animate(.25f, {}));
+      EXPECT_EQ(model.dance_cyclic_or_ended(), true);
+      auto final_pose = model.render();
+      ASSERT_TRUE(final_pose);
+      check_pose(*final_pose, "idle.1", false); // last step, not wrapped
+      ASSERT_TRUE(model.setState(Humanoid::Duck));
+      ASSERT_TRUE(model.animate(0.f, {}));
+      auto filtered = model.render();
+      ASSERT_TRUE(filtered);
+      check_pose(*filtered, "duck.1", true);
+      ASSERT_TRUE(model.setState(Humanoid::Idle));
+      ASSERT_TRUE(model.set_dance("emptyprobe"));
+      ASSERT_TRUE(model.animate(0.f, {}));
+      auto empty = model.render();
+      ASSERT_TRUE(empty);
+      check_pose(*empty, "idle.1", true);
+      ASSERT_TRUE(model.set_dance("loopprobe"));
+      ASSERT_TRUE(model.animate(.5f, {}));
+      auto second = model.render();
+      ASSERT_TRUE(second);
+      check_pose(*second, "idle.3", false);
+      ASSERT_TRUE(model.animate(.5f, {}));
+      auto wrapped = model.render();
+      ASSERT_TRUE(wrapped);
+      check_pose(*wrapped, "idle.2", false);
+      ASSERT_TRUE(model.set_dance("renderprobe"));
+      ASSERT_TRUE(model.animate(.25f, {}));
+    }
+    // The selected name stays unchanged across a Root reload. Both models have
+    // already cached and played the old definition; do not call set_dance again.
+    ASSERT_TRUE(File::write_file(String(R"({
+      "name":"renderprobe","states":["idle"],"cycle":1,"duration":2,"cyclic":false,
+      "steps":[{"bodyFrame":"idle.4"}]
+    })"), dance_path));
+    ASSERT_TRUE((*root)->reload());
+    for (auto& model : models) {
+      ASSERT_TRUE(model->animate(0.f, {}));
+      auto replaced = model->render();
+      ASSERT_TRUE(replaced) << replaced.error().what();
+      check_pose(*replaced, "idle.4", false);
+      ASSERT_TRUE(model->set_dance({}));
+      auto stopped = model->render();
+      ASSERT_TRUE(stopped);
+      check_pose(*stopped, "idle.1", true);
     }
   });
