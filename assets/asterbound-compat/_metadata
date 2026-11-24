@@ -63,6 +63,6 @@
       "/scripts/asterbound/compat/frackinuniverse.lua",
       "/scripts/asterbound/compat/collection.lua"
     ],
-    "postLoad" : ["/scripts/asterbound/compat/starcore.lua", "/scripts/asterbound/compat/arcana.lua"]
+    "postLoad" : ["/scripts/asterbound/compat/arcana.lua"]
   }
 }

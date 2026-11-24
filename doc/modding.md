@@ -105,7 +105,7 @@ A metadata-only legacy dependency marker is bundled alongside the real Asterboun
 
 These are provider/version/content-guarded compatibility fixes, not global suppression of invalid patches or Lua errors. Unknown versions, changed content and foreign providers are not blindly patched. No installed mod files or saves are rewritten; restart the game after installing the compatibility source.
 
-For [StarCore Simplified Chinese](https://steamcommunity.com/sharedfiles/filedetails/?id=807695810) (`SChinese`, version `V108_241106_09`), the source removes four unused imports from `/scripts/replaceTags.lua` in memory, breaking `util.lua → replaceTags.lua → util.lua`. The replacement function body, utility functions and translations remain unchanged; the engine still rejects cyclic `require` calls. This repair applies only when the effective script provider is that known SChinese version and its import header matches the [verified upstream release](https://github.com/sffxzzp/Starbound-Chinese/releases/tag/UTC-241105-1953). Other providers, unknown versions and unrecognized headers are left untouched.
+For [StarCore Simplified Chinese](https://steamcommunity.com/sharedfiles/filedetails/?id=807695810) (`SChinese`, version `V108_241106_09`), the compatibility source removes four unused `require` calls from `/scripts/replaceTags.lua` during `onLoad`. Later sources and `postLoad` scripts can load `util.lua` without re-entering it through the tag helper. The rule checks the effective provider and the fingerprint of the entire Workshop script (LF or CRLF), so a modified helper with the same header is left alone. The tag replacement function, its callers and the engine's cycle detection are unchanged.
 
 Additional guarded repairs cover:
 
