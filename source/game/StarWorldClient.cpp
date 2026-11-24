@@ -915,7 +915,7 @@ std::expected<bool, StarException> WorldClient::damageWouldDestroy(Vec2I const& 
   if (!inWorld()) {
     return false;
   }
-  return WorldImpl::damageWouldDestroy(this->root(), m_tileArray, pos, layer, tileDamage);
+  return WorldImpl::damage_would_destroy(this->root(), *m_tileArray, pos, layer, tileDamage);
 }
 
 std::expected<float, StarException> WorldClient::gravity(Vec2F const& pos) const {
@@ -1269,14 +1269,14 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
       renderTile.foregroundHueShift = clientTile.foregroundHueShift;
       renderTile.foregroundModHueShift = clientTile.foregroundModHueShift;
       renderTile.foregroundColorVariant = clientTile.foregroundColorVariant;
-      renderTile.foregroundDamageType = clientTile.foregroundDamage.damageType();
-      renderTile.foregroundDamageLevel = float_to_byte(clientTile.foregroundDamage.damageEffectPercentage());
+      renderTile.foregroundDamageType = clientTile.foregroundDamage.damage_type();
+      renderTile.foregroundDamageLevel = float_to_byte(clientTile.foregroundDamage.damage_effect_percentage());
       
       renderTile.backgroundHueShift = clientTile.backgroundHueShift;
       renderTile.backgroundModHueShift = clientTile.backgroundModHueShift;
       renderTile.backgroundColorVariant = clientTile.backgroundColorVariant;
-      renderTile.backgroundDamageType = clientTile.backgroundDamage.damageType();
-      renderTile.backgroundDamageLevel = float_to_byte(clientTile.backgroundDamage.damageEffectPercentage());
+      renderTile.backgroundDamageType = clientTile.backgroundDamage.damage_type();
+      renderTile.backgroundDamageLevel = float_to_byte(clientTile.backgroundDamage.damage_effect_percentage());
       
       renderTile.liquidId = clientTile.liquid.liquid;
       renderTile.liquidLevel = float_to_byte(clientTile.liquid.level);
@@ -1838,20 +1838,20 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       if (!result127)
         return std::unexpected(std::move(result127.error()));
     } else if (auto hit = as<HitRequestPacket>(packet)) {
-      auto result128 = m_damageManager->pushRemoteHitRequest(hit->remoteHitRequest);
+      auto result128 = m_damageManager->push_remote_hit_request(hit->remoteHitRequest);
       if (!result128)
         return std::unexpected(std::move(result128.error()));
     } else if (auto damage = as<DamageRequestPacket>(packet)) {
-      auto result129 = m_damageManager->pushRemoteDamageRequest(damage->remoteDamageRequest);
+      auto result129 = m_damageManager->push_remote_damage_request(damage->remoteDamageRequest);
       if (!result129)
         return std::unexpected(std::move(result129.error()));
     } else if (auto damage = as<DamageNotificationPacket>(packet)) {
-      std::string_view view = damage->remoteDamageNotification.damageNotification.targetMaterialKind.utf8();
+      std::string_view view = damage->remoteDamageNotification.damage_notification.target_material_kind.utf8();
       constexpr auto full_size = secret_broadcast_prefix.size() + Curve25519::signature_size;
       constexpr auto legacy_full_size = legacy_voice_prefix.size() + Curve25519::signature_size;
 
       if (view.size() >= full_size && view.starts_with(secret_broadcast_prefix)) {
-        if (auto player = m_entityMap->get<Player>(damage->remoteDamageNotification.sourceEntityId)) {
+        if (auto player = m_entityMap->get<Player>(damage->remoteDamageNotification.source_entity_id)) {
           auto public_key = player->getSecretPropertyView(secret_broadcast_public_key);
           auto signature = view.substr(secret_broadcast_prefix.size(), Curve25519::signature_size);
           auto raw_broadcast = view.substr(full_size);
@@ -1865,7 +1865,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         }
       } else if (view.size() > legacy_full_size && view.starts_with(legacy_voice_prefix)) {
         // Preserve StarExtensions' signed voice framing on vanilla servers.
-        if (auto player = m_entityMap->get<Player>(damage->remoteDamageNotification.sourceEntityId)) {
+        if (auto player = m_entityMap->get<Player>(damage->remoteDamageNotification.source_entity_id)) {
           auto public_key = player->effectsAnimator()->globalTag(legacy_voice_public_key);
           auto signature = view.substr(legacy_voice_prefix.size(), Curve25519::signature_size);
           auto raw = view.substr(legacy_full_size);
@@ -1880,7 +1880,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
           }
         }
       } else {
-        auto result132 = m_damageManager->pushRemoteDamageNotification(damage->remoteDamageNotification);
+        auto result132 = m_damageManager->push_remote_damage_notification(damage->remoteDamageNotification);
         if (!result132)
           return std::unexpected(std::move(result132.error()));
       }
@@ -2872,13 +2872,13 @@ std::expected<void, StarException> WorldClient::queueUpdatePackets(bool sendEnti
     m_outgoingPackets.push_back(std::move(entityUpdateSet));
   }
   
-  for (auto& remoteHitRequest : m_damageManager->pullRemoteHitRequests()) {
+  for (auto& remoteHitRequest : m_damageManager->pull_remote_hit_requests()) {
     m_outgoingPackets.push_back(std::make_shared<HitRequestPacket>(std::move(remoteHitRequest)));
   }
-  for (auto& remoteDamageRequest : m_damageManager->pullRemoteDamageRequests()) {
+  for (auto& remoteDamageRequest : m_damageManager->pull_remote_damage_requests()) {
     m_outgoingPackets.push_back(std::make_shared<DamageRequestPacket>(std::move(remoteDamageRequest)));
   }
-  for (auto& remoteDamageNotification : m_damageManager->pullRemoteDamageNotifications()) {
+  for (auto& remoteDamageNotification : m_damageManager->pull_remote_damage_notifications()) {
     m_outgoingPackets.push_back(std::make_shared<DamageNotificationPacket>(std::move(remoteDamageNotification)));
   }
   return {};
@@ -2924,15 +2924,15 @@ std::expected<void, StarException> WorldClient::handleDamageNotifications() {
   }
   
   if (m_headless) {
-    m_damageManager->pullPendingNotifications();
+    m_damageManager->pull_pending_notifications();
     return {};
   }
-  for (auto const& damageNotification : m_damageManager->pullPendingNotifications()) {
+  for (auto const& damageNotification : m_damageManager->pull_pending_notifications()) {
     auto result215 = this->root().damageDatabase();
     if (!result215)
       return std::unexpected(std::move(result215.error()));
     auto damageDatabase = (std::move(*result215));
-    auto result216 = damageDatabase->damageKind(damageNotification.damageSourceKind);
+    auto result216 = damageDatabase->damageKind(damageNotification.damage_source_kind);
     if (!result216)
       return std::unexpected(std::move(result216.error()));
     DamageKind const& damageKind = result216->get();
@@ -2941,13 +2941,13 @@ std::expected<void, StarException> WorldClient::handleDamageNotifications() {
       return std::unexpected(std::move(result217.error()));
     ElementalType const& elementalType = result217->get();
     
-    auto result218 = elementalType.damageNumberParticles.get(damageNotification.hitType);
+    auto result218 = elementalType.damageNumberParticles.get(damageNotification.hit_type);
     if (!result218)
       return std::unexpected(std::move(result218.error()));
     auto damageNumberParticleKind = result218->get();
     auto damageNumberKey = DamageNumberKey{.damageNumberParticleKind = damageNumberParticleKind,
-                                           .sourceEntityId = damageNotification.sourceEntityId,
-                                           .targetEntityId = damageNotification.targetEntityId};
+                                           .sourceEntityId = damageNotification.source_entity_id,
+                                           .targetEntityId = damageNotification.target_entity_id};
 
     DamageNumber number;
     if (m_damageNumbers.contains(damageNumberKey)) {
@@ -2956,16 +2956,16 @@ std::expected<void, StarException> WorldClient::handleDamageNotifications() {
         return std::unexpected(std::move(result219.error()));
       number = (std::move(*result219));
       
-      if (damageNotification.hitType == HitType::Kill) {
+      if (damageNotification.hit_type == HitType::Kill) {
         auto result220 = renderParticle(damageNotification.position,
-                    damageNotification.damageDealt + number.amount,
+                    damageNotification.damage_dealt + number.amount,
                     damageNumberKey.damageNumberParticleKind);
         if (!result220)
           return std::unexpected(std::move(result220.error()));
       }
     } else {
-      if (damageNotification.hitType == HitType::Kill) {
-        auto result221 = renderParticle(damageNotification.position, damageNotification.damageDealt, damageNumberParticleKind);
+      if (damageNotification.hit_type == HitType::Kill) {
+        auto result221 = renderParticle(damageNotification.position, damageNotification.damage_dealt, damageNumberParticleKind);
         if (!result221)
           return std::unexpected(std::move(result221.error()));
       }
@@ -2973,19 +2973,19 @@ std::expected<void, StarException> WorldClient::handleDamageNotifications() {
       number.timestamp = std::chrono::time_point_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now());
     }
     
-    if (damageNotification.hitType != HitType::Kill) {
+    if (damageNotification.hit_type != HitType::Kill) {
       number.position = damageNotification.position;
-      number.amount += damageNotification.damageDealt;
+      number.amount += damageNotification.damage_dealt;
       m_damageNumbers[damageNumberKey] = number;
     }
     
-    String material = damageNotification.targetMaterialKind;
+    String material = damageNotification.target_material_kind;
     if (!material.empty() && damageKind.effects.contains(material)) {
       // default to normal hit
       auto result222 = damageKind.effects.get(material);
       if (!result222)
         return std::unexpected(std::move(result222.error()));
-      HitType effectHitType = result222->get().contains(damageNotification.hitType) ? damageNotification.hitType : HitType::Hit;
+      HitType effectHitType = result222->get().contains(damageNotification.hit_type) ? damageNotification.hit_type : HitType::Hit;
       auto result223 = damageKind.effects.get(material);
       if (!result223)
         return std::unexpected(std::move(result223.error()));
@@ -3015,7 +3015,7 @@ std::expected<void, StarException> WorldClient::handleDamageNotifications() {
         }
       }
       if (directives) {
-        int directiveIndex = static_cast<unsigned>(damageNotification.targetEntityId) % directives->get().size();
+        int directiveIndex = static_cast<unsigned>(damageNotification.target_entity_id) % directives->get().size();
         for (auto& p : hitParticles) {
           p.directives.append(directives->get()[directiveIndex]);
         }
@@ -3042,7 +3042,7 @@ std::expected<void, StarException> WorldClient::sparkDamagedBlocks() {
         m_damagedBlocks.remove(pos);
       }
       
-      if (isRealMaterial(tile->get().foreground) && tile->get().foregroundDamage.damageEffectPercentage() - this->root().random().uniform_float() > 0.0f
+      if (isRealMaterial(tile->get().foreground) && tile->get().foregroundDamage.damage_effect_percentage() - this->root().random().uniform_float() > 0.0f
                 && (this->root().random().uniform_float() < m_blockDamageParticleProbability)) {
         auto particle = m_blockDamageParticle;
         auto result230 = materialDatabase->materialParticleColor(tile->get().foreground, tile->get().foregroundHueShift);
@@ -3055,12 +3055,12 @@ std::expected<void, StarException> WorldClient::sparkDamagedBlocks() {
         
         particle.position += center_of_tile(pos);
         particle.velocity = particle.velocity.magnitude()
-            * vnorm(m_geometry.diff(tile->get().foregroundDamage.sourcePosition(), particle.position));
+            * vnorm(m_geometry.diff(tile->get().foregroundDamage.source_position(), particle.position));
         particle.applyVariance(this->root(), m_blockDamageParticleVariance);
         m_particles->add(particle);
       }
       
-      if (isRealMaterial(tile->get().background) && tile->get().backgroundDamage.damageEffectPercentage() - this->root().random().uniform_float() > 0.0f
+      if (isRealMaterial(tile->get().background) && tile->get().backgroundDamage.damage_effect_percentage() - this->root().random().uniform_float() > 0.0f
                 && (this->root().random().uniform_float() < m_blockDamageParticleProbability)) {
         auto particle = m_blockDamageParticle;
         auto result232 = materialDatabase->materialParticleColor(tile->get().background, tile->get().backgroundHueShift);
@@ -3073,7 +3073,7 @@ std::expected<void, StarException> WorldClient::sparkDamagedBlocks() {
         
         particle.position += center_of_tile(pos);
         particle.velocity = particle.velocity.magnitude()
-            * vnorm(m_geometry.diff(tile->get().backgroundDamage.sourcePosition(), particle.position));
+            * vnorm(m_geometry.diff(tile->get().backgroundDamage.source_position(), particle.position));
         particle.applyVariance(this->root(), m_blockDamageParticleVariance);
         m_particles->add(particle);
       }
@@ -3715,7 +3715,7 @@ std::expected<void, StarException> WorldClient::notifyEntityCreate(std::shared_p
   return {};
 }
 
-List<EntityId> WorldClient::entityIds() const {
+List<EntityId> WorldClient::entity_ids() const {
   return m_entityMap->entityIds();
 }
 
@@ -4024,14 +4024,14 @@ bool WorldClient::sendSecretBroadcast(StringView broadcast, bool raw, bool compr
 
   auto damageNotification = std::make_shared<DamageNotificationPacket>();
   auto& remDmg = damageNotification->remoteDamageNotification;
-  auto& dmg = remDmg.damageNotification;
+  auto& dmg = remDmg.damage_notification;
 
-  dmg.targetEntityId = dmg.sourceEntityId = remDmg.sourceEntityId = m_mainPlayer->entityId();
-  dmg.damageDealt = dmg.healthLost = 0.0f;
-  dmg.hitType = HitType::Hit;
-  dmg.damageSourceKind = "nodamage";
+  dmg.target_entity_id = dmg.source_entity_id = remDmg.source_entity_id = m_mainPlayer->entityId();
+  dmg.damage_dealt = dmg.health_lost = 0.0f;
+  dmg.hit_type = HitType::Hit;
+  dmg.damage_source_kind = "nodamage";
   if (raw) {
-    dmg.targetMaterialKind = String(broadcast);
+    dmg.target_material_kind = String(broadcast);
   } else {
     auto message = broadcast.utf8();
     auto signature = this->root().identity().sign(std::span<char const>(message));
@@ -4039,7 +4039,7 @@ bool WorldClient::sendSecretBroadcast(StringView broadcast, bool raw, bool compr
     wire.reserve(secret_broadcast_prefix.size() + signature.size() + message.size());
     wire.append(signature.begin(), signature.end());
     wire.append(message);
-    dmg.targetMaterialKind = String(std::move(wire));
+    dmg.target_material_kind = String(std::move(wire));
   }
   dmg.position = m_mainPlayer->position();
 

@@ -307,7 +307,7 @@ auto result39 = std::move(*result38)->writeMonsterVariantToJson(m_monsterVariant
 if (!result39) return std::unexpected(std::move(result39.error()));
 auto result40 = m_scriptComponent.get_script_storage();
 if (!result40) return std::unexpected(std::move(result40.error()));
-auto result41 = getTeam().toJson();
+auto result41 = getTeam().to_json();
 if (!result41) return std::unexpected(std::move(result41.error()));
 return JsonObject{
     {"monsterLevel", json_from_optional(m_monsterLevel)},
@@ -566,7 +566,7 @@ std::expected<std::optional<HitType>, StarException> Monster::queryHit(DamageSou
   {
   auto result91 = world();
   if (!result91) return std::unexpected(std::move(result91.error()));
-  auto result92 = source.intersectsWithPoly(result91->get().geometry(), **body);
+  auto result92 = source.intersects_with_poly(result91->get().geometry(), **body);
   if (!result92) return std::unexpected(std::move(result92.error()));
   if (std::move(*result92))
       return HitType::Hit;
@@ -592,21 +592,21 @@ auto notifications = std::move(*result93);
 
   float totalDamage = 0.0f;
   for (auto const& notification : notifications)
-    totalDamage += notification.healthLost;
+    totalDamage += notification.health_lost;
 
   if (totalDamage > 0.0f) {
     auto result94 = recover_lua_script_error(m_scriptComponent.invoke("damage", JsonObject{
-        {"sourceId", damage.sourceEntityId},
+        {"sourceId", damage.source_entity_id},
         {"damage", totalDamage},
         {"sourceDamage", damage.damage},
-        {"sourceKind", damage.damageSourceKind}
+        {"sourceKind", damage.damage_source_kind}
       }));
 if (!result94) return std::unexpected(std::move(result94.error()));
 
   }
 
   if (!m_statusController->resourcePositive("health"))
-    m_deathDamageSourceKinds.add(damage.damageSourceKind);
+    m_deathDamageSourceKinds.add(damage.damage_source_kind);
 
   return notifications;
 }
@@ -631,10 +631,10 @@ float levelPowerMultiplier = std::move(*result98);
     auto result99 = DamageSource::create(m_monsterVariant.touchDamageConfig);
 if (!result99) return std::unexpected(std::move(result99.error()));
 auto damageSource = std::move(*result99);
-    if (std::holds_alternative<PolyF>(damageSource.damageArea))
-      std::get<PolyF>(damageSource.damageArea).rotate(m_movementController->rotation());
+    if (std::holds_alternative<PolyF>(damageSource.damage_area))
+      std::get<PolyF>(damageSource.damage_area).rotate(m_movementController->rotation());
     damageSource.damage *= m_monsterVariant.touchDamageMultiplier * levelPowerMultiplier * m_statusController->stat("powerMultiplier");
-    damageSource.sourceEntityId = entityId();
+    damageSource.source_entity_id = entityId();
     damageSource.team = getTeam();
     damageSources.push_back(damageSource);
   }
@@ -662,7 +662,7 @@ poly.transform(std::move(*result103));
           poly.flip_horizontal(m_networkedAnimator->flippedRelativeCenterLine());
       }
       return {};
-    }, ds.damageArea);
+    }, ds.damage_area);
 if (!result104) return std::unexpected(std::move(result104.error()));
 
     if (std::holds_alternative<Vec2F>(ds.knockback)) {
@@ -676,12 +676,12 @@ knockback = std::move(*result106).transform_point(knockback);
     }
 
     List<DamageSource> partSources;
-    if (std::holds_alternative<Line2F>(ds.damageArea)) {
+    if (std::holds_alternative<Line2F>(ds.damage_area)) {
       {
   auto result107 = pair.second.get_bool("checkLineCollision", false);
   if (!result107) return std::unexpected(std::move(result107.error()));
   if (std::move(*result107)) {
-          Line2F worldLine = std::get<Line2F>(ds.damageArea).translated(position());
+          Line2F worldLine = std::get<Line2F>(ds.damage_area).translated(position());
           float length = worldLine.length();
 
           auto result108 = pair.second.get_int("bounces", 0);
@@ -695,7 +695,7 @@ knockback = std::move(*result106).transform_point(knockback);
     auto collision =  std::move(*result110);
     if (!collision) break;
     worldLine = Line2F(worldLine.min(), collision.value_or(std::pair<Vec2F, Vec2I>{}).first);
-              ds.damageArea = worldLine.translated(-position());
+              ds.damage_area = worldLine.translated(-position());
               length = length - worldLine.length();
 
               if (--bounces >= 0 && length > 0.0f) {
@@ -709,7 +709,7 @@ knockback = std::move(*result106).transform_point(knockback);
 
                 worldLine.min() = (*collision).first;
                 worldLine.max() = worldLine.min() + (reflection * length);
-                ds.damageArea = worldLine.translated(-position());
+                ds.damage_area = worldLine.translated(-position());
               } else {
                 break;
               }

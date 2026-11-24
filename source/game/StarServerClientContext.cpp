@@ -639,7 +639,7 @@ std::expected<Json, StarException> ServerClientContext::store_server_data() cons
   std::unique_lock locker(m_mutex, std::defer_lock);
   lock_with_diagnostics(locker);
   auto location = jsonFromSystemLocation(m_ship_system_location);
-  auto team_data = m_net_state.team.get().toJson();
+  auto team_data = m_net_state.team.get().to_json();
   if (!team_data)
     return std::unexpected(std::move(team_data.error()));
   auto revive = m_revive_warp.toJson();

@@ -771,7 +771,7 @@ const GameTestRegistration firstContactTriggersCollisionActionOnce("ProjectileAc
   auto projectileId = projectile->entityId();
   auto markerCount = [&]() -> std::expected<unsigned, StarException> {
     unsigned count = 0;
-    for (auto entityId : world->entityIds()) {
+    for (auto entityId : world->entity_ids()) {
       if (auto entity = world->get<Projectile>(entityId)) {
         auto marker = entity->configValue("collisionActionMarker", false);
         if (!marker)

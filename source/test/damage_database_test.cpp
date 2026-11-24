@@ -6,6 +6,15 @@ import star.assets;
 import star.damage_database;
 import star.damage_types;
 import star.damage;
+import star.byte_array;
+import star.data_stream;
+import star.data_stream_devices;
+import star.data_stream_extra;
+import star.game_types;
+import star.line;
+import star.poly;
+import star.status_types;
+import star.vector;
 import star.lua;
 import star.lua_game_converters;
 import star.unicode;
@@ -55,6 +64,126 @@ damageFixture(GameTest& fixture, String const& directory, std::initializer_list<
 }
 
 }// namespace
+
+TEST(DamageValueTest, DefaultValuesAndRepeatIdentity) {
+  DamageSource source;
+  EXPECT_TRUE(source.track_source_entity);
+  EXPECT_FALSE(source.ray_check);
+  EXPECT_EQ(source.damage_type, DamageType::NoDamage);
+  EXPECT_EQ(source.source_entity_id, null_entity_id);
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(source.damage_area));
+  auto stored = source.to_json();
+  ASSERT_TRUE(stored);
+  EXPECT_EQ(DamageSource::create(*stored), source);
+  auto other = source;
+  other.damage_repeat_group = "";
+  EXPECT_NE(other, source);
+  other = source;
+  other.damage_repeat_timeout = 0;
+  EXPECT_NE(other, source);
+
+  DamageNotification notification;
+  EXPECT_EQ(notification.source_entity_id, null_entity_id);
+  EXPECT_EQ(notification.target_entity_id, null_entity_id);
+  EXPECT_EQ(notification.hit_type, HitType::Hit);
+  auto event = notification.to_json();
+  ASSERT_TRUE(event);
+  EXPECT_EQ(event->get_string("hitType"), "Hit");
+  EXPECT_EQ(DamageNotification::create(*event), notification);
+}
+
+TEST(DamageValueTest, ConfigAndStoredGeometryKeepTheirType) {
+  Json const points = JsonArray{JsonArray{3, 5}, JsonArray{1, 2}};
+  Json const ambiguous = JsonObject{{"damage", 4}, {"damageArea", points}};
+  auto rejected = DamageSource::create(ambiguous);
+  ASSERT_FALSE(rejected);
+  EXPECT_NE(std::string_view(rejected.error().what()).find("Ambiguous"), std::string_view::npos);
+  for (String const& type : {String("poly"), String("line")}) {
+    JsonObject config{{"damage", 4}, {type, points}, {"knockback", JsonArray{1, 2}},
+                      {"damageRepeatGroup", "arm"}, {"damageRepeatTimeout", 0.5},
+                      {"statusEffects", JsonArray{"slow"}}};
+    auto source = DamageSource::create(config);
+    ASSERT_TRUE(source);
+    EXPECT_EQ(std::holds_alternative<Line2F>(source->damage_area), type == "line");
+    auto stored = source->to_json();
+    ASSERT_TRUE(stored);
+    EXPECT_EQ(stored->get("damageArea"), points);
+    EXPECT_EQ(stored->get_string("damageAreaType"), type);
+    EXPECT_EQ(DamageSource::create(*stored), *source);
+    auto tagged = ambiguous.set("damageAreaType", type);
+    ASSERT_TRUE(tagged);
+    auto restored = DamageSource::create(*tagged);
+    ASSERT_TRUE(restored);
+    EXPECT_EQ(restored->damage_area, source->damage_area);
+  }
+  // Config polygons retain precedence over line and presentation keys. Untagged
+  // legacy polygons with a point count other than two have unambiguous winding.
+  auto both = DamageSource::create(JsonObject{{"damage", 4}, {"line", 3}, {"poly", points}, {"damageArea", 42}});
+  ASSERT_TRUE(both);
+  EXPECT_TRUE(std::holds_alternative<PolyF>(both->damage_area));
+  Json const clockwise = JsonArray{JsonArray{0, 0}, JsonArray{0, 1}, JsonArray{1, 0}};
+  auto legacy = DamageSource::create(JsonObject{{"damage", 4}, {"damageArea", clockwise}});
+  ASSERT_TRUE(legacy);
+  auto stored = legacy->to_json();
+  ASSERT_TRUE(stored);
+  EXPECT_EQ(stored->get("damageArea"), clockwise);
+  EXPECT_FALSE(DamageSource::create(JsonObject{{"damage", 4}, {"damageArea", clockwise}, {"damageAreaType", "line"}}));
+  EXPECT_FALSE(DamageSource::create(JsonObject{{"damage", 4}, {"damageArea", points}, {"damageAreaType", "unknown"}}));
+}
+
+TEST(DamageValueTest, SourceWireRetainsLegacyOrderAndVariantTags) {
+  PolyF const poly{Vec2F(1, 2), Vec2F(3, 4), Vec2F(5, -6)};
+  Line2F const line(Vec2F(-3, 2), Vec2F(1, 8));
+  Vec2F const vector(19, -2);
+  for (std::uint8_t tag : std::array<std::uint8_t, 3>{0, 1, 2}) {
+    SCOPED_TRACE(static_cast<unsigned>(tag));
+    DamageSource source{DamageType::IgnoresDef, {}, 2.5f, false, 31, EntityDamageTeam(TeamType::PVP, 7),
+                        String("arm"), 0.5f, "frost", {{"slow", 3.0f}}, {}, true};
+    DataStreamBuffer legacy;
+    ASSERT_TRUE(legacy << source.damage_type << tag);
+    if (tag == 1) {
+      source.damage_area = poly;
+      source.knockback = 3.5f;
+      ASSERT_TRUE(legacy << poly);
+    } else if (tag == 2) {
+      source.damage_area = line;
+      source.knockback = vector;
+      ASSERT_TRUE(legacy << line);
+    }
+    ASSERT_TRUE(legacy << source.damage << source.track_source_entity << source.source_entity_id << source.team
+                       << source.damage_repeat_group << source.damage_repeat_timeout << source.damage_source_kind
+                       << source.status_effects << tag);
+    if (tag == 1)
+      ASSERT_TRUE(legacy << 3.5f);
+    else if (tag == 2)
+      ASSERT_TRUE(legacy << vector);
+    ASSERT_TRUE(legacy << source.ray_check);
+    auto encoded = DataStreamBuffer::serialize(source);
+    ASSERT_TRUE(encoded);
+    EXPECT_EQ(*encoded, legacy.data());
+    EXPECT_EQ(DataStreamBuffer::deserialize<DamageSource>(legacy.span()), source);
+  }
+}
+
+TEST(DamageValueTest, RequestAndNotificationRetainLegacyLayout) {
+  DamageRequest request{HitType::Kill, DamageType::Status, 12, Vec2F(3, -1), -37, "ice", {{"slow", 1.5f}}};
+  DataStreamBuffer hit;
+  ASSERT_TRUE(hit << request.hit_type << request.damage_type << request.damage << request.knockback_momentum
+                  << request.source_entity_id << request.damage_source_kind << request.status_effects);
+  EXPECT_EQ(DataStreamBuffer::serialize(request), hit.data());
+  EXPECT_EQ(DataStreamBuffer::deserialize<DamageRequest>(hit.span()), request);
+
+  DamageNotification event{-37, 65, Vec2F(0.5f, -1), 12, 6, HitType::Kill, "ice", "metal"};
+  DataStreamBuffer legacy;
+  ASSERT_TRUE(legacy.viwrite(event.source_entity_id));
+  ASSERT_TRUE(legacy.viwrite(event.target_entity_id));
+  ASSERT_TRUE(legacy.vfwrite(event.position[0], 0.01f));
+  ASSERT_TRUE(legacy.vfwrite(event.position[1], 0.01f));
+  ASSERT_TRUE(legacy << event.damage_dealt << event.health_lost << event.hit_type
+                     << event.damage_source_kind << event.target_material_kind);
+  EXPECT_EQ(DataStreamBuffer::serialize(event), legacy.data());
+  EXPECT_EQ(DataStreamBuffer::deserialize<DamageNotification>(legacy.span()), event);
+}
 
 const GameTestRegistration
   damageLookup("DamageDatabaseTest", "CaseInsensitiveKindsAndIndependentElementalTypes", [](GameTest& fixture) {
@@ -219,9 +348,9 @@ const GameTestRegistration
                               Json(JsonObject{{"damage", 3}, {"hitType", Json()}, {"damageType", Json()}})}) {
       auto request = DamageRequest::create(input);
       ASSERT_TRUE(request);
-      EXPECT_EQ(request->hitType, HitType::Hit);
-      EXPECT_EQ(request->damageType, DamageType::Damage);
-      auto stored = request->toJson();
+      EXPECT_EQ(request->hit_type, HitType::Hit);
+      EXPECT_EQ(request->damage_type, DamageType::Damage);
+      auto stored = request->to_json();
       ASSERT_TRUE(stored);
       EXPECT_EQ(stored->get_string("hitType"), "Hit");
       EXPECT_EQ(stored->get_string("damageType"), "Damage");
@@ -229,9 +358,9 @@ const GameTestRegistration
     auto mixedCase =
       DamageRequest::create(JsonObject{{"damage", 3}, {"hitType", "sTrOnGhIt"}, {"damageType", "iGnOrEsDeF"}});
     ASSERT_TRUE(mixedCase);
-    EXPECT_EQ(mixedCase->hitType, HitType::StrongHit);
-    EXPECT_EQ(mixedCase->damageType, DamageType::IgnoresDef);
-    auto stored = mixedCase->toJson();
+    EXPECT_EQ(mixedCase->hit_type, HitType::StrongHit);
+    EXPECT_EQ(mixedCase->damage_type, DamageType::IgnoresDef);
+    auto stored = mixedCase->to_json();
     ASSERT_TRUE(stored);
     EXPECT_EQ(stored->get_string("hitType"), "StrongHit");
     EXPECT_EQ(stored->get_string("damageType"), "IgnoresDef");
@@ -251,7 +380,7 @@ const GameTestRegistration
     ASSERT_TRUE(team);
     EXPECT_EQ(team->type, TeamType::Friendly);
     EXPECT_EQ(team->team, 0);
-    EXPECT_EQ(team->toJson(), Json(JsonObject{{"type", "friendly"}, {"team", 0}}));
+    EXPECT_EQ(team->to_json(), Json(JsonObject{{"type", "friendly"}, {"team", 0}}));
   });
 
 const GameTestRegistration
@@ -262,8 +391,8 @@ const GameTestRegistration
     ASSERT_TRUE(context);
     auto defaults = context->eval<DamageRequest>("return {damage = 3}");
     ASSERT_TRUE(defaults);
-    EXPECT_EQ(defaults->hitType, HitType::Hit);
-    EXPECT_EQ(defaults->damageType, DamageType::Damage);
+    EXPECT_EQ(defaults->hit_type, HitType::Hit);
+    EXPECT_EQ(defaults->damage_type, DamageType::Damage);
     auto request =
       context->eval<DamageRequest>("return {damage = 3, hitType = 'sTrOnGhIt', damageType = 'iGnOrEsDeF'}");
     ASSERT_TRUE(request);
@@ -288,11 +417,11 @@ const GameTestRegistration
     EXPECT_TRUE(rejected.error().is<UnicodeException>());
 
     DamageNotification notification;
-    notification.hitType = HitType::ShieldHit;
+    notification.hit_type = HitType::ShieldHit;
     ASSERT_TRUE(context->set_path("notification", notification));
     auto roundTrip = context->eval<DamageNotification>("return notification");
     ASSERT_TRUE(roundTrip);
-    EXPECT_EQ(roundTrip->hitType, HitType::ShieldHit);
+    EXPECT_EQ(roundTrip->hit_type, HitType::ShieldHit);
     auto unknown = context->eval<LuaValue>("notification.hitType = 'unknown'; return notification");
     ASSERT_TRUE(unknown);
     auto noNotification = (*engine)->lua_maybe_to<DamageNotification>(*unknown);

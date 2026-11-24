@@ -4,79 +4,89 @@ import star.vector;
 import star.data_stream;
 import star.game_types;
 import star.poly;
-import star.strong_typedef;
-import star.id_map;
 import star.data_stream_extra;
-import star.ordered_map;
-import star.bi_map;
-import star.thread;
-import star.io_device;
 import star.list;
-import star.image_processing;
-import star.hash;
-import star.string_view;
-import star.directives;
-import star.asset_path;
-import star.ref_ptr;
-import star.logging;
-import star.listener;
 import std;
 import star.string;
+import star.string_view;
+import star.bi_map;
 import star.format;
 
 import star.damage_types;
 import star.world_geometry;
 import star.status_types;
 import star.damage;
-import star.asset_source;
-import star.assets;
-import star.root_base;
-import star.configuration;
-import star.root;
-
 import star.line;
 namespace Star {
 
-DamageSource::DamageSource()
-  : damageType(DamageType::NoDamage), damage(0.0), sourceEntityId(null_entity_id), rayCheck(false) {}
+namespace {
+std::expected<DamageSource::DamageArea, StarException> read_damage_area(Json const& config) {
+  // Configuration keys take precedence, including the historical poly-before-line rule.
+  auto poly = config.find("poly");
+  if (!poly)
+    return std::unexpected(std::move(poly.error()));
+  if (*poly)
+    return json_to_polyf((*poly)->get());
+  auto line = config.find("line");
+  if (!line)
+    return std::unexpected(std::move(line.error()));
+  if (*line)
+    return json_to_line2f((*line)->get());
+
+  auto area = config.get("damageArea");
+  if (!area)
+    return std::unexpected(std::move(area.error()));
+  auto type = config.opt_string("damageAreaType");
+  if (!type)
+    return std::unexpected(std::move(type.error()));
+  if (area->is_null() && !*type)
+    return std::monostate{};
+
+  auto size = area->size();
+  if (!size)
+    return std::unexpected(std::move(size.error()));
+  if (*type && **type == "line") {
+    if (*size != 2)
+      return std::unexpected(JsonException("DamageSource line requires two endpoints"));
+    return json_to_line2f(*area);
+  }
+  if (*type && **type != "poly")
+    return std::unexpected(JsonException("Unknown DamageSource damageAreaType"));
+  if (!*type && *size == 2)
+    return std::unexpected(JsonException("Ambiguous two-point damageArea: specify damageAreaType 'poly' or 'line'"));
+  // Stored polygons already have their native winding. Only config polygons are normalized.
+  auto vertices = json_to_list<Vec2F>(*area, json_to_vec2f);
+  if (!vertices)
+    return std::unexpected(std::move(vertices.error()));
+  return PolyF(std::move(*vertices));
+}
+
+std::expected<List<EphemeralStatusEffect>, StarException> read_status_effects(Json const& config) {
+  auto effects = config.find("statusEffects");
+  if (!effects)
+    return std::unexpected(std::move(effects.error()));
+  if (!*effects || (*effects)->get().is_null())
+    return List<EphemeralStatusEffect>{};
+  return json_to_list<EphemeralStatusEffect>((*effects)->get(), jsonToEphemeralStatusEffect);
+}
+}
 
 std::expected<DamageSource, StarException> DamageSource::create(Json const& config) {
   DamageSource source;
   auto dtype = config.opt_string("damageType");
   if (!dtype)
     return std::unexpected(std::move(dtype.error()));
-  source.damageType = DamageType::Damage;
+  source.damage_type = DamageType::Damage;
   if (*dtype) {
     auto type = enum_value<DamageTypeNames>(**dtype);
     if (!type)
       return std::unexpected(std::move(type.error()));
-    source.damageType = *type;
+    source.damage_type = *type;
   }
-  auto hasPoly = config.contains("poly");
-  if (!hasPoly)
-    return std::unexpected(std::move(hasPoly.error()));
-  auto hasLine = config.contains("line");
-  if (!hasLine)
-    return std::unexpected(std::move(hasLine.error()));
-  if (*hasPoly) {
-    auto value = config.get("poly");
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    auto poly = json_to_polyf(*value);
-    if (!poly)
-      return std::unexpected(std::move(poly.error()));
-    source.damageArea = std::move(*poly);
-  } else if (*hasLine) {
-    auto value = config.get("line");
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    auto line = json_to_line2f(*value);
-    if (!line)
-      return std::unexpected(std::move(line.error()));
-    source.damageArea = std::move(*line);
-  } else {
-    return std::unexpected(StarException("No 'poly' or 'line' key in DamageSource config"));
-  }
+  auto area = read_damage_area(config);
+  if (!area)
+    return std::unexpected(std::move(area.error()));
+  source.damage_area = std::move(*area);
   auto damage = config.get_float("damage");
   if (!damage)
     return std::unexpected(std::move(damage.error()));
@@ -84,16 +94,16 @@ std::expected<DamageSource, StarException> DamageSource::create(Json const& conf
   auto track = config.get_bool("trackSourceEntity", true);
   if (!track)
     return std::unexpected(std::move(track.error()));
-  source.trackSourceEntity = *track;
+  source.track_source_entity = *track;
   auto id = config.get_int("sourceEntityId", null_entity_id);
   if (!id)
     return std::unexpected(std::move(id.error()));
-  source.sourceEntityId = *id;
-  auto teamConfig = config.opt("team");
-  if (!teamConfig)
-    return std::unexpected(std::move(teamConfig.error()));
-  if (*teamConfig) {
-    auto team = EntityDamageTeam::create(**teamConfig);
+  source.source_entity_id = *id;
+  auto team_config = config.opt("team");
+  if (!team_config)
+    return std::unexpected(std::move(team_config.error()));
+  if (*team_config) {
+    auto team = EntityDamageTeam::create(**team_config);
     if (!team)
       return std::unexpected(std::move(team.error()));
     source.team = *team;
@@ -113,24 +123,19 @@ std::expected<DamageSource, StarException> DamageSource::create(Json const& conf
   auto group = config.opt_string("damageRepeatGroup");
   if (!group)
     return std::unexpected(std::move(group.error()));
-  source.damageRepeatGroup = std::move(*group);
+  source.damage_repeat_group = std::move(*group);
   auto timeout = config.opt_float("damageRepeatTimeout");
   if (!timeout)
     return std::unexpected(std::move(timeout.error()));
-  source.damageRepeatTimeout = *timeout;
+  source.damage_repeat_timeout = *timeout;
   auto kind = config.get_string("damageSourceKind", "");
   if (!kind)
     return std::unexpected(std::move(kind.error()));
-  source.damageSourceKind = std::move(*kind);
-  auto effects = config.get_array("statusEffects", {});
+  source.damage_source_kind = std::move(*kind);
+  auto effects = read_status_effects(config);
   if (!effects)
     return std::unexpected(std::move(effects.error()));
-  for (auto const& effect : *effects) {
-    auto parsed = jsonToEphemeralStatusEffect(effect);
-    if (!parsed)
-      return std::unexpected(std::move(parsed.error()));
-    source.statusEffects.push_back(std::move(*parsed));
-  }
+  source.status_effects = std::move(*effects);
   auto knockback = config.get("knockback", Json(0.0f));
   if (!knockback)
     return std::unexpected(std::move(knockback.error()));
@@ -139,345 +144,254 @@ std::expected<DamageSource, StarException> DamageSource::create(Json const& conf
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
     source.knockback = *parsed;
-  } else {
+  } else if (!knockback->is_null()) {
     auto parsed = knockback->to_float();
     if (!parsed)
       return std::unexpected(std::move(parsed.error()));
     source.knockback = *parsed;
   }
-  auto rayCheck = config.get_bool("rayCheck", false);
-  if (!rayCheck)
-    return std::unexpected(std::move(rayCheck.error()));
-  source.rayCheck = *rayCheck;
+  auto ray_check = config.get_bool("rayCheck", false);
+  if (!ray_check)
+    return std::unexpected(std::move(ray_check.error()));
+  source.ray_check = *ray_check;
   return source;
 }
 
-DamageSource::DamageSource(DamageType damageType,
-    DamageArea damageArea,
-    float damage,
-    bool trackSourceEntity,
-    EntityId sourceEntityId,
-    EntityDamageTeam team,
-    std::optional<String> damageRepeatGroup,
-    std::optional<float> damageRepeatTimeout,
-    String damageSourceKind,
-    List<EphemeralStatusEffect> statusEffects,
-    Knockback knockback,
-    bool rayCheck)
-  : damageType(std::move(damageType)),
-    damageArea(std::move(damageArea)),
-    damage(std::move(damage)),
-    trackSourceEntity(std::move(trackSourceEntity)),
-    sourceEntityId(std::move(sourceEntityId)),
-    team(std::move(team)),
-    damageRepeatGroup(std::move(damageRepeatGroup)),
-    damageRepeatTimeout(std::move(damageRepeatTimeout)),
-    damageSourceKind(std::move(damageSourceKind)),
-    statusEffects(std::move(statusEffects)),
-    knockback(std::move(knockback)),
-    rayCheck(std::move(rayCheck)) {}
+std::expected<Json, StarException> DamageSource::to_json() const {
+  Json area;
+  if (std::holds_alternative<PolyF>(damage_area))
+    area = json_from_polyf(std::get<PolyF>(damage_area));
+  else if (std::holds_alternative<Line2F>(damage_area))
+    area = json_from_line2f(std::get<Line2F>(damage_area));
 
-std::expected<Json, StarException> DamageSource::toJson() const {
-  Json damageAreaJson;
-  if (std::holds_alternative<PolyF>(damageArea))
-    damageAreaJson = json_from_polyf(std::get<PolyF>(damageArea));
-  else if (std::holds_alternative<Line2F>(damageArea))
-    damageAreaJson = json_from_line2f(std::get<Line2F>(damageArea));
-
-  Json knockbackJson;
+  Json knockback_json;
   if (std::holds_alternative<float>(knockback))
-    knockbackJson = std::get<float>(knockback);
+    knockback_json = std::get<float>(knockback);
   else if (std::holds_alternative<Vec2F>(knockback))
-    knockbackJson = json_from_vec2f(std::get<Vec2F>(knockback));
+    knockback_json = json_from_vec2f(std::get<Vec2F>(knockback));
 
-  auto typeName = enum_name<DamageTypeNames>(damageType);
-  if (!typeName)
-    return std::unexpected(std::move(typeName.error()));
-  auto teamJson = team.toJson();
-  if (!teamJson)
-    return std::unexpected(std::move(teamJson.error()));
-  return JsonObject{{"damageType", String(*typeName)},
-                    {"damageArea", damageAreaJson},
+  auto type_name = enum_name<DamageTypeNames>(damage_type);
+  if (!type_name)
+    return std::unexpected(std::move(type_name.error()));
+  auto team_json = team.to_json();
+  if (!team_json)
+    return std::unexpected(std::move(team_json.error()));
+  JsonObject result{{"damageType", String(*type_name)},
+                    {"damageArea", std::move(area)},
                     {"damage", damage},
-                    {"trackSourceEntity", trackSourceEntity},
-                    {"sourceEntityId", sourceEntityId},
-                    {"team", std::move(*teamJson)},
-                    {"damageRepeatGroup", json_from_optional(damageRepeatGroup)},
-                    {"damageRepeatTimeout", json_from_optional(damageRepeatTimeout)},
-                    {"damageSourceKind", damageSourceKind},
-                    {"statusEffects", statusEffects.transformed(jsonFromEphemeralStatusEffect)},
-                    {"knockback", knockbackJson},
-                    {"rayCheck", rayCheck}};
+                    {"trackSourceEntity", track_source_entity},
+                    {"sourceEntityId", source_entity_id},
+                    {"team", std::move(*team_json)},
+                    {"damageRepeatGroup", json_from_optional(damage_repeat_group)},
+                    {"damageRepeatTimeout", json_from_optional(damage_repeat_timeout)},
+                    {"damageSourceKind", damage_source_kind},
+                    {"statusEffects", status_effects.transformed(jsonFromEphemeralStatusEffect)},
+                    {"knockback", std::move(knockback_json)},
+                    {"rayCheck", ray_check}};
+  // Keep the legacy Lua-visible array. Only two-point shapes need a discriminator.
+  if (std::holds_alternative<Line2F>(damage_area))
+    result["damageAreaType"] = "line";
+  else if (std::holds_alternative<PolyF>(damage_area) && std::get<PolyF>(damage_area).sides() == 2)
+    result["damageAreaType"] = "poly";
+  return result;
 }
 
-std::expected<bool, StarException> DamageSource::intersectsWithPoly(WorldGeometry const& geometry, PolyF const& targetPoly) const {
-  if (std::holds_alternative<PolyF>(damageArea))
-    return geometry.poly_intersects_poly(std::get<PolyF>(damageArea), targetPoly);
-  else if (std::holds_alternative<Line2F>(damageArea))
-    return geometry.line_intersects_poly(std::get<Line2F>(damageArea), targetPoly);
+std::expected<bool, StarException> DamageSource::intersects_with_poly(WorldGeometry const& geometry, PolyF const& target_poly) const {
+  if (std::holds_alternative<PolyF>(damage_area))
+    return geometry.poly_intersects_poly(std::get<PolyF>(damage_area), target_poly);
+  else if (std::holds_alternative<Line2F>(damage_area))
+    return geometry.line_intersects_poly(std::get<Line2F>(damage_area), target_poly);
   else
     return false;
 }
 
-Vec2F DamageSource::knockbackMomentum(WorldGeometry const& worldGeometry, Vec2F const& targetCenter) const {
+Vec2F DamageSource::knockback_momentum(WorldGeometry const& world_geometry, Vec2F const& target_center) const {
   if (std::holds_alternative<Vec2F>(knockback)) {
     return std::get<Vec2F>(knockback);
   } else if (std::holds_alternative<float>(knockback)) {
     float strength = std::get<float>(knockback);
     if (strength != 0) {
-      if (std::holds_alternative<PolyF>(damageArea))
-        return worldGeometry.diff(targetCenter, std::get<PolyF>(damageArea).center()).normalized() * strength;
-      else if (std::holds_alternative<Line2F>(damageArea))
-        return vnorm(std::get<Line2F>(damageArea).diff()) * strength;
+      if (std::holds_alternative<PolyF>(damage_area))
+        return world_geometry.diff(target_center, std::get<PolyF>(damage_area).center()).normalized() * strength;
+      else if (std::holds_alternative<Line2F>(damage_area))
+        return vnorm(std::get<Line2F>(damage_area).diff()) * strength;
     }
   }
 
   return Vec2F();
 }
 
-bool DamageSource::operator==(DamageSource const& rhs) const {
-  return std::tie(damageType, damageArea, damage, trackSourceEntity, sourceEntityId, team, damageSourceKind, statusEffects, knockback, rayCheck)
-      == std::tie(rhs.damageType,
-             rhs.damageArea,
-             rhs.damage,
-             rhs.trackSourceEntity,
-             rhs.sourceEntityId,
-             rhs.team,
-             rhs.damageSourceKind,
-             rhs.statusEffects,
-             rhs.knockback,
-             rhs.rayCheck);
-}
-
 DamageSource& DamageSource::translate(Vec2F const& position) {
-  if (std::holds_alternative<PolyF>(damageArea))
-    std::get<PolyF>(damageArea).translate(position);
-  else if (std::holds_alternative<Line2F>(damageArea))
-    std::get<Line2F>(damageArea).translate(position);
+  if (std::holds_alternative<PolyF>(damage_area))
+    std::get<PolyF>(damage_area).translate(position);
+  else if (std::holds_alternative<Line2F>(damage_area))
+    std::get<Line2F>(damage_area).translate(position);
   return *this;
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DamageSource const& source) {
-  auto result = ds << source.damageType << source.damageArea << source.damage
-      << source.trackSourceEntity << source.sourceEntityId << source.team
-      << source.damageRepeatGroup << source.damageRepeatTimeout << source.damageSourceKind
-      << source.statusEffects << source.knockback << source.rayCheck;
-  if (!result)
-    return std::unexpected(std::move(result.error()));
-  return std::ref(ds);
+  return ds << source.damage_type << source.damage_area << source.damage
+      << source.track_source_entity << source.source_entity_id << source.team
+      << source.damage_repeat_group << source.damage_repeat_timeout << source.damage_source_kind
+      << source.status_effects << source.knockback << source.ray_check;
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DamageSource& source) {
-  auto result = ds >> source.damageType >> source.damageArea >> source.damage
-      >> source.trackSourceEntity >> source.sourceEntityId >> source.team
-      >> source.damageRepeatGroup >> source.damageRepeatTimeout >> source.damageSourceKind
-      >> source.statusEffects >> source.knockback >> source.rayCheck;
-  if (!result)
-    return std::unexpected(std::move(result.error()));
-  return std::ref(ds);
+  return ds >> source.damage_type >> source.damage_area >> source.damage
+      >> source.track_source_entity >> source.source_entity_id >> source.team
+      >> source.damage_repeat_group >> source.damage_repeat_timeout >> source.damage_source_kind
+      >> source.status_effects >> source.knockback >> source.ray_check;
 }
-
-DamageRequest::DamageRequest()
-  : hitType(HitType::Hit), damageType(DamageType::Damage), damage(0.0f), sourceEntityId(null_entity_id) {}
 
 std::expected<DamageRequest, StarException> DamageRequest::create(Json const& v) {
   DamageRequest request;
-  auto hitName = v.get_string("hitType", "hit");
-  if (!hitName)
-    return std::unexpected(std::move(hitName.error()));
-  auto hit = enum_value<HitTypeNames>(*hitName);
+  auto hit_name = v.get_string("hitType", "hit");
+  if (!hit_name)
+    return std::unexpected(std::move(hit_name.error()));
+  auto hit = enum_value<HitTypeNames>(*hit_name);
   if (!hit)
     return std::unexpected(std::move(hit.error()));
-  request.hitType = *hit;
-  auto typeName = v.get_string("damageType", "damage");
-  if (!typeName)
-    return std::unexpected(std::move(typeName.error()));
-  auto type = enum_value<DamageTypeNames>(*typeName);
+  request.hit_type = *hit;
+  auto type_name = v.get_string("damageType", "damage");
+  if (!type_name)
+    return std::unexpected(std::move(type_name.error()));
+  auto type = enum_value<DamageTypeNames>(*type_name);
   if (!type)
     return std::unexpected(std::move(type.error()));
-  request.damageType = *type;
+  request.damage_type = *type;
   auto damage = v.get_float("damage");
   if (!damage)
     return std::unexpected(std::move(damage.error()));
   request.damage = *damage;
-  auto momentumJson = v.get("knockbackMomentum", JsonArray{0, 0});
-  if (!momentumJson)
-    return std::unexpected(std::move(momentumJson.error()));
-  auto momentum = json_to_vec2f(*momentumJson);
+  auto momentum_json = v.get("knockbackMomentum", JsonArray{0, 0});
+  if (!momentum_json)
+    return std::unexpected(std::move(momentum_json.error()));
+  auto momentum = json_to_vec2f(*momentum_json);
   if (!momentum)
     return std::unexpected(std::move(momentum.error()));
-  request.knockbackMomentum = *momentum;
+  request.knockback_momentum = *momentum;
   auto id = v.get_int("sourceEntityId", null_entity_id);
   if (!id)
     return std::unexpected(std::move(id.error()));
-  request.sourceEntityId = *id;
+  request.source_entity_id = *id;
   auto kind = v.get_string("damageSourceKind", "");
   if (!kind)
     return std::unexpected(std::move(kind.error()));
-  request.damageSourceKind = std::move(*kind);
-  auto effects = v.get_array("statusEffects", {});
+  request.damage_source_kind = std::move(*kind);
+  auto effects = read_status_effects(v);
   if (!effects)
     return std::unexpected(std::move(effects.error()));
-  for (auto const& effect : *effects) {
-    auto parsed = jsonToEphemeralStatusEffect(effect);
-    if (!parsed)
-      return std::unexpected(std::move(parsed.error()));
-    request.statusEffects.push_back(std::move(*parsed));
-  }
+  request.status_effects = std::move(*effects);
   return request;
 }
 
-DamageRequest::DamageRequest(HitType hitType,
-    DamageType damageType,
-    float damage,
-    Vec2F const& knockbackMomentum,
-    EntityId sourceEntityId,
-    String const& damageSourceKind,
-    List<EphemeralStatusEffect> const& statusEffects)
-  : hitType(hitType),
-    damageType(damageType),
-    damage(damage),
-    knockbackMomentum(knockbackMomentum),
-    sourceEntityId(sourceEntityId),
-    damageSourceKind(damageSourceKind),
-    statusEffects(statusEffects) {}
-
-std::expected<Json, StarException> DamageRequest::toJson() const {
-  auto hit = enum_name<HitTypeNames>(hitType);
+std::expected<Json, StarException> DamageRequest::to_json() const {
+  auto hit = enum_name<HitTypeNames>(hit_type);
   if (!hit)
     return std::unexpected(std::move(hit.error()));
-  auto type = enum_name<DamageTypeNames>(damageType);
+  auto type = enum_name<DamageTypeNames>(damage_type);
   if (!type)
     return std::unexpected(std::move(type.error()));
   return JsonObject{{"hitType", String(*hit)},
                     {"damageType", String(*type)},
                     {"damage", damage},
-                    {"knockbackMomentum", json_from_vec2f(knockbackMomentum)},
-                    {"sourceEntityId", sourceEntityId},
-                    {"damageSourceKind", damageSourceKind},
-                    {"statusEffects", statusEffects.transformed(jsonFromEphemeralStatusEffect)}};
+                    {"knockbackMomentum", json_from_vec2f(knockback_momentum)},
+                    {"sourceEntityId", source_entity_id},
+                    {"damageSourceKind", damage_source_kind},
+                    {"statusEffects", status_effects.transformed(jsonFromEphemeralStatusEffect)}};
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DamageRequest const& request) {
-  auto result = ds << request.hitType << request.damageType << request.damage
-      << request.knockbackMomentum << request.sourceEntityId << request.damageSourceKind << request.statusEffects;
-  if (!result)
-    return std::unexpected(std::move(result.error()));
-  return std::ref(ds);
+  return ds << request.hit_type << request.damage_type << request.damage
+      << request.knockback_momentum << request.source_entity_id << request.damage_source_kind << request.status_effects;
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DamageRequest& request) {
-  auto result = ds >> request.hitType >> request.damageType >> request.damage
-      >> request.knockbackMomentum >> request.sourceEntityId >> request.damageSourceKind >> request.statusEffects;
-  if (!result)
-    return std::unexpected(std::move(result.error()));
-  return std::ref(ds);
+  return ds >> request.hit_type >> request.damage_type >> request.damage
+      >> request.knockback_momentum >> request.source_entity_id >> request.damage_source_kind >> request.status_effects;
 }
-
-DamageNotification::DamageNotification() : sourceEntityId(), targetEntityId(), damageDealt(), healthLost() {}
 
 std::expected<DamageNotification, StarException> DamageNotification::create(Json const& v) {
   DamageNotification notification;
   auto source = v.get_int("sourceEntityId");
   if (!source)
     return std::unexpected(std::move(source.error()));
-  notification.sourceEntityId = *source;
+  notification.source_entity_id = *source;
   auto target = v.get_int("targetEntityId");
   if (!target)
     return std::unexpected(std::move(target.error()));
-  notification.targetEntityId = *target;
-  auto positionJson = v.get("position");
-  if (!positionJson)
-    return std::unexpected(std::move(positionJson.error()));
-  auto position = json_to_vec2f(*positionJson);
+  notification.target_entity_id = *target;
+  auto position_json = v.get("position");
+  if (!position_json)
+    return std::unexpected(std::move(position_json.error()));
+  auto position = json_to_vec2f(*position_json);
   if (!position)
     return std::unexpected(std::move(position.error()));
   notification.position = *position;
   auto damage = v.get_float("damageDealt");
   if (!damage)
     return std::unexpected(std::move(damage.error()));
-  notification.damageDealt = *damage;
+  notification.damage_dealt = *damage;
   auto health = v.get_float("healthLost");
   if (!health)
     return std::unexpected(std::move(health.error()));
-  notification.healthLost = *health;
-  auto hitName = v.get_string("hitType");
-  if (!hitName)
-    return std::unexpected(std::move(hitName.error()));
-  auto hit = enum_value<HitTypeNames>(*hitName);
+  notification.health_lost = *health;
+  auto hit_name = v.get_string("hitType");
+  if (!hit_name)
+    return std::unexpected(std::move(hit_name.error()));
+  auto hit = enum_value<HitTypeNames>(*hit_name);
   if (!hit)
     return std::unexpected(std::move(hit.error()));
-  notification.hitType = *hit;
-  auto sourceKind = v.get_string("damageSourceKind");
-  if (!sourceKind)
-    return std::unexpected(std::move(sourceKind.error()));
-  notification.damageSourceKind = std::move(*sourceKind);
+  notification.hit_type = *hit;
+  auto source_kind = v.get_string("damageSourceKind");
+  if (!source_kind)
+    return std::unexpected(std::move(source_kind.error()));
+  notification.damage_source_kind = std::move(*source_kind);
   auto material = v.get_string("targetMaterialKind");
   if (!material)
     return std::unexpected(std::move(material.error()));
-  notification.targetMaterialKind = std::move(*material);
+  notification.target_material_kind = std::move(*material);
   return notification;
 }
 
-DamageNotification::DamageNotification(EntityId sourceEntityId,
-    EntityId targetEntityId,
-    Vec2F position,
-    float damageDealt,
-    float healthLost,
-    HitType hitType,
-    String damageSourceKind,
-    String targetMaterialKind)
-  : sourceEntityId(sourceEntityId),
-    targetEntityId(targetEntityId),
-    position(position),
-    damageDealt(damageDealt),
-    healthLost(healthLost),
-    hitType(hitType),
-    damageSourceKind(std::move(damageSourceKind)),
-    targetMaterialKind(std::move(targetMaterialKind)) {}
-
-std::expected<Json, StarException> DamageNotification::toJson() const {
-  auto hit = enum_name<HitTypeNames>(hitType);
+std::expected<Json, StarException> DamageNotification::to_json() const {
+  auto hit = enum_name<HitTypeNames>(hit_type);
   if (!hit)
     return std::unexpected(std::move(hit.error()));
-  return JsonObject{{"sourceEntityId", sourceEntityId},
-                    {"targetEntityId", targetEntityId},
+  return JsonObject{{"sourceEntityId", source_entity_id},
+                    {"targetEntityId", target_entity_id},
                     {"position", json_from_vec2f(position)},
-                    {"damageDealt", damageDealt},
-                    {"healthLost", healthLost},
+                    {"damageDealt", damage_dealt},
+                    {"healthLost", health_lost},
                     {"hitType", String(*hit)},
-                    {"damageSourceKind", damageSourceKind},
-                    {"targetMaterialKind", targetMaterialKind}};
+                    {"damageSourceKind", damage_source_kind},
+                    {"targetMaterialKind", target_material_kind}};
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DamageNotification const& notification) {
-  auto source = ds.viwrite(notification.sourceEntityId);
+  auto source = ds.viwrite(notification.source_entity_id);
   if (!source) return std::unexpected(std::move(source.error()));
-  auto target = ds.viwrite(notification.targetEntityId);
+  auto target = ds.viwrite(notification.target_entity_id);
   if (!target) return std::unexpected(std::move(target.error()));
   auto x = ds.vfwrite(notification.position[0], 0.01f);
   if (!x) return std::unexpected(std::move(x.error()));
   auto y = ds.vfwrite(notification.position[1], 0.01f);
   if (!y) return std::unexpected(std::move(y.error()));
-  auto result = ds << notification.damageDealt << notification.healthLost << notification.hitType
-      << notification.damageSourceKind << notification.targetMaterialKind;
-  if (!result) return std::unexpected(std::move(result.error()));
-  return std::ref(ds);
+  return ds << notification.damage_dealt << notification.health_lost << notification.hit_type
+      << notification.damage_source_kind << notification.target_material_kind;
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DamageNotification& notification) {
-  auto source = ds.viread(notification.sourceEntityId);
+  auto source = ds.viread(notification.source_entity_id);
   if (!source) return std::unexpected(std::move(source.error()));
-  auto target = ds.viread(notification.targetEntityId);
+  auto target = ds.viread(notification.target_entity_id);
   if (!target) return std::unexpected(std::move(target.error()));
   auto x = ds.vfread(notification.position[0], 0.01f);
   if (!x) return std::unexpected(std::move(x.error()));
   auto y = ds.vfread(notification.position[1], 0.01f);
   if (!y) return std::unexpected(std::move(y.error()));
-  auto result = ds >> notification.damageDealt >> notification.healthLost >> notification.hitType
-      >> notification.damageSourceKind >> notification.targetMaterialKind;
-  if (!result) return std::unexpected(std::move(result.error()));
-  return std::ref(ds);
+  return ds >> notification.damage_dealt >> notification.health_lost >> notification.hit_type
+      >> notification.damage_source_kind >> notification.target_material_kind;
 }
 
 }

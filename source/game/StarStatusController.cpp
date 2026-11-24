@@ -572,13 +572,13 @@ std::expected<void, StarException> StatusController::apply_self_damage_request(D
 
 std::expected<StatusController::DamageHistory, StarException> StatusController::damage_taken_since(std::uint64_t since) const {
   return m_recent_damage_taken.transform_since<Json>(since, [](DamageNotification const& notification) {
-    return notification.toJson();
+    return notification.to_json();
   });
 }
 
 std::expected<StatusController::DamageHistory, StarException> StatusController::inflicted_hits_since(std::uint64_t since) const {
   return m_recent_hits_given.transform_since<Json>(since, [](std::pair<EntityId, DamageRequest> const& hit) -> std::expected<Json, StarException> {
-    auto json = hit.second.toJson();
+    auto json = hit.second.to_json();
     if (!json) return std::unexpected(std::move(json.error()));
     return json->set("targetEntityId", hit.first);
   });
@@ -586,7 +586,7 @@ std::expected<StatusController::DamageHistory, StarException> StatusController::
 
 std::expected<StatusController::DamageHistory, StarException> StatusController::inflicted_damage_since(std::uint64_t since) const {
   return m_recent_damage_given.transform_since<Json>(since, [](DamageNotification const& notification) {
-    return notification.toJson();
+    return notification.to_json();
   });
 }
 

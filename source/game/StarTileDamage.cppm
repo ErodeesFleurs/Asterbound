@@ -22,7 +22,7 @@ struct TileDamageExceptionTag {
 };
 using TileDamageException = StarError<TileDamageExceptionTag, StarException>;
 
-List<Vec2I> tileAreaBrush(float range, Vec2F const& centerOffset, bool diameterMode);
+List<Vec2I> tile_area_brush(float range, Vec2F const& center_offset, bool square_mode);
 
 enum class TileDamageType : std::uint8_t {
   // Damage done that will not actually kill the target
@@ -40,23 +40,23 @@ enum class TileDamageType : std::uint8_t {
   // Can "till" certain materials into others
   Tilling
 };
-extern std::expected<EnumMap<TileDamageType>, StarException> const TileDamageTypeNames;
+extern std::expected<EnumMap<TileDamageType>, StarException> const tile_damage_type_names;
 
-bool tileDamageIsPenetrating(TileDamageType damageType);
+bool tile_damage_is_penetrating(TileDamageType damage_type);
 
 struct TileDamage {
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, TileDamage& tileDamage);
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, TileDamage const& tileDamage);
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, TileDamage& tile_damage);
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, TileDamage const& tile_damage);
   TileDamage();
-  TileDamage(TileDamageType type, float amount, unsigned harvestLevel = 1);
+  TileDamage(TileDamageType type, float amount, unsigned harvest_level = 1);
 
   TileDamageType type;
   float amount;
-  unsigned harvestLevel;
+  unsigned harvest_level;
 };
 
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, TileDamage& tileDamage);
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, TileDamage const& tileDamage);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, TileDamage& tile_damage);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, TileDamage const& tile_damage);
 
 class TileDamageParameters {
 public:
@@ -64,102 +64,105 @@ public:
 
   // If 'config' is a string type, it is assumed to be a descriptor file,
   // otherwise it should contain map configuration data.
-  [[nodiscard]] static std::expected<TileDamageParameters, StarException> create(Assets const& assets, Json config, std::optional<float> healthOverride = {}, std::optional<unsigned> requiredHarvestLevelOverride = {});
+  [[nodiscard]] static std::expected<TileDamageParameters, StarException> create(Assets const& assets, Json const& config, std::optional<float> health_override = {}, std::optional<unsigned> harvest_level_override = {});
 
-  [[nodiscard]] std::expected<float, StarException> damageDone(TileDamage const& damage) const;
-  float recoveryPerSecond() const;
-  unsigned requiredHarvestLevel() const;
-  float maximumEffectTime() const;
-  float totalHealth() const;
+  float damage_fraction(TileDamage const& damage) const;
+  float recovery_fraction(float dt) const;
+  unsigned required_harvest_level() const;
+  float maximum_effect_time() const;
+  float total_health() const;
 
-  TileDamageParameters sum(TileDamageParameters const& other) const;
+  [[nodiscard]] std::expected<TileDamageParameters, StarException> sum(this TileDamageParameters result, TileDamageParameters const& other);
 
-  [[nodiscard]] std::expected<Json, StarException> toJson() const;
+  [[nodiscard]] std::expected<Json, StarException> to_json() const;
 
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, TileDamageParameters& tileDamage);
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, TileDamageParameters const& tileDamage);
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, TileDamageParameters& tile_damage);
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, TileDamageParameters const& tile_damage);
 
 private:
+  static std::expected<TileDamageParameters, StarException> parse_config(Json const& config, std::optional<float> health_override, std::optional<unsigned> harvest_level_override);
+
   Map<TileDamageType, float> m_damages;
-  float m_damageRecoveryPerSecond;
-  float m_maximumEffectTime;
-  float m_totalHealth;
-  unsigned m_requiredHarvestLevel;
+  float m_damage_recovery_per_second;
+  float m_maximum_effect_time;
+  float m_total_health;
+  unsigned m_required_harvest_level;
 };
 
 class TileDamageStatus {
 public:
   TileDamageStatus();
 
-  float damagePercentage() const;
-  float damageEffectPercentage() const;
-  Vec2F sourcePosition() const;
-  TileDamageType damageType() const;
+  float damage_percentage() const;
+  float damage_effect_percentage() const;
+  Vec2F source_position() const;
+  TileDamageType damage_type() const;
 
   void reset();
-  [[nodiscard]] std::expected<void, StarException> damage(TileDamageParameters const& damageParameters, Vec2F const& sourcePosition, TileDamage const& damage);
-  void recover(TileDamageParameters const& damageParameters, float dt);
+  void damage(TileDamageParameters const& damage_parameters, Vec2F const& source_position, TileDamage const& damage);
+  void recover(TileDamageParameters const& damage_parameters, float dt);
 
   bool healthy() const;
   bool damaged() const;
-  bool damageProtected() const;
+  bool damage_protected() const;
   bool dead() const;
   bool harvested() const;
 
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, TileDamageStatus& tileDamageStatus);
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, TileDamageStatus const& tileDamageStatus);
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, TileDamageStatus& tile_damage_status);
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, TileDamageStatus const& tile_damage_status);
 
 private:
-  void updateDamageEffectPercentage();
+  void update_damage_effect_percentage();
 
-  float m_damagePercentage;
-  float m_damageEffectTimeFactor;
+  float m_damage_percentage;
+  float m_damage_effect_time_factor;
   bool m_harvested;
-  Vec2F m_damageSourcePosition;
-  TileDamageType m_damageType;
-  float m_damageEffectPercentage;
+  Vec2F m_damage_source_position;
+  TileDamageType m_damage_type;
+  float m_damage_effect_percentage;
 };
 
 class EntityTileDamageStatus : public NetElementGroup {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
 public:
+  explicit EntityTileDamageStatus(ConstructionKey);
   [[nodiscard]] static std::expected<std::shared_ptr<EntityTileDamageStatus>, StarException> create();
 
-  float damagePercentage() const;
-  float damageEffectPercentage() const;
-  TileDamageType damageType() const;
+  float damage_percentage() const;
+  float damage_effect_percentage() const;
+  TileDamageType damage_type() const;
 
   void reset();
-  [[nodiscard]] std::expected<void, StarException> damage(TileDamageParameters const& damageParameters, TileDamage const& damage);
-  void recover(TileDamageParameters const& damageParameters, float dt);
+  void damage(TileDamageParameters const& damage_parameters, TileDamage const& damage);
+  void recover(TileDamageParameters const& damage_parameters, float dt);
 
   bool healthy() const;
   bool damaged() const;
-  bool damageProtected() const;
+  bool damage_protected() const;
   bool dead() const;
   bool harvested() const;
 
 private:
-  EntityTileDamageStatus();
-  NetElementFloat m_damagePercentage;
-  NetElementFloat m_damageEffectTimeFactor;
-  NetElementBool m_damageHarvested;
-  NetElementEnum<TileDamageType> m_damageType;
+  NetElementFloat m_damage_percentage;
+  NetElementFloat m_damage_effect_time_factor;
+  NetElementBool m_damage_harvested;
+  NetElementEnum<TileDamageType> m_damage_type;
 };
 
-inline float TileDamageStatus::damagePercentage() const {
-  return m_damagePercentage;
+inline float TileDamageStatus::damage_percentage() const {
+  return m_damage_percentage;
 }
 
-inline float TileDamageStatus::damageEffectPercentage() const {
-  return m_damageEffectPercentage;
+inline float TileDamageStatus::damage_effect_percentage() const {
+  return m_damage_effect_percentage;
 }
 
-inline Vec2F TileDamageStatus::sourcePosition() const {
-  return m_damageSourcePosition;
+inline Vec2F TileDamageStatus::source_position() const {
+  return m_damage_source_position;
 }
 
-inline TileDamageType TileDamageStatus::damageType() const {
-  return m_damageType;
+inline TileDamageType TileDamageStatus::damage_type() const {
+  return m_damage_type;
 }
 
 }
@@ -172,9 +175,9 @@ export namespace Star {
   using ::Star::EntityTileDamageStatus;
   using ::Star::TileDamageExceptionTag;
   using ::Star::TileDamageException;
-  using ::Star::tileAreaBrush;
+  using ::Star::tile_area_brush;
   using ::Star::TileDamageType;
-  using ::Star::TileDamageTypeNames;
-  using ::Star::tileDamageIsPenetrating;
+  using ::Star::tile_damage_type_names;
+  using ::Star::tile_damage_is_penetrating;
   using ::Star::TileDamage;
 }

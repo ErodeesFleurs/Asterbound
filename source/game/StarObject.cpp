@@ -963,9 +963,7 @@ std::expected<void, StarException> Object::renderLightSources(RenderCallback& re
 std::expected<bool, StarException> Object::damageTiles(List<Vec2I> const&, Vec2F const&, TileDamage const& tileDamage) {
   if (m_unbreakable)
     return false;
-  auto operation1 = m_tileDamageStatus->damage(m_config->tileDamageParameters, tileDamage);
-  if (!operation1)
-    return std::unexpected(std::move(operation1.error()));
+  m_tileDamageStatus->damage(m_config->tileDamageParameters, tileDamage);
   if (m_tileDamageStatus->dead())
     m_broken = true;
   return m_broken;
@@ -2176,7 +2174,7 @@ std::expected<List<DamageSource>, StarException> Object::damageSources() const {
       if (!sourceResult)
         return std::unexpected(std::move(sourceResult.error()));
       auto source = std::move(*sourceResult);
-      source.sourceEntityId = entityId();
+      source.source_entity_id = entityId();
       source.team = getTeam();
       sources.push_back(std::move(source));
     }
@@ -2205,7 +2203,7 @@ std::expected<std::optional<HitType>, StarException> Object::queryHit(DamageSour
   auto& currentWorld = currentWorldResult->get();
   auto poly = volume();
   poly.translate(position());
-  auto intersectsResult = source.intersectsWithPoly(currentWorld.geometry(), poly);
+  auto intersectsResult = source.intersects_with_poly(currentWorld.geometry(), poly);
   if (!intersectsResult)
     return std::unexpected(std::move(intersectsResult.error()));
   auto intersects = std::move(*intersectsResult);
@@ -2230,14 +2228,14 @@ std::expected<List<DamageNotification>, StarException> Object::applyDamage(Damag
   if (notifications) {
     float totalDamage = 0.0f;
     for (auto const& notification : *notifications)
-      totalDamage += notification.healthLost;
+      totalDamage += notification.health_lost;
     float dmg = std::min(m_health.get(), totalDamage);
     m_health.set(m_health.get() - dmg);
     return std::move(*notifications);
   }
   float dmg = std::min(m_health.get(), damage.damage);
   m_health.set(m_health.get() - dmg);
-  return List<DamageNotification>{{damage.sourceEntityId, entityId(), position(), damage.damage, dmg, m_health.get() <= 0 ? HitType::Kill : HitType::Hit, damage.damageSourceKind, m_config->damageMaterialKind}};
+  return List<DamageNotification>{{damage.source_entity_id, entityId(), position(), damage.damage, dmg, m_health.get() <= 0 ? HitType::Kill : HitType::Hit, damage.damage_source_kind, m_config->damageMaterialKind}};
 }
 
 RectF Object::interactiveBoundBox() const {
@@ -2531,7 +2529,7 @@ std::expected<Vec2F, StarException> Object::damageShake() const {
 }
 
 std::expected<Vec2F, StarException> Object::computeDamageShake() const {
-  if (m_tileDamageStatus->damaged() && !m_tileDamageStatus->damageProtected()) {
+  if (m_tileDamageStatus->damaged() && !m_tileDamageStatus->damage_protected()) {
     auto xResult = root().random().uniform_float(-1, 1);
     if (!xResult)
       return std::unexpected(std::move(xResult.error()));
@@ -2540,7 +2538,7 @@ std::expected<Vec2F, StarException> Object::computeDamageShake() const {
     if (!yResult)
       return std::unexpected(std::move(yResult.error()));
     auto y = std::move(*yResult);
-    return Vec2F(x, y) * m_tileDamageStatus->damageEffectPercentage() * m_config->damageShakeMagnitude;
+    return Vec2F(x, y) * m_tileDamageStatus->damage_effect_percentage() * m_config->damageShakeMagnitude;
   }
   return Vec2F();
 }

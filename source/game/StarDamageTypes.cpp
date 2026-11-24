@@ -9,8 +9,6 @@ import star.format;
 
 namespace Star {
 
-EntityDamageTeam::EntityDamageTeam() : type(TeamType::Null), team(0) {}
-
 EntityDamageTeam::EntityDamageTeam(TeamType type, TeamNumber team) : type(type), team(team) {}
 
 std::expected<EntityDamageTeam, StarException> EntityDamageTeam::create(Json const& json) {
@@ -26,53 +24,36 @@ std::expected<EntityDamageTeam, StarException> EntityDamageTeam::create(Json con
   return EntityDamageTeam(*type, *team);
 }
 
-std::expected<Json, StarException> EntityDamageTeam::toJson() const {
+std::expected<Json, StarException> EntityDamageTeam::to_json() const {
   auto name = enum_name<TeamTypeNames>(type);
   if (!name)
     return std::unexpected(std::move(name.error()));
   return JsonObject{{"type", String(*name)}, {"team", team}};
 }
 
-bool EntityDamageTeam::canDamage(EntityDamageTeam victim, bool victimIsSelf) const {
-  if (victimIsSelf) {
-    if (type == TeamType::Indiscriminate)
-      return true;
-  } else if (type == TeamType::Friendly) {
-    if (victim.type == TeamType::Enemy || victim.type == TeamType::Passive || victim.type == TeamType::Environment || victim.type == TeamType::Indiscriminate)
-      return true;
-  } else if (type == TeamType::Enemy) {
-    if (victim.type == TeamType::Friendly || victim.type == TeamType::PVP || victim.type == TeamType::Indiscriminate)
-      return true;
-    else if (victim.type == TeamType::Enemy && team != victim.team)
-      return true;
-  } else if (type == TeamType::PVP) {
-    if (victim.type == TeamType::Enemy || victim.type == TeamType::Passive || victim.type == TeamType::Environment || victim.type == TeamType::Indiscriminate)
-      return true;
-    else if (victim.type == TeamType::PVP && (team == 0 || team != victim.team))
-      return true;
-  } else if (type == TeamType::Passive) {
-    // never deal damage
-  } else if (type == TeamType::Ghostly) {
-    // never deal damage
-  } else if (type == TeamType::Environment) {
-    if (victim.type == TeamType::Friendly || victim.type == TeamType::PVP || victim.type == TeamType::Indiscriminate)
-      return true;
-  } else if (type == TeamType::Indiscriminate) {
-    if (victim.type == TeamType::Friendly || victim.type == TeamType::Enemy || victim.type == TeamType::PVP
-        || victim.type == TeamType::Passive
-        || victim.type == TeamType::Environment
-        || victim.type == TeamType::Indiscriminate)
-      return true;
-  } else if (type == TeamType::Assistant) {
-    if (victim.type == TeamType::Enemy || victim.type == TeamType::Passive || victim.type == TeamType::Environment || victim.type == TeamType::Indiscriminate)
-      return true;
+bool EntityDamageTeam::can_damage(EntityDamageTeam victim, bool victim_is_self) const {
+  using enum TeamType;
+  if (victim_is_self)
+    return type == Indiscriminate;
+
+  bool const allied_targets = victim.type == Enemy || victim.type == Passive
+      || victim.type == Environment || victim.type == Indiscriminate;
+  bool const environment_targets = victim.type == Friendly || victim.type == PVP || victim.type == Indiscriminate;
+  switch (type) {
+    case Friendly:
+    case Assistant:
+      return allied_targets;
+    case PVP:
+      return allied_targets || (victim.type == PVP && (team == 0 || team != victim.team));
+    case Enemy:
+      return environment_targets || (victim.type == Enemy && team != victim.team);
+    case Environment:
+      return environment_targets;
+    case Indiscriminate:
+      return allied_targets || environment_targets;
+    default:
+      return false;
   }
-
-  return false;
-}
-
-bool EntityDamageTeam::operator==(EntityDamageTeam const& rhs) const {
-  return std::tie(type, team) == std::tie(rhs.type, rhs.team);
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, EntityDamageTeam const& team) {
@@ -89,5 +70,4 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
   return std::ref(ds);
 }
 
-TeamNumber soloPvpTeam(ConnectionId clientId) { return clientId; }
 }

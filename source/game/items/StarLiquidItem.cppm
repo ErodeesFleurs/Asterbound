@@ -237,7 +237,7 @@ std::expected<void, StarException> LiquidItem::fire(FireMode mode, bool shifting
   auto aimPosition = itemOwner->get().aimPosition();
   if (!aimPosition)
     return std::unexpected(std::move(aimPosition.error()));
-  for (auto pos : tileAreaBrush(radius, *aimPosition, true)) {
+  for (auto pos : tile_area_brush(radius, *aimPosition, true)) {
     auto placeable = canPlaceAtTile(pos);
     if (!placeable)
       return std::unexpected(std::move(placeable.error()));
@@ -284,7 +284,7 @@ std::expected<List<PreviewTile>, StarException> LiquidItem::previewTiles(bool sh
     auto aimPosition = itemOwner->get().aimPosition();
     if (!aimPosition)
       return std::unexpected(std::move(aimPosition.error()));
-    for (auto pos : tileAreaBrush(radius, *aimPosition, true)) {
+    for (auto pos : tile_area_brush(radius, *aimPosition, true)) {
       if (c >= count())
         break;
       auto placeable = canPlaceAtTile(pos);
@@ -309,7 +309,7 @@ std::expected<bool, StarException> LiquidItem::canPlace(bool shifting) const {
     auto aimPosition = itemOwner->get().aimPosition();
     if (!aimPosition)
       return std::unexpected(std::move(aimPosition.error()));
-    for (auto pos : tileAreaBrush(radius, *aimPosition, true)) {
+    for (auto pos : tile_area_brush(radius, *aimPosition, true)) {
       auto placeable = canPlaceAtTile(pos);
       if (!placeable)
         return std::unexpected(std::move(placeable.error()));

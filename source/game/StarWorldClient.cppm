@@ -303,7 +303,7 @@ public:
   void overrideGravity(float gravity);
   void resetGravity();
 
-  List<EntityId> entityIds() const;
+  List<EntityId> entity_ids() const override;
 
   // Disable normal client-side lighting algorithm, everything full brightness.
   bool fullBright() const;

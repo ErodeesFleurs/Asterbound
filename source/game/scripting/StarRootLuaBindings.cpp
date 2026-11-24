@@ -695,7 +695,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
     if (!id) return std::unexpected(std::move(id.error()));
     auto parameters = (*database)->materialDamageParameters(*id);
     if (!parameters) return std::unexpected(std::move(parameters.error()));
-    return parameters->totalHealth();
+    return parameters->total_health();
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.register_callback("techType", [&root](String const& techName) -> std::expected<String, StarException> {

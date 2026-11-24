@@ -158,13 +158,13 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
         if (!world)
           return std::unexpected(std::move(world.error()));
         auto other = world->get().entity(otherId);
-        return other && entity->getTeam().canDamage(other->getTeam(), false);
+        return other && entity->getTeam().can_damage(other->getTeam(), false);
   }); !registration)
       return std::unexpected(std::move(registration.error()));
 
     if (auto registration = methods.register_method("damageTeam",
     [&](std::shared_ptr<Entity> const& entity) -> std::expected<Json, StarException> {
-        return entity->getTeam().toJson();
+        return entity->getTeam().to_json();
     }); !registration)
       return std::unexpected(std::move(registration.error()));
 

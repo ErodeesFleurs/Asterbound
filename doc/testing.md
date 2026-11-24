@@ -215,7 +215,7 @@ single process with streamed output. To filter without losing per-case isolation
 
 ```sh
 ASTERBOUND_ASSETS=/absolute/path/to/Starbound/assets \
-  GTEST_FILTER='DamageDatabaseTest.*' nix run .#game-tests
+  GTEST_FILTER='DamageDatabaseTest.*:DamageValueTest.*:TileDamageTest.*:DamageManagerTest.*' nix run .#game-tests
 ```
 
 | Setting | Meaning |

@@ -1378,7 +1378,7 @@ std::expected<std::optional<HitType>, StarException> Player::queryHit(DamageSour
   if (!currentWorldResult)
     return std::unexpected(std::move(currentWorldResult.error()));
   auto& currentWorld = currentWorldResult->get();
-  auto intersectsResult = source.intersectsWithPoly(currentWorld.geometry(), m_movementController->collisionBody());
+  auto intersectsResult = source.intersects_with_poly(currentWorld.geometry(), m_movementController->collisionBody());
   if (!intersectsResult)
     return std::unexpected(std::move(intersectsResult.error()));
   auto intersects = std::move(*intersectsResult);
@@ -2326,7 +2326,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
   auto damageSources = std::move(*damageSourcesResult);
   m_damageSources = std::move(damageSources);
   for (auto& damageSource : m_damageSources) {
-    damageSource.sourceEntityId = entityId();
+    damageSource.source_entity_id = entityId();
     damageSource.team = getTeam();
   }
 
@@ -4609,7 +4609,7 @@ std::expected<Json, StarException> Player::diskStore() {
   if (!identityResult)
     return std::unexpected(std::move(identityResult.error()));
   auto identity = std::move(*identityResult);
-  auto teamResult = getTeam().toJson();
+  auto teamResult = getTeam().to_json();
   if (!teamResult)
     return std::unexpected(std::move(teamResult.error()));
   auto team = std::move(*teamResult);

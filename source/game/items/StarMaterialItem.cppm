@@ -733,7 +733,7 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
   auto harvest = beamAxe.instanceValue("harvestLevel", *defaultHarvest).and_then([](Json const& value) { return value.to_uint(); });
   if (!harvest)
     return std::unexpected(std::move(harvest.error()));
-  damage.harvestLevel = *harvest;
+  damage.harvest_level = *harvest;
 
   TileModificationList toSwap;
   List<Vec2I> willDamage;
@@ -963,7 +963,7 @@ List<Vec2I>& MaterialItem::tileArea(float radius, Vec2F const& position) const {
   if (m_lastTileAreaOriginCache != position || m_lastTileAreaRadiusCache != radius) {
     m_lastTileAreaOriginCache = position;
     m_lastTileAreaRadiusCache = radius;
-    m_tileAreasCache = tileAreaBrush(radius, position, true);
+    m_tileAreasCache = tile_area_brush(radius, position, true);
   }
   return m_tileAreasCache;
 }

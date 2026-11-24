@@ -435,7 +435,7 @@ auto result76 = m_effectEmitter->toJson();
 if (!result76) return std::unexpected(std::move(result76.error()));
 auto result77 = m_scriptComponent.get_script_storage();
 if (!result77) return std::unexpected(std::move(result77.error()));
-auto result78 = getTeam().toJson();
+auto result78 = getTeam().to_json();
 if (!result78) return std::unexpected(std::move(result78.error()));
 return JsonObject{
     {"npcVariant", std::move(*result67)},
@@ -804,7 +804,7 @@ std::expected<std::optional<HitType>, StarException> Npc::queryHit(DamageSource 
   {
   auto result169 = world();
   if (!result169) return std::unexpected(std::move(result169.error()));
-  auto result170 = source.intersectsWithPoly(result169->get().geometry(), m_movementController->collisionBody());
+  auto result170 = source.intersects_with_poly(result169->get().geometry(), m_movementController->collisionBody());
   if (!result170) return std::unexpected(std::move(result170.error()));
   if (std::move(*result170))
       return HitType::Hit;
@@ -827,14 +827,14 @@ auto notifications = std::move(*result171);
 
   float totalDamage = 0.0f;
   for (auto const& notification : notifications)
-    totalDamage += notification.healthLost;
+    totalDamage += notification.health_lost;
 
   if (totalDamage > 0 && m_hitDamageNotificationLimiter < m_hitDamageNotificationLimit) {
     auto result172 = recover_lua_script_error(m_scriptComponent.invoke("damage", JsonObject{
-        {"sourceId", damage.sourceEntityId},
+        {"sourceId", damage.source_entity_id},
         {"damage", totalDamage},
         {"sourceDamage", damage.damage},
-        {"sourceKind", damage.damageSourceKind}
+        {"sourceKind", damage.damage_source_kind}
       }));
 if (!result172) return std::unexpected(std::move(result172.error()));
 
@@ -2595,14 +2595,14 @@ auto damageSources = std::move(*result515);
     auto result520 = DamageSource::create(config);
 if (!result520) return std::unexpected(std::move(result520.error()));
 auto damageSource = std::move(*result520);
-    if (std::holds_alternative<PolyF>(damageSource.damageArea))
-      std::get<PolyF>(damageSource.damageArea).rotate(m_movementController->rotation());
+    if (std::holds_alternative<PolyF>(damageSource.damage_area))
+      std::get<PolyF>(damageSource.damage_area).rotate(m_movementController->rotation());
     damageSource.damage *= m_statusController->stat("powerMultiplier");
     damageSources.push_back(damageSource);
   }
 
   for (auto& damageSource : damageSources) {
-    damageSource.sourceEntityId = entityId();
+    damageSource.source_entity_id = entityId();
     damageSource.team = getTeam();
   }
 

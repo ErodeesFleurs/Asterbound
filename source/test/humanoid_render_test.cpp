@@ -147,7 +147,7 @@ const GameTestRegistration self_damage_history(
     auto pending = player.selfDamageNotifications();
     ASSERT_TRUE(pending) << pending.error().what();
     ASSERT_EQ(pending->size(), 1u);
-    EXPECT_EQ(pending->front().toJson(), *observed);
+    EXPECT_EQ(pending->front().to_json(), *observed);
     auto drained = player.selfDamageNotifications();
     ASSERT_TRUE(drained) << drained.error().what();
     EXPECT_TRUE(drained->empty());

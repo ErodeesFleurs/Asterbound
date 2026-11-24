@@ -499,15 +499,15 @@ LuaConverter<EphemeralStatusEffect>::to(LuaStackValue v) {
 }
 
 std::expected<void, StarException> LuaConverter<DamageRequest>::from(LuaStack stack, DamageRequest const& v) {
-  auto hitType = enum_name<HitTypeNames>(v.hitType);
-  if (!hitType)
-    return std::unexpected(std::move(hitType.error()));
-  auto damageType = enum_name<DamageTypeNames>(v.damageType);
-  if (!damageType)
-    return std::unexpected(std::move(damageType.error()));
-  return makeTable(stack, "hitType", *hitType, "damageType", *damageType, "damage", v.damage, "knockbackMomentum",
-                   v.knockbackMomentum, "sourceEntityId", v.sourceEntityId, "damageSourceKind", v.damageSourceKind,
-                   "statusEffects", v.statusEffects);
+  auto hit_type = enum_name<HitTypeNames>(v.hit_type);
+  if (!hit_type)
+    return std::unexpected(std::move(hit_type.error()));
+  auto damage_type = enum_name<DamageTypeNames>(v.damage_type);
+  if (!damage_type)
+    return std::unexpected(std::move(damage_type.error()));
+  return makeTable(stack, "hitType", *hit_type, "damageType", *damage_type, "damage", v.damage, "knockbackMomentum",
+                   v.knockback_momentum, "sourceEntityId", v.source_entity_id, "damageSourceKind", v.damage_source_kind,
+                   "statusEffects", v.status_effects);
 }
 
 std::expected<std::optional<DamageRequest>, StarException> LuaConverter<DamageRequest>::to(LuaStackValue v) {
@@ -515,51 +515,51 @@ std::expected<std::optional<DamageRequest>, StarException> LuaConverter<DamageRe
     return std::nullopt;
   auto const& table = v;
   DamageRequest result;
-  std::optional<String> hitType, damageType, damageSourceKind;
+  std::optional<String> hit_type, damage_type, damage_source_kind;
   std::optional<Vec2F> knockback;
   std::optional<EntityId> source;
   std::optional<List<EphemeralStatusEffect>> effects;
   auto read =
-    readFields(table, "hitType", hitType, "damageType", damageType, "damage", result.damage, "knockbackMomentum",
-               knockback, "sourceEntityId", source, "damageSourceKind", damageSourceKind, "statusEffects", effects);
+    readFields(table, "hitType", hit_type, "damageType", damage_type, "damage", result.damage, "knockbackMomentum",
+               knockback, "sourceEntityId", source, "damageSourceKind", damage_source_kind, "statusEffects", effects);
   if (!read)
     return std::unexpected(std::move(read.error()));
   if (!*read)
     return std::nullopt;
-  if (hitType) {
-    auto converted = maybe_enum_value<HitTypeNames>(*hitType);
+  if (hit_type) {
+    auto converted = maybe_enum_value<HitTypeNames>(*hit_type);
     if (!converted)
       return std::unexpected(std::move(converted.error()));
     if (!*converted)
       return std::nullopt;
-    result.hitType = **converted;
+    result.hit_type = **converted;
   }
-  if (damageType) {
-    auto converted = maybe_enum_value<DamageTypeNames>(*damageType);
+  if (damage_type) {
+    auto converted = maybe_enum_value<DamageTypeNames>(*damage_type);
     if (!converted)
       return std::unexpected(std::move(converted.error()));
     if (!*converted)
       return std::nullopt;
-    result.damageType = **converted;
+    result.damage_type = **converted;
   }
   if (knockback)
-    result.knockbackMomentum = *knockback;
+    result.knockback_momentum = *knockback;
   if (source)
-    result.sourceEntityId = *source;
-  if (damageSourceKind)
-    result.damageSourceKind = std::move(*damageSourceKind);
+    result.source_entity_id = *source;
+  if (damage_source_kind)
+    result.damage_source_kind = std::move(*damage_source_kind);
   if (effects)
-    result.statusEffects = std::move(*effects);
+    result.status_effects = std::move(*effects);
   return result;
 }
 
 std::expected<void, StarException> LuaConverter<DamageNotification>::from(LuaStack stack, DamageNotification const& v) {
-  auto hitType = enum_name<HitTypeNames>(v.hitType);
-  if (!hitType)
-    return std::unexpected(std::move(hitType.error()));
-  return makeTable(stack, "sourceEntityId", v.sourceEntityId, "targetEntityId", v.targetEntityId, "position",
-                   v.position, "damageDealt", v.damageDealt, "healthLost", v.healthLost, "hitType", *hitType,
-                   "damageSourceKind", v.damageSourceKind, "targetMaterialKind", v.targetMaterialKind);
+  auto hit_type = enum_name<HitTypeNames>(v.hit_type);
+  if (!hit_type)
+    return std::unexpected(std::move(hit_type.error()));
+  return makeTable(stack, "sourceEntityId", v.source_entity_id, "targetEntityId", v.target_entity_id, "position",
+                   v.position, "damageDealt", v.damage_dealt, "healthLost", v.health_lost, "hitType", *hit_type,
+                   "damageSourceKind", v.damage_source_kind, "targetMaterialKind", v.target_material_kind);
 }
 
 std::expected<std::optional<DamageNotification>, StarException> LuaConverter<DamageNotification>::to(LuaStackValue v) {
@@ -567,21 +567,21 @@ std::expected<std::optional<DamageNotification>, StarException> LuaConverter<Dam
     return std::nullopt;
   auto const& table = v;
   DamageNotification result;
-  String hitType;
+  String hit_type;
   auto read =
-    readFields(table, "sourceEntityId", result.sourceEntityId, "targetEntityId", result.targetEntityId, "position",
-               result.position, "damageDealt", result.damageDealt, "healthLost", result.healthLost, "hitType", hitType,
-               "damageSourceKind", result.damageSourceKind, "targetMaterialKind", result.targetMaterialKind);
+    readFields(table, "sourceEntityId", result.source_entity_id, "targetEntityId", result.target_entity_id, "position",
+               result.position, "damageDealt", result.damage_dealt, "healthLost", result.health_lost, "hitType", hit_type,
+               "damageSourceKind", result.damage_source_kind, "targetMaterialKind", result.target_material_kind);
   if (!read)
     return std::unexpected(std::move(read.error()));
   if (!*read)
     return std::nullopt;
-  auto converted = maybe_enum_value<HitTypeNames>(hitType);
+  auto converted = maybe_enum_value<HitTypeNames>(hit_type);
   if (!converted)
     return std::unexpected(std::move(converted.error()));
   if (!*converted)
     return std::nullopt;
-  result.hitType = **converted;
+  result.hit_type = **converted;
   return result;
 }
 

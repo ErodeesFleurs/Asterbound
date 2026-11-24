@@ -262,7 +262,7 @@ std::expected<void, StarException> MiningTool::fire(FireMode mode, bool shifting
       auto aimPosition = itemOwner->get().aimPosition();
       if (!aimPosition)
         return std::unexpected(std::move(aimPosition.error()));
-      brushArea = tileAreaBrush(radius, *aimPosition, true);
+      brushArea = tile_area_brush(radius, *aimPosition, true);
       for (auto pos : brushArea) {
         auto sound = (*materialDatabase)->miningSound(itemWorld->get().material(pos, layer), itemWorld->get().mod(pos, layer));
         if (!sound)
@@ -294,9 +294,9 @@ std::expected<void, StarException> MiningTool::fire(FireMode mode, bool shifting
       auto damageTypeName = instanceValue("tileDamageType", "blockish").and_then([](Json const& value) { return value.to_string(); });
       if (!damageTypeName)
         return std::unexpected(std::move(damageTypeName.error()));
-      if (!TileDamageTypeNames)
-        return std::unexpected(TileDamageTypeNames.error());
-      auto damageType = TileDamageTypeNames->get_left(*damageTypeName);
+      if (!tile_damage_type_names)
+        return std::unexpected(tile_damage_type_names.error());
+      auto damageType = tile_damage_type_names->get_left(*damageTypeName);
       if (!damageType)
         return std::unexpected(std::move(damageType.error()));
       damage.type = damageType->get();
@@ -310,7 +310,7 @@ std::expected<void, StarException> MiningTool::fire(FireMode mode, bool shifting
       auto harvest = instanceValue("harvestLevel", 1).and_then([](Json const& value) { return value.to_uint(); });
       if (!harvest)
         return std::unexpected(std::move(harvest.error()));
-      damage.harvestLevel = *harvest;
+      damage.harvest_level = *harvest;
       auto damageResult = itemWorld->get().damageTiles(brushArea, layer, itemOwner->get().position(), damage, itemOwner->get().entityId());
       if (!damageResult)
         return std::unexpected(std::move(damageResult.error()));
@@ -802,7 +802,7 @@ std::expected<List<PreviewTile>, StarException> BeamMiningTool::previewTiles(boo
     auto aimPosition = ownerp->get().aimPosition();
     if (!aimPosition)
       return std::unexpected(std::move(aimPosition.error()));
-    for (auto pos : tileAreaBrush(radius, *aimPosition, true)) {
+    for (auto pos : tile_area_brush(radius, *aimPosition, true)) {
       auto foreground = worldp->get().tileIsOccupied(pos, TileLayer::Foreground, true);
       if (!foreground)
         return std::unexpected(std::move(foreground.error()));
@@ -876,7 +876,7 @@ std::expected<void, StarException> BeamMiningTool::fire(FireMode mode, bool shif
       auto brushAimPosition = ownerp.aimPosition();
       if (!brushAimPosition)
         return std::unexpected(std::move(brushAimPosition.error()));
-      brushArea = tileAreaBrush(radius, *brushAimPosition, true);
+      brushArea = tile_area_brush(radius, *brushAimPosition, true);
       auto tileAimPosition = ownerp.aimPosition();
       if (!tileAimPosition)
         return std::unexpected(std::move(tileAimPosition.error()));
@@ -1120,7 +1120,7 @@ std::expected<List<PreviewTile>, StarException> PaintingBeamTool::previewTiles(b
     auto aimPosition = ownerp.aimPosition();
     if (!aimPosition)
       return std::unexpected(std::move(aimPosition.error()));
-    for (auto pos : tileAreaBrush(radius, *aimPosition, true)) {
+    for (auto pos : tile_area_brush(radius, *aimPosition, true)) {
       for (auto const& [layer, color] :
            {std::pair{TileLayer::Foreground, static_cast<MaterialColorVariant>(m_colorIndex)},
             std::pair{TileLayer::Background, static_cast<MaterialColorVariant>(m_colorIndex)},
@@ -1189,7 +1189,7 @@ std::expected<void, StarException> PaintingBeamTool::fire(FireMode mode, bool sh
         auto aimPosition = ownerp.aimPosition();
         if (!aimPosition)
           return std::unexpected(std::move(aimPosition.error()));
-        for (auto pos : tileAreaBrush(radius, *aimPosition, true)) {
+        for (auto pos : tile_area_brush(radius, *aimPosition, true)) {
           TileModificationList modifications = {
             {pos,
              PlaceMaterialColor{.layer = TileLayer::Foreground,

@@ -572,7 +572,7 @@ const GameTestRegistration signed_broadcast_lifecycle("RootTest", "SignedBroadca
     auto damage = as<DamageNotificationPacket>(packet);
     if (!damage)
       continue;
-    auto wire = damage->remoteDamageNotification.damageNotification.targetMaterialKind.utf8();
+    auto wire = damage->remoteDamageNotification.damage_notification.target_material_kind.utf8();
     constexpr std::string_view prefix("\0Broadcast\0", sizeof("\0Broadcast\0") - 1);
     if (!wire.starts_with(prefix))
       continue;
@@ -598,8 +598,8 @@ const GameTestRegistration signed_broadcast_lifecycle("RootTest", "SignedBroadca
     wire.append(signature.begin(), signature.end());
     wire.append(payload);
     auto packet = std::make_shared<DamageNotificationPacket>();
-    packet->remoteDamageNotification.sourceEntityId = player->entityId();
-    packet->remoteDamageNotification.damageNotification.targetMaterialKind = String(std::move(wire));
+    packet->remoteDamageNotification.source_entity_id = player->entityId();
+    packet->remoteDamageNotification.damage_notification.target_material_kind = String(std::move(wire));
     return packet;
   };
   for (bool legacy : {false, true}) {

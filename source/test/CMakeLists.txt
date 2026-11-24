@@ -257,6 +257,7 @@ set (star_game_tests_SOURCES
       context_session_test.cpp
       context_transport_test.cpp
       damage_database_test.cpp
+      damage_manager_test.cpp
       function_test.cpp
       humanoid_render_test.cpp
       lighting_test.cpp

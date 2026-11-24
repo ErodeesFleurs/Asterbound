@@ -64,23 +64,23 @@ using TeamNumber = std::uint16_t;
 struct EntityDamageTeam {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, EntityDamageTeam& value);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, EntityDamageTeam const& value);
-  EntityDamageTeam();
+  EntityDamageTeam() = default;
   explicit EntityDamageTeam(TeamType type, TeamNumber team = 0);
   [[nodiscard]] static std::expected<EntityDamageTeam, StarException> create(Json const& json);
 
-  [[nodiscard]] std::expected<Json, StarException> toJson() const;
+  [[nodiscard]] std::expected<Json, StarException> to_json() const;
 
-  bool canDamage(EntityDamageTeam victim, bool victimIsSelf) const;
+  [[nodiscard]] bool can_damage(EntityDamageTeam victim, bool victim_is_self) const;
 
-  bool operator==(EntityDamageTeam const& rhs) const;
+  bool operator==(EntityDamageTeam const&) const = default;
 
-  TeamType type;
-  TeamNumber team;
+  TeamType type = TeamType::Null;
+  TeamNumber team = 0;
 };
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, EntityDamageTeam const& team);
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, EntityDamageTeam& team);
 
-TeamNumber soloPvpTeam(ConnectionId clientId);
+constexpr TeamNumber solo_pvp_team(ConnectionId client_id) { return client_id; }
 }
 
 export module star.damage_types;
@@ -100,5 +100,5 @@ export namespace Star {
   using ::Star::TeamTypeNames;
   using ::Star::TeamNumber;
   using ::Star::EntityDamageTeam;
-  using ::Star::soloPvpTeam;
+  using ::Star::solo_pvp_team;
 }

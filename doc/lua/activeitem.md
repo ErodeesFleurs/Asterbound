@@ -112,6 +112,12 @@ Sets the item's requested facing direction, which controls the owner's facing. P
 
 Sets a list of active damage sources with coordinates relative to the owner's position or clears them if unspecified.
 
+A damage source config specifies `poly` or `line` (`poly` takes precedence).
+Serialized sources use `damageArea` instead. A line and a two-vertex polygon
+both serialize as two points, so keep `damageAreaType` (`"line"` or `"poly"`)
+when passing that data back. For older untagged two-point data, supply the
+intended type explicitly.
+
 ---
 
 #### `void` activeItem.setItemDamageSources([`List<DamageSource>` damageSources])

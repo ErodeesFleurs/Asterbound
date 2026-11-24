@@ -418,8 +418,8 @@ std::expected<void, StarException> ActiveItem::update(float dt, FireMode fireMod
 std::expected<List<DamageSource>, StarException> ActiveItem::damageSources() const {
   List<DamageSource> damageSources = m_damageSources.get();
   for (auto ds : m_itemDamageSources.get()) {
-    if (std::holds_alternative<PolyF>(ds.damageArea)) {
-      auto& poly = std::get<PolyF>(ds.damageArea);
+    if (std::holds_alternative<PolyF>(ds.damage_area)) {
+      auto& poly = std::get<PolyF>(ds.damage_area);
       poly.rotate(m_armAngle.get());
       auto itemOwner = owner();
       if (!itemOwner)
@@ -430,8 +430,8 @@ std::expected<List<DamageSource>, StarException> ActiveItem::damageSources() con
       if (!position)
         return std::unexpected(std::move(position.error()));
       poly.translate(*position);
-    } else if (std::holds_alternative<Line2F>(ds.damageArea)) {
-      auto& line = std::get<Line2F>(ds.damageArea);
+    } else if (std::holds_alternative<Line2F>(ds.damage_area)) {
+      auto& line = std::get<Line2F>(ds.damage_area);
       line.rotate(m_armAngle.get());
       auto itemOwner = owner();
       if (!itemOwner)
@@ -673,7 +673,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
     }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("ownerTeam", [this]() {
-      return owner().and_then([](std::reference_wrapper<ToolUserEntity> owner) { return owner.get().getTeam().toJson(); });
+      return owner().and_then([](std::reference_wrapper<ToolUserEntity> owner) { return owner.get().getTeam().to_json(); });
     }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("ownerAimPosition", [this]() {

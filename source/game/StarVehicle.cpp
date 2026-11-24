@@ -458,7 +458,7 @@ Json Vehicle::dynamicConfig() const {
 }
 
 std::expected<Json, StarException> Vehicle::diskStore() const {
-  auto result1273 = m_damageTeam.get().toJson();
+  auto result1273 = m_damageTeam.get().to_json();
 if (!result1273) return std::unexpected(std::move(result1273.error()));
 auto result1274 = m_scriptComponent.get_script_storage();
 if (!result1274) return std::unexpected(std::move(result1274.error()));
@@ -501,7 +501,7 @@ ClientEntityMode Vehicle::clientEntityMode() const {
 std::expected<std::optional<HitType>, StarException> Vehicle::queryHit(DamageSource const& source) const {
   auto result1264 = world();
 if (!result1264) return std::unexpected(std::move(result1264.error()));
-auto result1265 = source.intersectsWithPoly(result1264->get().geometry(), m_movementController->collisionBody());
+auto result1265 = source.intersects_with_poly(result1264->get().geometry(), m_movementController->collisionBody());
 if (!result1265) return std::unexpected(std::move(result1265.error()));
 if (std::move(*result1265))
     return HitType::Hit;
@@ -1144,11 +1144,11 @@ Mat3F partTransformation = std::move(*result1126);
         std::visit([partTransformation](auto& da) {
           if constexpr (!std::is_same_v<std::remove_cvref_t<decltype(da)>, std::monostate>)
             da.transform(partTransformation);
-        }, damageSource.damageArea);
+        }, damageSource.damage_area);
       }
 
       damageSource.team = m_damageTeam.get();
-      damageSource.sourceEntityId = entityId();
+      damageSource.source_entity_id = entityId();
 
       sources.push_back(std::move(damageSource));
     }

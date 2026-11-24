@@ -582,7 +582,7 @@ void ToolUser::setupHumanoidHandItemPose(Humanoid& humanoid) const {
         poly.translate(m_user->get().position());
         auto world = m_user->get().world();
         if (!world) return std::unexpected(std::move(world.error()));
-        auto hit = source.intersectsWithPoly(world->get().geometry(), poly);
+        auto hit = source.intersects_with_poly(world->get().geometry(), poly);
         if (!hit) return std::unexpected(std::move(hit.error()));
         if (*hit) return true;
       }

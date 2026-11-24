@@ -19,126 +19,98 @@ import star.line;
 namespace Star {
 
 struct DamageSource {
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DamageSource const& damageSource);
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DamageSource& damageSource);
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DamageSource const& source);
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DamageSource& source);
 
   using DamageArea = std::variant<std::monostate, PolyF, Line2F>;
   using Knockback = std::variant<std::monostate, float, Vec2F>;
 
-  DamageSource();
   [[nodiscard]] static std::expected<DamageSource, StarException> create(Json const& v);
-  DamageSource(DamageType damageType,
-      DamageArea damageArea,
-      float damage,
-      bool trackSourceEntity,
-      EntityId sourceEntityId,
-      EntityDamageTeam team,
-      std::optional<String> damageRepeatGroup,
-      std::optional<float> damageRepeatTimeout,
-      String damageSourceKind,
-      List<EphemeralStatusEffect> statusEffects,
-      Knockback knockback,
-      bool rayCheck);
 
-  [[nodiscard]] std::expected<Json, StarException> toJson() const;
+  [[nodiscard]] std::expected<Json, StarException> to_json() const;
 
   DamageSource& translate(Vec2F const& position);
 
-  [[nodiscard]] std::expected<bool, StarException> intersectsWithPoly(WorldGeometry const& worldGeometry, PolyF const& poly) const;
-  Vec2F knockbackMomentum(WorldGeometry const& worldGeometry, Vec2F const& targetCenter) const;
+  [[nodiscard]] std::expected<bool, StarException> intersects_with_poly(WorldGeometry const& geometry, PolyF const& poly) const;
+  Vec2F knockback_momentum(WorldGeometry const& geometry, Vec2F const& target_center) const;
 
-  bool operator==(DamageSource const& rhs) const;
+  bool operator==(DamageSource const&) const = default;
 
-  DamageType damageType;
-  DamageArea damageArea;
-  float damage;
+  DamageType damage_type = DamageType::NoDamage;
+  DamageArea damage_area;
+  float damage = 0;
 
-  bool trackSourceEntity;
+  bool track_source_entity = true;
   // The originating entity for the damage, which can be different than the
   // actual causing entity.  Optional, defaults to null_entity_id.
-  EntityId sourceEntityId;
+  EntityId source_entity_id = null_entity_id;
   EntityDamageTeam team;
 
   // Applying damage will block other DamageSources with the same
-  // damageRepeatGroup from applying damage until the timeout expires, to
+  // damage_repeat_group from applying damage until the timeout expires, to
   // prevent damages being applied every tick.  This is optional, and if it is
   // omitted then the repeat group will instead be based on the causing entity
   // id.
-  std::optional<String> damageRepeatGroup;
+  std::optional<String> damage_repeat_group;
   // Can override the default repeat damage timeout with a custom timeout.
-  std::optional<float> damageRepeatTimeout;
+  std::optional<float> damage_repeat_timeout;
 
-  String damageSourceKind;
-  List<EphemeralStatusEffect> statusEffects;
+  String damage_source_kind;
+  List<EphemeralStatusEffect> status_effects;
   // Either directionless knockback momentum or directional knockback momentum
   Knockback knockback;
   // Should a collision check from the source entity to the impact center be
-  // peformed before applying the damage?
-  bool rayCheck;
+  // performed before applying the damage?
+  bool ray_check = false;
 };
 
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DamageSource const& damageSource);
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DamageSource& damageSource);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DamageSource const& source);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DamageSource& source);
 
 struct DamageRequest {
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DamageRequest const& damageRequest);
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DamageRequest& damageRequest);
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DamageRequest const& request);
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DamageRequest& request);
 
-  DamageRequest();
   [[nodiscard]] static std::expected<DamageRequest, StarException> create(Json const& v);
-  DamageRequest(HitType hitType,
-      DamageType type,
-      float damage,
-      Vec2F const& knockbackMomentum,
-      EntityId sourceEntityId,
-      String const& damageSourceKind,
-      List<EphemeralStatusEffect> const& statusEffects);
 
-  [[nodiscard]] std::expected<Json, StarException> toJson() const;
+  [[nodiscard]] std::expected<Json, StarException> to_json() const;
+  bool operator==(DamageRequest const&) const = default;
 
-  HitType hitType;
-  DamageType damageType;
-  float damage;
-  Vec2F knockbackMomentum;
+  HitType hit_type = HitType::Hit;
+  DamageType damage_type = DamageType::Damage;
+  float damage = 0;
+  Vec2F knockback_momentum;
   // May be different than the entity that actually caused damage, for example,
   // a player firing a projectile.
-  EntityId sourceEntityId;
-  String damageSourceKind;
-  List<EphemeralStatusEffect> statusEffects;
+  EntityId source_entity_id = null_entity_id;
+  String damage_source_kind;
+  List<EphemeralStatusEffect> status_effects;
 };
 
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DamageRequest const& damageRequest);
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DamageRequest& damageRequest);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DamageRequest const& request);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DamageRequest& request);
 
 struct DamageNotification {
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DamageNotification const& damageNotification);
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DamageNotification& damageNotification);
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DamageNotification const& notification);
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DamageNotification& notification);
 
-  DamageNotification();
   [[nodiscard]] static std::expected<DamageNotification, StarException> create(Json const& v);
-  DamageNotification(EntityId sourceEntityId,
-      EntityId targetEntityId,
-      Vec2F position,
-      float damageDealt,
-      float healthLost,
-      HitType hitType,
-      String damageSourceKind,
-      String targetMaterialKind);
 
-  [[nodiscard]] std::expected<Json, StarException> toJson() const;
+  [[nodiscard]] std::expected<Json, StarException> to_json() const;
+  bool operator==(DamageNotification const&) const = default;
 
-  EntityId sourceEntityId;
-  EntityId targetEntityId;
+  EntityId source_entity_id = null_entity_id;
+  EntityId target_entity_id = null_entity_id;
   Vec2F position;
-  float damageDealt;
-  float healthLost;
-  HitType hitType;
-  String damageSourceKind;
-  String targetMaterialKind;
+  float damage_dealt = 0;
+  float health_lost = 0;
+  HitType hit_type = HitType::Hit;
+  String damage_source_kind;
+  String target_material_kind;
 };
 
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DamageNotification const& damageNotification);
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DamageNotification& damageNotification);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DamageNotification const& notification);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DamageNotification& notification);
 }
 
 export module star.damage;

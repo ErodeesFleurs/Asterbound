@@ -573,7 +573,7 @@ std::expected<void, StarException> UniverseServer::setPvp(ConnectionId clientId,
     if (pvp) {
       TeamNumber pvpTeam = m_teamManager->getPvpTeam(client_context->player_uuid());
       if (pvpTeam == 0)
-        pvpTeam = soloPvpTeam(clientId);
+        pvpTeam = solo_pvp_team(clientId);
       client_context->set_team(EntityDamageTeam(TeamType::PVP, pvpTeam));
     } else
       client_context->set_team(EntityDamageTeam(TeamType::Friendly));
@@ -1360,7 +1360,7 @@ std::expected<void, StarException> UniverseServer::updateTeams() {
     connectedPlayers[p.second->player_name()].push_back(p.second->player_uuid());
 
     if (p.second->team().type == TeamType::PVP)
-      p.second->set_team(EntityDamageTeam(TeamType::PVP, teams.value(p.second->player_uuid(), soloPvpTeam(p.second->client_id()))));
+      p.second->set_team(EntityDamageTeam(TeamType::PVP, teams.value(p.second->player_uuid(), solo_pvp_team(p.second->client_id()))));
     else
       p.second->set_team(EntityDamageTeam(TeamType::Friendly));
 

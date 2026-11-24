@@ -196,10 +196,15 @@ namespace WorldImpl {
   }
 
   [[nodiscard]]
-  inline std::expected<TileDamageParameters, StarException> tileDamageParameters(Root& root, WorldTile& tile, TileLayer layer, TileDamage const& tileDamage);
-  template <typename TileSectorArray>
+  inline std::expected<TileDamageParameters, StarException> tile_damage_parameters(Root& root, WorldTile const& tile, TileLayer layer, TileDamage const& tile_damage);
+  template <typename Tiles>
+  concept damage_tile_source = std::derived_from<typename Tiles::Tile, WorldTile>
+      && requires(Tiles& tiles, Vec2I const& pos) {
+        { tiles.modify_tile(pos) } -> std::same_as<std::optional<std::reference_wrapper<typename Tiles::Tile>>>;
+      };
+  template <damage_tile_source TileSectorArray>
   [[nodiscard]]
-  std::expected<bool, StarException> damageWouldDestroy(Root& root, std::shared_ptr<TileSectorArray> const& tileSectorArray, Vec2I pos, TileLayer layer, TileDamage const& tileDamage);
+  std::expected<bool, StarException> damage_would_destroy(Root& root, TileSectorArray& tile_sector_array, Vec2I pos, TileLayer layer, TileDamage const& tile_damage);
   
   template <typename GetTileFunction>
   [[nodiscard]]
@@ -410,42 +415,38 @@ namespace WorldImpl {
     return candidates;
   }
 
-  inline std::expected<TileDamageParameters, StarException> tileDamageParameters(Root& root, WorldTile& tile, TileLayer layer, TileDamage const& tileDamage) {
+  inline std::expected<TileDamageParameters, StarException> tile_damage_parameters(Root& root, WorldTile const& tile, TileLayer layer, TileDamage const& tile_damage) {
     bool foreground = layer == TileLayer::Foreground;
-    auto materialDatabase = root.materialDatabase();
-    if (!materialDatabase)
-      return std::unexpected(std::move(materialDatabase.error()));
+    auto material_database = root.materialDatabase();
+    if (!material_database)
+      return std::unexpected(std::move(material_database.error()));
     auto target = foreground ? tile.foreground : tile.background;
     auto mod = foreground ? tile.foregroundMod : tile.backgroundMod;
-    if (!isRealMod(mod) || tileDamageIsPenetrating(tileDamage.type))
-      return (*materialDatabase)->materialDamageParameters(target);
-    auto breaksWithTile = (*materialDatabase)->modBreaksWithTile(mod);
-    if (!breaksWithTile)
-      return std::unexpected(std::move(breaksWithTile.error()));
-    auto modDamage = (*materialDatabase)->modDamageParameters(mod);
-    if (!modDamage)
-      return std::unexpected(std::move(modDamage.error()));
-    if (!*breaksWithTile)
-      return std::move(*modDamage);
-    auto materialDamage = (*materialDatabase)->materialDamageParameters(target);
-    if (!materialDamage)
-      return std::unexpected(std::move(materialDamage.error()));
-    return modDamage->sum(*materialDamage);
+    if (!isRealMod(mod) || tile_damage_is_penetrating(tile_damage.type))
+      return (*material_database)->materialDamageParameters(target);
+    auto breaks_with_tile = (*material_database)->modBreaksWithTile(mod);
+    if (!breaks_with_tile)
+      return std::unexpected(std::move(breaks_with_tile.error()));
+    auto mod_damage = (*material_database)->modDamageParameters(mod);
+    if (!mod_damage)
+      return std::unexpected(std::move(mod_damage.error()));
+    if (!*breaks_with_tile)
+      return std::move(*mod_damage);
+    auto material_damage = (*material_database)->materialDamageParameters(target);
+    if (!material_damage)
+      return std::unexpected(std::move(material_damage.error()));
+    return std::move(*mod_damage).sum(*material_damage);
   }
 
-  template <typename TileSectorArray>
+  template <damage_tile_source TileSectorArray>
   [[nodiscard]]
-  std::expected<bool, StarException> damageWouldDestroy(Root& root, std::shared_ptr<TileSectorArray> const& tileSectorArray, Vec2I pos, TileLayer layer, TileDamage const& tileDamage) {
-    if (auto tile = tileSectorArray->modify_tile(pos)) {
-      auto damageParameters = tileDamageParameters(root, tile->get(), layer, tileDamage);
-      if (!damageParameters)
-        return std::unexpected(std::move(damageParameters.error()));
-      auto damageDone = damageParameters->damageDone(tileDamage);
-      if (!damageDone)
-        return std::unexpected(std::move(damageDone.error()));
-      float percentageDelta = *damageDone / damageParameters->totalHealth();
-      auto damage = layer == TileLayer::Foreground ? tile->get().foregroundDamage : tile->get().backgroundDamage;
-      return percentageDelta + damage.damagePercentage() >= 1.0f;
+  std::expected<bool, StarException> damage_would_destroy(Root& root, TileSectorArray& tile_sector_array, Vec2I pos, TileLayer layer, TileDamage const& tile_damage) {
+    if (auto tile = tile_sector_array.modify_tile(pos)) {
+      auto damage_parameters = tile_damage_parameters(root, tile->get(), layer, tile_damage);
+      if (!damage_parameters)
+        return std::unexpected(std::move(damage_parameters.error()));
+      auto const& damage = layer == TileLayer::Foreground ? tile->get().foregroundDamage : tile->get().backgroundDamage;
+      return damage_parameters->damage_fraction(tile_damage) + damage.damage_percentage() >= 1.0f;
     }
 
     return false;
@@ -907,8 +908,8 @@ export namespace Star::WorldImpl {
   using ::Star::WorldImpl::line_tile_collision;
   using ::Star::WorldImpl::line_tile_collision_point;
   using ::Star::WorldImpl::colliding_tiles_along_line;
-  using ::Star::WorldImpl::tileDamageParameters;
-  using ::Star::WorldImpl::damageWouldDestroy;
+  using ::Star::WorldImpl::tile_damage_parameters;
+  using ::Star::WorldImpl::damage_would_destroy;
   using ::Star::WorldImpl::canPlaceMaterial;
   using ::Star::WorldImpl::perhapsCanPlaceMaterial;
   using ::Star::WorldImpl::canPlaceMaterialColorVariant;

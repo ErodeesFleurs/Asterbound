@@ -1033,7 +1033,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       if (!owner)
         return std::unexpected(WorldServerException("Hit request has no owning connection"));
       if (*owner == server_connection_id) {
-        auto result86 = m_damageManager->pushRemoteHitRequest(hit->remoteHitRequest);
+        auto result86 = m_damageManager->push_remote_hit_request(hit->remoteHitRequest);
         if (!result86)
           return std::unexpected(std::move(result86.error()));
       } else {
@@ -1047,7 +1047,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       if (!owner)
         return std::unexpected(WorldServerException("Damage request has no owning connection"));
       if (*owner == server_connection_id) {
-        auto result87 = m_damageManager->pushRemoteDamageRequest(damage->remoteDamageRequest);
+        auto result87 = m_damageManager->push_remote_damage_request(damage->remoteDamageRequest);
         if (!result87)
           return std::unexpected(std::move(result87.error()));
       } else {
@@ -1058,7 +1058,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           std::make_shared<DamageRequestPacket>(damage->remoteDamageRequest));
       }
     } else if (auto damage = as<DamageNotificationPacket>(packet)) {
-      auto result88 = m_damageManager->pushRemoteDamageNotification(damage->remoteDamageNotification);
+      auto result88 = m_damageManager->push_remote_damage_notification(damage->remoteDamageNotification);
       if (!result88)
         return std::unexpected(std::move(result88.error()));
       for (auto const& pair : m_clientInfo) {
@@ -1596,7 +1596,7 @@ float WorldServer::expiryTime() {
   return m_expiryTimer.timer;
 }
 
-List<EntityId> WorldServer::entityIds() const {
+List<EntityId> WorldServer::entity_ids() const {
   return m_entityMap->entityIds();
 }
 
@@ -2129,15 +2129,15 @@ std::expected<bool, StarException> WorldServer::replaceTile(Vec2I const& pos, Ti
       return false;
 
     if (auto tile = m_tileArray->modify_tile(pos)) {
-      auto result225 = WorldImpl::tileDamageParameters(this->root(), tile->get(), placeMaterial.layer, tileDamage);
+      auto result225 = WorldImpl::tile_damage_parameters(this->root(), tile->get(), placeMaterial.layer, tileDamage);
       if (!result225)
         return std::unexpected(std::move(result225.error()));
       auto damageParameters = std::move(*result225);
-      bool harvested = tileDamage.amount >= 0 && tileDamage.harvestLevel >= damageParameters.requiredHarvestLevel();
+      bool harvested = tileDamage.amount >= 0 && tileDamage.harvest_level >= damageParameters.required_harvest_level();
       auto damage = placeMaterial.layer == TileLayer::Foreground ? tile->get().foregroundDamage : tile->get().backgroundDamage;
       Vec2F dropPosition = center_of_tile(pos);
 
-      auto result226 = destroyBlock(placeMaterial.layer, pos, harvested, !tileDamageIsPenetrating(damage.damageType()), false);
+      auto result226 = destroyBlock(placeMaterial.layer, pos, harvested, !tile_damage_is_penetrating(damage.damage_type()), false);
       if (!result226)
         return std::unexpected(std::move(result226.error()));
       for (auto const& drop : std::move(*result226)) {
@@ -2231,7 +2231,7 @@ std::expected<TileModificationList, StarException> WorldServer::replaceTiles(Til
 }
 
 std::expected<bool, StarException> WorldServer::damageWouldDestroy(Vec2I const& pos, TileLayer layer, TileDamage const& tileDamage) const {
-  auto result235 = WorldImpl::damageWouldDestroy(this->root(), m_tileArray, pos, layer, tileDamage);
+  auto result235 = WorldImpl::damage_would_destroy(this->root(), *m_tileArray, pos, layer, tileDamage);
   if (!result235)
     return std::unexpected(std::move(result235.error()));
   return std::move(*result235);
@@ -2321,17 +2321,15 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
 
       // Penetrating damage should carry through to the blocks behind this
       // entity.
-      if (tileRes == TileDamageResult::None || tileDamageIsPenetrating(tileDamage.type)) {
-        auto result244 = WorldImpl::tileDamageParameters(this->root(), tile->get(), layer, tileDamage);
+      if (tileRes == TileDamageResult::None || tile_damage_is_penetrating(tileDamage.type)) {
+        auto result244 = WorldImpl::tile_damage_parameters(this->root(), tile->get(), layer, tileDamage);
         if (!result244)
           return std::unexpected(std::move(result244.error()));
         auto damageParameters = std::move(*result244);
 
         if (layer == TileLayer::Foreground && isRealMaterial(tile->get().foreground)) {
           if (!tile->get().rootSource || damagedEntities.empty()) {
-            auto result245 = tile->get().foregroundDamage.damage(damageParameters, sourcePosition, tileDamage);
-            if (!result245)
-              return std::unexpected(std::move(result245.error()));
+            tile->get().foregroundDamage.damage(damageParameters, sourcePosition, tileDamage);
 
             // if the tile is broken, send a message back to the source entity with position, layer, dungeonId, and whether the tile was harvested
             if (sourceEntity.has_value() && tile->get().foregroundDamage.dead()) {
@@ -2361,9 +2359,7 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
             }
           }
         } else if (layer == TileLayer::Background && isRealMaterial(tile->get().background)) {
-          auto result249 = tile->get().backgroundDamage.damage(damageParameters, sourcePosition, tileDamage);
-          if (!result249)
-            return std::unexpected(std::move(result249.error()));
+          tile->get().backgroundDamage.damage(damageParameters, sourcePosition, tileDamage);
 
           // if the tile is broken, send a message back to the source entity with position and whether the tile was harvested
           if (sourceEntity.has_value() && tile->get().backgroundDamage.dead()) {
@@ -3842,29 +3838,29 @@ std::expected<void, StarException> WorldServer::updateDamage(float dt) {
     return std::unexpected(std::move(result411.error()));
 
   // Do nothing with damage notifications at the moment.
-  m_damageManager->pullPendingNotifications();
+  m_damageManager->pull_pending_notifications();
 
-  for (auto const& remoteHitRequest : m_damageManager->pullRemoteHitRequests()) {
+  for (auto& remoteHitRequest : m_damageManager->pull_remote_hit_requests()) {
     auto owner = remoteHitRequest.destination_connection();
     if (!owner)
       return std::unexpected(WorldServerException("Hit request has no owning connection"));
     auto destination = m_clientInfo.get(*owner);
     if (!destination)
       return std::unexpected(std::move(destination.error()));
-    destination->get()->outgoingPackets.push_back(std::make_shared<HitRequestPacket>(remoteHitRequest));
+    destination->get()->outgoingPackets.push_back(std::make_shared<HitRequestPacket>(std::move(remoteHitRequest)));
   }
 
-  for (auto const& remoteDamageRequest : m_damageManager->pullRemoteDamageRequests()) {
+  for (auto& remoteDamageRequest : m_damageManager->pull_remote_damage_requests()) {
     auto owner = remoteDamageRequest.destination_connection();
     if (!owner)
       return std::unexpected(WorldServerException("Damage request has no owning connection"));
     auto destination = m_clientInfo.get(*owner);
     if (!destination)
       return std::unexpected(std::move(destination.error()));
-    destination->get()->outgoingPackets.push_back(std::make_shared<DamageRequestPacket>(remoteDamageRequest));
+    destination->get()->outgoingPackets.push_back(std::make_shared<DamageRequestPacket>(std::move(remoteDamageRequest)));
   }
 
-  for (auto const& remoteDamageNotification : m_damageManager->pullRemoteDamageNotifications()) {
+  for (auto const& remoteDamageNotification : m_damageManager->pull_remote_damage_notifications()) {
     for (auto const& pair : m_clientInfo) {
       if (pair.second->needsDamageNotification(remoteDamageNotification))
         pair.second->outgoingPackets.push_back(std::make_shared<DamageNotificationPacket>(remoteDamageNotification));
@@ -3913,7 +3909,7 @@ std::expected<void, StarException> WorldServer::updateDamagedBlocks(float dt) {
     Vec2F dropPosition = center_of_tile(pos);
     if (tile->get().foregroundDamage.dead()) {
       bool harvested = tile->get().foregroundDamage.harvested();
-      auto result417 = destroyBlock(TileLayer::Foreground, pos, harvested, !tileDamageIsPenetrating(tile->get().foregroundDamage.damageType()), true);
+      auto result417 = destroyBlock(TileLayer::Foreground, pos, harvested, !tile_damage_is_penetrating(tile->get().foregroundDamage.damage_type()), true);
       if (!result417)
         return std::unexpected(std::move(result417.error()));
       for (auto const& drop : std::move(*result417)) {
@@ -3927,7 +3923,7 @@ std::expected<void, StarException> WorldServer::updateDamagedBlocks(float dt) {
     } else if (tile->get().foregroundDamage.damaged()) {
       if (isRealMaterial(tile->get().foreground)) {
         if (isRealMod(tile->get().foregroundMod)) {
-          if (tileDamageIsPenetrating(tile->get().foregroundDamage.damageType())) {
+          if (tile_damage_is_penetrating(tile->get().foregroundDamage.damage_type())) {
             auto result420 = materialDatabase->materialDamageParameters(tile->get().foreground);
             if (!result420)
               return std::unexpected(std::move(result420.error()));
@@ -3943,7 +3939,10 @@ std::expected<void, StarException> WorldServer::updateDamagedBlocks(float dt) {
               auto result423 = materialDatabase->materialDamageParameters(tile->get().foreground);
               if (!result423)
                 return std::unexpected(std::move(result423.error()));
-              tile->get().foregroundDamage.recover(std::move(*result422).sum(std::move(*result423)), dt);
+              auto combined = std::move(*result422).sum(*result423);
+              if (!combined)
+                return std::unexpected(std::move(combined.error()));
+              tile->get().foregroundDamage.recover(*combined, dt);
             } else {
               auto result424 = materialDatabase->modDamageParameters(tile->get().foregroundMod);
               if (!result424)
@@ -3968,7 +3967,7 @@ std::expected<void, StarException> WorldServer::updateDamagedBlocks(float dt) {
 
     if (tile->get().backgroundDamage.dead()) {
       bool harvested = tile->get().backgroundDamage.harvested();
-      auto result427 = destroyBlock(TileLayer::Background, pos, harvested, !tileDamageIsPenetrating(tile->get().backgroundDamage.damageType()), true);
+      auto result427 = destroyBlock(TileLayer::Background, pos, harvested, !tile_damage_is_penetrating(tile->get().backgroundDamage.damage_type()), true);
       if (!result427)
         return std::unexpected(std::move(result427.error()));
       for (auto const& drop : std::move(*result427)) {
@@ -3982,7 +3981,7 @@ std::expected<void, StarException> WorldServer::updateDamagedBlocks(float dt) {
     } else if (tile->get().backgroundDamage.damaged()) {
       if (isRealMaterial(tile->get().background)) {
         if (isRealMod(tile->get().backgroundMod)) {
-          if (tileDamageIsPenetrating(tile->get().backgroundDamage.damageType())) {
+          if (tile_damage_is_penetrating(tile->get().backgroundDamage.damage_type())) {
             auto result430 = materialDatabase->materialDamageParameters(tile->get().background);
             if (!result430)
               return std::unexpected(std::move(result430.error()));
@@ -3998,7 +3997,10 @@ std::expected<void, StarException> WorldServer::updateDamagedBlocks(float dt) {
               auto result433 = materialDatabase->materialDamageParameters(tile->get().background);
               if (!result433)
                 return std::unexpected(std::move(result433.error()));
-              tile->get().backgroundDamage.recover(std::move(*result432).sum(std::move(*result433)), dt);
+              auto combined = std::move(*result432).sum(*result433);
+              if (!combined)
+                return std::unexpected(std::move(combined.error()));
+              tile->get().backgroundDamage.recover(*combined, dt);
             } else {
               auto result434 = materialDatabase->modDamageParameters(tile->get().backgroundMod);
               if (!result434)
@@ -4681,13 +4683,13 @@ std::expected<List<RectI>, StarException> WorldServer::ClientInfo::monitoringReg
 }
 
 bool WorldServer::ClientInfo::needsDamageNotification(RemoteDamageNotification const& rdn) const {
-  if (clientId == connection_for_entity(rdn.sourceEntityId) || clientId == connection_for_entity(rdn.damageNotification.targetEntityId))
+  if (clientId == connection_for_entity(rdn.source_entity_id) || clientId == connection_for_entity(rdn.damage_notification.target_entity_id))
     return true;
 
-  if (clientSlavesNetVersion.contains(rdn.damageNotification.targetEntityId))
+  if (clientSlavesNetVersion.contains(rdn.damage_notification.target_entity_id))
     return true;
 
-  if (clientState->window().contains(Vec2I::floor(rdn.damageNotification.position)))
+  if (clientState->window().contains(Vec2I::floor(rdn.damage_notification.position)))
     return true;
 
   return false;

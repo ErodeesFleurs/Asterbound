@@ -98,6 +98,8 @@ public:
   virtual bool isTileProtected(Vec2I const& pos) const = 0;
 
   virtual std::shared_ptr<Entity> entity(EntityId entityId) const = 0;
+  // Snapshot in iteration order for callbacks that may remove entities.
+  virtual List<EntityId> entity_ids() const = 0;
   // *If* the entity is initialized immediately and locally, then will use the
   // passed in pointer directly and initialize it, and entity will have a valid
   // id in this world and be ready for use.  This is always the case on the

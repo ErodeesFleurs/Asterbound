@@ -1329,7 +1329,7 @@ namespace LuaBindings {
       view.set("id", entity.entityId());
       view.set("type", type->get());
       view.set("position", json_from_vec2f(entity.position()));
-      auto team = entity.getTeam().toJson();
+      auto team = entity.getTeam().to_json();
       if (!team) return std::unexpected(std::move(team.error()));
       view.set("team", std::move(*team));
       if (details) {
@@ -2079,7 +2079,7 @@ namespace LuaBindings {
             auto layerPointer = std::move(*layerPointerResult);
             auto layer = layerPointer;
             List<Vec2I> tiles;
-            for (auto const& tile : tileAreaBrush(radius, center, false)) {
+            for (auto const& tile : tile_area_brush(radius, center, false)) {
               if (world.material(tile, layer) != EmptyMaterialId)
                 tiles.push_back(tile);
             }
@@ -3198,7 +3198,7 @@ namespace LuaBindings {
     auto source = world.entity(sourceId);
     auto target = world.entity(targetId);
 
-    if (!source || !target || !source->getTeam().canDamage(target->getTeam(), false))
+    if (!source || !target || !source->getTeam().can_damage(target->getTeam(), false))
       return false;
 
     return true;
@@ -3206,7 +3206,7 @@ namespace LuaBindings {
 
   std::expected<Json, StarException> WorldEntityCallbacks::entityDamageTeam(World& world, EntityId entityId) {
     if (auto entity = world.entity(entityId))
-      return entity->getTeam().toJson();
+      return entity->getTeam().to_json();
     return {};
   }
 
@@ -4090,9 +4090,9 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
     if (arg6)
       harvestLevel = *arg6;
 
-    if (!TileDamageTypeNames)
-      return std::unexpected(TileDamageTypeNames.error());
-    auto damageTypePointerResult = TileDamageTypeNames->get_left(arg4);
+    if (!tile_damage_type_names)
+      return std::unexpected(tile_damage_type_names.error());
+    auto damageTypePointerResult = tile_damage_type_names->get_left(arg4);
     if (!damageTypePointerResult)
       return std::unexpected(std::move(damageTypePointerResult.error()));
     auto damageTypePointer = std::move(*damageTypePointerResult);
@@ -4114,7 +4114,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
       float damage,
       std::optional<unsigned> const& harvestLevel,
       std::optional<EntityId> sourceEntity) {
-    auto tiles = tileAreaBrush(radius, center, false);
+    auto tiles = tile_area_brush(radius, center, false);
     return damageTiles(world, tiles, layer, sourcePosition, damageType, damage, harvestLevel, sourceEntity);
   }
 
@@ -4228,7 +4228,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
     TileDamage damage;
     if (enableDrops) {
       damage.amount = 1.0f;
-      damage.harvestLevel = 999;
+      damage.harvest_level = 999;
     } else {
       damage.amount = -1.0f;
     }
@@ -4247,7 +4247,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
       String const& materialName,
       std::optional<int> const& hueShift,
       bool enableDrops) {
-    auto tiles = tileAreaBrush(radius, center, false);
+    auto tiles = tile_area_brush(radius, center, false);
     return replaceMaterials(world, tiles, layer, materialName, hueShift, enableDrops);
   }
 

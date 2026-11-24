@@ -313,7 +313,7 @@ public:
 
   std::shared_ptr<WorldServer::ScriptComponent> scriptContext(String const& contextName);
 
-  List<EntityId> entityIds() const;
+  List<EntityId> entity_ids() const override;
 
   // Queues a microdungeon for placement
   [[nodiscard]] std::expected<RpcPromise<Vec2I>, StarException> enqueuePlacement(List<BiomeItemDistribution> distributions, std::optional<DungeonId> id);

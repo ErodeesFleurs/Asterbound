@@ -773,7 +773,7 @@ if (!result570) return std::unexpected(std::move(result570.error()));
 }
 
 std::expected<Json, StarException> Plant::diskStore() const {
-  auto result651 = m_tileDamageParameters.toJson();
+  auto result651 = m_tileDamageParameters.to_json();
 if (!result651) return std::unexpected(std::move(result651.error()));
 auto result652 = writePiecesToJson();
 if (!result652) return std::unexpected(std::move(result652.error()));
@@ -1275,8 +1275,8 @@ m_windLevel = std::move(*result622);
     if (m_tileDamageStatus->damaged())
       m_tileDamageStatus->recover(m_tileDamageParameters, dt);
   } else {
-    if (m_tileDamageStatus->damaged() && !m_tileDamageStatus->damageProtected()) {
-      float damageEffectPercentage = m_tileDamageStatus->damageEffectPercentage();
+    if (m_tileDamageStatus->damaged() && !m_tileDamageStatus->damage_protected()) {
+      float damageEffectPercentage = m_tileDamageStatus->damage_effect_percentage();
       m_windTime += damageEffectPercentage * 10 * dt;
       m_windLevel += damageEffectPercentage * 20;
     }
@@ -1291,7 +1291,7 @@ std::expected<void, StarException> Plant::collectRenderEvents(RenderCallback& re
   auto damageOffset = this->root().random().uniform_float(-0.1f, 0.1f);
   if (!damageOffset)
     return std::unexpected(std::move(damageOffset.error()));
-  m_presentationDamageXOffset = *damageOffset * m_tileDamageStatus->damageEffectPercentage();
+  m_presentationDamageXOffset = *damageOffset * m_tileDamageStatus->damage_effect_percentage();
   if (m_tileDamageEvent) {
     m_tileDamageEvent = false;
     if (m_stemDropConfig.type() == Json::Type::Object) {
@@ -1621,8 +1621,7 @@ auto position = std::move(*result584);
 if (!result585) return std::unexpected(std::move(result585.error()));
 auto geometry = result585->get().geometry();
 
-  auto result586 = m_tileDamageStatus->damage(m_tileDamageParameters, tileDamage);
-if (!result586) return std::unexpected(std::move(result586.error()));
+  m_tileDamageStatus->damage(m_tileDamageParameters, tileDamage);
   m_tileDamageX = geometry.diff(position[0], tilePosition()[0]);
   m_tileDamageY = position[1] - tilePosition()[1];
   m_tileDamageEvent = true;

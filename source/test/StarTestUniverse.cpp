@@ -520,7 +520,7 @@ TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
           auto& observation = observedWorldScripts.try_emplace(name.utf8(), Observation{step}).first->second;
           settled(observation, context->update_dt());
         }
-        for (auto id : world.entityIds()) {
+        for (auto id : world.entity_ids()) {
           auto entity = world.entity(id);
           if (!entity || (entity->entityType() != EntityType::Npc && entity->entityType() != EntityType::Stagehand))
             continue;

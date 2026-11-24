@@ -1371,8 +1371,8 @@ if (!result832) return std::unexpected(std::move(result832.error()));
 float explosiveDamageAmount = std::move(*result832);
     auto result833 = parameters.get_string("tileDamageType", "explosive");
 if (!result833) return std::unexpected(std::move(result833.error()));
-if (!TileDamageTypeNames) return std::unexpected(TileDamageTypeNames.error());
-auto result834 = TileDamageTypeNames->get_left(std::move(*result833));
+if (!tile_damage_type_names) return std::unexpected(tile_damage_type_names.error());
+auto result834 = tile_damage_type_names->get_left(std::move(*result833));
 if (!result834) return std::unexpected(std::move(result834.error()));
 auto damageType = result834->get();
     auto result835 = parameters.get_uint("harvestLevel", 0);
@@ -1385,13 +1385,13 @@ if (!result836) return std::unexpected(std::move(result836.error()));
 auto result837 = doWithDelay(std::move(*result836),
         [foregroundRadius, backgroundRadius, explosionPosition, damageType,
             explosiveDamageAmount, harvestLevel, sourceEntityId = sourceEntity()](World& world)  -> std::expected<void, StarException> {
-        auto result654 = world.damageTiles(tileAreaBrush(foregroundRadius, explosionPosition, false),
+        auto result654 = world.damageTiles(tile_area_brush(foregroundRadius, explosionPosition, false),
             TileLayer::Foreground,
             explosionPosition,
             {damageType, explosiveDamageAmount, harvestLevel},
             sourceEntityId);
 if (!result654) return std::unexpected(std::move(result654.error()));
-        auto result655 = world.damageTiles(tileAreaBrush(backgroundRadius, explosionPosition, false),
+        auto result655 = world.damageTiles(tile_area_brush(backgroundRadius, explosionPosition, false),
             TileLayer::Background,
             explosionPosition,
             {damageType, explosiveDamageAmount, harvestLevel},

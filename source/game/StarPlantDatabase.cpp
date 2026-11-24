@@ -102,7 +102,7 @@ value.tileDamageParameters = std::move(*result161);
 }
 
 std::expected<Json, StarException> TreeVariant::toJson() const {
-  auto result186 = tileDamageParameters.toJson();
+  auto result186 = tileDamageParameters.to_json();
 if (!result186) return std::unexpected(std::move(result186.error()));
 return JsonObject{
       {"stemName", stemName},
@@ -158,7 +158,7 @@ value.tileDamageParameters = std::move(*result171);
 }
 
 std::expected<Json, StarException> GrassVariant::toJson() const {
-  auto result187 = tileDamageParameters.toJson();
+  auto result187 = tileDamageParameters.to_json();
 if (!result187) return std::unexpected(std::move(result187.error()));
 return JsonObject{{"name", name},
       {"directory", directory},
@@ -218,7 +218,7 @@ value.tileDamageParameters = std::move(*result185);
 }
 
 std::expected<Json, StarException> BushVariant::toJson() const {
-  auto result188 = tileDamageParameters.toJson();
+  auto result188 = tileDamageParameters.to_json();
 if (!result188) return std::unexpected(std::move(result188.error()));
 return JsonObject{{"bushName", bushName},
       {"modName", modName},

@@ -12,6 +12,12 @@ import star.sector_array_2d;
 
 import star.worker_pool;
 import star.tile_sector_array;
+import star.assets;
+import star.data_stream;
+import star.data_stream_devices;
+import star.json;
+import star.string;
+import star.tile_damage;
 import star.collision_block;
 import star.collision_generator;
 import star.poly;
@@ -27,6 +33,117 @@ import star.root;
 using namespace Star;
 
 namespace {
+
+const GameTestRegistration tile_damage_union("TileDamageTest", "WeightedUnionDistinguishesMissingAndZero", [](GameTest& fixture) {
+  auto assets = fixture.root().assets();
+  ASSERT_TRUE(assets);
+  auto left = TileDamageParameters::create(**assets, JsonObject{
+      {"totalHealth", 4}, {"damageRecovery", 1}, {"harvestLevel", 6}, {"maximumEffectTime", 1},
+      {"damageFactors", JsonObject{{"blockish", 2}, {"explosive", 1.5}, {"beamish", 3}, {"protected", 0}}}});
+  auto right = TileDamageParameters::create(**assets, JsonObject{
+      {"totalHealth", 12}, {"damageRecovery", 2}, {"harvestLevel", 3}, {"maximumEffectTime", 2},
+      {"damageFactors", JsonObject{{"blockish", 6}, {"fire", 3}, {"beamish", 0}}}});
+  ASSERT_TRUE(left);
+  ASSERT_TRUE(right);
+  Json const expected = JsonObject{
+      {"totalHealth", 16}, {"damageRecovery", 3}, {"requiredHarvestLevel", 6}, {"maximumEffectTime", 2},
+      {"damageFactors", JsonObject{{"blockish", 4}, {"explosive", 1.5}, {"beamish", 0}, {"protected", 0}, {"fire", 3}}}};
+  for (bool reverse : {false, true}) {
+    auto merged = reverse ? right->sum(*left) : left->sum(*right);
+    ASSERT_TRUE(merged);
+    auto json = merged->to_json();
+    ASSERT_TRUE(json);
+    EXPECT_EQ(*json, expected);
+    EXPECT_FLOAT_EQ(merged->damage_fraction({TileDamageType::Blockish, 1}), .25f);
+    EXPECT_FLOAT_EQ(merged->damage_fraction({TileDamageType::Plantish, 10}), 0);
+  }
+});
+
+const GameTestRegistration tile_damage_health("TileDamageTest", "ZeroHealthAndExplicitImmunity", [](GameTest& fixture) {
+  auto assets = fixture.root().assets();
+  ASSERT_TRUE(assets);
+  Json config = JsonObject{{"damageRecovery", 1}, {"damageFactors", JsonObject{{"fire", 2}, {"blockish", 0}, {"protected", 2}}}};
+  auto zero = TileDamageParameters::create(**assets, config, 0);
+  ASSERT_TRUE(zero);
+  TileDamageStatus tile;
+  auto entity = EntityTileDamageStatus::create();
+  ASSERT_TRUE(entity);
+  (*entity)->reset();
+  for (TileDamage damage : {TileDamage{TileDamageType::Blockish, 10}, {TileDamageType::Fire, 0}, {TileDamageType::Plantish, 10}}) {
+    tile.damage(*zero, {}, damage);
+    (*entity)->damage(*zero, damage);
+    EXPECT_EQ(tile.damage_percentage(), 0);
+    EXPECT_EQ((*entity)->damage_percentage(), 0);
+  }
+  TileDamage hit(TileDamageType::Protected, 1);
+  tile.damage(*zero, {}, hit);
+  (*entity)->damage(*zero, hit);
+  EXPECT_EQ(tile.damage_percentage(), 1);
+  EXPECT_EQ((*entity)->damage_percentage(), 1);
+  tile.recover(*zero, 0);
+  (*entity)->recover(*zero, 0);
+  EXPECT_EQ(tile.damage_percentage(), 1);
+  EXPECT_EQ((*entity)->damage_percentage(), 1);
+  tile.recover(*zero, 1);
+  (*entity)->recover(*zero, 1);
+  EXPECT_TRUE(tile.healthy());
+  EXPECT_TRUE((*entity)->healthy());
+  auto combined = zero->sum(*zero);
+  ASSERT_TRUE(combined);
+  hit.type = TileDamageType::Fire;
+  tile.damage(*combined, {}, hit);
+  (*entity)->damage(*combined, hit);
+  EXPECT_TRUE(tile.dead());
+  EXPECT_TRUE((*entity)->dead());
+
+  auto positive = TileDamageParameters::create(**assets, JsonObject{
+      {"damageRecovery", 0}, {"totalHealth", 4}, {"damageFactors", JsonObject{{"fire", 4}, {"blockish", 4}}}});
+  ASSERT_TRUE(positive);
+  for (bool reverse : {false, true}) {
+    auto mixed = reverse ? zero->sum(*positive) : positive->sum(*zero);
+    ASSERT_TRUE(mixed);
+    EXPECT_EQ(mixed->damage_fraction(hit), 1);
+    EXPECT_EQ(mixed->damage_fraction({TileDamageType::Blockish, 1}), 0);
+  }
+  EXPECT_FALSE(TileDamageParameters::create(**assets, config, -1));
+  auto maximum = TileDamageParameters::create(**assets, config, std::numeric_limits<float>::max());
+  ASSERT_TRUE(maximum);
+  EXPECT_FALSE(maximum->sum(*maximum));
+});
+
+const GameTestRegistration tile_damage_formats("TileDamageTest", "HarvestConfigPersistedJsonAndLegacyWire", [](GameTest& fixture) {
+  auto assets = fixture.root().assets();
+  ASSERT_TRUE(assets);
+  Json config = JsonObject{{"damageRecovery", 1}, {"totalHealth", 4}, {"damageFactors", JsonObject{{"fire", 2}}},
+                           {"harvestLevel", 7}, {"requiredHarvestLevel", 3}};
+  auto from_config = TileDamageParameters::create(**assets, config);
+  ASSERT_TRUE(from_config);
+  EXPECT_EQ(from_config->required_harvest_level(), 7u);
+  auto persisted = from_config->to_json();
+  ASSERT_TRUE(persisted);
+  EXPECT_EQ(*persisted, (JsonObject{{"damageRecovery", 1}, {"totalHealth", 4}, {"damageFactors", JsonObject{{"fire", 2}}},
+                                    {"requiredHarvestLevel", 7}, {"maximumEffectTime", 1.5}}));
+  auto restored = TileDamageParameters::create(**assets, *persisted);
+  ASSERT_TRUE(restored);
+  EXPECT_EQ(restored->required_harvest_level(), 7u);
+  auto overridden = TileDamageParameters::create(**assets, *persisted, {}, 0u);
+  ASSERT_TRUE(overridden);
+  EXPECT_EQ(overridden->required_harvest_level(), 0u);
+
+  // Map count, enum byte, factor, recovery, unsigned harvest level, effect time, total health.
+  constexpr std::array<char, 22> bytes{1, 5, 0x40, 0, 0, 0, 0x3f, '\x80', 0, 0, 0, 0, 0, 7,
+                                       0x3f, '\xc0', 0, 0, 0x40, '\x80', 0, 0};
+  DataStreamBuffer encoded;
+  ASSERT_TRUE(encoded.write(*restored));
+  EXPECT_TRUE(std::ranges::equal(encoded.span(), bytes));
+  DataStreamExternalBuffer stream(bytes);
+  TileDamageParameters decoded;
+  ASSERT_TRUE(stream.read(decoded));
+  EXPECT_EQ(stream.remaining(), 0u);
+  auto decoded_json = decoded.to_json();
+  ASSERT_TRUE(decoded_json);
+  EXPECT_EQ(*decoded_json, *persisted);
+});
 
 TEST(CollisionGenerator, RejectsUnrepresentableHaloBeforeReadingAnyTile) {
   constexpr int low = std::numeric_limits<int>::min();

@@ -177,7 +177,7 @@ std::expected<bool, StarException> LuaBindings::EntityCallbacks::isValidTarget(E
     return std::unexpected(std::move(world.error()));
   auto target = world->get().entity(entityId);
 
-  if (!target || !entity.getTeam().canDamage(target->getTeam(), false))
+  if (!target || !entity.getTeam().can_damage(target->getTeam(), false))
     return false;
 
   if (auto monster = as<Monster>(target))
