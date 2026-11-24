@@ -114,7 +114,10 @@ const GameTestRegistration empty_random("BiomePlacement", "EmptyRandomPoolDoesNo
   EXPECT_FALSE(*item);
   auto stored = distribution->to_json();
   ASSERT_TRUE(stored);
-  auto restored = BiomeItemDistribution::create(**assets, *stored);
+  // Old worlds can contain arbitrary octaves in the unused density function.
+  auto legacy = stored->set_path("densityFunction.octaves", -1);
+  ASSERT_TRUE(legacy);
+  auto restored = BiomeItemDistribution::create(**assets, *legacy);
   ASSERT_TRUE(restored);
   auto placement = restored->item_to_place(0, 0);
   ASSERT_TRUE(placement);

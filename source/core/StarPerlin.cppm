@@ -192,6 +192,13 @@ auto Perlin<Float>::make_parameters(PerlinType type, double const& octaves,
 
 template <finite_classifiable Float>
 auto Perlin<Float>::parse_parameters(Json const& config) -> std::expected<Parameters, StarException> {
+  auto type_name = config.get_string("type");
+  if (!type_name) return std::unexpected(std::move(type_name.error()));
+  auto type = enum_value<perlin_type_names>(StringView(*type_name));
+  if (!type) return std::unexpected(std::move(type.error()));
+  // Older world templates serialized indeterminate noise parameters for this placeholder.
+  if (*type == PerlinType::Uninitialized)
+    return Parameters{};
   auto octaves = config.get_double("octaves", 1);
   if (!octaves) return std::unexpected(std::move(octaves.error()));
   auto frequency = config.get_double("frequency", 1);
@@ -208,10 +215,6 @@ auto Perlin<Float>::parse_parameters(Json const& config) -> std::expected<Parame
   if (!offset) return std::unexpected(std::move(offset.error()));
   auto gain = config.get_double("gain", 2);
   if (!gain) return std::unexpected(std::move(gain.error()));
-  auto type_name = config.get_string("type");
-  if (!type_name) return std::unexpected(std::move(type_name.error()));
-  auto type = enum_value<perlin_type_names>(StringView(*type_name));
-  if (!type) return std::unexpected(std::move(type.error()));
   return make_parameters(*type, *octaves, *frequency, *amplitude, *bias, *alpha, *beta, *offset, *gain);
 }
 

@@ -142,6 +142,26 @@ TEST(PerlinTest, ParsedParametersAreReusableAndNormalizeOctaves) {
   expect_empty(*restored);
 }
 
+TEST(PerlinTest, LegacyStoredPlaceholdersIgnoreUnusedNoiseParameters) {
+  auto canonical = PerlinF{}.to_json();
+  ASSERT_TRUE(canonical);
+  constexpr double nan = std::numeric_limits<double>::quiet_NaN();
+  for (auto [octaves, frequency] : {std::pair{-1.0, 1.0}, std::pair{2.0, nan}}) {
+    JsonObject stored{{"type", "uninitialized"}, {"seed", 913}, {"octaves", octaves}, {"frequency", frequency}};
+    auto placeholder = PerlinF::create(stored);
+    ASSERT_TRUE(placeholder);
+    EXPECT_FALSE(placeholder->get(0, 0));
+    auto normalized = placeholder->to_json();
+    ASSERT_TRUE(normalized);
+    EXPECT_EQ(*normalized, *canonical);
+
+    stored["type"] = "perlin";
+    auto active = PerlinF::create(stored);
+    ASSERT_FALSE(active);
+    EXPECT_TRUE(active.error().is<PerlinException>());
+  }
+}
+
 TEST(PerlinTest, RejectsInvalidConfigurationBeforeNarrowing) {
   for (double octaves : {-0.25, -1.0, 0x1p31}) {
     EXPECT_FALSE(PerlinD::create(PerlinType::Perlin, octaves, 1, 1, 0, 2, 2, 1));

@@ -718,6 +718,12 @@ IEEE bit patterns exercise nonfinite coordinate and parameter checks under
 fast-math. Large finite coordinates must match their 512-cell periodic images;
 coordinates overflowing only after an octave step must return an error.
 
+When restoring a world template, a noise object tagged `uninitialized` is
+an unused placeholder: old writers could store invalid octaves or nonfinite
+parameters there. The reader restores the canonical empty object without
+changing validation for active noise. `BiomePlacement.EmptyRandomPoolDoesNotPlaceDefaultGrass`
+exercises this through a stored biome item distribution.
+
 For the asset-facing path run
 `game_tests --gtest_filter='TerrainDatabaseTest.UnknownNamesAndSeededNamedSelectorsPreserveSampling'`
 with the normal game-test assets. Named-versus-direct agreement alone does not
