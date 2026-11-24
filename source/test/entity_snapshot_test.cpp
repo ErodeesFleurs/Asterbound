@@ -120,7 +120,7 @@ const GameTestRegistration persistentSnapshot("EntitySnapshot", "VersionedPersis
   EXPECT_EQ(versioned->content, *original);
   auto factory = fixture.root().entityFactory();
   ASSERT_TRUE(factory) << factory.error().what();
-  auto restored = (*factory)->loadVersionedEntity(*versioned);
+  auto restored = (*factory)->load_versioned_entity(*versioned);
   ASSERT_TRUE(restored) << restored.error().what();
   auto restoredDrop = as<ItemDrop>(*restored);
   ASSERT_TRUE(restoredDrop);
@@ -230,10 +230,14 @@ const GameTestRegistration transientSnapshots("EntitySnapshot", "TransientStateR
   ASSERT_TRUE(plantDrop) << plantDrop.error().what();
   auto factory = fixture.root().entityFactory();
   ASSERT_TRUE(factory) << factory.error().what();
+  EXPECT_FALSE((*factory)->disk_store_entity({}));
+  EXPECT_FALSE((*factory)->net_store_entity({}));
   NetCompatibilityRules rules;
   for (std::shared_ptr<Entity> const& entity : {std::shared_ptr<Entity>(*projectile), std::shared_ptr<Entity>(*plantDrop)}) {
     SCOPED_TRACE(static_cast<unsigned>(entity->entityType()));
     ASSERT_TRUE(setup.world->addEntity(entity));
+    EXPECT_FALSE((*factory)->disk_store_entity(entity));
+    EXPECT_FALSE((*factory)->disk_load_entity(entity->entityType(), JsonObject{}));
     auto baseline = entity->write_net_state(0, rules);
     ASSERT_TRUE(baseline) << baseline.error().what();
     auto result = snapshot(setup, entity->entityId());

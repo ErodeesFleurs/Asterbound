@@ -545,13 +545,13 @@ std::expected<void, StarException> WorldClient::reviveMainPlayer() {
     auto revived = m_mainPlayer->revive(m_playerStart);
     if (!revived)
       return std::unexpected(std::move(revived.error()));
-    auto entityId = m_entityMap->reserveEntityId();
+    auto entityId = m_entityMap->reserve_entity_id();
     if (!entityId)
       return std::unexpected(std::move(entityId.error()));
     auto initialized = m_mainPlayer->init(*this, *entityId, EntityMode::Master);
     if (!initialized)
       return std::unexpected(std::move(initialized.error()));
-    auto added = m_entityMap->addEntity(m_mainPlayer);
+    auto added = m_entityMap->add_entity(m_mainPlayer);
     if (!added) {
       auto cleared = m_mainPlayer->uninit();
       if (!cleared)
@@ -645,7 +645,7 @@ std::expected<void, StarException> WorldClient::removeEntity(EntityId entityId, 
       std::make_shared<EntityDestroyPacket>(entity->entityId(), std::move(finalNetState), andDie));
   }
 
-  m_entityMap->removeEntity(entityId);
+  m_entityMap->remove_entity(entityId);
   m_entityPresentation.remove(entityId);
   m_hiddenEntityAudio.remove(entityId);
   return entity->uninit();
@@ -675,53 +675,53 @@ std::expected<std::shared_ptr<Entity>, StarException> WorldClient::closestEntity
     return {};
   }
   
-  return m_entityMap->closestEntity(center, radius, selector);
+  return m_entityMap->closest_entity(center, radius, selector);
 }
 
 std::expected<void, StarException> WorldClient::forAllEntities(EntityCallback callback) const {
-  return m_entityMap->forAllEntities(callback);
+  return m_entityMap->for_all_entities(callback);
 }
 
 std::expected<void, StarException> WorldClient::forEachEntity(RectF const& boundBox, EntityCallback callback) const {
   if (!inWorld()) {
     return {};
   }
-  return m_entityMap->forEachEntity(boundBox, callback);
+  return m_entityMap->for_each_entity(boundBox, callback);
 }
 
 std::expected<void, StarException> WorldClient::forEachEntityLine(Vec2F const& begin, Vec2F const& end, EntityCallback callback) const {
   if (!inWorld()) {
     return {};
   }
-  return m_entityMap->forEachEntityLine(begin, end, callback);
+  return m_entityMap->for_each_entity_line(begin, end, callback);
 }
 
 std::expected<void, StarException> WorldClient::forEachEntityAtTile(Vec2I const& pos, EntityCallbackOf<TileEntity> callback) const {
   if (!inWorld()) {
     return {};
   }
-  return m_entityMap->forEachEntityAtTile(pos, callback);
+  return m_entityMap->for_each_entity_at_tile(pos, callback);
 }
 
 std::expected<std::shared_ptr<Entity>, StarException> WorldClient::findEntity(RectF const& boundBox, EntityFilter entityFilter) const {
   if (!inWorld()) {
     return {};
   }
-  return m_entityMap->findEntity(boundBox, entityFilter);
+  return m_entityMap->find_entity(boundBox, entityFilter);
 }
 
 std::expected<std::shared_ptr<Entity>, StarException> WorldClient::findEntityLine(Vec2F const& begin, Vec2F const& end, EntityFilter entityFilter) const {
   if (!inWorld()) {
     return {};
   }
-  return m_entityMap->findEntityLine(begin, end, entityFilter);
+  return m_entityMap->find_entity_line(begin, end, entityFilter);
 }
 
 std::expected<std::shared_ptr<Entity>, StarException> WorldClient::findEntityAtTile(Vec2I const& pos, EntityFilterOf<TileEntity> entityFilter) const {
   if (!inWorld()) {
     return {};
   }
-  return m_entityMap->findEntityAtTile(pos, entityFilter);
+  return m_entityMap->find_entity_at_tile(pos, entityFilter);
 }
 
 std::expected<bool, StarException> WorldClient::tileIsOccupied(Vec2I const& pos, TileLayer layer, bool includeEphemeral, bool checkCollision) const {
@@ -1054,7 +1054,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   m_particles->sampleParticles(interpolation, renderData.particles);
   
   ClientRenderCallback lightingRenderCallback(tileDrawer, presentation, m_presentationTimestep);
-  auto result47 = m_entityMap->forAllEntities([&, &self = *this](std::shared_ptr<Entity> const& entity)  -> std::expected<void, StarException> {
+  auto result47 = m_entityMap->for_all_entities([&, &self = *this](std::shared_ptr<Entity> const& entity)  -> std::expected<void, StarException> {
       if (self.m_startupHiddenEntities.contains(entity->entityId())) {
         return {};
       }
@@ -1154,7 +1154,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
     }
   }
   std::size_t drawableIndex = 0;
-  auto result72 = m_entityMap->forAllEntities([&, &self = *this](std::shared_ptr<Entity> const& entity)  -> std::expected<void, StarException> {
+  auto result72 = m_entityMap->for_all_entities([&, &self = *this](std::shared_ptr<Entity> const& entity)  -> std::expected<void, StarException> {
       if (self.m_startupHiddenEntities.contains(entity->entityId())) {
         return {};
       }
@@ -1615,7 +1615,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       auto result102 = entity->init(*this, entityCreate->entityId, EntityMode::Slave);
       if (!result102)
         return std::unexpected(std::move(result102.error()));
-      auto result103 = m_entityMap->addEntity(entity);
+      auto result103 = m_entityMap->add_entity(entity);
       if (!result103) {
         auto cleared = entity->uninit();
         if (!cleared)
@@ -1638,7 +1638,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       }
     } else if (auto entityUpdateSet = as<EntityUpdateSetPacket>(packet)) {
       float interpolationLeadTime = m_interpolationTracker.interpolationLeadTime();
-      auto result106 = m_entityMap->forAllEntities([&, &self = *this](std::shared_ptr<Entity> const& entity)  -> std::expected<void, StarException> {
+      auto result106 = m_entityMap->for_all_entities([&, &self = *this](std::shared_ptr<Entity> const& entity)  -> std::expected<void, StarException> {
               EntityId entityId = entity->entityId();
               if (connection_for_entity(entityId) == entityUpdateSet->forConnection) {
                 if (Star::debug_enabled) {
@@ -1889,7 +1889,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       if (std::holds_alternative<EntityId>(entityMessagePacket->entityId)) {
         entity = m_entityMap->entity(std::get<EntityId>(entityMessagePacket->entityId));
       } else {
-        entity = m_entityMap->uniqueEntity(std::get<String>(entityMessagePacket->entityId));
+        entity = m_entityMap->unique_entity(std::get<String>(entityMessagePacket->entityId));
       }
       
       if (!entity) {
@@ -2087,7 +2087,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     m_currentParallax = m_nextParallax;
     m_nextParallax.reset();
   }
-  auto beginPresentation = m_entityMap->forAllEntities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
+  auto beginPresentation = m_entityMap->for_all_entities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
     auto& state = m_entityPresentation[entity->entityId()];
     if (state.instance.lock() != entity || state.epoch != entity->presentationEpoch()) {
       state.instance = entity;
@@ -2161,7 +2161,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
   
   List<EntityId> toRemove;
   List<EntityId> clientPresenceEntities;
-  auto result160 = m_entityMap->updateAllEntities([&, &self = *this](std::shared_ptr<Entity> const& entity)  -> std::expected<void, StarException> {
+  auto result160 = m_entityMap->update_all_entities([&, &self = *this](std::shared_ptr<Entity> const& entity)  -> std::expected<void, StarException> {
       auto updated = entity->update(dt, self.m_currentStep);
       if (!updated) {
         auto const& e = updated.error();
@@ -2352,7 +2352,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
       return std::unexpected(std::move(result177.error()));
     // Entity events are born at this completed tick's state. Unlike weather,
     // they must not integrate/age for the timestep that produced their birth.
-    auto events = m_entityMap->forAllEntities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
+    auto events = m_entityMap->for_all_entities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
       // The removal path performs the final live-event drain before destroy().
       // Collectors may synthesize effects, so a queued death must not run both.
       if (toRemove.contains(entity->entityId()))
@@ -2563,7 +2563,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
   this->root().logMap().set(Star::format("client_{}_entities",m_subWorldId), m_entityMap->size());
   this->root().logMap().set(Star::format("client_{}_sectors",m_subWorldId), Star::to_string(loadedSectors.size()));
   this->root().logMap().set(Star::format("client_{}_lua_mem",m_subWorldId), m_luaRoot->lua_memory_usage());
-  auto endPresentation = m_entityMap->forAllEntities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
+  auto endPresentation = m_entityMap->for_all_entities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
     auto& state = m_entityPresentation[entity->entityId()];
     if (state.instance.lock() != entity || state.epoch != entity->presentationEpoch()) {
       state.instance = entity;
@@ -2647,13 +2647,13 @@ std::expected<void, StarException> WorldClient::addEntity(std::shared_ptr<Entity
   if (!entity || !inWorld())
     return {};
   if (entity->clientEntityMode() != ClientEntityMode::ClientSlaveOnly) {
-    auto reserved = m_entityMap->reserveEntityId(entityId);
+    auto reserved = m_entityMap->reserve_entity_id(entityId);
     if (!reserved)
       return std::unexpected(std::move(reserved.error()));
     auto initialized = entity->init(*this, *reserved, EntityMode::Master);
     if (!initialized)
       return std::unexpected(std::move(initialized.error()));
-    auto added = m_entityMap->addEntity(entity);
+    auto added = m_entityMap->add_entity(entity);
     if (!added) {
       auto cleared = entity->uninit();
       if (!cleared)
@@ -2840,7 +2840,7 @@ std::expected<void, StarException> WorldClient::queueUpdatePackets(bool sendEnti
     }
   }
   
-  auto result208 = m_entityMap->forAllEntities([&self = *this](std::shared_ptr<Entity> const& entity)  -> std::expected<void, StarException> {
+  auto result208 = m_entityMap->for_all_entities([&self = *this](std::shared_ptr<Entity> const& entity)  -> std::expected<void, StarException> {
       auto result207 = self.notifyEntityCreate(entity);
       if (!result207)
         return std::unexpected(std::move(result207.error()));
@@ -2853,7 +2853,7 @@ std::expected<void, StarException> WorldClient::queueUpdatePackets(bool sendEnti
     auto entityUpdateSet = std::make_shared<EntityUpdateSetPacket>();
     entityUpdateSet->forConnection = *m_clientId;
     auto netRules = m_clientState->netCompatibilityRules();
-    auto result210 = m_entityMap->forAllEntities(
+    auto result210 = m_entityMap->for_all_entities(
       [&, &self = *this](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
         if (auto version = self.m_masterEntitiesNetVersion.find_ref(entity->entityId())) {
           auto result209 = entity->write_net_state(version->get(), netRules);
@@ -3466,13 +3466,13 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
     m_inWorld = true;
     if (!m_headless) {
       if (!m_mainPlayer->isDead()) {
-        auto result273 = m_entityMap->reserveEntityId();
+        auto result273 = m_entityMap->reserve_entity_id();
         if (!result273)
           return std::unexpected(std::move(result273.error()));
         auto result274 = m_mainPlayer->init(*this, (std::move(*result273)), EntityMode::Master);
         if (!result274)
           return std::unexpected(std::move(result274.error()));
-        auto result275 = m_entityMap->addEntity(m_mainPlayer);
+        auto result275 = m_entityMap->add_entity(m_mainPlayer);
         if (!result275) {
           auto cleared = m_mainPlayer->uninit();
           if (!cleared)
@@ -3593,12 +3593,12 @@ std::expected<void, StarException> WorldClient::clearWorld() {
   for (auto&& p : m_scriptContexts)
     remember(recover_lua_script_error(p.second->invoke("preUninit")));
   if (m_entityMap) {
-    for (auto entityId : m_entityMap->entityIds()) {
+    for (auto entityId : m_entityMap->entity_ids()) {
       auto entity = m_entityMap->entity(entityId);
       remember(removeEntity(entityId, false));
       // A failed final net snapshot must not leave an initialized entity attached.
       if (m_entityMap->entity(entityId)) {
-        m_entityMap->removeEntity(entityId);
+        m_entityMap->remove_entity(entityId);
         remember(entity->uninit());
       }
     }
@@ -3716,7 +3716,7 @@ std::expected<void, StarException> WorldClient::notifyEntityCreate(std::shared_p
 }
 
 List<EntityId> WorldClient::entity_ids() const {
-  return m_entityMap->entityIds();
+  return m_entityMap->entity_ids();
 }
 
 Vec2I WorldClient::environment_biome_track_position() const {
@@ -4179,7 +4179,7 @@ std::expected<RpcPromise<Vec2F>, StarException> WorldClient::findUniqueEntity(St
     return RpcPromise<Vec2F>::make_failed("Not currently in a world");
   }
   
-  if (auto entity = m_entityMap->uniqueEntity(uniqueId)) {
+  if (auto entity = m_entityMap->unique_entity(uniqueId)) {
     return RpcPromise<Vec2F>::make_fulfilled(entity->position());
   }
   
@@ -4208,7 +4208,7 @@ std::expected<RpcPromise<Json>, StarException> WorldClient::sendEntityMessage(st
     if (!entity && *owner == m_clientId)
       return RpcPromise<Json>::make_failed("Unknown entity");
   } else {
-    entity = m_entityMap->uniqueEntity(std::get<String>(entityId));
+    entity = m_entityMap->unique_entity(std::get<String>(entityId));
   }
 
   if (entity && entity->isMaster()) {

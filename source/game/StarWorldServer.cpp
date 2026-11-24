@@ -794,7 +794,7 @@ std::expected<List<std::shared_ptr<Packet>>, StarException> WorldServer::removeC
       return std::unexpected(std::move(result64.error()));
   }
 
-  for (auto const& entityId : m_entityMap->entityIds()) {
+  for (auto const& entityId : m_entityMap->entity_ids()) {
     if (connection_for_entity(entityId) == clientId) {
       auto result65 = removeEntity(entityId, false);
       if (!result65)
@@ -1125,14 +1125,14 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           bool published = false;
           auto reject = [&](StarException error) -> std::expected<void, StarException> {
             if (published)
-              world.m_entityMap->removeEntity(entity->entityId());
+              world.m_entityMap->remove_entity(entity->entityId());
             if (auto result = entity->uninit(); !result)
               error = error.with_context(Star::format("Error uninitializing rejected slave entity: {}", result.error().what()));
             return std::unexpected(std::move(error));
           };
           if (auto result = entity->init(world, entityCreate->entityId, EntityMode::Slave); !result)
             return reject(std::move(result.error()));
-          if (auto result = world.m_entityMap->addEntity(entity); !result)
+          if (auto result = world.m_entityMap->add_entity(entity); !result)
             return reject(std::move(result.error()));
           published = true;
           if (clientInfo->interpolationTracker.interpolationEnabled()) {
@@ -1151,7 +1151,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       }
     } else if (auto entityUpdateSet = as<EntityUpdateSetPacket>(packet)) {
       float interpolationLeadTime = clientInfo->interpolationTracker.interpolationLeadTime();
-      auto result102 = m_entityMap->forAllEntities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
+      auto result102 = m_entityMap->for_all_entities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
         EntityId entityId = entity->entityId();
         if (connection_for_entity(entityId) == clientId) {
           if constexpr (Star::debug_enabled) {
@@ -1597,7 +1597,7 @@ float WorldServer::expiryTime() {
 }
 
 List<EntityId> WorldServer::entity_ids() const {
-  return m_entityMap->entityIds();
+  return m_entityMap->entity_ids();
 }
 
 std::expected<void, StarException> WorldServer::update(float dt) {
@@ -1631,7 +1631,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
     m_needsGlobalBreakCheck = false;
 
   List<EntityId> toRemove;
-  auto result162 = m_entityMap->updateAllEntities([&, &world = *this](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
+  auto result162 = m_entityMap->update_all_entities([&, &world = *this](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
     auto result155 = entity->update(dt, world.m_currentStep);
     if (!result155)
       return std::unexpected(std::move(result155.error()));
@@ -1917,7 +1917,7 @@ std::expected<void, StarException> WorldServer::addEntity(std::shared_ptr<Entity
   if (!entity)
     return {};
 
-  auto reservedId = m_entityMap->reserveEntityId(entityId);
+  auto reservedId = m_entityMap->reserve_entity_id(entityId);
   if (!reservedId)
     return std::unexpected(std::move(reservedId.error()));
 
@@ -1927,7 +1927,7 @@ std::expected<void, StarException> WorldServer::addEntity(std::shared_ptr<Entity
         if (auto result = world.updateTileEntityTiles(tileEntity, true, false); !result)
           error = error.with_context(Star::format("Error clearing rejected entity tiles: {}", result.error().what()));
       }
-      world.m_entityMap->removeEntity(entity->entityId());
+      world.m_entityMap->remove_entity(entity->entityId());
     }
     if (auto result = entity->uninit(); !result)
       error = error.with_context(Star::format("Error uninitializing rejected entity: {}", result.error().what()));
@@ -1936,7 +1936,7 @@ std::expected<void, StarException> WorldServer::addEntity(std::shared_ptr<Entity
 
   if (auto result = entity->init(*this, *reservedId, EntityMode::Master); !result)
     return reject(std::move(result.error()), false);
-  if (auto result = m_entityMap->addEntity(entity); !result)
+  if (auto result = m_entityMap->add_entity(entity); !result)
     return reject(std::move(result.error()), false);
 
   if (auto tileEntity = as<TileEntity>(entity)) {
@@ -1947,56 +1947,56 @@ std::expected<void, StarException> WorldServer::addEntity(std::shared_ptr<Entity
 }
 
 std::expected<std::shared_ptr<Entity>, StarException> WorldServer::closestEntity(Vec2F const& center, float radius, EntityFilter selector) const {
-  auto result200 = m_entityMap->closestEntity(center, radius, selector);
+  auto result200 = m_entityMap->closest_entity(center, radius, selector);
   if (!result200)
     return std::unexpected(std::move(result200.error()));
   return std::move(*result200);
 }
 
 std::expected<void, StarException> WorldServer::forAllEntities(EntityCallback callback) const {
-  auto result201 = m_entityMap->forAllEntities(callback);
+  auto result201 = m_entityMap->for_all_entities(callback);
   if (!result201)
     return std::unexpected(std::move(result201.error()));
   return {};
 }
 
 std::expected<void, StarException> WorldServer::forEachEntity(RectF const& boundBox, EntityCallback callback) const {
-  auto result202 = m_entityMap->forEachEntity(boundBox, callback);
+  auto result202 = m_entityMap->for_each_entity(boundBox, callback);
   if (!result202)
     return std::unexpected(std::move(result202.error()));
   return {};
 }
 
 std::expected<void, StarException> WorldServer::forEachEntityLine(Vec2F const& begin, Vec2F const& end, EntityCallback callback) const {
-  auto result203 = m_entityMap->forEachEntityLine(begin, end, callback);
+  auto result203 = m_entityMap->for_each_entity_line(begin, end, callback);
   if (!result203)
     return std::unexpected(std::move(result203.error()));
   return {};
 }
 
 std::expected<void, StarException> WorldServer::forEachEntityAtTile(Vec2I const& pos, EntityCallbackOf<TileEntity> callback) const {
-  auto result204 = m_entityMap->forEachEntityAtTile(pos, callback);
+  auto result204 = m_entityMap->for_each_entity_at_tile(pos, callback);
   if (!result204)
     return std::unexpected(std::move(result204.error()));
   return {};
 }
 
 std::expected<std::shared_ptr<Entity>, StarException> WorldServer::findEntity(RectF const& boundBox, EntityFilter entityFilter) const {
-  auto result205 = m_entityMap->findEntity(boundBox, entityFilter);
+  auto result205 = m_entityMap->find_entity(boundBox, entityFilter);
   if (!result205)
     return std::unexpected(std::move(result205.error()));
   return std::move(*result205);
 }
 
 std::expected<std::shared_ptr<Entity>, StarException> WorldServer::findEntityLine(Vec2F const& begin, Vec2F const& end, EntityFilter entityFilter) const {
-  auto result206 = m_entityMap->findEntityLine(begin, end, entityFilter);
+  auto result206 = m_entityMap->find_entity_line(begin, end, entityFilter);
   if (!result206)
     return std::unexpected(std::move(result206.error()));
   return std::move(*result206);
 }
 
 std::expected<std::shared_ptr<Entity>, StarException> WorldServer::findEntityAtTile(Vec2I const& pos, EntityFilterOf<TileEntity> entityFilter) const {
-  auto result207 = m_entityMap->findEntityAtTile(pos, entityFilter);
+  auto result207 = m_entityMap->find_entity_at_tile(pos, entityFilter);
   if (!result207)
     return std::unexpected(std::move(result207.error()));
   return std::move(*result207);
@@ -2260,7 +2260,7 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
           damagePositionSet.add(entityDamagePos);
         }
 
-        auto result237 = m_entityMap->entitiesAtTile(entityDamagePos);
+        auto result237 = m_entityMap->entities_at_tile(entityDamagePos);
         if (!result237)
           return std::unexpected(std::move(result237.error()));
         for (auto const& entity : *result237) {
@@ -3753,7 +3753,7 @@ std::expected<void, StarException> WorldServer::queueUpdatePackets(ConnectionId 
 
   HashSet<std::shared_ptr<Entity>> monitoredEntities;
   for (auto const& monitoredRegion : monitoringRegions) {
-    auto collected = m_entityMap->forEachEntity(RectF(monitoredRegion),
+    auto collected = m_entityMap->for_each_entity(RectF(monitoredRegion),
         [&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
           monitoredEntities.add(entity);
           return {};
@@ -4109,7 +4109,7 @@ std::expected<void, StarException> WorldServer::removeEntity(EntityId entityId, 
     }
   }
 
-  m_entityMap->removeEntity(entityId);
+  m_entityMap->remove_entity(entityId);
   auto result443 = entity->uninit();
   if (!result443)
     return std::unexpected(std::move(result443.error()));

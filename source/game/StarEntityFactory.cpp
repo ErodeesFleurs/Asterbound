@@ -124,7 +124,7 @@ import star.net_compatibility;
 import star.byte_array;
 namespace Star {
 
-std::expected<EnumMap<EntityType>, StarException> const EntityFactory::EntityStorageIdentifiers = EnumMap<EntityType>::create({
+std::expected<EnumMap<EntityType>, StarException> const EntityFactory::entity_storage_identifiers = EnumMap<EntityType>::create({
   {EntityType::Player, "PlayerEntity"},
   {EntityType::Monster, "MonsterEntity"},
   {EntityType::Object, "ObjectEntity"},
@@ -140,28 +140,31 @@ std::expected<EnumMap<EntityType>, StarException> const EntityFactory::EntitySto
 EntityFactory::EntityFactory(Root& root) : m_root(root) {}
 
 std::expected<std::shared_ptr<EntityFactory>, StarException> EntityFactory::create(Root& root) {
-  auto factory = std::shared_ptr<EntityFactory>(new EntityFactory(root));
+  struct MakeShared final : EntityFactory {
+    explicit MakeShared(Root& root) : EntityFactory(root) {}
+  };
+  auto factory = std::make_shared<MakeShared>(root);
   auto player = root.playerFactory();
   if (!player) return std::unexpected(std::move(player.error()));
-  factory->m_playerFactory = std::move(*player);
+  factory->m_player_factory = std::move(*player);
   auto monster = root.monsterDatabase();
   if (!monster) return std::unexpected(std::move(monster.error()));
-  factory->m_monsterDatabase = std::move(*monster);
+  factory->m_monster_database = std::move(*monster);
   auto object = root.objectDatabase();
   if (!object) return std::unexpected(std::move(object.error()));
-  factory->m_objectDatabase = std::move(*object);
+  factory->m_object_database = std::move(*object);
   auto projectile = root.projectileDatabase();
   if (!projectile) return std::unexpected(std::move(projectile.error()));
-  factory->m_projectileDatabase = std::move(*projectile);
+  factory->m_projectile_database = std::move(*projectile);
   auto npc = root.npcDatabase();
   if (!npc) return std::unexpected(std::move(npc.error()));
-  factory->m_npcDatabase = std::move(*npc);
+  factory->m_npc_database = std::move(*npc);
   auto vehicle = root.vehicleDatabase();
   if (!vehicle) return std::unexpected(std::move(vehicle.error()));
-  factory->m_vehicleDatabase = std::move(*vehicle);
+  factory->m_vehicle_database = std::move(*vehicle);
   auto versioning = root.versioningDatabase();
   if (!versioning) return std::unexpected(std::move(versioning.error()));
-  factory->m_versioningDatabase = std::move(*versioning);
+  factory->m_versioning_database = std::move(*versioning);
   return factory;
 }
 
@@ -169,155 +172,199 @@ std::expected<ByteArray, StarException> EntityFactory::net_store_entity(std::sha
   std::unique_lock locker(m_mutex, std::defer_lock);
   lock_with_diagnostics(locker);
 
-  if (auto player = as<Player>(entity)) {
-    return player->net_store(rules);
-  } else if (auto monster = as<Monster>(entity)) {
-    return monster->net_store(rules);
-  } else if (auto object = as<Object>(entity)) {
-    return object->net_store(rules);
-  } else if (auto plant = as<Plant>(entity)) {
-    return plant->net_store(rules);
-  } else if (auto plantDrop = as<PlantDrop>(entity)) {
-    return plantDrop->net_store(rules);
-  } else if (auto projectile = as<Projectile>(entity)) {
-    return projectile->net_store(rules);
-  } else if (auto itemDrop = as<ItemDrop>(entity)) {
-    return itemDrop->net_store(rules);
-  } else if (auto npc = as<Npc>(entity)) {
-    return npc->net_store(rules);
-  } else if (auto stagehand = as<Stagehand>(entity)) {
-    return stagehand->net_store(rules);
-  } else if (auto vehicle = as<Vehicle>(entity)) {
-    return m_vehicleDatabase->net_store(vehicle, rules);
-  } else {
-    if (!EntityTypeNames) return std::unexpected(EntityTypeNames.error());
-    auto name = EntityTypeNames->get_right(entity->entityType());
-    if (!name) return std::unexpected(std::move(name.error()));
-    return std::unexpected(EntityFactoryException::format("Don't know how to make net store for entity type '{}'", name->get()));
+  if (!entity)
+    return std::unexpected(EntityFactoryException::format("Cannot make net store for a null entity"));
+  auto type = entity->entityType();
+  auto store = [&]<typename T>() -> std::expected<ByteArray, StarException> {
+    auto typed = convert_ref<T>(*entity);
+    if (!typed) return std::unexpected(std::move(typed.error()));
+    return typed->get().net_store(rules);
+  };
+  switch (type) {
+    case EntityType::Player:
+      return store.template operator()<Player>();
+    case EntityType::Monster:
+      return store.template operator()<Monster>();
+    case EntityType::Object:
+      return store.template operator()<Object>();
+    case EntityType::Plant:
+      return store.template operator()<Plant>();
+    case EntityType::PlantDrop:
+      return store.template operator()<PlantDrop>();
+    case EntityType::Projectile:
+      return store.template operator()<Projectile>();
+    case EntityType::ItemDrop:
+      return store.template operator()<ItemDrop>();
+    case EntityType::Npc:
+      return store.template operator()<Npc>();
+    case EntityType::Stagehand:
+      return store.template operator()<Stagehand>();
+    case EntityType::Vehicle: {
+      auto vehicle = convert<Vehicle>(entity);
+      if (!vehicle) return std::unexpected(std::move(vehicle.error()));
+      return m_vehicle_database->net_store(*vehicle, rules);
+    }
+    default:
+      break;
   }
+  if (!EntityTypeNames) return std::unexpected(EntityTypeNames.error());
+  auto name = EntityTypeNames->get_right(type);
+  if (!name) return std::unexpected(std::move(name.error()));
+  return std::unexpected(EntityFactoryException::format("Don't know how to make net store for entity type '{}'", name->get()));
 }
 
 std::expected<std::shared_ptr<Entity>, StarException> EntityFactory::net_load_entity(EntityType type, ByteArray const& net_store, NetCompatibilityRules rules) const {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lock_with_diagnostics(locker);
 
-  if (type == EntityType::Player) {
-    return m_playerFactory->net_load_player(net_store, rules);
-  } else if (type == EntityType::Monster) {
-    return m_monsterDatabase->net_load_monster(net_store, rules);
-  } else if (type == EntityType::Object) {
-    return m_objectDatabase->net_load_object(net_store, rules);
-  } else if (type == EntityType::Plant) {
-    return Plant::create(m_root, net_store, rules);
-  } else if (type == EntityType::PlantDrop) {
-    return PlantDrop::create(m_root, net_store, rules);
-  } else if (type == EntityType::Projectile) {
-    return m_projectileDatabase->net_load_projectile(net_store, rules);
-  } else if (type == EntityType::ItemDrop) {
-    return ItemDrop::create(m_root, net_store, rules);
-  } else if (type == EntityType::Npc) {
-    return m_npcDatabase->net_load_npc(net_store, rules);
-  } else if (type == EntityType::Stagehand) {
-    return Stagehand::create(m_root, net_store, rules);
-  } else if (type == EntityType::Vehicle) {
-    return m_vehicleDatabase->net_load(net_store, rules);
-  } else {
-    if (!EntityTypeNames) return std::unexpected(EntityTypeNames.error());
-    auto name = EntityTypeNames->get_right(type);
-    if (!name) return std::unexpected(std::move(name.error()));
-    return std::unexpected(EntityFactoryException::format("Don't know how to create entity type '{}' from net store", name->get()));
+  switch (type) {
+    case EntityType::Player:
+      return m_player_factory->net_load_player(net_store, rules);
+    case EntityType::Monster:
+      return m_monster_database->net_load_monster(net_store, rules);
+    case EntityType::Object:
+      return m_object_database->net_load_object(net_store, rules);
+    case EntityType::Plant:
+      return Plant::create(m_root, net_store, rules);
+    case EntityType::PlantDrop:
+      return PlantDrop::create(m_root, net_store, rules);
+    case EntityType::Projectile:
+      return m_projectile_database->net_load_projectile(net_store, rules);
+    case EntityType::ItemDrop:
+      return ItemDrop::create(m_root, net_store, rules);
+    case EntityType::Npc:
+      return m_npc_database->net_load_npc(net_store, rules);
+    case EntityType::Stagehand:
+      return Stagehand::create(m_root, net_store, rules);
+    case EntityType::Vehicle:
+      return m_vehicle_database->net_load(net_store, rules);
+    default:
+      break;
   }
+  if (!EntityTypeNames) return std::unexpected(EntityTypeNames.error());
+  auto name = EntityTypeNames->get_right(type);
+  if (!name) return std::unexpected(std::move(name.error()));
+  return std::unexpected(EntityFactoryException::format("Don't know how to create entity type '{}' from net store", name->get()));
 }
 
-std::expected<Json, StarException> EntityFactory::diskStoreEntity(std::shared_ptr<Entity> const& entity) const {
+std::expected<Json, StarException> EntityFactory::disk_store_entity(std::shared_ptr<Entity> const& entity) const {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lock_with_diagnostics(locker);
-
-  if (auto player = as<Player>(entity)) {
-    return player->diskStore();
-  } else if (auto monster = as<Monster>(entity)) {
-    return monster->diskStore();
-  } else if (auto object = as<Object>(entity)) {
-    return object->diskStore();
-  } else if (auto plant = as<Plant>(entity)) {
-    return plant->diskStore();
-  } else if (auto itemDrop = as<ItemDrop>(entity)) {
-    return itemDrop->diskStore();
-  } else if (auto npc = as<Npc>(entity)) {
-    return npc->diskStore();
-  } else if (auto stagehand = as<Stagehand>(entity)) {
-    return stagehand->diskStore();
-  } else if (auto vehicle = as<Vehicle>(entity)) {
-    return m_vehicleDatabase->diskStore(vehicle);
-  } else {
-    if (!EntityTypeNames) return std::unexpected(EntityTypeNames.error());
-    auto name = EntityTypeNames->get_right(entity->entityType());
-    if (!name) return std::unexpected(std::move(name.error()));
-    return std::unexpected(EntityFactoryException::format("Don't know how to make disk store for entity type '{}'", name->get()));
-  }
+  return disk_store_entity_locked(entity);
 }
 
-std::expected<std::shared_ptr<Entity>, StarException> EntityFactory::diskLoadEntity(EntityType type, Json const& diskStore) const {
-  std::unique_lock locker(m_mutex, std::defer_lock);
-  lock_with_diagnostics(locker);
+std::expected<Json, StarException> EntityFactory::disk_store_entity_locked(std::shared_ptr<Entity> const& entity) const {
 
-  if (type == EntityType::Player) {
-    return m_playerFactory->diskLoadPlayer(diskStore);
-  } else if (type == EntityType::Monster) {
-    return m_monsterDatabase->diskLoadMonster(diskStore);
-  } else if (type == EntityType::Object) {
-    return m_objectDatabase->diskLoadObject(diskStore);
-  } else if (type == EntityType::Plant) {
-    return Plant::create(m_root, diskStore);
-  } else if (type == EntityType::ItemDrop) {
-    return ItemDrop::create(m_root, diskStore);
-  } else if (type == EntityType::Npc) {
-    return m_npcDatabase->diskLoadNpc(diskStore);
-  } else if (type == EntityType::Stagehand) {
-    return Stagehand::create(m_root, diskStore);
-  } else if (type == EntityType::Vehicle) {
-    return m_vehicleDatabase->diskLoad(diskStore);
-  } else {
-    if (!EntityTypeNames) return std::unexpected(EntityTypeNames.error());
-    auto name = EntityTypeNames->get_right(type);
-    if (!name) return std::unexpected(std::move(name.error()));
-    return std::unexpected(EntityFactoryException::format("Don't know how to create entity type '{}' from disk store", name->get()));
+  if (!entity)
+    return std::unexpected(EntityFactoryException::format("Cannot make disk store for a null entity"));
+  auto type = entity->entityType();
+  auto store = [&]<typename T>() -> std::expected<Json, StarException> {
+    auto typed = convert_ref<T>(*entity);
+    if (!typed) return std::unexpected(std::move(typed.error()));
+    return typed->get().diskStore();
+  };
+  switch (type) {
+    case EntityType::Player:
+      return store.template operator()<Player>();
+    case EntityType::Monster:
+      return store.template operator()<Monster>();
+    case EntityType::Object:
+      return store.template operator()<Object>();
+    case EntityType::Plant:
+      return store.template operator()<Plant>();
+    case EntityType::ItemDrop:
+      return store.template operator()<ItemDrop>();
+    case EntityType::Npc:
+      return store.template operator()<Npc>();
+    case EntityType::Stagehand:
+      return store.template operator()<Stagehand>();
+    case EntityType::Vehicle: {
+      auto vehicle = convert<Vehicle>(entity);
+      if (!vehicle) return std::unexpected(std::move(vehicle.error()));
+      return m_vehicle_database->diskStore(*vehicle);
+    }
+    default:
+      break;
   }
+  if (!EntityTypeNames) return std::unexpected(EntityTypeNames.error());
+  auto name = EntityTypeNames->get_right(type);
+  if (!name) return std::unexpected(std::move(name.error()));
+  return std::unexpected(EntityFactoryException::format("Don't know how to make disk store for entity type '{}'", name->get()));
 }
 
-std::expected<Json, StarException> EntityFactory::loadVersionedJson(VersionedJson const& versionedJson, EntityType expectedType) const {
+std::expected<std::shared_ptr<Entity>, StarException> EntityFactory::disk_load_entity(EntityType type, Json const& disk_store) const {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lock_with_diagnostics(locker);
-  if (!EntityStorageIdentifiers) return std::unexpected(EntityStorageIdentifiers.error());
-  auto identifier = EntityStorageIdentifiers->get_right(expectedType);
+  return disk_load_entity_locked(type, disk_store);
+}
+
+std::expected<std::shared_ptr<Entity>, StarException> EntityFactory::disk_load_entity_locked(EntityType type, Json const& disk_store) const {
+
+  switch (type) {
+    case EntityType::Player:
+      return m_player_factory->diskLoadPlayer(disk_store);
+    case EntityType::Monster:
+      return m_monster_database->diskLoadMonster(disk_store);
+    case EntityType::Object:
+      return m_object_database->diskLoadObject(disk_store);
+    case EntityType::Plant:
+      return Plant::create(m_root, disk_store);
+    case EntityType::ItemDrop:
+      return ItemDrop::create(m_root, disk_store);
+    case EntityType::Npc:
+      return m_npc_database->diskLoadNpc(disk_store);
+    case EntityType::Stagehand:
+      return Stagehand::create(m_root, disk_store);
+    case EntityType::Vehicle:
+      return m_vehicle_database->diskLoad(disk_store);
+    default:
+      break;
+  }
+  if (!EntityTypeNames) return std::unexpected(EntityTypeNames.error());
+  auto name = EntityTypeNames->get_right(type);
+  if (!name) return std::unexpected(std::move(name.error()));
+  return std::unexpected(EntityFactoryException::format("Don't know how to create entity type '{}' from disk store", name->get()));
+}
+
+std::expected<Json, StarException> EntityFactory::load_versioned_json(VersionedJson const& versioned_json, EntityType expected_type) const {
+  std::unique_lock locker(m_mutex, std::defer_lock);
+  lock_with_diagnostics(locker);
+  if (!entity_storage_identifiers) return std::unexpected(entity_storage_identifiers.error());
+  auto identifier = entity_storage_identifiers->get_right(expected_type);
   if (!identifier) return std::unexpected(std::move(identifier.error()));
-  return m_versioningDatabase->loadVersionedJson(versionedJson, identifier->get());
+  return m_versioning_database->loadVersionedJson(versioned_json, identifier->get());
 }
 
-std::expected<VersionedJson, StarException> EntityFactory::storeVersionedJson(EntityType type, Json const& store) const {
+std::expected<VersionedJson, StarException> EntityFactory::store_versioned_json(EntityType type, Json const& store) const {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lock_with_diagnostics(locker);
-  if (!EntityStorageIdentifiers) return std::unexpected(EntityStorageIdentifiers.error());
-  auto identifier = EntityStorageIdentifiers->get_right(type);
+  return store_versioned_json_locked(type, store);
+}
+
+std::expected<VersionedJson, StarException> EntityFactory::store_versioned_json_locked(EntityType type, Json const& store) const {
+  if (!entity_storage_identifiers) return std::unexpected(entity_storage_identifiers.error());
+  auto identifier = entity_storage_identifiers->get_right(type);
   if (!identifier) return std::unexpected(std::move(identifier.error()));
-  return m_versioningDatabase->makeCurrentVersionedJson(identifier->get(), store);
+  return m_versioning_database->makeCurrentVersionedJson(identifier->get(), store);
 }
 
-std::expected<std::shared_ptr<Entity>, StarException> EntityFactory::loadVersionedEntity(VersionedJson const& versionedJson) const {
+std::expected<std::shared_ptr<Entity>, StarException> EntityFactory::load_versioned_entity(VersionedJson const& versioned_json) const {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lock_with_diagnostics(locker);
-  if (!EntityStorageIdentifiers) return std::unexpected(EntityStorageIdentifiers.error());
-  auto type = EntityStorageIdentifiers->get_left(versionedJson.identifier);
+  if (!entity_storage_identifiers) return std::unexpected(entity_storage_identifiers.error());
+  auto type = entity_storage_identifiers->get_left(versioned_json.identifier);
   if (!type) return std::unexpected(std::move(type.error()));
-  auto store = loadVersionedJson(versionedJson, type->get());
+  auto store = m_versioning_database->loadVersionedJson(versioned_json, versioned_json.identifier);
   if (!store) return std::unexpected(std::move(store.error()));
-  return diskLoadEntity(type->get(), *store);
+  return disk_load_entity_locked(type->get(), *store);
 }
 
-std::expected<VersionedJson, StarException> EntityFactory::storeVersionedEntity(std::shared_ptr<Entity> const& entityPtr) const {
-  auto store = diskStoreEntity(entityPtr);
+std::expected<VersionedJson, StarException> EntityFactory::store_versioned_entity(std::shared_ptr<Entity> const& entity) const {
+  std::unique_lock locker(m_mutex, std::defer_lock);
+  lock_with_diagnostics(locker);
+  auto store = disk_store_entity_locked(entity);
   if (!store) return std::unexpected(std::move(store.error()));
-  return storeVersionedJson(entityPtr->entityType(), *store);
+  return store_versioned_json_locked(entity->entityType(), *store);
 }
 
 }

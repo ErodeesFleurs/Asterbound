@@ -40,6 +40,11 @@ concept spatial_visitor = std::invocable<Function&, Value const&>
     && (std::same_as<std::invoke_result_t<Function&, Value const&>, void>
         || std::same_as<std::invoke_result_t<Function&, Value const&>, std::expected<void, StarException>>);
 
+template <typename Function, typename Value>
+concept spatial_predicate = std::invocable<Function&, Value const&>
+    && (std::same_as<std::invoke_result_t<Function&, Value const&>, bool>
+        || std::same_as<std::invoke_result_t<Function&, Value const&>, std::expected<bool, StarException>>);
+
 // An entry owns its exact closed bounds. The secondary index only borrows
 // stable nodes; neither rehashing nor moving the node owner relocates them.
 template <spatial_key KeyT, spatial_scalar ScalarT, typename ValueT, spatial_integer IntT = int,
@@ -155,69 +160,39 @@ public:
   // replace/destroy the owner during a callback.
   template <spatial_query_bounds<Rect> Bounds, spatial_visitor<Value> Function>
   [[nodiscard]] std::expected<void, StarException> for_each(Bounds&& bounds, Function&& function) const {
-    SmallList<EntryRef, 32> hits;
-    bool saw_rect = false, may_repeat = false;
-    auto gather = [&](Rect const& rect) -> std::expected<void, StarException> {
-      auto range = sector_range(rect, scale_);
-      if (!range)
-        return std::unexpected(std::move(range.error()));
-      if (range->is_null())
-        return {};
-      may_repeat |= std::exchange(saw_rect, true);
-      auto consider = [&](Entry const& entry) {
-        bool intersects = entry.rects.size() == 1 ? entry.rects.front().intersects(rect)
-            : std::ranges::any_of(entry.rects, [&](Rect const& stored) {
-                return stored.intersects(rect) && !stored.is_negative();
-              });
-        if (intersects)
-          hits.emplace_back(entry);
-      };
-      auto visit_bucket = [&](Sector const& cell) {
-        auto bucket = sectors_.find(cell);
-        if (bucket != sectors_.end())
-          for (EntryRef entry : bucket->second)
-            consider(entry);
-      };
-      // A world-sized query costs O(entries), even when its cell count can't
-      // be represented by size_t. Oversized entries are disjoint from buckets.
-      if (range->min() == range->max()) {
-        visit_bucket(range->min());
-      } else if (cell_count(*range, std::max<std::size_t>(4, size()))) {
-        may_repeat = true;
-        each_cell(*range, visit_bucket);
-      } else {
-        for (auto const& item : entries_)
-          if (!std::holds_alternative<std::monostate>(item.second.coverage))
-            consider(item.second);
-        return {};
-      }
-      for (EntryRef entry : oversized_)
-        consider(entry);
-      return {};
-    };
-    auto gathered = each_rect(std::forward<Bounds>(bounds), gather);
+    Hits hits;
+    auto gathered = collect_hits(std::forward<Bounds>(bounds), hits);
     if (!gathered)
       return gathered;
-
-    // Address order is observable (first matching entity / first error).
-    auto end = hits.end();
-    if (hits.size() > 1) {
-      std::sort(hits.begin(), end, [](EntryRef a, EntryRef b) {
-        return std::less<>{}(std::addressof(a.get()), std::addressof(b.get()));
-      });
-      if (may_repeat)
-        end = std::unique(hits.begin(), end, IdentityEqual{});
-    }
-    for (auto i = hits.begin(); i != end; ++i) {
+    for (auto entry : hits) {
       if constexpr (std::same_as<std::invoke_result_t<Function&, Value const&>, void>) {
-        std::invoke(function, i->get().value);
+        std::invoke(function, entry.get().value);
       } else {
-        auto visited = std::invoke(function, i->get().value);
+        auto visited = std::invoke(function, entry.get().value);
         if (!visited)
           return visited;
       }
     }
     return {};
+  }
+
+  // Same ordered membership snapshot as for_each. Stop at the first true
+  // result or predicate error, after all query bounds have been validated.
+  template <spatial_query_bounds<Rect> Bounds, spatial_predicate<Value> Predicate>
+  [[nodiscard]] std::expected<bool, StarException> any_of(Bounds&& bounds, Predicate&& predicate) const {
+    Hits hits;
+    auto gathered = collect_hits(std::forward<Bounds>(bounds), hits);
+    if (!gathered)
+      return std::unexpected(std::move(gathered.error()));
+    for (auto entry : hits) {
+      auto accepted = std::invoke(predicate, entry.get().value);
+      if constexpr (std::same_as<decltype(accepted), bool>) {
+        if (accepted) return true;
+      } else {
+        if (!accepted || *accepted) return accepted;
+      }
+    }
+    return false;
   }
 
   template <spatial_entry_bounds<Rect> Bounds>
@@ -307,6 +282,67 @@ public:
 
 private:
   using EntryRef = std::reference_wrapper<Entry const>;
+  using Hits = SmallList<EntryRef, 32>;
+
+  template <spatial_query_bounds<Rect> Bounds>
+  std::expected<void, StarException> collect_hits(Bounds&& bounds, Hits& hits) const {
+    bool saw_rect = false, may_repeat = false;
+    auto gather = [&](Rect const& rect) -> std::expected<void, StarException> {
+      auto range = sector_range(rect, scale_);
+      if (!range)
+        return std::unexpected(std::move(range.error()));
+      if (range->is_null())
+        return {};
+      may_repeat |= std::exchange(saw_rect, true);
+      auto consider = [&](Entry const& entry) {
+        bool intersects = entry.rects.size() == 1 ? entry.rects.front().intersects(rect)
+            : std::ranges::any_of(entry.rects, [&](Rect const& stored) {
+                return stored.intersects(rect) && !stored.is_negative();
+              });
+        if (intersects)
+          hits.emplace_back(entry);
+      };
+      auto visit_bucket = [&](Sector const& cell) {
+        auto bucket = sectors_.find(cell);
+        if (bucket != sectors_.end())
+          for (EntryRef entry : bucket->second)
+            consider(entry);
+      };
+      // A world-sized query costs O(entries), even when its cell count can't
+      // be represented by size_t. Oversized entries are disjoint from buckets.
+      if (range->min() == range->max()) {
+        visit_bucket(range->min());
+      } else if (cell_count(*range, std::max<std::size_t>(4, size()))) {
+        may_repeat = true;
+        each_cell(*range, visit_bucket);
+      } else {
+        for (auto const& item : entries_)
+          if (!std::holds_alternative<std::monostate>(item.second.coverage))
+            consider(item.second);
+        return {};
+      }
+      for (EntryRef entry : oversized_)
+        consider(entry);
+      return {};
+    };
+    auto gathered = each_rect(std::forward<Bounds>(bounds), gather);
+    if (!gathered)
+      return gathered;
+
+    // Address order is observable (first matching entity / first error).
+    auto end = hits.end();
+    if (hits.size() > 1) {
+      std::sort(hits.begin(), end, [](EntryRef a, EntryRef b) {
+        return std::less<>{}(std::addressof(a.get()), std::addressof(b.get()));
+      });
+      if (may_repeat)
+        end = std::unique(hits.begin(), end, IdentityEqual{});
+    }
+    if (end != hits.end())
+      hits.erase(end, hits.end());
+    return {};
+  }
+
   struct IdentityEqual {
     bool operator()(EntryRef a, EntryRef b) const noexcept {
       return std::addressof(a.get()) == std::addressof(b.get());
@@ -595,4 +631,5 @@ export namespace Star {
   using ::Star::spatial_query_bounds;
   using ::Star::spatial_entry_bounds;
   using ::Star::spatial_visitor;
+  using ::Star::spatial_predicate;
 }

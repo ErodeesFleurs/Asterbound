@@ -43,30 +43,33 @@ public:
   [[nodiscard]] std::expected<ByteArray, StarException> net_store_entity(std::shared_ptr<Entity> const& entity, NetCompatibilityRules rules = {}) const;
   [[nodiscard]] std::expected<std::shared_ptr<Entity>, StarException> net_load_entity(EntityType type, ByteArray const& net_store, NetCompatibilityRules rules = {}) const;
 
-  [[nodiscard]] std::expected<Json, StarException> diskStoreEntity(std::shared_ptr<Entity> const& entity) const;
-  [[nodiscard]] std::expected<std::shared_ptr<Entity>, StarException> diskLoadEntity(EntityType type, Json const& diskStore) const;
+  [[nodiscard]] std::expected<Json, StarException> disk_store_entity(std::shared_ptr<Entity> const& entity) const;
+  [[nodiscard]] std::expected<std::shared_ptr<Entity>, StarException> disk_load_entity(EntityType type, Json const& disk_store) const;
 
-  [[nodiscard]] std::expected<Json, StarException> loadVersionedJson(VersionedJson const& versionedJson, EntityType expectedType) const;
-  [[nodiscard]] std::expected<VersionedJson, StarException> storeVersionedJson(EntityType type, Json const& store) const;
+  [[nodiscard]] std::expected<Json, StarException> load_versioned_json(VersionedJson const& versioned_json, EntityType expected_type) const;
+  [[nodiscard]] std::expected<VersionedJson, StarException> store_versioned_json(EntityType type, Json const& store) const;
 
   // Versioned loads retain the database's migration and recovery policy.
-  [[nodiscard]] std::expected<std::shared_ptr<Entity>, StarException> loadVersionedEntity(VersionedJson const& versionedJson) const;
-  [[nodiscard]] std::expected<VersionedJson, StarException> storeVersionedEntity(std::shared_ptr<Entity> const& entityPtr) const;
+  [[nodiscard]] std::expected<std::shared_ptr<Entity>, StarException> load_versioned_entity(VersionedJson const& versioned_json) const;
+  [[nodiscard]] std::expected<VersionedJson, StarException> store_versioned_entity(std::shared_ptr<Entity> const& entity) const;
 
 private:
   explicit EntityFactory(Root& root);
+  std::expected<Json, StarException> disk_store_entity_locked(std::shared_ptr<Entity> const& entity) const;
+  std::expected<std::shared_ptr<Entity>, StarException> disk_load_entity_locked(EntityType type, Json const& disk_store) const;
+  std::expected<VersionedJson, StarException> store_versioned_json_locked(EntityType type, Json const& store) const;
   Root& m_root;
-  static std::expected<EnumMap<EntityType>, StarException> const EntityStorageIdentifiers;
+  static std::expected<EnumMap<EntityType>, StarException> const entity_storage_identifiers;
 
   mutable std::recursive_mutex m_mutex;
 
-  std::shared_ptr<PlayerFactory const> m_playerFactory;
-  std::shared_ptr<MonsterDatabase const> m_monsterDatabase;
-  std::shared_ptr<ObjectDatabase const> m_objectDatabase;
-  std::shared_ptr<ProjectileDatabase const> m_projectileDatabase;
-  std::shared_ptr<NpcDatabase const> m_npcDatabase;
-  std::shared_ptr<VehicleDatabase const> m_vehicleDatabase;
-  std::shared_ptr<VersioningDatabase const> m_versioningDatabase;
+  std::shared_ptr<PlayerFactory const> m_player_factory;
+  std::shared_ptr<MonsterDatabase const> m_monster_database;
+  std::shared_ptr<ObjectDatabase const> m_object_database;
+  std::shared_ptr<ProjectileDatabase const> m_projectile_database;
+  std::shared_ptr<NpcDatabase const> m_npc_database;
+  std::shared_ptr<VehicleDatabase const> m_vehicle_database;
+  std::shared_ptr<VersioningDatabase const> m_versioning_database;
 };
 
 }

@@ -619,6 +619,15 @@ with a conservative earliest-timestamp bound; negative smear, TTL changes and
 failed-insertion timestamps must remain covered. Filtered cleanup still visits
 every entry. Revisiting evicted cells re-executes their deterministic callbacks.
 
+### Entity indexing
+
+Automatic IDs use both endpoints of the assigned interval. Explicit IDs outside
+it do not reduce automatic capacity. First-hit spatial queries keep the same
+ordered membership snapshot as exhaustive queries and stop predicate dispatch
+on the first match or error. For performance comparisons distinguish the
+`SpatialHash/Query/*` index benchmarks from EntityMap tests with real entities,
+capability casts, tile spaces and world wrapping.
+
 ### Chat emotes and animation timing
 
 Run `game_tests --gtest_filter='*Emote*'` with real assets. Matching ranks the

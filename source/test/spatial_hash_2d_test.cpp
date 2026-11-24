@@ -39,6 +39,9 @@ static_assert(!std::is_copy_constructible_v<Grid> && !std::is_copy_assignable_v<
 static_assert(std::is_move_constructible_v<PayloadGrid>);
 static_assert(copies_query_values<Grid> && !copies_query_values<PayloadGrid>);
 static_assert(!borrows_temporary<Grid> && !borrows_temporary<Grid const>);
+static_assert(spatial_predicate<decltype([](Payload const&) { return true; }), Payload>);
+static_assert(!spatial_predicate<PayloadVisitor, Payload>);
+static_assert(!spatial_predicate<decltype([](int) { return 1; }), int>);
 
 TEST(SpatialHash2DTest, ClosedRectanglesMatchBruteForceAcrossSectorEdges) {
   auto grid = Grid::create(4);
@@ -120,6 +123,7 @@ TEST(SpatialHash2DTest, InvalidGeometryAndReindexLeaveBothIndexesAndValueIntact)
     EXPECT_FALSE(grid->set(2, rects, 22));
     int calls = 0;
     EXPECT_FALSE(grid->for_each(std::array{original, bad}, [&](int) { ++calls; }));
+    EXPECT_FALSE(grid->any_of(std::array{original, bad}, [&](int) { ++calls; return true; }));
     EXPECT_EQ(calls, 0);
     unchanged();
   }
@@ -254,6 +258,57 @@ TEST(SpatialHash2DTest, SnapshotMembershipSurvivesNestedMutationsAndFirstVisitor
   ASSERT_FALSE(failed);
   EXPECT_TRUE(failed.error().is<OutOfRangeException>());
   EXPECT_EQ(calls, 2);
+}
+
+TEST(SpatialHash2DTest, AnyOfStopsInOrderOnTheFirstMatchOrError) {
+  auto grid = PayloadGrid::create(2);
+  ASSERT_TRUE(grid);
+  RectF const here(0, 0, 4, 4), away(20, 20, 22, 22);
+  for (int id : {1, 2, 3})
+    ASSERT_TRUE(grid->set(id, here, Payload(id)));
+  std::vector<int> order;
+  ASSERT_TRUE(grid->for_each(here, [&](Payload const& value) { order.push_back(value.id); }));
+  ASSERT_EQ(order.size(), 3u);
+
+  // Duplicate query bounds must not duplicate predicate calls.
+  std::array probes{here, here};
+  std::vector<int> visited;
+  auto failed = grid->any_of(probes, [&](Payload const& value) -> std::expected<bool, StarException> {
+    visited.push_back(value.id);
+    if (value.id == order[1]) return std::unexpected(OutOfRangeException("bad candidate"));
+    return value.id == order[2];
+  });
+  ASSERT_FALSE(failed);
+  EXPECT_TRUE(failed.error().is<OutOfRangeException>());
+  EXPECT_EQ(visited, (std::vector<int>{order[0], order[1]}));
+
+  // A pending candidate can move and change value without leaving the
+  // snapshot. A newly inserted member is visible only to the nested query.
+  visited.clear();
+  auto matched = grid->any_of(probes, [&](Payload const& value) -> std::expected<bool, StarException> {
+    visited.push_back(value.id);
+    if (value.id == order[0]) {
+      auto moved = grid->set(order[1], away, Payload(42));
+      if (!moved) return std::unexpected(std::move(moved.error()));
+      auto added = grid->set(4, here, Payload(4));
+      if (!added) return std::unexpected(std::move(added.error()));
+      auto nested = grid->any_of(here, [](Payload const& candidate) { return candidate.id == 4; });
+      if (!nested) return std::unexpected(std::move(nested.error()));
+      EXPECT_TRUE(*nested);
+      return false;
+    }
+    if (value.id == 42) return true;
+    return std::unexpected(OutOfRangeException("past first match"));
+  });
+  ASSERT_TRUE(matched) << matched.error().what();
+  EXPECT_TRUE(*matched);
+  EXPECT_EQ(visited, (std::vector<int>{order[0], 42}));
+
+  visited.clear();
+  auto miss = grid->any_of(away, [&](Payload const& value) { visited.push_back(value.id); return false; });
+  ASSERT_TRUE(miss);
+  EXPECT_FALSE(*miss);
+  EXPECT_EQ(visited, std::vector<int>{42});
 }
 
 } // namespace

@@ -9,6 +9,7 @@ import star.force_regions;
 import star.format;
 import star.game_test;
 import star.game_types;
+import star.interactive_entity;
 import star.json;
 import star.line;
 import star.list;
@@ -20,6 +21,7 @@ import star.physics_object;
 import star.poly;
 import star.rect;
 import star.root;
+import star.tile_entity;
 import star.string;
 import star.vector;
 import star.world_server;
@@ -41,6 +43,56 @@ std::shared_ptr<ObjectConfig> unanchored_physics_config() {
   config->orientations.push_back(std::move(orientation));
   return config;
 }
+
+template <typename T>
+concept typed_map_query = requires(EntityMap const& map, RectF const& bounds) { map.query<T>(bounds); };
+static_assert(typed_map_query<PhysicsEntity> && !typed_map_query<int>);
+
+const GameTestRegistration typed_tile_queries("EntityMap", "TypedLinesAndMutableWrappedTiles", [](GameTest& fixture) {
+  auto storage = File::ephemeral_file(fixture.root().random());
+  ASSERT_TRUE(storage);
+  Vec2U size(128, 128);
+  auto world = WorldServer::create(fixture.root(), size, *storage);
+  ASSERT_TRUE(world) << world.error().what();
+  auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
+  auto config = unanchored_physics_config();
+  config->orientations.front()->spaces = {Vec2I(0, 0), Vec2I(0, 0)};
+  auto object = PhysicsObject::create(fixture.root(), config, JsonObject{{"physicsForces", JsonObject()}});
+  ASSERT_TRUE(object) << object.error().what();
+  Vec2I origin(127, 64);
+  ASSERT_TRUE((*object)->setTilePosition(origin));
+  EntityMap entities(size, 1, 10);
+  ASSERT_TRUE((*object)->init(**world, 1, EntityMode::Master));
+  auto release = make_scope_exit([&] { entities.remove_entity(1); EXPECT_TRUE((*object)->uninit()); });
+  ASSERT_TRUE(entities.add_entity(*object));
+  int calls = 0;
+  auto line = entities.line_query<PhysicsEntity>({126, 64}, {127, 64}, [&](auto const& physics) {
+    ++calls;
+    return physics == *object;
+  });
+  ASSERT_TRUE(line) << line.error().what();
+  ASSERT_EQ(line->size(), 1u);
+  EXPECT_EQ(calls, 1);
+  EXPECT_EQ(line->front(), *object);
+
+  Vec2I wrapped(std::numeric_limits<int>::max(), 64);
+  auto tiles = entities.at_tile<PhysicsEntity>(wrapped);
+  ASSERT_TRUE(tiles) << tiles.error().what();
+  EXPECT_EQ(tiles->size(), 2u);
+  auto occupied = entities.tile_is_occupied(wrapped, true);
+  ASSERT_TRUE(occupied);
+  EXPECT_TRUE(*occupied);
+  calls = 0;
+  auto found = entities.find_entity_at_tile(wrapped, [&](auto const&) { return ++calls == 2; });
+  ASSERT_TRUE(found);
+  EXPECT_EQ(*found, *object);
+  calls = 0;
+  ASSERT_TRUE(entities.for_each_entity_at_tile(wrapped, [&](auto const& tile) {
+    ++calls;
+    return tile->setTilePosition({126, 64});
+  }));
+  EXPECT_EQ(calls, 1);
+});
 
 const GameTestRegistration preferred_orientation("ObjectDatabase", "PreferredOrientationFallback", [](GameTest& fixture) {
   auto storage = File::ephemeral_file(fixture.root().random());
@@ -133,7 +185,7 @@ const GameTestRegistration
   })");
     ASSERT_TRUE(forceConfig) << forceConfig.error().what();
     RectF expectedBounds(-12, -9, 13, 6);
-    Vec2I farPosition(EntityMap::MaximumEntityBoundBox + 1024, EntityMap::MaximumEntityBoundBox + 2048);
+    Vec2I farPosition(EntityMap::maximum_entity_bound_box + 1024, EntityMap::maximum_entity_bound_box + 2048);
     ASSERT_LT(farPosition[0] + 13, static_cast<int>(worldSize[0]));
     ASSERT_LT(farPosition[1] + 6, static_cast<int>(worldSize[1]));
 
@@ -158,12 +210,12 @@ const GameTestRegistration
                                        Vec2I(world_width - 13, 256), Vec2I(12, 256)}) {
         SCOPED_TRACE(Star::format("position {}", tilePosition));
         ASSERT_TRUE(object->setTilePosition(tilePosition));
-        auto id = entities.reserveEntityId();
+        auto id = entities.reserve_entity_id();
         ASSERT_TRUE(id) << id.error().what();
         auto initialized = object->init(*world, *id, EntityMode::Master);
         ASSERT_TRUE(initialized) << initialized.error().what();
         auto uninitObject = make_scope_exit([&] {
-          entities.removeEntity(*id);
+          entities.remove_entity(*id);
           EXPECT_TRUE(object->uninit());
         });
         Vec2F position(tilePosition);
@@ -173,8 +225,8 @@ const GameTestRegistration
           EXPECT_EQ(object->metaBoundBox(), *firstBounds);
         else
           firstBounds = object->metaBoundBox();
-        EXPECT_LT(object->metaBoundBox().width(), EntityMap::MaximumEntityBoundBox);
-        EXPECT_LT(object->metaBoundBox().height(), EntityMap::MaximumEntityBoundBox);
+        EXPECT_LT(object->metaBoundBox().width(), EntityMap::maximum_entity_bound_box);
+        EXPECT_LT(object->metaBoundBox().height(), EntityMap::maximum_entity_bound_box);
 
         auto output = object->forceRegions();
         ASSERT_TRUE(output) << output.error().what();
@@ -197,10 +249,10 @@ const GameTestRegistration
         }
 
         object->setUniqueId(String("indexed-object"));
-        auto added = entities.addEntity(object);
+        auto added = entities.add_entity(object);
         ASSERT_TRUE(added) << added.error().what();
         auto expectQuery = [&](Vec2F localPoint, bool present) {
-          auto found = entities.entityQuery(RectF::with_size(position + localPoint, Vec2F(0.25f, 0.25f)));
+          auto found = entities.entity_query(RectF::with_size(position + localPoint, Vec2F(0.25f, 0.25f)));
           ASSERT_TRUE(found) << found.error().what();
           EXPECT_EQ(found->size(), present ? 1u : 0u);
           if (present && !found->empty())
@@ -219,13 +271,13 @@ const GameTestRegistration
           float const y = position[1];
           for (auto const& query : {RectF(width - 11, y, width - 10, y + 1),
                                     RectF(9, y, 10, y + 1), RectF(-11, y, 10, y + 1)}) {
-            auto hits = entities.entityQuery(query);
+            auto hits = entities.entity_query(query);
             ASSERT_TRUE(hits) << hits.error().what();
             ASSERT_EQ(hits->size(), 1u);
             EXPECT_EQ((*hits)[0], object);
           }
           int filter_calls = 0;
-          auto rejected = entities.entityQuery(RectF(-11, y, 10, y + 1),
+          auto rejected = entities.entity_query(RectF(-11, y, 10, y + 1),
               [&](std::shared_ptr<Entity> const&) -> std::expected<bool, StarException> {
                 ++filter_calls;
                 return std::unexpected(EntityMapException("seam filter"));
@@ -236,32 +288,32 @@ const GameTestRegistration
           auto other = PhysicsObject::create(fixture.root(), config, JsonObject{{"physicsForces", JsonObject()}});
           ASSERT_TRUE(other) << other.error().what();
           ASSERT_TRUE((*other)->setTilePosition(Vec2I(128, 256)));
-          auto other_id = entities.reserveEntityId();
+          auto other_id = entities.reserve_entity_id();
           ASSERT_TRUE(other_id);
           ASSERT_TRUE((*other)->init(*world, *other_id, EntityMode::Master));
           auto release_other = make_scope_exit([&] {
-            entities.removeEntity(*other_id);
+            entities.remove_entity(*other_id);
             EXPECT_TRUE((*other)->uninit());
           });
           (*other)->setUniqueId(String("second-object"));
-          ASSERT_TRUE(entities.addEntity(*other));
+          ASSERT_TRUE(entities.add_entity(*other));
           ASSERT_TRUE((*other)->setTilePosition(Vec2I(512, 256)));
           (*other)->setUniqueId(String("indexed-object"));
-          auto conflict = entities.updateAllEntities();
+          auto conflict = entities.update_all_entities();
           ASSERT_FALSE(conflict);
           EXPECT_TRUE(conflict.error().is<EntityMapException>());
-          EXPECT_EQ(entities.uniqueEntityId("indexed-object"), *id);
-          EXPECT_EQ(entities.uniqueEntityId("second-object"), *other_id);
-          auto old_hits = entities.entityQuery(RectF(128, 256, 128, 256));
+          EXPECT_EQ(entities.unique_entity_id("indexed-object"), *id);
+          EXPECT_EQ(entities.unique_entity_id("second-object"), *other_id);
+          auto old_hits = entities.entity_query(RectF(128, 256, 128, 256));
           ASSERT_TRUE(old_hits);
           ASSERT_EQ(old_hits->size(), 1u);
           EXPECT_EQ((*old_hits)[0], *other);
-          auto new_hits = entities.entityQuery(RectF(512, 256, 512, 256));
+          auto new_hits = entities.entity_query(RectF(512, 256, 512, 256));
           ASSERT_TRUE(new_hits);
           EXPECT_TRUE(new_hits->empty());
           (*other)->setUniqueId(String("second-object"));
-          ASSERT_TRUE(entities.updateAllEntities());
-          new_hits = entities.entityQuery(RectF(512, 256, 512, 256));
+          ASSERT_TRUE(entities.update_all_entities());
+          new_hits = entities.entity_query(RectF(512, 256, 512, 256));
           ASSERT_TRUE(new_hits);
           ASSERT_EQ(new_hits->size(), 1u);
           EXPECT_EQ((*new_hits)[0], *other);
@@ -272,24 +324,124 @@ const GameTestRegistration
           float const seam = at_left ? static_cast<float>(world_width) : 0.f;
           Vec2F const edge(seam, position[1]);
           Vec2F const outside(seam + (at_left ? -1.f : 1.f), position[1]);
-          auto point_hits = entities.entityQuery(RectF(edge, edge));
+          auto point_hits = entities.entity_query(RectF(edge, edge));
           ASSERT_TRUE(point_hits) << point_hits.error().what();
           ASSERT_EQ(point_hits->size(), 1u);
           EXPECT_EQ((*point_hits)[0], object);
-          auto line_hits = entities.entityLineQuery(outside, edge);
+          auto line_hits = entities.entity_line_query(outside, edge);
           ASSERT_TRUE(line_hits) << line_hits.error().what();
           ASSERT_EQ(line_hits->size(), 1u);
           EXPECT_EQ((*line_hits)[0], object);
-          auto diagonal_miss = entities.entityLineQuery(outside, edge + Vec2F(0, 20));
+          auto diagonal_miss = entities.entity_line_query(outside, edge + Vec2F(0, 20));
           ASSERT_TRUE(diagonal_miss) << diagonal_miss.error().what();
           EXPECT_TRUE(diagonal_miss->empty());
         }
-        ASSERT_TRUE(entities.updateAllEntities());
+        ASSERT_TRUE(entities.update_all_entities());
         expectQuery(Vec2F(-11, -3), true);
         expectQuery(Vec2F(32, 32), false);
       }
     }
   });
+
+const GameTestRegistration entity_id_range("EntityMap", "InclusiveIdReservation", [](GameTest& fixture) {
+  Vec2U world_size(128, 128);
+  auto storage = File::ephemeral_file(fixture.root().random());
+  ASSERT_TRUE(storage);
+  auto world = WorldServer::create(fixture.root(), world_size, *storage);
+  ASSERT_TRUE(world) << world.error().what();
+  auto close_world = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
+  EntityMap pair(world_size, 7, 8);
+  auto cleanup = make_scope_exit([&] {
+    for (auto id : pair.entity_ids())
+      EXPECT_TRUE(pair.remove_entity(id)->uninit());
+  });
+
+  auto config = unanchored_physics_config();
+  // A collision with a foreign ID must fall back into the local range.
+  // The foreign entity must not consume either of its two slots.
+  std::array<std::pair<EntityId, EntityId>, 3> requests{{{42, 42}, {42, 7}, {null_entity_id, 8}}};
+  for (auto [request, expected_id] : requests) {
+    auto id = pair.reserve_entity_id(request);
+    ASSERT_TRUE(id) << id.error().what();
+    ASSERT_EQ(*id, expected_id);
+    auto object = PhysicsObject::create(fixture.root(), config, JsonObject());
+    ASSERT_TRUE(object) << object.error().what();
+    ASSERT_TRUE((*object)->setTilePosition({64, 64}));
+    ASSERT_TRUE((*object)->init(**world, *id, EntityMode::Master));
+    ASSERT_TRUE(pair.add_entity(*object));
+  }
+  auto exhausted = pair.reserve_entity_id();
+  ASSERT_FALSE(exhausted);
+  EXPECT_TRUE(exhausted.error().is<EntityMapException>());
+  auto conflict = pair.maybe_reserve_entity_id(7);
+  ASSERT_TRUE(conflict);
+  EXPECT_FALSE(*conflict);
+  auto external = pair.reserve_entity_id(43);
+  ASSERT_TRUE(external);
+  EXPECT_EQ(*external, 43);
+  auto released = pair.remove_entity(8);
+  ASSERT_TRUE(released);
+  EXPECT_TRUE(released->uninit());
+  auto last_slot = pair.reserve_entity_id(7);
+  ASSERT_TRUE(last_slot);
+  EXPECT_EQ(*last_slot, 8);
+
+  EntityMap singleton(world_size, 7, 7);
+  auto only_id = singleton.reserve_entity_id();
+  ASSERT_TRUE(only_id);
+  EXPECT_EQ(*only_id, 7);
+  ASSERT_TRUE(singleton.add_entity(pair.entity(7)));
+  EXPECT_FALSE(singleton.reserve_entity_id());
+  ASSERT_TRUE(singleton.remove_entity(7));
+  only_id = singleton.reserve_entity_id();
+  ASSERT_TRUE(only_id);
+  EXPECT_EQ(*only_id, 7);
+});
+
+const GameTestRegistration entity_query_geometry("EntityMap", "InteractionRadiusAndWrappedOrdering", [](GameTest& fixture) {
+  Vec2U world_size(128, 128);
+  auto storage = File::ephemeral_file(fixture.root().random());
+  ASSERT_TRUE(storage);
+  auto world = WorldServer::create(fixture.root(), world_size, *storage);
+  ASSERT_TRUE(world) << world.error().what();
+  auto close_world = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
+  EntityMap entities(world_size, 1, 2);
+  auto cleanup = make_scope_exit([&] {
+    for (auto id : entities.entity_ids())
+      EXPECT_TRUE(entities.remove_entity(id)->uninit());
+  });
+  auto add = [&](EntityId id, int x, RectF bounds, int interaction_x) {
+    auto config = unanchored_physics_config();
+    config->orientations.front()->metaBoundBox = bounds;
+    config->orientations.front()->interactiveSpaces = List<Vec2I>{{interaction_x, 0}};
+    auto object = PhysicsObject::create(fixture.root(), config, JsonObject{{"interactAction", "OpenCraftingInterface"}});
+    ASSERT_TRUE(object) << object.error().what();
+    ASSERT_TRUE((*object)->setTilePosition({x, 64}));
+    ASSERT_TRUE((*object)->init(**world, id, EntityMode::Master));
+    ASSERT_TRUE(entities.add_entity(*object));
+  };
+  auto expect_near = [&](float x, EntityId wanted) {
+    auto found = entities.interactive_entity_near({x, 64.5f}, 4.f);
+    ASSERT_TRUE(found) << found.error().what();
+    EXPECT_EQ(*found ? (*found)->entityId() : null_entity_id, wanted);
+  };
+  ASSERT_NO_FATAL_FAILURE(add(1, 127, RectF(0, 0, 2, 1), 0));
+  // Across the seam, the tile center is at -0.5 and its bounds end at 1.
+  expect_near(3.25f, 1);
+  expect_near(3.5f, 1);
+  expect_near(3.75f, null_entity_id);
+
+  ASSERT_NO_FATAL_FAILURE(add(2, 2, RectF(-3, 0, 1, 1), -3));
+  // Both objects offer the same interaction tile. Moving the cursor between
+  // their distinct box centers must flip the tie-break, in either visit order.
+  expect_near(0.f, 1);
+  expect_near(1.f, 2);
+  auto ordered = entities.entities_at({0.f, 64.5f});
+  ASSERT_TRUE(ordered) << ordered.error().what();
+  ASSERT_EQ(ordered->size(), 2u);
+  EXPECT_EQ((*ordered)[0]->entityId(), 1);
+  EXPECT_EQ((*ordered)[1]->entityId(), 2);
+});
 
 const GameTestRegistration moving_collision_filter("MovementController", "MovingPlatformAcrossSeam", [](GameTest& fixture) {
   auto storage = File::ephemeral_file(fixture.root().random());

@@ -426,7 +426,7 @@ bool WorldStorage::setSectorTimeToLive(Sector sector, float newTimeToLive) {
 }
 
 std::expected<std::optional<Vec2F>, StarException> WorldStorage::findUniqueEntity(String const& uniqueId) {
-  if (auto entity = m_entityMap->entity(m_entityMap->uniqueEntityId(uniqueId)))
+  if (auto entity = m_entityMap->entity(m_entityMap->unique_entity_id(uniqueId)))
     return entity->position();
 
   // Only return the unique index entry for the entity IF that stored sector is
@@ -443,7 +443,7 @@ std::expected<std::optional<Vec2F>, StarException> WorldStorage::findUniqueEntit
 }
 
 std::expected<EntityId, StarException> WorldStorage::loadUniqueEntity(String const& uniqueId) {
-  EntityId entityId = m_entityMap->uniqueEntityId(uniqueId);
+  EntityId entityId = m_entityMap->unique_entity_id(uniqueId);
   if (entityId != null_entity_id)
     return entityId;
 
@@ -452,7 +452,7 @@ std::expected<EntityId, StarException> WorldStorage::loadUniqueEntity(String con
   if (auto const& sectorAndPosition = *index) {
     auto loaded = loadSector(sectorAndPosition->first);
     if (!loaded) return std::unexpected(std::move(loaded.error()));
-    return m_entityMap->uniqueEntityId(uniqueId);
+    return m_entityMap->unique_entity_id(uniqueId);
   }
 
   return {};
@@ -524,7 +524,7 @@ std::expected<void, StarException> WorldStorage::tick(float dt, std::optional<st
 
       bool keepAlive = false;
       List<std::shared_ptr<Entity>> zombieEntities;
-      auto scanned = m_entityMap->forEachEntity(RectF(m_tileArray->sector_region(sector)), [&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
+      auto scanned = m_entityMap->for_each_entity(RectF(m_tileArray->sector_region(sector)), [&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
           if (belongsInSector(sector, entity->position())) {
             if (!keepAlive) {
               auto active = m_generatorFacade->entityKeepAlive(*this, entity);
@@ -565,7 +565,7 @@ std::expected<void, StarException> WorldStorage::tick(float dt, std::optional<st
         }
 
         for (auto const& entity : zombiesToRemove) {
-          m_entityMap->removeEntity(entity->entityId());
+          m_entityMap->remove_entity(entity->entityId());
           {
             auto operationResult1 = m_generatorFacade->destructEntity(*this, entity);
             if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
@@ -587,7 +587,7 @@ std::expected<void, StarException> WorldStorage::tick(float dt, std::optional<st
 
           UniqueIndexStore storedUniques;
           for (auto const& entity : zombiesToStore) {
-            m_entityMap->removeEntity(entity->entityId());
+            m_entityMap->remove_entity(entity->entityId());
             {
               auto operationResult1 = m_generatorFacade->destructEntity(*this, entity);
               if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
@@ -596,7 +596,7 @@ std::expected<void, StarException> WorldStorage::tick(float dt, std::optional<st
               auto added = storedUniques.add(*uniqueId, {sector, entity->position()});
               if (!added) return std::unexpected(std::move(added.error()));
             }
-            auto autostoredResult1 = entityFactory->storeVersionedEntity(entity);
+            auto autostoredResult1 = entityFactory->store_versioned_entity(entity);
             if (!autostoredResult1) return std::unexpected(std::move(autostoredResult1.error()));
             auto stored = std::move((*autostoredResult1));
             sectorStore.push_back(std::move(stored));
@@ -1205,7 +1205,7 @@ std::expected<void, StarException> WorldStorage::loadSectorToLevel(Sector const&
         if (!autosectorStoreResult1) return std::unexpected(std::move(autosectorStoreResult1.error()));
         auto sectorStore = std::move((*autosectorStoreResult1));
         for (auto const& entityStore : sectorStore) {
-          auto entity = entityFactory->loadVersionedEntity(entityStore);
+          auto entity = entityFactory->load_versioned_entity(entityStore);
           if (entity) {
             addedEntities.push_back(std::move(*entity));
           } else {
@@ -1224,13 +1224,13 @@ std::expected<void, StarException> WorldStorage::loadSectorToLevel(Sector const&
       UniqueIndexStore readUniques;
       for (auto const& entity : addedEntities) {
         {
-          auto operationResult1 = m_entityMap->reserveEntityId();
+          auto operationResult1 = m_entityMap->reserve_entity_id();
           if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
           auto operationResult2 = m_generatorFacade->initEntity(*this, (*operationResult1), entity);
           if (!operationResult2) return std::unexpected(std::move(operationResult2.error()));
         }
         {
-          auto indexed = m_entityMap->addEntity(entity);
+          auto indexed = m_entityMap->add_entity(entity);
           if (!indexed) {
             // initEntity registers tiles by id, not by object identity. If
             // initialization reentered the world and the id is now in use,
@@ -1274,7 +1274,7 @@ std::expected<bool, StarException> WorldStorage::unloadSectorToLevel(Sector cons
     auto entityFactory = std::move((*autoentityFactoryResult1));
     List<std::shared_ptr<Entity>> entitiesToStore;
     List<std::shared_ptr<Entity>> entitiesToRemove;
-    auto autosectorEntitiesResult1 = m_entityMap->entityQuery(RectF(m_tileArray->sector_region(sector)));
+    auto autosectorEntitiesResult1 = m_entityMap->entity_query(RectF(m_tileArray->sector_region(sector)));
     if (!autosectorEntitiesResult1) return std::unexpected(std::move(autosectorEntitiesResult1.error()));
     auto sectorEntities = std::move((*autosectorEntitiesResult1));
 
@@ -1307,7 +1307,7 @@ std::expected<bool, StarException> WorldStorage::unloadSectorToLevel(Sector cons
     }
 
     for (auto const& entity : entitiesToRemove) {
-      m_entityMap->removeEntity(entity->entityId());
+      m_entityMap->remove_entity(entity->entityId());
       {
         auto operationResult1 = m_generatorFacade->destructEntity(*this, entity);
         if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
@@ -1334,7 +1334,7 @@ std::expected<bool, StarException> WorldStorage::unloadSectorToLevel(Sector cons
 
       UniqueIndexStore storedUniques;
       for (auto const& entity : entitiesToStore) {
-        m_entityMap->removeEntity(entity->entityId());
+        m_entityMap->remove_entity(entity->entityId());
         {
           auto operationResult1 = m_generatorFacade->destructEntity(*this, entity);
           if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
@@ -1344,7 +1344,7 @@ std::expected<bool, StarException> WorldStorage::unloadSectorToLevel(Sector cons
           auto added = storedUniques.add(*uniqueId, {sector, position});
           if (!added) return std::unexpected(std::move(added.error()));
         }
-        auto autostoredEntityResult1 = entityFactory->storeVersionedEntity(entity);
+        auto autostoredEntityResult1 = entityFactory->store_versioned_entity(entity);
         if (!autostoredEntityResult1) return std::unexpected(std::move(autostoredEntityResult1.error()));
         auto storedEntity = std::move((*autostoredEntityResult1));
         sectorStore.push_back(std::move(storedEntity));
@@ -1420,7 +1420,7 @@ std::expected<void, StarException> WorldStorage::syncSector(Sector const& sector
   if (metadata.loadLevel >= SectorLoadLevel::Entities) {
     EntitySectorStore sectorStore;
     UniqueIndexStore storedUniques;
-    auto autosectorEntitiesResult1 = m_entityMap->entityQuery(RectF(m_tileArray->sector_region(sector)));
+    auto autosectorEntitiesResult1 = m_entityMap->entity_query(RectF(m_tileArray->sector_region(sector)));
     if (!autosectorEntitiesResult1) return std::unexpected(std::move(autosectorEntitiesResult1.error()));
     auto sectorEntities = std::move((*autosectorEntitiesResult1));
     for (auto const& entity : sectorEntities) {
@@ -1435,7 +1435,7 @@ std::expected<void, StarException> WorldStorage::syncSector(Sector const& sector
           auto added = storedUniques.add(*uniqueId, {sector, entity->position()});
           if (!added) return std::unexpected(std::move(added.error()));
         }
-        auto autostoredEntityResult1 = entityFactory->storeVersionedEntity(entity);
+        auto autostoredEntityResult1 = entityFactory->store_versioned_entity(entity);
         if (!autostoredEntityResult1) return std::unexpected(std::move(autostoredEntityResult1.error()));
         auto storedEntity = std::move((*autostoredEntityResult1));
         sectorStore.push_back(std::move(storedEntity));

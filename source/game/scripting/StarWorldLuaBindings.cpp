@@ -3179,7 +3179,7 @@ namespace LuaBindings {
     } else {
       // The existing dispatcher includes Player::diskStore on replicas too.
       // Keep its errors (including live Lua storage conversion errors) intact.
-      auto store = (*factory)->storeVersionedEntity(entity);
+      auto store = (*factory)->store_versioned_entity(entity);
       if (!store)
         return std::unexpected(std::move(store.error()));
       snapshot["data"] = store->toJson();

@@ -263,7 +263,7 @@ namespace WorldImpl {
     if (layer == TileLayer::Foreground) {
       if (checkCollision ? tile.getCollision() >= CollisionKind::Dynamic : tile.foreground != EmptyMaterialId)
         return true;
-      return entityMap->tileIsOccupied(pos, includeEphemeral);
+      return entityMap->tile_is_occupied(pos, includeEphemeral);
     }
     return tile.background != EmptyMaterialId;
   }
@@ -503,14 +503,14 @@ namespace WorldImpl {
       if (tile->get().foreground != EmptyMaterialId && tile->get().foreground != ObjectPlatformMaterialId)
         return false;
       if (!allowTileOverlap) {
-        auto occupied = entityMap->tileIsOccupied(pos);
+        auto occupied = entityMap->tile_is_occupied(pos);
         if (!occupied)
           return std::unexpected(std::move(occupied.error()));
         if (*occupied)
           return false;
       }
       if (!allowEntityOverlap) {
-        auto occupied = entityMap->spaceIsOccupied(RectF::with_size(Vec2F(pos), Vec2F(0.999f, 0.999f)));
+        auto occupied = entityMap->space_is_occupied(RectF::with_size(Vec2F(pos), Vec2F(0.999f, 0.999f)));
         if (!occupied)
           return std::unexpected(std::move(occupied.error()));
         if (*occupied)
@@ -547,14 +547,14 @@ namespace WorldImpl {
     if (tile->get().foreground != EmptyMaterialId && tile->get().foreground != ObjectPlatformMaterialId)
       return false;
     if (!allowTileOverlap) {
-      auto occupied = entityMap->tileIsOccupied(pos);
+      auto occupied = entityMap->tile_is_occupied(pos);
       if (!occupied)
         return std::unexpected(std::move(occupied.error()));
       if (*occupied)
         return false;
     }
     if (!allowEntityOverlap) {
-      auto occupied = entityMap->spaceIsOccupied(RectF::with_size(Vec2F(pos), Vec2F(0.999f, 0.999f)));
+      auto occupied = entityMap->space_is_occupied(RectF::with_size(Vec2F(pos), Vec2F(0.999f, 0.999f)));
       if (!occupied)
         return std::unexpected(std::move(occupied.error()));
       if (*occupied)
@@ -760,7 +760,7 @@ namespace WorldImpl {
 
     if (!evaluated)
       return std::unexpected(std::move(evaluated.error()));
-    auto entities = entityMap->entityQuery(RectF(lighting.calculation_region()));
+    auto entities = entityMap->entity_query(RectF(lighting.calculation_region()));
     if (!entities)
       return std::unexpected(std::move(entities.error()));
     for (auto const& entity : *entities) {
@@ -781,7 +781,7 @@ namespace WorldImpl {
 
   inline std::expected<std::shared_ptr<InteractiveEntity>, StarException> getInteractiveInRange(WorldGeometry const& geometry, std::shared_ptr<EntityMap> const& entityMap,
       Vec2F const& targetPosition, Vec2F const& sourcePosition, float maxRange) {
-    auto entity = entityMap->interactiveEntityNear(targetPosition, maxRange);
+    auto entity = entityMap->interactive_entity_near(targetPosition, maxRange);
     if (!entity)
       return std::unexpected(std::move(entity.error()));
     if (*entity) {

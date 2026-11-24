@@ -204,7 +204,7 @@ std::expected<void, StarException> PlayerStorage::initialize(String const& stora
         if (!basename)
           return std::unexpected(std::move(basename.error()));
         if (m_playerFileNames.insert(*uuid, basename->get())) {
-          auto data = (*entityFactory)->loadVersionedJson(*json, EntityType::Player);
+          auto data = (*entityFactory)->load_versioned_json(*json, EntityType::Player);
           if (!data)
             return std::unexpected(std::move(data.error()));
           m_savedPlayersCache[*uuid] = std::move(*data);
@@ -237,7 +237,7 @@ std::expected<void, StarException> PlayerStorage::initialize(String const& stora
         continue;
       }
       auto validated = [&]() -> std::expected<void, StarException> {
-        auto entity = (*entityFactory)->diskLoadEntity(EntityType::Player, entry.second);
+        auto entity = (*entityFactory)->disk_load_entity(EntityType::Player, entry.second);
         if (!entity)
           return std::unexpected(std::move(entity.error()));
         auto player = convert<Player>(*entity);
@@ -402,7 +402,7 @@ std::expected<Json, StarException> PlayerStorage::savePlayer(std::shared_ptr<Pla
     return std::unexpected(std::move(newPlayerData.error()));
   auto cached = m_savedPlayersCache.find_ref(uuid);
   if (!cached || cached->get() != *newPlayerData) {
-    auto versionedJson = (*entityFactory)->storeVersionedJson(EntityType::Player, *newPlayerData);
+    auto versionedJson = (*entityFactory)->store_versioned_json(EntityType::Player, *newPlayerData);
     if (!versionedJson)
       return std::unexpected(std::move(versionedJson.error()));
     auto basename = uuidFileName(uuid);
@@ -447,7 +447,7 @@ std::expected<std::shared_ptr<Player>, StarException> PlayerStorage::loadPlayer(
   if (!entityFactory)
     return std::unexpected(std::move(entityFactory.error()));
   auto loaded = [&]() -> std::expected<std::shared_ptr<Player>, StarException> {
-    auto entity = (*entityFactory)->diskLoadEntity(EntityType::Player, *playerCacheData);
+    auto entity = (*entityFactory)->disk_load_entity(EntityType::Player, *playerCacheData);
     if (!entity)
       return std::unexpected(std::move(entity.error()));
     auto player = convert<Player>(*entity);
