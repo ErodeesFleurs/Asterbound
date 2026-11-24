@@ -217,11 +217,8 @@ std::expected<Json, StarException> StatusController::diskStore() const {
     // Store ephemeral effects in the disk store based on remaining duration.
     // TODO: Need to store maximum duration as well in the store, otherwise the
     // effect will always appear "full" on reload (but just last less time)
-    auto metadata = m_uniqueEffectMetadata.get_net_element(pair.second.metadataId);
-    if (!metadata) return std::unexpected(std::move(metadata.error()));
-    if ((*metadata)->duration) {
-      ephemeralEffects.push_back(
-        jsonFromEphemeralStatusEffect(EphemeralStatusEffect{pair.first, *(*metadata)->duration}));
+    if (auto duration = pair.second->metadata->duration) {
+      ephemeralEffects.push_back(jsonFromEphemeralStatusEffect(EphemeralStatusEffect{pair.first, *duration}));
     }
   }
 
@@ -449,49 +446,44 @@ std::expected<void, StarException> StatusController::clearAllPersistentEffects()
 }
 
 std::expected<void, StarException> StatusController::addEphemeralEffect(EphemeralStatusEffect const& effect, std::optional<EntityId> sourceEntityId) {
-  return addEphemeralEffects({effect}, sourceEntityId);
+  if (auto existing = m_uniqueEffects.find_ref(effect.uniqueEffect)) {
+    auto const& instance = *existing->get();
+    auto& metadata = *instance.metadata;
+    if (metadata.duration) {
+      float duration = effect.duration.value_or(instance.definition.defaultDuration);
+      if (duration > *metadata.duration) {
+        metadata.sourceEntityId.set(sourceEntityId);
+        metadata.duration = duration;
+      }
+      metadata.maxDuration.set(std::max(metadata.maxDuration.get(), duration));
+    }
+    return {};
+  }
+  auto added = add_unique_effect(effect.uniqueEffect, true, effect.duration, sourceEntityId);
+  if (!added) return std::unexpected(std::move(added.error()));
+  return {};
 }
 
 std::expected<void, StarException> StatusController::addEphemeralEffects(List<EphemeralStatusEffect> const& effectList, std::optional<EntityId> sourceEntityId) {
   for (auto const& effect : effectList) {
-    if (auto existingEffect = m_uniqueEffects.find_ref(effect.uniqueEffect)) {
-      auto metadata = m_uniqueEffectMetadata.get_net_element(existingEffect->get().metadataId);
-      if (!metadata) return std::unexpected(std::move(metadata.error()));
-      if ((*metadata)->duration) {
-        auto defaultDuration = defaultUniqueEffectDuration(effect.uniqueEffect);
-        if (!defaultDuration) return std::unexpected(std::move(defaultDuration.error()));
-        auto newDuration = effect.duration.value_or(*defaultDuration);
-        if (newDuration > *(*metadata)->duration) {
-          (*metadata)->sourceEntityId.set(sourceEntityId);
-          (*metadata)->duration = newDuration;
-        }
-        (*metadata)->maxDuration.set(std::max((*metadata)->maxDuration.get(), newDuration));
-      }
-    } else {
-      auto defaultDuration = defaultUniqueEffectDuration(effect.uniqueEffect);
-      if (!defaultDuration) return std::unexpected(std::move(defaultDuration.error()));
-      auto added = addUniqueEffect(effect.uniqueEffect, effect.duration.value_or(*defaultDuration), sourceEntityId);
-      if (!added) return std::unexpected(std::move(added.error()));
-    }
+    if (auto result = addEphemeralEffect(effect, sourceEntityId); !result)
+      return std::unexpected(std::move(result.error()));
   }
   return {};
 }
 
 std::expected<bool, StarException> StatusController::removeEphemeralEffect(UniqueStatusEffect const& effect) {
-  if (auto uniqueEffect = m_uniqueEffects.find_ref(effect)) {
-    auto metadata = m_uniqueEffectMetadata.get_net_element(uniqueEffect->get().metadataId);
-    if (!metadata) return std::unexpected(std::move(metadata.error()));
-    if ((*metadata)->duration) {
-      if (auto result = removeUniqueEffect(effect); !result) return std::unexpected(std::move(result.error()));
-      return true;
-    }
+  if (auto instance = m_uniqueEffects.find_ref(effect); instance && instance->get()->metadata->duration) {
+    if (auto result = remove_unique_effect(instance->get()); !result) return std::unexpected(std::move(result.error()));
+    return true;
   }
   return false;
 }
 
 std::expected<void, StarException> StatusController::clearEphemeralEffects() {
-  for (auto const& key : m_uniqueEffects.keys()) {
-    if (auto result = removeEphemeralEffect(key); !result) return std::unexpected(std::move(result.error()));
+  for (auto effects = effect_snapshot(); auto const& instance : *effects) {
+    if (instance->active && instance->metadata->duration)
+      if (auto result = remove_unique_effect(instance); !result) return std::unexpected(std::move(result.error()));
   }
   return {};
 }
@@ -597,10 +589,14 @@ std::expected<void, StarException> StatusController::init(Entity& parentEntity, 
   m_movementController = std::ref(movementController);
 
   if (m_parentEntity->get().isMaster()) {
+    auto effects = effect_snapshot();
+    m_run_effect_scripts = true;
     if (auto result = initPrimaryScript(); !result) return std::unexpected(std::move(result.error()));
-    for (auto& p : m_uniqueEffects.keys())
-      if (auto effect = m_uniqueEffects.find_ref(p))
-        if (auto result = initUniqueEffectScript(effect->get()); !result) return std::unexpected(std::move(result.error()));
+    for (auto const& instance : *effects) {
+      if (!instance->active) continue;
+      auto result = dispatch_effect(*instance, [&] { return initUniqueEffectScript(*instance); });
+      if (!result) return std::unexpected(std::move(result.error()));
+    }
   }
 
   m_environmentStatusEffectUpdateTimer.reset();
@@ -609,9 +605,10 @@ std::expected<void, StarException> StatusController::init(Entity& parentEntity, 
 
 std::expected<void, StarException> StatusController::uninit() {
   std::optional<StarException> error;
-  for (auto const& key : m_uniqueEffects.keys()) {
-    if (auto effect = m_uniqueEffects.find_ref(key)) {
-      auto result = uninitUniqueEffectScript(effect->get());
+  m_run_effect_scripts = false;
+  for (auto effects = effect_snapshot(); auto const& instance : *effects) {
+    if (instance->active) {
+      auto result = uninitUniqueEffectScript(*instance);
       if (!result && !error) error = std::move(result.error());
     }
   }
@@ -732,28 +729,26 @@ std::expected<void, StarException> StatusController::tickMaster(float dt) {
   }
   auto primary = m_primaryScript.update(m_primaryScript.update_dt(dt));
   if (!primary && !primary.error().is<LuaScriptError>()) return std::unexpected(std::move(primary.error()));
-  for (auto& entry : m_uniqueEffects) {
-    auto updated = entry.second.script.update(entry.second.script.update_dt(dt));
+  auto effects = effect_snapshot();
+  for (auto const& instance : *effects) {
+    if (!instance->active) continue;
+    auto updated = dispatch_effect(*instance, [&] { return instance->script.update(instance->script.update_dt(dt)); });
     // Each failing effect has already been logged and disabled by its script component.
     if (!updated && !updated.error().is<LuaScriptError>()) return std::unexpected(std::move(updated.error()));
-    auto metadata = m_uniqueEffectMetadata.get_net_element(entry.second.metadataId);
-    if (!metadata) return std::unexpected(std::move(metadata.error()));
-    if ((*metadata)->duration) *(*metadata)->duration -= dt;
+    if (instance->active && instance->metadata->duration) *instance->metadata->duration -= dt;
   }
-  for (auto const& key : m_uniqueEffects.keys()) {
-    auto effect = m_uniqueEffects.get(key);
-    if (!effect) return std::unexpected(std::move(effect.error()));
-    auto metadata = m_uniqueEffectMetadata.get_net_element(effect->get().metadataId);
-    if (!metadata) return std::unexpected(std::move(metadata.error()));
-    if (((*metadata)->duration && *(*metadata)->duration <= 0.0f)
-        || (((*metadata)->duration && statPositive("statusImmunity"))
-          || (effect->get().effectConfig.blockingStat && statPositive(*effect->get().effectConfig.blockingStat)))) {
-      if (auto result = removeUniqueEffect(key); !result) return std::unexpected(std::move(result.error()));
+  for (auto const& instance : *effects) {
+    if (!instance->active) continue;
+    auto duration = instance->metadata->duration;
+    auto const& blocking_stat = instance->definition.blockingStat;
+    if ((duration && (*duration <= 0.0f || statPositive("statusImmunity")))
+        || (blocking_stat && statPositive(*blocking_stat))) {
+      if (auto result = remove_unique_effect(instance); !result) return std::unexpected(std::move(result.error()));
     }
   }
   DirectivesGroup directives;
   directives.append(m_primaryDirectives);
-  for (auto const& entry : m_uniqueEffects) directives.append(entry.second.parentDirectives);
+  for (auto const& entry : m_uniqueEffects) directives.append(entry.second->parentDirectives);
   m_parentDirectives.set(std::move(directives));
   return updateAnimators(dt);
 }
@@ -830,8 +825,9 @@ MessageResponseResult StatusController::receiveMessage(String const& message, bo
     if (!result.error().is<LuaScriptError>()) return std::unexpected(std::move(result.error()));
     result = std::optional<ChainableJsonMessageResponse>{};
   }
-  for (auto& entry : m_uniqueEffects) {
-    auto response = entry.second.script.handle_message(message, localMessage, args);
+  for (auto effects = effect_snapshot(); auto const& instance : *effects) {
+    if (!instance->active) continue;
+    auto response = dispatch_effect(*instance, [&] { return instance->script.handle_message(message, localMessage, args); });
     if (!response) {
       if (!response.error().is<LuaScriptError>()) return std::unexpected(std::move(response.error()));
       continue;
@@ -949,107 +945,138 @@ std::expected<void, StarException> StatusController::updateAnimators(float dt) {
 }
 
 std::expected<void, StarException> StatusController::updatePersistentUniqueEffects() {
+  auto revision = ++m_persistent_revision;
   Set<UniqueStatusEffect> active;
-  for (auto&& category : m_persistentEffects) {
-    for (auto it = category.second.uniqueEffects.begin(); it != category.second.uniqueEffects.end();) {
-      auto const& name = *it++;
-      if (auto existing = m_uniqueEffects.find_ref(name)) {
-        auto metadata = m_uniqueEffectMetadata.get_net_element(existing->get().metadataId);
-        if (!metadata) return std::unexpected(std::move(metadata.error()));
-        (*metadata)->duration.reset();
-        active.add(name);
-      } else {
-        auto added = addUniqueEffect(name, {}, {});
-        if (!added) return std::unexpected(std::move(added.error()));
-        if (*added) active.add(name);
-        else category.second.uniqueEffects.remove(name);
-      }
+  List<UniqueStatusEffect> missing;
+  for (auto const& category : m_persistentEffects) {
+    for (auto const& name : category.second.uniqueEffects) {
+      if (!active.add(name)) continue;
+      if (auto existing = m_uniqueEffects.find_ref(name))
+        existing->get()->metadata->duration.reset();
+      else
+        missing.push_back(name);
     }
   }
-  for (auto const& key : m_uniqueEffects.keys()) {
-    auto effect = m_uniqueEffects.get(key);
-    if (!effect) return std::unexpected(std::move(effect.error()));
-    auto metadata = m_uniqueEffectMetadata.get_net_element(effect->get().metadataId);
-    if (!metadata) return std::unexpected(std::move(metadata.error()));
-    if (!(*metadata)->duration && !active.contains(key)) {
-      if (auto result = removeUniqueEffect(key); !result) return std::unexpected(std::move(result.error()));
+  // init and onExpire can synchronously reconcile a newer set of categories.
+  for (auto const& name : missing) {
+    if (auto existing = m_uniqueEffects.find_ref(name)) {
+      existing->get()->metadata->duration.reset();
+      continue;
+    }
+    auto added = add_unique_effect(name, false, {}, {});
+    if (!added) return std::unexpected(std::move(added.error()));
+    if (revision != m_persistent_revision) return {};
+    if (!*added)
+      for (auto&& category : m_persistentEffects) category.second.uniqueEffects.remove(name);
+  }
+  for (auto effects = effect_snapshot(); auto const& instance : *effects) {
+    if (instance->active && !instance->metadata->duration && !active.contains(instance->definition.name)) {
+      if (auto result = remove_unique_effect(instance); !result) return std::unexpected(std::move(result.error()));
+      if (revision != m_persistent_revision) return {};
     }
   }
   return {};
 }
 
-std::expected<float, StarException> StatusController::defaultUniqueEffectDuration(UniqueStatusEffect const& effect) const {
-  auto database = m_root.statusEffectDatabase();
-  if (!database) return std::unexpected(std::move(database.error()));
-  auto config = (*database)->uniqueEffectConfig(effect);
-  if (!config) return std::unexpected(std::move(config.error()));
-  return config->defaultDuration;
+std::shared_ptr<StatusController::EffectSnapshot const> StatusController::effect_snapshot() {
+  if (m_uniqueEffects.empty()) {
+    static auto const empty = std::make_shared<EffectSnapshot const>();
+    return empty;
+  }
+  if (!m_effect_snapshot)
+    m_effect_snapshot = std::make_shared<EffectSnapshot>(m_uniqueEffects.values());
+  return m_effect_snapshot;
 }
 
-std::expected<bool, StarException> StatusController::addUniqueEffect(UniqueStatusEffect const& effect, std::optional<float> duration, std::optional<EntityId> sourceEntityId) {
+template <status_effect_call call_type>
+std::invoke_result_t<call_type&> StatusController::dispatch_effect(UniqueEffectInstance& instance, call_type&& call) {
+  bool nested = std::exchange(instance.executing, true);
+  auto result = call();
+  instance.executing = nested;
+  // A self-removing script finishes its current native/Lua frame with its
+  // original callbacks intact. Only the outermost caller performs teardown.
+  if (!nested && !instance.active) {
+    if (auto stopped = uninitUniqueEffectScript(instance); !stopped) {
+      if (!result) return std::unexpected(stopped.error().with_related(result.error(), "Effect callback failed"));
+      return std::unexpected(std::move(stopped.error()));
+    }
+  }
+  return result;
+}
+
+std::expected<bool, StarException> StatusController::add_unique_effect(UniqueStatusEffect const& effect,
+    bool ephemeral, std::optional<float> duration, std::optional<EntityId> source_id) {
   auto database = m_root.statusEffectDatabase();
   if (!database) return std::unexpected(std::move(database.error()));
-  if (!(*database)->isUniqueEffect(effect)) {
+  auto config = (*database)->unique_effect_config(effect);
+  if (!config) {
+    if (ephemeral) return std::unexpected(std::move(config.error()));
     if (auto result = m_root.logger().warn("Unique status effect '{}' not found in status effect database", effect); !result) return std::unexpected(std::move(result.error()));
     return false;
   }
-  auto config = (*database)->uniqueEffectConfig(effect);
-  if (!config) return std::unexpected(std::move(config.error()));
-  if ((duration && statPositive("statusImmunity")) || (config->blockingStat && statPositive(*config->blockingStat))) return false;
-  auto& instance = m_uniqueEffects.try_emplace(effect, m_root).first->second;
-  instance.effectConfig = std::move(*config);
-  if (auto result = instance.script.set_scripts(instance.effectConfig.scripts); !result) {
-    m_uniqueEffects.remove(effect);
-    return std::unexpected(std::move(result.error()));
+  auto const& definition = config->get();
+  if ((ephemeral && statPositive("statusImmunity")) || (definition.blockingStat && statPositive(*definition.blockingStat))) return false;
+  if (ephemeral && !duration) duration = definition.defaultDuration;
+  auto metadata = UniqueEffectMetadata::create(effect, duration, source_id);
+  if (!metadata) return std::unexpected(std::move(metadata.error()));
+  auto instance = std::make_shared<UniqueEffectInstance>(m_root, std::move(*database), definition, std::move(*metadata));
+  if (auto result = instance->script.set_scripts(definition.scripts); !result) return std::unexpected(std::move(result.error()));
+  instance->script.set_update_delta(definition.scriptDelta);
+  if (definition.animationConfig) {
+    auto animator = EffectAnimator::create(m_root, definition.animationConfig);
+    if (!animator) return std::unexpected(std::move(animator.error()));
+    instance->animator = std::move(*animator);
   }
-  instance.script.set_update_delta(instance.effectConfig.scriptDelta);
-  auto createdMetadata = UniqueEffectMetadata::create(effect, duration, sourceEntityId);
-  if (!createdMetadata) { m_uniqueEffects.remove(effect); return std::unexpected(std::move(createdMetadata.error())); }
-  auto metadata = m_uniqueEffectMetadata.add_net_element(std::move(*createdMetadata));
-  if (!metadata) { m_uniqueEffects.remove(effect); return std::unexpected(std::move(metadata.error())); }
-  instance.metadataId = *metadata;
-  instance.animatorId = EffectAnimatorGroup::null_element_id;
-  if (instance.effectConfig.animationConfig) {
-    auto animator = EffectAnimator::create(m_root, instance.effectConfig.animationConfig);
-    if (!animator) {
-      m_uniqueEffectMetadata.remove_net_element(instance.metadataId);
-      m_uniqueEffects.remove(effect);
-      return std::unexpected(std::move(animator.error()));
+  auto metadata_id = m_uniqueEffectMetadata.add_net_element(instance->metadata);
+  if (!metadata_id) return std::unexpected(std::move(metadata_id.error()));
+  instance->metadata_id = *metadata_id;
+  if (instance->animator) {
+    auto animator_id = m_effectAnimators.add_net_element(instance->animator);
+    if (!animator_id) {
+      m_uniqueEffectMetadata.remove_net_element(*metadata_id);
+      return std::unexpected(std::move(animator_id.error()));
     }
-    auto id = m_effectAnimators.add_net_element(std::move(*animator));
-    if (!id) {
-      m_uniqueEffectMetadata.remove_net_element(instance.metadataId);
-      m_uniqueEffects.remove(effect);
-      return std::unexpected(std::move(id.error()));
-    }
-    instance.animatorId = *id;
+    instance->animator_id = *animator_id;
   }
-  instance.toolUsageSuppressed = false;
-  if (m_parentEntity) {
-    if (auto result = initUniqueEffectScript(instance); !result) {
-      auto cleanup = uninitUniqueEffectScript(instance);
-      m_uniqueEffectMetadata.remove_net_element(instance.metadataId);
-      if (instance.animatorId != EffectAnimatorGroup::null_element_id) m_effectAnimators.remove_net_element(instance.animatorId);
-      m_uniqueEffects.remove(effect);
-      if (!cleanup) return std::unexpected(cleanup.error().with_context(result.error().what()));
+  m_uniqueEffects.try_emplace(effect, instance);
+  m_effect_snapshot.reset();
+  if (m_run_effect_scripts) {
+    if (auto result = dispatch_effect(*instance, [&] { return initUniqueEffectScript(*instance); }); !result) {
+      if (instance->active) {
+        if (auto cleanup = remove_unique_effect(instance, false); !cleanup)
+          return std::unexpected(cleanup.error().with_related(result.error(), "Effect initialization failed"));
+      }
       return std::unexpected(std::move(result.error()));
     }
   }
   return true;
 }
 
-std::expected<void, StarException> StatusController::removeUniqueEffect(UniqueStatusEffect const& effect) {
-  auto instance = m_uniqueEffects.get(effect);
-  if (!instance) return std::unexpected(std::move(instance.error()));
-  auto expired = instance->get().script.invoke("onExpire");
-  auto uninitialized = uninitUniqueEffectScript(instance->get());
-  m_uniqueEffectMetadata.remove_net_element(instance->get().metadataId);
-  if (instance->get().animatorId != EffectAnimatorGroup::null_element_id)
-    m_effectAnimators.remove_net_element(instance->get().animatorId);
-  m_uniqueEffects.remove(effect);
-  if (!expired && !expired.error().is<LuaScriptError>()) return std::unexpected(std::move(expired.error()));
-  if (!uninitialized) return std::unexpected(std::move(uninitialized.error()));
+std::expected<void, StarException> StatusController::remove_unique_effect(std::shared_ptr<UniqueEffectInstance> instance, bool expire) {
+  // Unpublish identity and wire entries before running arbitrary Lua. The
+  // detached instance still owns the metadata and animator its callbacks use.
+  instance->active = false;
+  m_uniqueEffects.remove(instance->definition.name);
+  m_effect_snapshot.reset();
+  m_uniqueEffectMetadata.remove_net_element(instance->metadata_id);
+  if (instance->animator) m_effectAnimators.remove_net_element(instance->animator_id);
+  if (instance->tool_usage_suppressed) update_tool_suppression();
+  std::optional<StarException> error;
+  if (expire) {
+    auto expired = instance->script.invoke("onExpire");
+    if (!expired && !expired.error().is<LuaScriptError>()) error = std::move(expired.error());
+  }
+  if (!instance->executing) {
+    auto stopped = uninitUniqueEffectScript(*instance);
+    if (!stopped && !error) error = std::move(stopped.error());
+  }
+  if (error) return std::unexpected(std::move(*error));
   return {};
+}
+
+void StatusController::update_tool_suppression() {
+  m_toolUsageSuppressed.set(std::ranges::any_of(m_uniqueEffects.value_view(),
+      [](std::shared_ptr<UniqueEffectInstance> const& instance) { return instance->tool_usage_suppressed; }));
 }
 
 std::expected<void, StarException> StatusController::initPrimaryScript() {
@@ -1094,17 +1121,15 @@ std::expected<void, StarException> StatusController::initUniqueEffectScript(Uniq
   if (!statusCallbacks) return std::unexpected(std::move(statusCallbacks.error()));
   if (auto result = uniqueEffect.script.add_callbacks("status", std::move(*statusCallbacks)); !result) return std::unexpected(std::move(result.error()));
   auto configCallbacks = LuaBindings::makeConfigCallbacks([&uniqueEffect](String const& name, Json const& def) {
-    return uniqueEffect.effectConfig.effectConfig.query(name, def);
+    return uniqueEffect.definition.effectConfig.query(name, def);
   });
   if (!configCallbacks) return std::unexpected(std::move(configCallbacks.error()));
   if (auto result = uniqueEffect.script.add_callbacks("config", std::move(*configCallbacks)); !result) return std::unexpected(std::move(result.error()));
   auto entityCallbacks = LuaBindings::makeEntityCallbacks(m_parentEntity->get());
   if (!entityCallbacks) return std::unexpected(std::move(entityCallbacks.error()));
   if (auto result = uniqueEffect.script.add_callbacks("entity", std::move(*entityCallbacks)); !result) return std::unexpected(std::move(result.error()));
-  if (uniqueEffect.animatorId != EffectAnimatorGroup::null_element_id) {
-    auto animator = m_effectAnimators.get_net_element(uniqueEffect.animatorId);
-    if (!animator) return std::unexpected(std::move(animator.error()));
-    auto callbacks = LuaBindings::makeNetworkedAnimatorCallbacks(*(*animator)->animator);
+  if (uniqueEffect.animator) {
+    auto callbacks = LuaBindings::makeNetworkedAnimatorCallbacks(*uniqueEffect.animator->animator);
     if (!callbacks) return std::unexpected(std::move(callbacks.error()));
     if (auto result = uniqueEffect.script.add_callbacks("animator", std::move(*callbacks)); !result) return std::unexpected(std::move(result.error()));
   }
@@ -1117,6 +1142,8 @@ std::expected<void, StarException> StatusController::initUniqueEffectScript(Uniq
 }
 
 std::expected<void, StarException> StatusController::uninitUniqueEffectScript(UniqueEffectInstance& uniqueEffect) {
+  bool nested = std::exchange(uniqueEffect.executing, true);
+  auto reset = make_scope_exit([&] { uniqueEffect.executing = nested; });
   auto uninitialized = uniqueEffect.script.uninit();
   std::optional<StarException> error;
   if (!uninitialized && !uninitialized.error().is<LuaScriptError>()) error = std::move(uninitialized.error());
@@ -1134,38 +1161,19 @@ std::expected<void, StarException> StatusController::uninitUniqueEffectScript(Un
 
 std::expected<LuaCallbacks, StarException> StatusController::makeUniqueEffectCallbacks(UniqueEffectInstance& uniqueEffect) {
   LuaCallbacks callbacks;
-  if (auto result = callbacks.register_callback("name", [&controller = *this, &uniqueEffect]() -> std::expected<UniqueStatusEffect, StarException> {
-    auto metadata = controller.m_uniqueEffectMetadata.get_net_element(uniqueEffect.metadataId);
-    if (!metadata) return std::unexpected(std::move(metadata.error()));
-    return (*metadata)->effect;
+  if (auto result = callbacks.register_callback("name", [&uniqueEffect]() { return uniqueEffect.definition.name; }); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.register_callback("duration", [&uniqueEffect]() { return uniqueEffect.metadata->duration; }); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = callbacks.register_callback("modifyDuration", [&uniqueEffect](float duration) -> void {
+    if (uniqueEffect.metadata->duration) *uniqueEffect.metadata->duration += duration;
   }); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.register_callback("duration", [&controller = *this, &uniqueEffect]() -> std::expected<std::optional<float>, StarException> {
-    auto metadata = controller.m_uniqueEffectMetadata.get_net_element(uniqueEffect.metadataId);
-    if (!metadata) return std::unexpected(std::move(metadata.error()));
-    return (*metadata)->duration;
+  if (auto result = callbacks.register_callback("setDuration", [&uniqueEffect](float duration) -> void {
+    if (uniqueEffect.metadata->duration) uniqueEffect.metadata->duration = duration;
   }); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.register_callback("modifyDuration", [&controller = *this, &uniqueEffect](float duration) -> std::expected<void, StarException> {
-    auto metadata = controller.m_uniqueEffectMetadata.get_net_element(uniqueEffect.metadataId);
-    if (!metadata) return std::unexpected(std::move(metadata.error()));
-    if ((*metadata)->duration) *(*metadata)->duration += duration;
-    return {};
-  }); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.register_callback("setDuration", [&controller = *this, &uniqueEffect](float duration) -> std::expected<void, StarException> {
-    auto metadata = controller.m_uniqueEffectMetadata.get_net_element(uniqueEffect.metadataId);
-    if (!metadata) return std::unexpected(std::move(metadata.error()));
-    if ((*metadata)->duration) *(*metadata)->duration = duration;
-    return {};
-  }); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.register_callback("expire", [&controller = *this, &uniqueEffect]() -> std::expected<void, StarException> {
-    auto metadata = controller.m_uniqueEffectMetadata.get_net_element(uniqueEffect.metadataId);
-    if (!metadata) return std::unexpected(std::move(metadata.error()));
-    if ((*metadata)->duration) (*metadata)->duration = 0.0f;
-    return {};
+  if (auto result = callbacks.register_callback("expire", [&uniqueEffect]() -> void {
+    if (uniqueEffect.metadata->duration) uniqueEffect.metadata->duration = 0.0f;
   }); !result) return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("sourceEntity", [&controller = *this, &uniqueEffect]() -> std::expected<std::optional<EntityId>, StarException> {
-    auto metadata = controller.m_uniqueEffectMetadata.get_net_element(uniqueEffect.metadataId);
-    if (!metadata) return std::unexpected(std::move(metadata.error()));
-    auto source = (*metadata)->sourceEntityId.get();
+    auto source = uniqueEffect.metadata->sourceEntityId.get();
     if (!source) return std::optional<EntityId>(controller.m_parentEntity->get().entityId());
     if (source == null_entity_id) return std::optional<EntityId>{};
     return source;
@@ -1174,7 +1182,7 @@ std::expected<LuaCallbacks, StarException> StatusController::makeUniqueEffectCal
     uniqueEffect.parentDirectives = directives.value_or(String{});
   }); !result) return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("getParameter", [&uniqueEffect](String const& name, Json const& def) -> std::expected<Json, StarException> {
-    return uniqueEffect.effectConfig.effectConfig.query(name, def);
+    return uniqueEffect.definition.effectConfig.query(name, def);
   }); !result) return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("addStatModifierGroup", [&controller = *this, &uniqueEffect](List<StatModifier> const& modifiers) -> std::expected<StatModifierGroupId, StarException> {
     auto id = controller.m_statCollection->addStatModifierGroup(modifiers);
@@ -1195,11 +1203,9 @@ std::expected<LuaCallbacks, StarException> StatusController::makeUniqueEffectCal
     return {};
   }); !result) return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("setToolUsageSuppressed", [&controller = *this, &uniqueEffect](bool suppressed) -> void {
-    if (uniqueEffect.toolUsageSuppressed == suppressed) return;
-    uniqueEffect.toolUsageSuppressed = suppressed;
-    bool anySuppressed = false;
-    for (auto& entry : controller.m_uniqueEffects) anySuppressed = anySuppressed || entry.second.toolUsageSuppressed;
-    controller.m_toolUsageSuppressed.set(anySuppressed);
+    if (uniqueEffect.tool_usage_suppressed == suppressed) return;
+    uniqueEffect.tool_usage_suppressed = suppressed;
+    if (uniqueEffect.active) controller.update_tool_suppression();
   }); !result) return std::unexpected(std::move(result.error()));
   return callbacks;
 }

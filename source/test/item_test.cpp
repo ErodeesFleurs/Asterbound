@@ -1359,7 +1359,7 @@ const GameTestRegistration
 
     struct Events : NullRenderCallback {
       std::vector<std::tuple<Vec2F, Vec2F, Color>> particles;
-      std::expected<void, StarException> addParticle(Particle particle) override {
+      std::expected<void, StarException> add_particle(Particle&& particle) override {
         if (particle.type == Particle::Type::Ember && particle.timeToLive == 0.25f)
           particles.emplace_back(particle.position, particle.velocity, particle.color);
         return {};

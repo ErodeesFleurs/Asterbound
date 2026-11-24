@@ -21,8 +21,9 @@ class Root;
 class EffectEmitter : public NetElementGroup {
 public:
   [[nodiscard]] static std::expected<std::shared_ptr<EffectEmitter>, StarException> create(Root& root);
+  ~EffectEmitter() override;
 
-  void addEffectSources(String const& position, StringSet effectSources);
+  void addEffectSources(String const& position, StringSet const& effectSources);
   void setSourcePosition(String name, Vec2F const& position);
   void setDirection(Direction direction);
   void setBaseVelocity(Vec2F const& velocity);
@@ -36,11 +37,20 @@ public:
   [[nodiscard]] std::expected<void, StarException> fromJson(Json const& diskStore);
 
 private:
-  explicit EffectEmitter(Root& root) : m_root(root) {}
+  explicit EffectEmitter(Root& root);
+  using SourceKey = std::pair<String, String>;
+  struct RunningSource {
+    SourceKey key;
+    std::shared_ptr<EffectSource> source;
+  };
+  struct PendingEvents;
+  [[nodiscard]] std::expected<void, StarException> reconcile_sources();
   Root& m_root;
-  Set<std::pair<String, String>> m_newSources;
-  List<std::shared_ptr<EffectSource>> m_sources;
-  NetElementData<Set<std::pair<String, String>>> m_activeSources;
+  Set<SourceKey> m_newSources;
+  List<RunningSource> m_sources;
+  NetElementData<Set<SourceKey>> m_activeSources;
+  std::unique_ptr<PendingEvents> m_pending_events;
+  bool m_reconcile = true;
 
   StringMap<Vec2F> m_positions;
   Direction m_direction = Direction::Right;

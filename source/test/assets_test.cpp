@@ -36,6 +36,11 @@ import star.root;
 import star.random;
 import star.logging;
 import star.effect_source_database;
+import star.effect_emitter;
+import star.entity_rendering;
+import star.particle;
+import star.set;
+import star.net_compatibility;
 import star.lua;
 import star.lua_game_converters;
 import star.mixer;
@@ -258,6 +263,74 @@ namespace {
       return std::unexpected(std::move(written.error()));
     return buffer->take_data();
   }
+}
+
+namespace {
+constexpr std::array<unsigned char, 48> pcm_test_wave = {
+  'R', 'I', 'F', 'F', 40, 0, 0, 0, 'W', 'A', 'V', 'E',
+  'f', 'm', 't', ' ', 16, 0, 0, 0, 1, 0, 1, 0,
+  0x40, 0x1f, 0, 0, 0x80, 0x3e, 0, 0, 2, 0, 16, 0,
+  'd', 'a', 't', 'a', 4, 0, 0, 0, 0x34, 0x12, 0xfe, 0xff
+};
+
+std::expected<std::unique_ptr<Root>, StarException> effect_test_root(GameTest& fixture, String const& directory,
+    std::initializer_list<std::pair<String, String>> files) {
+  auto overlay = File::relative_to(directory, "assets");
+  auto created = File::create_directory(overlay);
+  if (!created)
+    return std::unexpected(std::move(created.error()));
+  for (auto const& [name, contents] : files) {
+    auto written = File::write_file(contents, File::relative_to(overlay, name));
+    if (!written)
+      return std::unexpected(std::move(written.error()));
+  }
+  auto wave = std::bit_cast<std::array<char, pcm_test_wave.size()>>(pcm_test_wave);
+  auto audio = File::write_file(std::span<char const>(wave), File::relative_to(overlay, "loop.wav"));
+  if (!audio)
+    return std::unexpected(std::move(audio.error()));
+  auto preload = File::write_file(String("[]"), File::relative_to(overlay, "preload.config"));
+  if (!preload)
+    return std::unexpected(std::move(preload.error()));
+  auto settings = fixture.rootSettings();
+  settings.assetDirectories.clear();
+  settings.assetSources = {overlay};
+  settings.storageDirectory = File::relative_to(directory, "storage");
+  settings.runtimeConfigFile = {};
+  settings.logFile = {};
+  settings.includeUGC = false;
+  settings.assetsSettings.missing_audio = {};
+  return Root::create(std::move(settings));
+}
+
+struct EffectEventSink : NullRenderCallback {
+  std::string accepted;
+  std::optional<std::size_t> fail_at;
+  List<Vec2F> particles;
+  List<std::shared_ptr<AudioInstance>> sounds;
+  std::optional<Vec2F> rejected_particle;
+  std::shared_ptr<AudioInstance> rejected_audio;
+
+  std::expected<void, StarException> add_particle(Particle&& particle) override {
+    if (accepted.size() == fail_at) {
+      fail_at.reset();
+      rejected_particle = particle.position;
+      return std::unexpected(StarException("Rejected particle"));
+    }
+    accepted += 'p';
+    particles.push_back(particle.position);
+    return {};
+  }
+  std::expected<void, StarException> addAudio(std::shared_ptr<AudioInstance> audio) override {
+    if (accepted.size() == fail_at) {
+      fail_at.reset();
+      rejected_audio = std::move(audio);
+      return std::unexpected(StarException("Rejected audio"));
+    }
+    accepted += 'a';
+    sounds.push_back(std::move(audio));
+    return {};
+  }
+};
 }
 
 const GameTestRegistration assetsAll("AssetsTest", "All", [](GameTest&) {
@@ -1793,7 +1866,7 @@ const GameTestRegistration effectSourceParticleCache(
                                  {"start", JsonObject{{"particles", JsonArray{JsonArray{"start-a", "start-b"}}}}},
                                  {"particles", JsonArray{JsonArray{"loop"}}},
                                  {"stop", JsonObject{{"particles", JsonArray{7}}}}};
-    auto source = EffectSource::create(fixture.root(), "private-cache-fixture", "normal", definition);
+    auto source = EffectSource::create(fixture.root(), "normal", definition);
     ASSERT_TRUE(source);
     auto initial = (*source)->particles();
     ASSERT_TRUE(initial);
@@ -1818,7 +1891,7 @@ const GameTestRegistration effectSourceParticleCache(
     EXPECT_TRUE(final.error().is<JsonException>());
     auto repaired = definition.set("stop", JsonObject{{"particles", JsonArray{JsonArray{"stop"}}}});
     ASSERT_TRUE(repaired);
-    auto replacement = EffectSource::create(fixture.root(), "private-cache-fixture", "normal", *repaired);
+    auto replacement = EffectSource::create(fixture.root(), "normal", *repaired);
     ASSERT_TRUE(replacement);
     (*replacement)->finishEventCollection();
     (*replacement)->stop();
@@ -1828,13 +1901,214 @@ const GameTestRegistration effectSourceParticleCache(
     EXPECT_EQ(*freshFinal, (List<String>{"stop"}));
   });
 
+const GameTestRegistration effect_duplicate_kinds("EffectSourceTest", "RejectsCaseAliasesInEitherFileOrder", [](GameTest& fixture) {
+  for (bool reversed : {false, true}) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    String mixed = R"({"kind":"Spark"})";
+    String lower = R"({"kind":"spark"})";
+    auto root = effect_test_root(fixture, *directory, {
+      {"first.effectsource", reversed ? mixed : lower}, {"second.effectsource", reversed ? lower : mixed}});
+    ASSERT_TRUE(root) << root.error().what();
+    auto database = (*root)->effectSourceDatabase();
+    ASSERT_FALSE(database);
+    EXPECT_NE(std::string_view(database.error().what()).find("Duplicate effect source"), std::string_view::npos);
+  }
+});
+
+const GameTestRegistration effect_identity_wire("EffectSourceTest", "CanonicalRunningIdentityPreservesRawWireAndDisk", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto root = effect_test_root(fixture, *directory, {
+    {"spark.effectsource", R"({"kind":"Spark","definition":{"duration":200,"start":{"sounds":"/loop.wav"}}})"},
+    {"pulse.effectsource", R"({"kind":"Pulse","definition":{"start":{"sounds":"/loop.wav"}}})"},
+    {"invalid.particle", R"({"kind":false})"}});
+  ASSERT_TRUE(root) << root.error().what();
+  auto master = EffectEmitter::create(**root);
+  auto slave = EffectEmitter::create(**root);
+  ASSERT_TRUE(master);
+  ASSERT_TRUE(slave);
+  EffectEventSink sink;
+  ASSERT_TRUE((*master)->collectRenderEvents(sink));
+  ASSERT_TRUE((*slave)->collectRenderEvents(sink));
+  (*master)->addEffectSources("hand", {"SPARK", "spark"});
+  ASSERT_TRUE((*master)->tick(0, EntityMode::Master));
+  auto disk = Json::parse(R"({"activeSources":[{"position":"hand","source":"SPARK"},{"position":"hand","source":"spark"}]})");
+  ASSERT_TRUE(disk);
+  EXPECT_EQ((*master)->toJson(), *disk);
+  Set<std::pair<String, String>> const raw{{"hand", "SPARK"}, {"hand", "spark"}};
+  DataStreamBuffer packet, legacy;
+  ASSERT_TRUE(legacy << raw);
+  ASSERT_TRUE((*master)->net_store(packet, {}));
+  EXPECT_TRUE(std::ranges::equal(packet.span(), legacy.span()));
+  ASSERT_TRUE(packet.seek(0));
+  ASSERT_TRUE((*slave)->net_load(packet, {}));
+  ASSERT_TRUE((*slave)->tick(0, EntityMode::Slave));
+  EXPECT_FALSE((*slave)->collectRenderEvents(sink)); // Position errors still precede event work.
+  (*slave)->setSourcePosition("hand", {1, 2});
+  ASSERT_TRUE((*slave)->collectRenderEvents(sink)); // Pure audio must not load the invalid particle DB.
+  ASSERT_EQ(sink.accepted, "a");
+  for (auto const& spelling : StringList{"sParK", "spark", "SPARK"}) {
+    Json updated = JsonObject{{"activeSources", JsonArray{JsonObject{{"position", "hand"}, {"source", spelling}}}}};
+    ASSERT_TRUE((*slave)->fromJson(updated));
+    ASSERT_TRUE((*slave)->tick(0, EntityMode::Slave));
+    ASSERT_TRUE((*slave)->collectRenderEvents(sink));
+    EXPECT_EQ((*slave)->toJson(), updated);
+    EXPECT_EQ(sink.accepted, "a");
+  }
+  // Expiry, unlike a mere case change, must restart a still-requested one-shot.
+  (*master)->reset();
+  (*master)->setSourcePosition("hand", {5, 6});
+  for (std::size_t frame = 0; frame != 5; ++frame) {
+    (*master)->addEffectSources("hand", {"PULSE"});
+    ASSERT_TRUE((*master)->tick(0, EntityMode::Master));
+    ASSERT_TRUE((*master)->collectRenderEvents(sink));
+  }
+  EXPECT_EQ(sink.accepted, "aaaa"); // start, final, start, final, start
+
+  // A failed reconciliation is retried even with an unchanged network field.
+  (*master)->reset();
+  for (std::size_t frame = 0; frame != 2; ++frame) {
+    (*master)->addEffectSources("hand", {"Spark", "unknown"});
+    EXPECT_FALSE((*master)->tick(0, EntityMode::Master));
+    ASSERT_TRUE((*master)->collectRenderEvents(sink));
+    EXPECT_EQ(sink.accepted, "aaaaa");
+  }
+});
+
+const GameTestRegistration effect_emission_retry("EffectSourceTest", "RetriesOnlyUnacceptedEventsWithoutNewDraws", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto root = effect_test_root(fixture, *directory, {
+    {"sample.particle", R"({"kind":"sample","definition":{"type":"ember","variance":{"position":[1,1]}}})"},
+    {"burst.effectsource", R"({
+      "kind":"Burst","definition":{"duration":100,"start":{"particles":[["sample","sample"]]},
+      "sounds":[[{"resource":"/loop.wav","loops":-1,"pitchVariability":0.2},
+                 {"resource":"/loop.wav","loops":-1,"pitchVariability":0.2}]]}})"}});
+  ASSERT_TRUE(root) << root.error().what();
+  // Database construction is outside the compared RNG sequences.
+  ASSERT_TRUE((*root)->effectSourceDatabase());
+  ASSERT_TRUE((*root)->particleDatabase());
+  List<Vec2F> baseline_particles;
+  std::uint64_t baseline_rng = 0;
+  for (auto failure : std::array<std::optional<std::size_t>, 4>{std::nullopt, 1u, 3u, 4u}) {
+    (*root)->random().seed(0x535041524bull);
+    auto emitter = EffectEmitter::create(**root);
+    ASSERT_TRUE(emitter);
+    EffectEventSink sink;
+    ASSERT_TRUE((*emitter)->collectRenderEvents(sink));
+    (*emitter)->setSourcePosition("a", {5, 6});
+    (*emitter)->setSourcePosition("b", {7, 8});
+    (*emitter)->addEffectSources("a", {"burst"});
+    (*emitter)->addEffectSources("b", {"BURST"});
+    ASSERT_TRUE((*emitter)->tick(0, EntityMode::Master));
+    sink.fail_at = failure;
+    auto result = (*emitter)->collectRenderEvents(sink);
+    if (failure) {
+      ASSERT_FALSE(result);
+      ASSERT_EQ(sink.accepted.size(), *failure);
+      auto particle_index = sink.particles.size();
+      auto audio_index = sink.sounds.size();
+      ASSERT_TRUE((*emitter)->collectRenderEvents(sink));
+      if (sink.rejected_particle) {
+        ASSERT_LT(particle_index, sink.particles.size());
+        EXPECT_EQ(sink.particles[particle_index], *sink.rejected_particle);
+      }
+      if (sink.rejected_audio) {
+        ASSERT_LT(audio_index, sink.sounds.size());
+        EXPECT_EQ(sink.sounds[audio_index], sink.rejected_audio);
+      }
+    } else {
+      ASSERT_TRUE(result) << result.error().what();
+    }
+    ASSERT_EQ(sink.accepted, "ppaappaa");
+    ASSERT_TRUE((*emitter)->collectRenderEvents(sink));
+    ASSERT_EQ(sink.accepted, "ppaappaa");
+    auto next = (*root)->random().next_u64();
+    if (!failure) {
+      baseline_particles = sink.particles;
+      baseline_rng = next;
+    } else {
+      EXPECT_EQ(sink.particles, baseline_particles);
+      EXPECT_EQ(next, baseline_rng);
+    }
+    // Stopping the sources must still stop the exact main loops handed to the sink.
+    Mixer mixer((*root)->logger(), 8000, 1);
+    for (auto const& sound : sink.sounds) {
+      EXPECT_EQ(sound->loops(), -1);
+      ASSERT_TRUE(mixer.play(sound));
+    }
+    for (std::size_t frame = 0; frame < 2; ++frame) {
+      ASSERT_TRUE((*emitter)->tick(0, EntityMode::Master));
+      ASSERT_TRUE((*emitter)->collectRenderEvents(sink));
+    }
+    std::array<std::int16_t, 8> samples;
+    ASSERT_TRUE(mixer.read(samples, samples.size()));
+    for (auto const& sound : sink.sounds)
+      EXPECT_TRUE(sound->finished());
+  }
+  // A reset discards a rejected submission, even when the same source is requested again.
+  auto emitter = EffectEmitter::create(**root);
+  ASSERT_TRUE(emitter);
+  EffectEventSink sink;
+  ASSERT_TRUE((*emitter)->collectRenderEvents(sink));
+  (*emitter)->setSourcePosition("a", {0, 0});
+  (*emitter)->addEffectSources("a", {"burst"});
+  ASSERT_TRUE((*emitter)->tick(0, EntityMode::Master));
+  sink.fail_at = 1;
+  ASSERT_FALSE((*emitter)->collectRenderEvents(sink));
+  (*emitter)->reset();
+  (*emitter)->setSourcePosition("a", {100, 100});
+  (*emitter)->addEffectSources("a", {"burst"});
+  ASSERT_TRUE((*emitter)->tick(0, EntityMode::Master));
+  ASSERT_TRUE((*emitter)->collectRenderEvents(sink));
+  EXPECT_EQ(sink.accepted, "pppaa");
+  ASSERT_EQ(sink.particles.size(), 3u);
+  EXPECT_GT(sink.particles[1][0], 98);
+});
+
+const GameTestRegistration effect_audio_repair("EffectSourceTest", "AudioRepairResumesBatchAndPreservesLaterTick", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto root = effect_test_root(fixture, *directory, {
+    {"sample.particle", R"({"kind":"sample","definition":{"type":"ember"}})"},
+    {"broken.wav", "invalid audio"},
+    {"burst.effectsource", R"({
+      "kind":"Burst","definition":{"duration":1,"particles":[["sample"]],
+      "start":{"particles":[["sample"]]},"sounds":[["/loop.wav","/broken.wav"]]}})"}});
+  ASSERT_TRUE(root) << root.error().what();
+  auto emitter = EffectEmitter::create(**root);
+  ASSERT_TRUE(emitter);
+  EffectEventSink sink;
+  ASSERT_TRUE((*emitter)->collectRenderEvents(sink));
+  (*emitter)->setSourcePosition("hand", {2, 3});
+  (*emitter)->addEffectSources("hand", {"Burst"});
+  ASSERT_TRUE((*emitter)->tick(0, EntityMode::Master));
+  ASSERT_FALSE((*emitter)->collectRenderEvents(sink));
+  ASSERT_EQ(sink.accepted, "p");
+  (*emitter)->setSourcePosition("hand", {12, 13});
+  (*emitter)->addEffectSources("hand", {"BURST"});
+  ASSERT_TRUE((*emitter)->tick(2, EntityMode::Master));
+  auto assets = (*root)->assets();
+  ASSERT_TRUE(assets);
+  auto wave = std::bit_cast<std::array<char, pcm_test_wave.size()>>(pcm_test_wave);
+  ASSERT_TRUE(File::write_file(std::span<char const>(wave), File::relative_to(*directory, "assets/broken.wav")));
+  (*assets)->hot_reload();
+  auto resumed = (*emitter)->collectRenderEvents(sink);
+  ASSERT_TRUE(resumed) << resumed.error().what();
+  EXPECT_EQ(sink.accepted, "paap");
+  EXPECT_EQ(sink.particles, (List<Vec2F>{{2, 3}, {12, 13}}));
+  ASSERT_EQ(sink.sounds.size(), 2u);
+  for (auto const& sound : sink.sounds)
+    EXPECT_EQ(sound->position(), Vec2F(2, 3));
+});
+
 const GameTestRegistration assetsWavSignaturesAndPcmSamples("AssetsTest", "WavSignaturesAndPcmSamples", [](GameTest&) {
-  std::array<unsigned char, 48> bytes = {
-    'R', 'I', 'F', 'F', 40, 0, 0, 0, 'W', 'A', 'V', 'E',
-    'f', 'm', 't', ' ', 16, 0, 0, 0, 1, 0, 1, 0,
-    0x40, 0x1f, 0, 0, 0x80, 0x3e, 0, 0, 2, 0, 16, 0,
-    'd', 'a', 't', 'a', 4, 0, 0, 0, 0x34, 0x12, 0xfe, 0xff
-  };
+  auto bytes = pcm_test_wave;
   auto device = [&]() -> std::expected<std::shared_ptr<Buffer>, StarException> {
     auto buffer = std::make_shared<Buffer>();
     auto written = buffer->write_full({reinterpret_cast<char const*>(bytes.data()), bytes.size()});

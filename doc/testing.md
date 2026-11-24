@@ -619,6 +619,15 @@ with a conservative earliest-timestamp bound; negative smear, TTL changes and
 failed-insertion timestamps must remain covered. Filtered cleanup still visits
 every entry. Revisiting evicted cells re-executes their deterministic callbacks.
 
+### Effect delivery and status lifecycle
+
+Run `game_tests --gtest_filter='EffectSourceTest.*:StatusControllerTest.*'` with
+real assets. Effect source names match case-insensitively without rewriting wire
+or disk spelling. A failed particle submission must leave its argument intact
+so the emitter can retry it without sampling or submitting earlier events again.
+An active status uses the default duration from the definition it started with;
+a new instance uses the currently loaded definition.
+
 ### Dungeon generation
 
 `game_tests --gtest_filter='*Dungeon*:WorldSnapshot.FixedCoordinateGenerationIsDeterministic'`

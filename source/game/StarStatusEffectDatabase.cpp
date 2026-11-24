@@ -42,10 +42,10 @@ std::expected<std::shared_ptr<StatusEffectDatabase>, StarException> StatusEffect
       if (!config) return std::unexpected(std::move(config.error()));
       auto effect = database->parseUniqueEffect(*config, file);
       if (!effect) return std::unexpected(std::move(effect.error()));
-      if (database->m_uniqueEffects.contains(effect->name))
+      auto name = effect->name;
+      if (!database->m_uniqueEffects.try_emplace(std::move(name), std::move(*effect)).second)
         return std::unexpected(StatusEffectDatabaseException::format(
             "Duplicate stat effect named '{}', config file '{}'", effect->name, file));
-      database->m_uniqueEffects[effect->name] = std::move(*effect);
       return {};
     }();
     if (!loaded)
@@ -54,13 +54,10 @@ std::expected<std::shared_ptr<StatusEffectDatabase>, StarException> StatusEffect
   return database;
 }
 
-bool StatusEffectDatabase::isUniqueEffect(UniqueStatusEffect const& effect) const {
-  return m_uniqueEffects.contains(effect);
-}
-
-std::expected<UniqueStatusEffectConfig, StarException> StatusEffectDatabase::uniqueEffectConfig(UniqueStatusEffect const& effect) const {
-  if (auto uniqueEffect = m_uniqueEffects.find_ref(effect))
-    return uniqueEffect->get();
+std::expected<std::reference_wrapper<UniqueStatusEffectConfig const>, StarException>
+StatusEffectDatabase::unique_effect_config(UniqueStatusEffect const& effect) const & {
+  if (auto definition = m_uniqueEffects.find_ref(effect))
+    return *definition;
   return std::unexpected(StatusEffectDatabaseException::format("No such unique stat effect '{}'", effect));
 }
 
@@ -109,7 +106,7 @@ std::expected<UniqueStatusEffectConfig, StarException> StatusEffectDatabase::par
   return parsed;
 }
 
-JsonObject UniqueStatusEffectConfig::toJson() {
+JsonObject UniqueStatusEffectConfig::to_json() const {
   return {
     {"name", name},
     {"blockingStat", blockingStat ? Json(*blockingStat) : Json()},

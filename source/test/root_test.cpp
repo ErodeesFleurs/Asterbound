@@ -66,6 +66,8 @@ import star.plant_database;
 import star.quest_template_database;
 import star.monster_database;
 import star.status_controller;
+import star.status_types;
+import star.light_source;
 import star.world_lua_bindings;
 import star.lua_game_converters;
 import star.lua_http_bindings;
@@ -1120,6 +1122,182 @@ writeIsolationModules(String const& overlay, std::initializer_list<std::pair<Str
   }
   return {};
 }
+
+const GameTestRegistration status_lifecycle("StatusControllerTest", "ReentrantLuaRemovalPreservesInstanceIdentity", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto settings = isolationSettings(fixture.rootSettings(), *directory, "status-lifecycle");
+  ASSERT_TRUE(settings) << settings.error().what();
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(writeIsolationModules(overlay, {
+    {"probe-a.statuseffect", R"({"name":"probe-a","defaultDuration":5,"scripts":["probe.lua"],"animationConfig":"probe.animation"})"},
+    {"probe-b.statuseffect", R"({"name":"probe-b","defaultDuration":5,"scripts":["probe.lua"],"animationConfig":"probe.animation"})"},
+    {"probe.animation", R"({"lights":{"lamp":{}}})"},
+    {"probe.lua", R"LUA(
+      local function bump(key)
+        local n = status.statusProperty(key, 0) + 1
+        status.setStatusProperty(key, n)
+        return n
+      end
+      function init()
+        self.serial = bump("inits")
+        effect.addStatModifierGroup({{stat="probePower", amount=1}})
+        effect.setToolUsageSuppressed(self.serial <= 2)
+        message.setHandler("observe", function()
+          status.setStatusProperty("source", effect.sourceEntity())
+          status.setStatusProperty("duration", effect.duration())
+        end)
+        message.setHandler("mark", function()
+          effect.expire()
+          assert(status.uniqueStatusEffectActive(effect.name()))
+        end)
+        message.setHandler("remove", function()
+          status.removeEphemeralEffect(effect.name())
+          animator.setLightActive("lamp", false)
+          status.setStatusProperty("removedInMessage", effect.name())
+        end)
+      end
+      function update()
+        bump("updates")
+        if self.serial > 2 then return end
+        local name = effect.name()
+        status.setStatusProperty("winner", name)
+        status.removeEphemeralEffect(name == "probe-a" and "probe-b" or "probe-a")
+        status.removeEphemeralEffect(name)
+        -- onExpire installed a new namesake. These callbacks still address
+        -- the outgoing instance, not its new animator, metadata or stat groups.
+        assert(status.uniqueStatusEffectActive(name) and effect.sourceEntity() == 11)
+        effect.setDuration(123)
+        effect.addStatModifierGroup({{stat="probePower", amount=100}})
+        animator.setLightActive("lamp", false)
+        status.setStatusProperty("returned", true)
+      end
+      function onExpire()
+        local name = effect.name()
+        assert(not status.uniqueStatusEffectActive(name))
+        status.removeEphemeralEffect(name)
+        bump("expirations")
+        if self.serial <= 2 and name == status.statusProperty("winner") then
+          status.addEphemeralEffect(name, 8, 77)
+        end
+      end
+      function uninit()
+        bump("uninits")
+      end
+    )LUA"}
+  }));
+  auto root = Root::create(std::move(*settings));
+  ASSERT_TRUE(root) << root.error().what();
+  auto storage = File::ephemeral_file((*root)->random());
+  ASSERT_TRUE(storage) << storage.error().what();
+  auto world = WorldServer::create(**root, Vec2U(2048, 2048), *storage);
+  ASSERT_TRUE(world) << world.error().what();
+  auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
+  auto npcs = (*root)->npcDatabase();
+  ASSERT_TRUE(npcs) << npcs.error().what();
+  auto variant = (*npcs)->generateNpcVariant("human", "villager", 1.0f, 1234, JsonObject{});
+  ASSERT_TRUE(variant) << variant.error().what();
+  auto npc = (*npcs)->createNpc(*variant);
+  ASSERT_TRUE(npc) << npc.error().what();
+  (*npc)->setPosition(Vec2F(100, 100));
+  ASSERT_TRUE((*world)->addEntity(*npc));
+  Json config = JsonObject{{"stats", JsonObject{{"probePower", JsonObject{}}}}, {"minimumLiquidStatusEffectPercentage", 1},
+      {"appliesEnvironmentStatusEffects", false}, {"appliesWeatherStatusEffects", false}, {"environmentStatusEffectUpdateTimer", 100}};
+  auto created = StatusController::create(**root, config);
+  ASSERT_TRUE(created) << created.error().what();
+  auto& status = **created;
+  ASSERT_TRUE(status.init(**npc, (*npc)->movementController()));
+  auto stop = make_scope_exit([&] { EXPECT_TRUE(status.uninit()); });
+  ASSERT_TRUE(status.addEphemeralEffects({{"probe-a", {}}, {"probe-b", {}}}, 11));
+  ASSERT_TRUE(status.toolUsageSuppressed());
+  ASSERT_TRUE(status.tickMaster(1.0f));
+  EXPECT_EQ(status.statusProperty("updates"), Json(1));
+  EXPECT_EQ(status.statusProperty("returned"), Json(true));
+  EXPECT_EQ(status.statusProperty("inits"), Json(3));
+  EXPECT_EQ(status.statusProperty("expirations"), Json(2));
+  EXPECT_EQ(status.statusProperty("uninits"), Json(2));
+  EXPECT_EQ(status.stat("probePower"), 1.0f);
+  EXPECT_FALSE(status.toolUsageSuppressed());
+  auto name = status.statusProperty("winner").to_string();
+  ASSERT_TRUE(name) << name.error().what();
+  auto summary = status.activeUniqueStatusEffectSummary();
+  ASSERT_EQ(summary.size(), 1u);
+  EXPECT_EQ(summary.front().first, *name);
+  EXPECT_EQ(summary.front().second, 1.0f);
+  ASSERT_TRUE(status.addEphemeralEffect({*name, 8}, 88)); // Equal duration must not steal the source.
+  ASSERT_TRUE(status.receiveMessage("observe", true));
+  EXPECT_EQ(status.statusProperty("duration"), Json(8));
+  EXPECT_EQ(status.statusProperty("source"), Json(77));
+  ASSERT_TRUE(status.tickMaster(2.0f));
+  ASSERT_TRUE(status.addEphemeralEffect({*name, {}}, 90)); // Default 5 < remaining 6.
+  ASSERT_TRUE(status.receiveMessage("observe", true));
+  EXPECT_EQ(status.statusProperty("source"), Json(77));
+  EXPECT_EQ(status.statusProperty("duration"), Json(6));
+  ASSERT_TRUE(status.addEphemeralEffect({*name, 7}, 91)); // Extends duration but not the historical peak.
+  ASSERT_TRUE(status.receiveMessage("observe", true));
+  EXPECT_EQ(status.statusProperty("source"), Json(91));
+  DataStreamBuffer wire;
+  ASSERT_TRUE(status.net_store(wire));
+  ASSERT_TRUE(wire.seek(0));
+  auto receiver = StatusController::create(**root, config);
+  ASSERT_TRUE(receiver) << receiver.error().what();
+  ASSERT_TRUE((*receiver)->init(**npc, (*npc)->movementController()));
+  auto stop_receiver = make_scope_exit([&] { EXPECT_TRUE((*receiver)->uninit()); });
+  ASSERT_TRUE((*receiver)->net_load(wire, {}));
+  auto replicated = (*receiver)->activeUniqueStatusEffectSummary();
+  ASSERT_EQ(replicated.size(), 1u);
+  EXPECT_EQ(replicated.front().second, 7.0f / 8.0f);
+  auto lights = (*receiver)->lightSources();
+  ASSERT_TRUE(lights) << lights.error().what();
+  EXPECT_EQ(lights->size(), 1u);
+
+  ASSERT_TRUE(status.receiveMessage("mark", true));
+  EXPECT_TRUE(status.uniqueStatusEffectActive(*name)); // effect.expire schedules, it does not remove.
+  ASSERT_TRUE(status.tickMaster(0.5f));
+  EXPECT_FALSE(status.uniqueStatusEffectActive(*name));
+  EXPECT_EQ(status.statusProperty("expirations"), Json(3));
+  EXPECT_EQ(status.statusProperty("uninits"), Json(3));
+  ASSERT_TRUE(status.addEphemeralEffect({*name, {}}, {}));
+  ASSERT_TRUE(status.receiveMessage("remove", true));
+  EXPECT_EQ(status.statusProperty("removedInMessage"), Json(*name));
+  EXPECT_EQ(status.statusProperty("expirations"), Json(4));
+  EXPECT_EQ(status.statusProperty("uninits"), Json(4));
+  EXPECT_EQ(status.stat("probePower"), 0.0f);
+  EXPECT_TRUE(status.activeUniqueStatusEffectSummary().empty());
+});
+
+const GameTestRegistration status_generation("StatusControllerTest", "ExistingDefaultDurationSurvivesAssetReload", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto settings = isolationSettings(fixture.rootSettings(), *directory, "status-generation");
+  ASSERT_TRUE(settings) << settings.error().what();
+  auto overlay = File::relative_to(*directory, "assets");
+  settings->assetSources = {overlay};
+  ASSERT_TRUE(writeIsolationModules(overlay, {{"preload.config", "[]"},
+      {"probe.statuseffect", R"({"name":"probe","defaultDuration":5})"}}));
+  auto root = Root::create(std::move(*settings));
+  ASSERT_TRUE(root) << root.error().what();
+  auto status = StatusController::create(**root, JsonObject{{"minimumLiquidStatusEffectPercentage", 1},
+      {"appliesEnvironmentStatusEffects", false}, {"appliesWeatherStatusEffects", false}});
+  ASSERT_TRUE(status) << status.error().what();
+  ASSERT_TRUE((*status)->addEphemeralEffect({"probe", 1}));
+  ASSERT_TRUE(writeIsolationModules(overlay, {{"probe.statuseffect", R"({"name":"probe","defaultDuration":9})"}}));
+  ASSERT_TRUE((*root)->reload());
+  ASSERT_TRUE((*status)->addEphemeralEffect({"probe", {}}));
+  auto old = (*status)->diskStore();
+  ASSERT_TRUE(old) << old.error().what();
+  EXPECT_EQ(old->query("ephemeralEffects[0].duration"), Json(5));
+  ASSERT_EQ((*status)->removeEphemeralEffect("probe"), true);
+  ASSERT_TRUE((*status)->addEphemeralEffect({"probe", {}}));
+  auto current = (*status)->diskStore();
+  ASSERT_TRUE(current) << current.error().what();
+  EXPECT_EQ(current->query("ephemeralEffects[0].duration"), Json(9));
+  ASSERT_TRUE((*status)->addPersistentEffect("equipment", UniqueStatusEffect("probe")));
+  ASSERT_TRUE((*status)->addEphemeralEffect({"probe", 100}));
+  EXPECT_EQ((*status)->removeEphemeralEffect("probe"), false);
+});
 
 const GameTestRegistration versioning_migrations("VersioningDatabase", "RunsLuaAtEachReachedVersion",
     [](GameTest& fixture) {

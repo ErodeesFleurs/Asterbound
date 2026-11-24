@@ -569,7 +569,7 @@ density--;
 
 particle.position = position() + particlePos.rotate(m_movementController->rotation());
 
-auto result305 = renderCallback.addParticle(particle);
+auto result305 = renderCallback.add_particle(std::move(particle));
 if (!result305) return std::unexpected(std::move(result305.error()));
   }
   return {};

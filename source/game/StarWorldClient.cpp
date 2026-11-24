@@ -4110,7 +4110,7 @@ std::expected<void, StarException> WorldClient::ClientRenderCallback::addLightSo
   return {};
 }
 
-std::expected<void, StarException> WorldClient::ClientRenderCallback::addParticle(Particle particle) {
+std::expected<void, StarException> WorldClient::ClientRenderCallback::add_particle(Particle&& particle) {
   particles.push_back(std::move(particle));
   return {};
 }

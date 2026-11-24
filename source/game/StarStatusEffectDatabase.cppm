@@ -33,16 +33,16 @@ struct UniqueStatusEffectConfig {
   String description;
   std::optional<String> icon;
 
-  JsonObject toJson();
+  JsonObject to_json() const;
 };
 
 class StatusEffectDatabase {
 public:
   [[nodiscard]] static std::expected<std::shared_ptr<StatusEffectDatabase>, StarException> create(std::shared_ptr<Assets const> assets);
 
-  bool isUniqueEffect(UniqueStatusEffect const& effect) const;
-
-  [[nodiscard]] std::expected<UniqueStatusEffectConfig, StarException> uniqueEffectConfig(UniqueStatusEffect const& effect) const;
+  // Definitions are immutable and borrowed for this database generation.
+  [[nodiscard]] std::expected<std::reference_wrapper<UniqueStatusEffectConfig const>, StarException>
+      unique_effect_config(UniqueStatusEffect const& effect) const &;
 
 private:
   StatusEffectDatabase() = default;

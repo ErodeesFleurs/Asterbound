@@ -2468,7 +2468,7 @@ std::expected<void, StarException> Object::collectParticles(RenderCallback& rend
           particle.translate(Vec2F(space) + Vec2F(0.5, 0.5));
         }
         particle.translate(position());
-        auto operation1 = renderCallback.addParticle(std::move(particle));
+        auto operation1 = renderCallback.add_particle(std::move(particle));
         if (!operation1)
           return std::unexpected(std::move(operation1.error()));
         auto varianceResult = root().random().uniform_float(-emitter.particleEmissionRateVariance, emitter.particleEmissionRateVariance);

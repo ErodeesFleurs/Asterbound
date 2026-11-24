@@ -670,10 +670,10 @@ std::expected<void, StarException> ItemTooltipBuilder::describePersistentEffect(
     if (!statusEffectDatabaseResult866)
       return std::unexpected(std::move(statusEffectDatabaseResult866.error()));
     auto statusEffectDatabase = std::move(*statusEffectDatabaseResult866);
-    auto uniqueEffectConfigResult867 = statusEffectDatabase->uniqueEffectConfig(std::get<UniqueStatusEffect>(effect));
-    if (!uniqueEffectConfigResult867)
-      return std::unexpected(std::move(uniqueEffectConfigResult867.error()));
-    auto effectConfig = std::move(*uniqueEffectConfigResult867);
+    auto definition = statusEffectDatabase->unique_effect_config(std::get<UniqueStatusEffect>(effect));
+    if (!definition)
+      return std::unexpected(std::move(definition.error()));
+    auto const& effectConfig = definition->get();
     if (effectConfig.icon) {
       auto addItemResult868 = container->addItem();
       if (!addItemResult868)

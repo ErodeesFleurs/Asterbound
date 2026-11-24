@@ -977,7 +977,7 @@ const GameTestRegistration playerPresentationEvents(
       unsigned audios = 0;
       float alpha = 1.0f;
       PresentationContext presentation() const override { return PresentationContext(alpha); }
-      std::expected<void, StarException> addParticle(Particle particle) override {
+      std::expected<void, StarException> add_particle(Particle&& particle) override {
         if (particle.string == "presentation-event-fixture")
           ++particles;
         return {};

@@ -65,7 +65,7 @@ std::expected<void, StarException> RenderCallback::addLightSources(List<LightSou
 std::expected<void, StarException> RenderCallback::addParticles(List<Particle> particles, Vec2F translate) {
   for (auto& particle : particles) {
     particle.translate(translate);
-    auto result = addParticle(std::move(particle));
+    auto result = add_particle(std::move(particle));
     if (!result)
       return std::unexpected(std::move(result.error()));
   }

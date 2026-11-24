@@ -69,7 +69,8 @@ public:
 
   [[nodiscard]] virtual std::expected<void, StarException> addDrawable(Drawable drawable, EntityRenderLayer renderLayer) = 0;
   [[nodiscard]] virtual std::expected<void, StarException> addLightSource(LightSource lightSource) = 0;
-  [[nodiscard]] virtual std::expected<void, StarException> addParticle(Particle particle) = 0;
+  // A failed submission must leave the particle intact for a retry.
+  [[nodiscard]] virtual std::expected<void, StarException> add_particle(Particle&& particle) = 0;
   [[nodiscard]] virtual std::expected<void, StarException> addAudio(std::shared_ptr<AudioInstance> audio) = 0;
   [[nodiscard]] virtual std::expected<void, StarException> addTilePreview(PreviewTile preview) = 0;
   [[nodiscard]] virtual std::expected<void, StarException> addOverheadBar(OverheadBar bar) = 0;
@@ -91,7 +92,7 @@ public:
   explicit NullRenderCallback(List<std::shared_ptr<AudioInstance>>* deferredLoops = nullptr) : m_deferredLoops(deferredLoops) {}
   std::expected<void, StarException> addDrawable(Drawable, EntityRenderLayer) override { return {}; }
   std::expected<void, StarException> addLightSource(LightSource) override { return {}; }
-  std::expected<void, StarException> addParticle(Particle) override { return {}; }
+  std::expected<void, StarException> add_particle(Particle&&) override { return {}; }
   std::expected<void, StarException> addAudio(std::shared_ptr<AudioInstance> audio) override {
     if (m_deferredLoops && audio->loops() != 0)
       m_deferredLoops->push_back(std::move(audio));

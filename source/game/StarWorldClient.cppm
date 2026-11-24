@@ -391,7 +391,7 @@ private:
     Vec2F m_offset;
     [[nodiscard]] std::expected<void, StarException> addDrawable(Drawable drawable, EntityRenderLayer renderLayer) override;
     [[nodiscard]] std::expected<void, StarException> addLightSource(LightSource lightSource) override;
-    [[nodiscard]] std::expected<void, StarException> addParticle(Particle particle) override;
+    [[nodiscard]] std::expected<void, StarException> add_particle(Particle&& particle) override;
     [[nodiscard]] std::expected<void, StarException> addAudio(std::shared_ptr<AudioInstance> audio) override;
     [[nodiscard]] std::expected<void, StarException> addTilePreview(PreviewTile preview) override;
     [[nodiscard]] std::expected<void, StarException> addOverheadBar(OverheadBar bar) override;

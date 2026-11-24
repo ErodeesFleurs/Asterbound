@@ -60,6 +60,11 @@ class Entity;
 class ActorMovementController;
 
 
+template <typename call_type>
+concept status_effect_call = std::invocable<call_type&>
+    && std::same_as<std::invoke_result_t<call_type&>,
+        std::expected<typename std::invoke_result_t<call_type&>::value_type, StarException>>;
+
 class StatusPropertyMap final : public NetElementHashMap<String, Json> {
 public:
   [[nodiscard]] std::expected<void, StarException> net_store(DataStream& ds, NetCompatibilityRules rules) const override;
@@ -234,23 +239,36 @@ private:
   };
 
   struct UniqueEffectInstance {
-    explicit UniqueEffectInstance(Root& root) : script(root) {}
+    UniqueEffectInstance(Root& root, std::shared_ptr<StatusEffectDatabase const> database,
+        UniqueStatusEffectConfig const& definition, std::shared_ptr<UniqueEffectMetadata> metadata)
+        : database(std::move(database)), definition(definition), metadata(std::move(metadata)), script(root) {}
 
-    UniqueStatusEffectConfig effectConfig;
+    // Keep this generation's definition, including its default duration, until removal.
+    std::shared_ptr<StatusEffectDatabase const> database;
+    UniqueStatusEffectConfig const& definition;
+    std::shared_ptr<UniqueEffectMetadata> metadata;
+    std::shared_ptr<EffectAnimator> animator;
     Directives parentDirectives;
     HashSet<StatModifierGroupId> modifierGroups;
     StatScript script;
-    UniqueEffectMetadataGroup::ElementId metadataId;
-    EffectAnimatorGroup::ElementId animatorId;
-    bool toolUsageSuppressed;
+    UniqueEffectMetadataGroup::ElementId metadata_id;
+    EffectAnimatorGroup::ElementId animator_id = EffectAnimatorGroup::null_element_id;
+    bool tool_usage_suppressed = false;
+    bool active = true;
+    bool executing = false;
   };
+  using EffectSnapshot = List<std::shared_ptr<UniqueEffectInstance>>;
 
   [[nodiscard]] std::expected<void, StarException> updateAnimators(float dt);
   [[nodiscard]] std::expected<void, StarException> updatePersistentUniqueEffects();
 
-  [[nodiscard]] std::expected<float, StarException> defaultUniqueEffectDuration(UniqueStatusEffect const& name) const;
-  [[nodiscard]] std::expected<bool, StarException> addUniqueEffect(UniqueStatusEffect const& effect, std::optional<float> duration, std::optional<EntityId> sourceEntityId);
-  [[nodiscard]] std::expected<void, StarException> removeUniqueEffect(UniqueStatusEffect const& name);
+  [[nodiscard]] std::shared_ptr<EffectSnapshot const> effect_snapshot();
+  template <status_effect_call call_type>
+  [[nodiscard]] std::invoke_result_t<call_type&> dispatch_effect(UniqueEffectInstance& instance, call_type&& call);
+  [[nodiscard]] std::expected<bool, StarException> add_unique_effect(UniqueStatusEffect const& effect,
+      bool ephemeral, std::optional<float> duration, std::optional<EntityId> source_id);
+  [[nodiscard]] std::expected<void, StarException> remove_unique_effect(std::shared_ptr<UniqueEffectInstance> instance, bool expire = true);
+  void update_tool_suppression();
 
   [[nodiscard]] std::expected<void, StarException> initPrimaryScript();
   [[nodiscard]] std::expected<void, StarException> uninitPrimaryScript();
@@ -277,7 +295,10 @@ private:
   // there are two magic keys used for this map: 'entities' and 'environment' for StatusEffectEntity
   // and environmentally applied persistent status effects, respectively
   StringMap<PersistentEffectCategory> m_persistentEffects;
-  StableHashMap<UniqueStatusEffect, UniqueEffectInstance> m_uniqueEffects;
+  StableHashMap<UniqueStatusEffect, std::shared_ptr<UniqueEffectInstance>> m_uniqueEffects;
+  std::shared_ptr<EffectSnapshot const> m_effect_snapshot;
+  std::uint64_t m_persistent_revision = 0;
+  bool m_run_effect_scripts = false;
   float m_minimumLiquidStatusEffectPercentage;
   bool m_appliesEnvironmentStatusEffects;
   bool m_appliesWeatherStatusEffects;
@@ -300,6 +321,7 @@ private:
 export module star.status_controller;
 
 export namespace Star {
+  using ::Star::status_effect_call;
   using ::Star::StatusController;
   using ::Star::StatusPropertyMap;
 }

@@ -1843,7 +1843,7 @@ if (!result668) return std::unexpected(std::move(result668.error()));
 }
     else if (std::holds_alternative<Particle>(renderable))
       {
-auto result669 = renderCallback.addParticle(std::get<Particle>(renderable));
+auto result669 = renderCallback.add_particle(Particle(std::get<Particle>(renderable)));
 if (!result669) return std::unexpected(std::move(result669.error()));
 }
     else if (auto light = std::get_if<LightSource>(&renderable))

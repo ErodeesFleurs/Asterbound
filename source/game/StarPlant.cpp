@@ -1334,7 +1334,7 @@ auto particle = std::move(*result611);
         }
         particle.position = {m_tileDamageX + this->root().random().uniform_float(), m_tileDamageY + this->root().random().uniform_float()};
         particle.translate(position());
-        auto result612 = renderCallback.addParticle(std::move(particle));
+        auto result612 = renderCallback.add_particle(std::move(particle));
 if (!result612) return std::unexpected(std::move(result612.error()));
       }
       auto result613 = m_stemDropConfig.get("sounds", JsonObject());

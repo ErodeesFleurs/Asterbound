@@ -874,9 +874,9 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
   if (auto r = callbacks.register_callback("effectConfig", [&root](String const& effect) -> std::expected<Json, StarException> {
     auto database = root.statusEffectDatabase();
     if (!database) return std::unexpected(std::move(database.error()));
-    auto config = (*database)->uniqueEffectConfig(effect);
+    auto config = (*database)->unique_effect_config(effect);
     if (!config) return std::unexpected(std::move(config.error()));
-    return config->toJson();
+    return config->get().to_json();
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.register_callback("monsterConfig", [&root](String const& typeName) -> std::expected<Json, StarException> {

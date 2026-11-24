@@ -15,17 +15,17 @@ struct Particle;
 
 class EffectSource {
 public:
-  [[nodiscard]] static std::expected<std::shared_ptr<EffectSource>, StarException> create(Root& root, String const& kind, String suggestedSpawnLocation, Json const& definition);
-  String const& kind() const;
+  friend class EffectEmitter;
+  [[nodiscard]] static std::expected<std::shared_ptr<EffectSource>, StarException> create(Root& root, String suggested_spawn_location, Json const& definition);
+  ~EffectSource();
   void tick(float dt);
   bool expired() const;
   void stop();
   [[nodiscard]] std::expected<List<String>, StarException> particles();
-  [[nodiscard]] std::expected<List<std::shared_ptr<AudioInstance>>, StarException> sounds(Vec2F offset);
+  bool has_pending_events() const;
   // Acknowledge the current tick's particle/audio stages after collection.
   void finishEventCollection();
-  String effectSpawnLocation() const;
-  String suggestedSpawnLocation() const;
+  String const& effect_spawn_location() const;
 
 private:
   explicit EffectSource(Root& root) : m_root(root) {}
@@ -33,19 +33,29 @@ private:
     std::shared_ptr<JsonArray const> options;
     List<std::optional<StringList>> decoded;
   };
+  // A collection owns its stage snapshot; later simulation ticks can queue the next one.
+  using Stages = std::array<bool, 3>;
+  struct SoundBatch {
+    List<std::shared_ptr<AudioInstance>> sounds;
+    std::shared_ptr<JsonArray const> selection;
+    std::size_t stage = 0;
+    std::size_t entry = 0;
+  };
+  [[nodiscard]] std::expected<Json, StarException> stage_config(std::size_t stage) const;
+  [[nodiscard]] std::expected<std::span<String const>, StarException> select_particles(std::size_t stage, std::optional<std::size_t>& selection);
+  [[nodiscard]] std::expected<void, StarException> prepare_sounds(Stages const& stages, SoundBatch& batch, Vec2F offset);
+  Stages take_stages();
+  void finish_stages(Stages const& stages);
+  void stop_main_sounds();
 
   Root& m_root;
-  String m_kind;
   Json m_config;
   bool m_loops;
   float m_loopDuration;
   float m_durationVariance;
   String m_effectSpawnLocation;
-  String m_suggestedSpawnLocation;
 
-  bool m_initialTick;
-  bool m_loopTick;
-  bool m_finalTick;
+  Stages m_stages{true, false, false}; // start, loop, stop
   float m_timer;
   bool m_expired;
   bool m_stop;

@@ -192,7 +192,7 @@ public:
     if (failCollection)
       return std::unexpected(StarException("Deliberate presentation lifecycle test failure"));
     if (nextParticle) {
-      auto emitted = renderer.addParticle(std::move(*nextParticle));
+      auto emitted = renderer.add_particle(std::move(*nextParticle));
       nextParticle.reset();
       return emitted;
     }

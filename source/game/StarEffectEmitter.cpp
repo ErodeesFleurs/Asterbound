@@ -46,6 +46,88 @@ import star.particle_database;
 import star.algorithm;
 namespace Star {
 
+// Keep this on the stack on the normal path. Only a failed batch needs to
+// outlive collection. Its source cannot expire until its final stage is acknowledged.
+struct EffectEmitter::PendingEvents {
+  EffectSource& source;
+  EffectSource::Stages stages;
+  Vec2F position;
+  Vec2F base_velocity;
+  Direction direction;
+  std::array<std::span<String const>, 3> definitions{};
+  std::size_t selected_stages = 0;
+  std::optional<std::size_t> choice;
+  std::size_t particle_stage = 0;
+  std::size_t particle_index = 0;
+  std::optional<Particle> rejected_particle;
+  EffectSource::SoundBatch audio;
+  std::size_t audio_index = 0;
+
+  std::expected<void, StarException> submit(Root& root, RenderCallback& sink, std::shared_ptr<ParticleDatabase const>& database) {
+    // Select every enabled particle stage before drawing any variance, just as
+    // in the original emission order. These spans borrow immutable decoded options.
+    for (; selected_stages < stages.size(); ++selected_stages) {
+      if (stages[selected_stages]) {
+        auto selected = source.select_particles(selected_stages, choice);
+        if (!selected)
+          return std::unexpected(std::move(selected.error()));
+        definitions[selected_stages] = *selected;
+        choice.reset();
+      }
+    }
+    for (; particle_stage < stages.size(); ++particle_stage) {
+      auto names = definitions[particle_stage];
+      for (; particle_index < names.size(); ++particle_index) {
+        if (rejected_particle) {
+          auto added = sink.add_particle(std::move(*rejected_particle));
+          if (!added)
+            return std::unexpected(std::move(added.error()));
+          rejected_particle.reset();
+        } else {
+          if (!database) {
+            auto loaded = root.particleDatabase();
+            if (!loaded)
+              return std::unexpected(std::move(loaded.error()));
+            database = std::move(*loaded);
+          }
+          auto config = database->config(names[particle_index]);
+          if (!config)
+            return std::unexpected(std::move(config.error()));
+          auto particle = (*config)->instance();
+          if (direction == Direction::Left) {
+            particle.flip = true;
+            particle.position[0] = -particle.position[0];
+            particle.velocity[0] = -particle.velocity[0];
+            particle.finalVelocity[0] = -particle.finalVelocity[0];
+          }
+          particle.velocity += base_velocity;
+          particle.finalVelocity += base_velocity;
+          particle.position += position;
+          auto added = sink.add_particle(std::move(particle));
+          if (!added) {
+            rejected_particle.emplace(std::move(particle));
+            return std::unexpected(std::move(added.error()));
+          }
+        }
+      }
+      particle_index = 0;
+    }
+    auto prepared = source.prepare_sounds(stages, audio, position);
+    if (!prepared)
+      return std::unexpected(std::move(prepared.error()));
+    for (; audio_index < audio.sounds.size(); ++audio_index) {
+      auto added = sink.addAudio(audio.sounds[audio_index]);
+      if (!added)
+        return std::unexpected(std::move(added.error()));
+    }
+    source.finish_stages(stages);
+    return {};
+  }
+};
+
+EffectEmitter::EffectEmitter(Root& root) : m_root(root) {}
+EffectEmitter::~EffectEmitter() = default;
+
 std::expected<std::shared_ptr<EffectEmitter>, StarException> EffectEmitter::create(Root& root) {
   auto emitter = std::shared_ptr<EffectEmitter>(new EffectEmitter(root));
   auto registered = emitter->add_net_element(emitter->m_activeSources);
@@ -54,9 +136,9 @@ std::expected<std::shared_ptr<EffectEmitter>, StarException> EffectEmitter::crea
   return emitter;
 }
 
-void EffectEmitter::addEffectSources(String const& position, StringSet effectSources) {
-  for (auto& e : effectSources)
-    m_newSources.add({position, std::move(e)});
+void EffectEmitter::addEffectSources(String const& position, StringSet const& effectSources) {
+  for (auto const& name : effectSources)
+    m_newSources.emplace(position, name);
 }
 
 void EffectEmitter::setSourcePosition(String name, Vec2F const& position) {
@@ -73,46 +155,87 @@ void EffectEmitter::setBaseVelocity(Vec2F const& velocity) {
 
 std::expected<void, StarException> EffectEmitter::tick(float dt, EntityMode mode) {
   if (mode == EntityMode::Master) {
-    m_activeSources.set(std::move(m_newSources));
+    if (m_activeSources.get() != m_newSources)
+      m_activeSources.push(std::move(m_newSources));
     m_newSources.clear();
-  } else {
-    if (!m_newSources.empty())
-      return std::unexpected(StarException("EffectEmitters can only be added to the master entity."));
+  } else if (!m_newSources.empty()) {
+    return std::unexpected(StarException("EffectEmitters can only be added to the master entity."));
   }
-  if (m_collectsEvents) {
+  if (!m_collectsEvents)
+    return {};
+
+  if (m_activeSources.pull_updated())
+    m_reconcile = true;
+  bool expired = false;
+  for (auto const& running : m_sources) {
+    if (running.source->expired())
+      expired = true;
+    else
+      running.source->tick(dt);
+  }
+  if (expired) {
     m_sources.erase(std::remove_if(m_sources.begin(), m_sources.end(),
-        [](std::shared_ptr<EffectSource> const& source) { return source->expired(); }), m_sources.end());
+        [](RunningSource const& running) { return running.source->expired(); }), m_sources.end());
+    m_reconcile = true;
+  }
+  if (m_reconcile) {
+    auto reconciled = reconcile_sources();
+    if (!reconciled)
+      return reconciled;
+    m_reconcile = false;
+  }
+  return {};
+}
 
-    for (auto& ps : m_sources)
-      ps->tick(dt);
-
-    Set<std::pair<String, String>> current;
-    for (auto& ps : m_sources) {
-      std::pair<String, String> entry = {ps->suggestedSpawnLocation(), ps->kind()};
-      current.add(entry);
-      if (!m_activeSources.get().contains(entry)) {
-        ps->stop();
-      }
+std::expected<void, StarException> EffectEmitter::reconcile_sources() {
+  Map<SourceKey, bool> requested;
+  struct Request {
+    Map<SourceKey, bool>::value_type& entry;
+    String const& spelling;
+  };
+  List<Request> ordered;
+  ordered.reserve(m_activeSources.get().size());
+  for (auto const& [position, name] : m_activeSources.get()) {
+    auto kind = name.to_lower();
+    if (!kind)
+      return std::unexpected(std::move(kind.error()));
+    auto [entry, inserted] = requested.try_emplace(SourceKey{position, std::move(*kind)}, false);
+    if (inserted)
+      ordered.push_back({*entry, name});
+  }
+  for (auto const& running : m_sources) {
+    auto wanted = requested.find(running.key);
+    if (wanted == requested.end())
+      running.source->stop();
+    else
+      wanted->second = true;
+  }
+  std::shared_ptr<EffectSourceDatabase const> database;
+  // Visit raw keys in wire order, but match only (exact position, canonical kind).
+  for (auto const& request : ordered) {
+    auto const& [key, running] = request.entry;
+    if (running)
+      continue;
+    if (!database) {
+      auto loaded = m_root.effectSourceDatabase();
+      if (!loaded)
+        return std::unexpected(std::move(loaded.error()));
+      database = std::move(*loaded);
     }
-    for (auto& c : m_activeSources.get()) {
-      if (!current.contains(c)) {
-        auto database = m_root.effectSourceDatabase();
-        if (!database)
-          return std::unexpected(std::move(database.error()));
-        auto config = (*database)->effectSourceConfig(c.second);
-        if (!config)
-          return std::unexpected(std::move(config.error()));
-        auto source = (*config)->instance(c.first);
-        if (!source)
-          return std::unexpected(std::move(source.error()));
-        m_sources.push_back(std::move(*source));
-      }
-    }
+    auto config = database->effectSourceConfig(request.spelling);
+    if (!config)
+      return std::unexpected(std::move(config.error()));
+    auto source = (*config)->instance(key.first);
+    if (!source)
+      return std::unexpected(std::move(source.error()));
+    m_sources.push_back({key, std::move(*source)});
   }
   return {};
 }
 
 void EffectEmitter::reset() {
+  m_pending_events.reset();
+  m_reconcile = true;
   m_sources.clear();
   m_newSources.clear();
   m_activeSources.set({});
@@ -120,46 +243,26 @@ void EffectEmitter::reset() {
 
 std::expected<void, StarException> EffectEmitter::collectRenderEvents(RenderCallback& renderCallback) {
   m_collectsEvents = true;
-  if (m_sources.empty())
-    return {};
-  for (auto& source : m_sources) {
-    auto position = m_positions.get(source->effectSpawnLocation());
+  std::shared_ptr<ParticleDatabase const> database;
+  if (m_pending_events) {
+    auto submitted = m_pending_events->submit(m_root, renderCallback, database);
+    if (!submitted)
+      return submitted;
+    m_pending_events.reset();
+  }
+  for (auto const& [key, source] : m_sources) {
+    auto position = m_positions.get(source->effect_spawn_location());
     if (!position)
       return std::unexpected(std::move(position.error()));
-    auto particles = source->particles();
-    if (!particles)
-      return std::unexpected(std::move(particles.error()));
-    for (auto const& definition : *particles) {
-      auto database = m_root.particleDatabase();
-      if (!database)
-        return std::unexpected(std::move(database.error()));
-      auto particle = (*database)->particle(definition);
-      if (!particle)
-        return std::unexpected(std::move(particle.error()));
-      if (m_direction == Direction::Left) {
-        particle->flip = true;
-        particle->position[0] = -particle->position[0];
-        particle->velocity[0] = -particle->velocity[0];
-        particle->finalVelocity[0] = -particle->finalVelocity[0];
-      }
-      particle->velocity += m_baseVelocity;
-      particle->finalVelocity += m_baseVelocity;
-      particle->position += position->get();
-      auto added = renderCallback.addParticle(*particle);
-      if (!added)
-        return std::unexpected(std::move(added.error()));
-    }
-    auto sounds = source->sounds(position->get());
-    if (!sounds)
-      return std::unexpected(std::move(sounds.error()));
-    for (auto& sound : *sounds) {
-      auto added = renderCallback.addAudio(sound);
-      if (!added)
-        return std::unexpected(std::move(added.error()));
+    if (!source->has_pending_events())
+      continue;
+    PendingEvents batch{*source, source->take_stages(), position->get(), m_baseVelocity, m_direction};
+    auto submitted = batch.submit(m_root, renderCallback, database);
+    if (!submitted) {
+      m_pending_events = std::make_unique<PendingEvents>(std::move(batch));
+      return submitted;
     }
   }
-  for (auto& source : m_sources)
-    source->finishEventCollection();
   return {};
 }
 
