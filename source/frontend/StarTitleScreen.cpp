@@ -233,6 +233,11 @@ TitleScreen::~TitleScreen() {
 }
 
 std::expected<void, StarException> TitleScreen::close() {
+  if (m_updateState == StandaloneUpdateState::Preparing) {
+    if (auto const& controller = m_guiContext.applicationController())
+      controller->cancelStandaloneUpdate();
+    m_updateState = StandaloneUpdateState::Unsupported;
+  }
   if (auto menu = m_optionsMenu.lock())
     menu->detachInterface();
   m_optionsMenu.reset();
@@ -410,7 +415,9 @@ std::expected<bool, StarException> TitleScreen::handleInputEvent(InputEvent cons
 
 std::expected<void, StarException> TitleScreen::update(float dt) {
   if (auto r = m_cursor->update(dt); !r) return std::unexpected(std::move(r.error()));
-  if (m_releaseCheck.poll()) {
+  auto const& controller = m_guiContext.applicationController();
+  if (m_releaseCheck.poll() || (m_releaseCheck.state() == ReleaseCheck::State::Available && controller
+      && m_updateState != controller->standaloneUpdateState())) {
     if (auto r = refreshUpdateButton(); !r) return std::unexpected(std::move(r.error()));
   }
   auto size = m_guiContext.windowSize();
@@ -599,6 +606,10 @@ std::expected<void, StarException> TitleScreen::initMainMenu() {
   reader.registerCallback("updates", [this](Widget&) -> std::expected<void, StarException> {
     if (m_releaseCheck.state() == ReleaseCheck::State::Available) {
       auto const& controller = m_guiContext.applicationController();
+      if (controller && controller->standaloneUpdateState() != StandaloneUpdateState::Unsupported) {
+        controller->startStandaloneUpdate(m_releaseCheck.latest_version());
+        return refreshUpdateButton();
+      }
       return refreshUpdateButton(!controller || !controller->openReleasePage());
     }
     if (m_releaseCheck.state() != ReleaseCheck::State::Checking)
@@ -650,11 +661,24 @@ std::expected<void, StarException> TitleScreen::initMainMenu() {
 std::expected<void, StarException> TitleScreen::refreshUpdateButton(bool openFailed) {
   String key;
   auto state = m_releaseCheck.state();
+  bool enabled = true;
   switch (state) {
     case ReleaseCheck::State::Idle: key = "idle"; break;
-    case ReleaseCheck::State::Checking: key = "checking"; break;
+    case ReleaseCheck::State::Checking: key = "checking"; enabled = false; break;
     case ReleaseCheck::State::Current: key = "current"; break;
-    case ReleaseCheck::State::Available: key = openFailed ? String("openFailed") : String("available"); break;
+    case ReleaseCheck::State::Available: {
+      auto const& controller = m_guiContext.applicationController();
+      m_updateState = controller ? controller->standaloneUpdateState() : StandaloneUpdateState::Unsupported;
+      switch (m_updateState) {
+        case StandaloneUpdateState::Unsupported: key = openFailed ? String("openFailed") : String("releasePage"); break;
+        case StandaloneUpdateState::Ready: key = "available"; break;
+        case StandaloneUpdateState::Preparing: key = "preparing"; enabled = false; break;
+        case StandaloneUpdateState::Cancelling: key = "cancelling"; enabled = false; break;
+        case StandaloneUpdateState::Failed: key = "installFailed"; break;
+        case StandaloneUpdateState::Restarting: key = "restarting"; enabled = false; break;
+      }
+      break;
+    }
     case ReleaseCheck::State::Failed: key = "failed"; break;
   }
   auto caption = m_updateButton->data().get_string(key);
@@ -664,7 +688,7 @@ std::expected<void, StarException> TitleScreen::refreshUpdateButton(bool openFai
     if (!caption) return std::unexpected(std::move(caption.error()));
   }
   m_updateButton->setText(*caption);
-  m_updateButton->setEnabled(state != ReleaseCheck::State::Checking);
+  m_updateButton->setEnabled(enabled);
   return {};
 }
 
@@ -973,6 +997,11 @@ std::expected<void, StarException> TitleScreen::switchState(TitleState titleStat
     return {};
   if (auto r = m_paneManager->dismissAllPanes(); !r) return std::unexpected(std::move(r.error()));
   m_titleState = titleState;
+  // Entering another menu or quitting withdraws consent to restart. The
+  // helper receives EOF, not COMMIT, while the client stays interactive.
+  if (titleState != TitleState::Main && m_updateState == StandaloneUpdateState::Preparing)
+    if (auto const& controller = m_guiContext.applicationController())
+      controller->cancelStandaloneUpdate();
   // Leaving the multiplayer menus forgets the skipped connection screen.
   if (m_titleState < TitleState::MultiPlayerSelectCharacter || m_titleState > TitleState::MultiPlayerConnect)
     m_skipMultiPlayerConnection = false;

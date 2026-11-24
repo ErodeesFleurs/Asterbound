@@ -24,6 +24,8 @@ struct AudioFormat {
   unsigned channels;
 };
 
+enum class StandaloneUpdateState { Unsupported, Ready, Preparing, Cancelling, Failed, Restarting };
+
 // Window size defaults to 800x600, fixed updates to 60hz, rendering to uncapped,
 // maximized and fullscreen are false, vsync is on, the cursor is visible, and
 // audio and text input are disabled.
@@ -95,6 +97,9 @@ public:
   virtual std::shared_ptr<DesktopService> desktopService() const = 0;
   // Open only the official Asterbound release page in the system browser.
   [[nodiscard]] virtual bool openReleasePage() = 0;
+  virtual StandaloneUpdateState standaloneUpdateState() const = 0;
+  virtual void startStandaloneUpdate(String const& targetVersion) = 0;
+  virtual void cancelStandaloneUpdate() = 0;
   virtual bool steamIsFlatpak() const = 0;
 
   // Signals the application to quit
@@ -108,4 +113,5 @@ export module star.application_controller;
 export namespace Star {
   using ::Star::ApplicationController;
   using ::Star::AudioFormat;
+  using ::Star::StandaloneUpdateState;
 }

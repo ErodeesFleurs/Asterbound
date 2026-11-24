@@ -429,6 +429,31 @@ macOS maps `a.b.c.d` to short version `a.b.c`, build version `(a*100+b).c.d`, an
 
 Linux validation is not proof of Windows/macOS native packaging or SDK interoperability; use each platform's runner for those checks.
 
+### Publishing signed client updates
+
+Self-update is opt-in at **packaging time**. The first installation must already contain the updater with your trusted Ed25519 public key. An older client cannot bootstrap trust from a file on the same release page. No private key belongs in Git, CI, release artifacts or the installed game.
+
+1. On an offline signing machine, generate an Ed25519 key once and back it up securely. With OpenSSL and the Go toolchain specified by `scripts/updater/go.mod`:
+
+   ```sh
+   umask 077
+   openssl genpkey -algorithm ED25519 -out /secure/release.pem
+   openssl pkey -in /secure/release.pem -pubout -out /secure/release-public.pem
+   go -C scripts/updater run ./cmd/release public-key /secure/release-public.pem
+   ```
+
+2. Set the repository **Actions variable** `ASTERBOUND_UPDATE_PUBLIC_KEY` to the printed 64 hex digits. Local native assembly uses the environment variable of the same name. Without it, normal distributions still build, but don't include a helper. Nix installations remain package-managed.
+3. Build all release platforms at the version recorded in `version.json`. Retrieve the `Update-*` workflow artifacts from that exact commit. Unwrap the Actions artifact and retain the inner `Asterbound-update-*.zip` bytes. Windows has separate client-only and combined installer payloads; publish both. Do not sign an unreviewed PR or rebuild payloads from a user's installation.
+4. Verify the build provenance and sign each ZIP offline. `sign` writes the adjacent `.zip.sig`: a raw Ed25519 signature of the ZIP's binary SHA-256 digest.
+
+   ```sh
+   go -C scripts/updater run ./cmd/release sign /secure/release.pem /absolute/path/to/Asterbound-update-linux-amd64.zip
+   ```
+
+5. Attach every ZIP **and** its `.zip.sig`, with the original filenames, to the draft GitHub Release tagged `v<version>`. Publish as stable/latest only after all files are available. A missing asset, bad signature, incompatible version or wrong platform must not trigger installation. To rotate keys, ship the next helper with the new public key in a transition payload signed by the old key; clients that miss the transition need a trusted manual reinstall.
+
+**Interrupted update:** If `.asterbound-update` remains in the installation root, do not delete it blindly or run another updater. Stop any running client, server and updater for that installation. Inspect `plan.json` and `old/`; preserve the backup until all runtime files are from the same release. If recovery is uncertain, extract a verified client distribution into a fresh directory and import user data separately.
+
 ## Continuous integration
 
 The native [Build workflow](../.github/workflows/build.yml) retains Windows x64, Linux x86_64/ARM64 and macOS ARM64 coverage and all development/client/server/installer artifacts. Asset-free tests run before distribution compression. Fast source checks have a 10-minute deadline; native and sanitizer jobs have 120-minute deadlines. New push/PR runs cancel superseded runs for the same event and branch; manual dispatches remain independent. Branch names containing `/` are supported.

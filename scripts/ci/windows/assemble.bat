@@ -38,5 +38,10 @@ if exist %win% rmdir %win% /S /Q
 xcopy %client% %win% /E /I /Y
 xcopy %server% %win% /E /I /Y
 
+python scripts\ci\package-updater.py "%client%"
+if errorlevel 1 exit /b %errorlevel%
+python scripts\ci\package-updater.py "%win%" --combined
+if errorlevel 1 exit /b %errorlevel%
+
 cmake -E tar cf client.zip --format=zip "%client%"
 cmake -E tar cf server.zip --format=zip "%server%"

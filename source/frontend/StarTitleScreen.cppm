@@ -41,6 +41,7 @@ import star.game_timers;
 import star.pane_manager;
 import star.registered_pane_manager;
 import star.release_check;
+import star.application_controller;
 
 import star.animation;
 
@@ -177,6 +178,7 @@ private:
   std::shared_ptr<Pane> m_backgroundMenu;
   List<std::pair<std::shared_ptr<ButtonWidget>, Vec2I>> m_rightAnchoredButtons;
   ReleaseCheck m_releaseCheck;
+  StandaloneUpdateState m_updateState = StandaloneUpdateState::Unsupported;
   std::shared_ptr<ButtonWidget> m_modsButton;
   std::shared_ptr<ButtonWidget> m_updateButton;
 

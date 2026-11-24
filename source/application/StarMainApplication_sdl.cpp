@@ -34,6 +34,7 @@ import star.desktop_service;
 import star.image;
 import star.rect;
 import star.application_controller;
+import star.standalone_update;
 import star.bi_map;
 import star.ref_ptr;
 import star.renderer;
@@ -514,6 +515,9 @@ public:
       return std::unexpected(ApplicationException("Application command line is missing its executable path"));
     String applicationPath = cmdLineArgs[0];
     cmdLineArgs.erase(cmdLineArgs.begin());
+    // SDL changes cwd and the platform consumes flags below. Preserve the
+    // original launch context only when a packaged updater is actually present.
+    m_standaloneUpdate.captureLaunch(cmdLineArgs);
 
     StringList platformArguments;
     String selectedRenderer = "vulkan";
@@ -913,6 +917,7 @@ public:
       auto result = initialize(std::move(arguments));
       if (result)
         result = runOwner();
+      m_standaloneUpdate.shutdown(); // EOF cancels preparation on ordinary quit
       // Cleanup participates in the same owned error channel; log only once
       // after all native owners that borrow the Root logger have been joined.
 
@@ -1275,6 +1280,8 @@ private:
           prepared = true;
         }
         if (m_signal_handler->interrupted())
+          m_quitRequested = true;
+        if (!m_quitRequested && m_standaloneUpdate.poll())
           m_quitRequested = true;
         auto throttleStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
         if (!m_quitRequested) {
@@ -1805,6 +1812,18 @@ private:
       });
     }
 
+    StandaloneUpdateState standaloneUpdateState() const override {
+      return parent.m_standaloneUpdate.state();
+    }
+
+    void startStandaloneUpdate(String const& targetVersion) override {
+      parent.m_standaloneUpdate.start(targetVersion);
+    }
+
+    void cancelStandaloneUpdate() override {
+      parent.m_standaloneUpdate.cancel();
+    }
+
     bool steamIsFlatpak() const override {
       return parent.m_steamIsFlatpak;
     }
@@ -2225,6 +2244,7 @@ private:
   }
 
   std::optional<SignalHandler> m_signal_handler;
+  StandaloneUpdate m_standaloneUpdate;
 
   FixedScheduler m_scheduler;
   float m_renderInterpolation = 1.0f;

@@ -14,7 +14,9 @@ Upstream OpenStarbound repository: <https://github.com/OpenStarbound/OpenStarbou
 
 Development artifacts are not stable releases. Keep backups before importing saves.
 
-The client checks GitHub for the latest stable Asterbound release when the title screen opens. The update button next to **Mods** lets you check again or open the release page when a newer version is available. It never downloads or installs an update. To disable automatic checks, set `"checkForUpdates": false` in `storage/starbound.config`; manual checks still work.
+The title screen checks GitHub for stable releases. On a standalone installation with the signed-update helper, click the update button next to **Mods** to download, verify, install and restart. Nothing is installed without the click. Saves, mods, your boot configuration and `assets/packed.pak` are not update targets. Close other instances sharing the installation first.
+
+Nix, development builds and older distributions without the helper keep the release-page button; update those through their usual installation method. To disable automatic checks, set `"checkForUpdates": false` in `storage/starbound.config`. Manual checks still work. See [publishing signed updates](doc/building.md#publishing-signed-client-updates).
 
 ## Features
 

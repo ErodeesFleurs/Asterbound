@@ -3,6 +3,9 @@ permissions:
   actions: read
   contents: read
 
+env:
+  ASTERBOUND_UPDATE_PUBLIC_KEY: ${{ vars.ASTERBOUND_UPDATE_PUBLIC_KEY }}
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'latest' }}
   cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
@@ -32,6 +35,7 @@ on:
       - 'triplets/**'
       - 'ports/**'
       - 'scripts/ci/**'
+      - 'scripts/updater/**'
       - '.github/actions/**'
       - '.clang-format'
       - '.gitattributes'
@@ -50,6 +54,7 @@ on:
       - 'ports/**'
       - 'scripts/ci/**'
       - '.github/actions/**'
+      - 'scripts/updater/**'
       - '.gitattributes'
       - '.clang-format'
       - 'scripts/format-source.sh'
@@ -65,6 +70,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version-file: scripts/updater/go.mod
+          cache: false
+      - name: Test signed updater
+        working-directory: scripts/updater
+        run: go test ./...
       - name: Check bundled asset versions
         run: cmake -P cmake/AsterboundVersion.cmake
       - name: Check changed C++ lines
@@ -137,12 +149,28 @@ jobs:
             build/windows-release/test-results.xml
           if-no-files-found: ignore
 
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        if: env.ASTERBOUND_UPDATE_PUBLIC_KEY != ''
+        with:
+          go-version-file: scripts/updater/go.mod
+          cache: false
+
       - name: Assemble Files
         shell: cmd
         run: |
           call scripts\ci\windows\assemble.bat
+          if errorlevel 1 exit /b %errorlevel%
           ren client.zip Asterbound-Windows-Client.zip
           ren server.zip Asterbound-Windows-Server.zip
+
+      - name: Upload unsigned update payloads for offline signing
+        if: env.ASTERBOUND_UPDATE_PUBLIC_KEY != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: Update-Windows-x64
+          path: Asterbound-update-windows-*.zip
+          if-no-files-found: error
+          compression-level: 0
 
       - name: Upload Client
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -249,11 +277,26 @@ jobs:
           archive: false
 
 
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        if: env.ASTERBOUND_UPDATE_PUBLIC_KEY != ''
+        with:
+          go-version-file: scripts/updater/go.mod
+          cache: false
+
       - name: Assemble Files
         run: |
           scripts/ci/linux/assemble.sh
           mv -v client.tar.lz ${{ matrix.artifact }}-Client.tar.lz
           mv -v server.tar.lz ${{ matrix.artifact }}-Server.tar.lz
+
+      - name: Upload unsigned update payload for offline signing
+        if: env.ASTERBOUND_UPDATE_PUBLIC_KEY != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: Update-Linux-${{ matrix.arch }}
+          path: Asterbound-update-linux-*.zip
+          if-no-files-found: error
+          compression-level: 0
 
       - name: Upload Client Files
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -322,10 +365,25 @@ jobs:
           path: Asterbound-macOS-Silicon.tar.lz
           archive: false
 
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        if: env.ASTERBOUND_UPDATE_PUBLIC_KEY != ''
+        with:
+          go-version-file: scripts/updater/go.mod
+          cache: false
+
       - name: Assemble Files
         run: |
           scripts/ci/macos/assemble.sh
           mv -v client.tar.lz Asterbound-macOS-Silicon-Client.tar.lz
+
+      - name: Upload unsigned update payload for offline signing
+        if: env.ASTERBOUND_UPDATE_PUBLIC_KEY != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: Update-macOS-arm64
+          path: Asterbound-update-darwin-*.zip
+          if-no-files-found: error
+          compression-level: 0
 
       - name: Upload Client Files
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

@@ -7,6 +7,7 @@ target_sources (star_application_module_interfaces PUBLIC FILE_SET CXX_MODULES F
     StarMainThreadDispatcher.cppm
     StarMainThreadServices.cppm
     StarNativeUiContext.cppm
+    StarStandaloneUpdate.cppm
     StarRenderer.cppm
     StarThreadedRenderer.cppm
     StarTextureAtlas.cppm
@@ -23,6 +24,7 @@ add_library (star_application_modules STATIC
     StarRenderer.cpp
     StarThreadedRenderer.cpp
     StarMainApplication_sdl.cpp
+    StarStandaloneUpdate.cpp
     StarP2PNetworkingService_pc.cpp
     StarPlatformServices_pc.cpp
     StarRenderer_opengl.cpp
@@ -83,6 +85,9 @@ foreach (target star_application_module_interfaces star_application_modules)
 endforeach ()
 target_link_libraries (star_application_module_interfaces PUBLIC star_modules star_platform_modules)
 target_link_libraries (star_application_modules PUBLIC star_application_module_interfaces)
+if (WIN32)
+  target_link_libraries (star_application_modules PRIVATE advapi32)
+endif ()
 
 if (STAR_ENABLE_DISCORD_INTEGRATION)
   add_library (star_application OBJECT ${star_application_DISCORD_SOURCES})

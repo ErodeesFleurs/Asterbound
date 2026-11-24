@@ -59,4 +59,5 @@ cp \
   scripts/steam_appid.txt \
   client_distribution/osx/
 
+python3 scripts/ci/package-updater.py client_distribution
 tarlz -c3vf client.tar.lz client_distribution
