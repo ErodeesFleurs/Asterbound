@@ -35,17 +35,11 @@ usage errors; when both are present, version information is printed first.
 
 ### Brand artwork
 
-Regenerate the ASCII A monogram, client/server ICO files, mod icon, installer
-bitmap and title wordmark with Python, Pillow and DejaVu Sans Mono:
-
-```sh
-python3 scripts/generate-branding.py --font /path/to/DejaVuSansMono.ttf
-```
-
-The font is rasterized, not bundled. Keep source strings ASCII, draw small ICO
-frames separately, and use terminal green for the client and blue for the server.
-macOS ICNS derives from the same PNG. Inspect native-size 16/24/32/48/64px icons
-and the title screen at its configured image scale after changes.
+The pixel-art originals are `scripts/branding/icon.png` and
+`assets/asterbound/interface/title/starbound.png`. The title is loaded directly.
+After editing the icon, run `python3 scripts/generate-branding.py` with Pillow
+installed to regenerate the application PNG, Windows icons, mod icon and
+installer bitmap. macOS ICNS derives from the application PNG.
 
 ## Threading and cancellation
 

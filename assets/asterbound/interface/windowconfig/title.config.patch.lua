@@ -7,7 +7,7 @@ function patch(data)
   data.skyBackdropDarken = jarray{0, 0, 0, 64}
   data.backdropImages = jarray{
     jarray{
-      jarray{0, 0},
+      jarray{0, -20},
       "/interface/title/starbound.png",
       0.5,
       jarray{0.5, 0.5}

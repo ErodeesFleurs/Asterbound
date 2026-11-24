@@ -66,6 +66,8 @@ The wire baseline is Starbound protocol **747**, OpenStarbound extension protoco
 
 [`version.json`](version.json) records product, bundled-asset and base-game versions separately. Bundled assets must match the engine's asset version.
 
+**Artwork:** yLinKis drew the Asterbound main-menu title, the project icon, and the artwork for the Keybindings screen.
+
 Original attribution and copyright notices are retained. [Third-party notices](doc/OPENSOURCE.md) are not a blanket license for the game source or assets; renaming does not grant redistribution rights.
 
 ## Community
