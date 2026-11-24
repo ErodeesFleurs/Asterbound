@@ -304,6 +304,7 @@ constexpr char AdditionalDefaultConfiguration[] = R"JSON(
       "cameraSpeedFactor" : 1.0,
       "interfaceScale" : 0,
       "speechBubbles" : true,
+      "checkForUpdates" : true,
 
       "title" : {
         "multiPlayerAddress" : "",

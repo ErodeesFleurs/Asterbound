@@ -1799,6 +1799,12 @@ private:
       return parent.m_mainThreadServices ? parent.m_mainThreadServices->desktop : nullptr;
     }
 
+    bool openReleasePage() override {
+      return parent.m_dispatcher.invoke([] {
+        return SDL_OpenURL("https://github.com/ErodeesFleurs/Asterbound/releases/latest");
+      });
+    }
+
     bool steamIsFlatpak() const override {
       return parent.m_steamIsFlatpak;
     }

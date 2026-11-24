@@ -14,6 +14,8 @@ Upstream OpenStarbound repository: <https://github.com/OpenStarbound/OpenStarbou
 
 Development artifacts are not stable releases. Keep backups before importing saves.
 
+The client checks GitHub for the latest stable Asterbound release when the title screen opens. The update button next to **Mods** lets you check again or open the release page when a newer version is available. It never downloads or installs an update. To disable automatic checks, set `"checkForUpdates": false` in `storage/starbound.config`; manual checks still work.
+
 ## Features
 
 - Multithreaded lighting, extended colors and additive point lights.

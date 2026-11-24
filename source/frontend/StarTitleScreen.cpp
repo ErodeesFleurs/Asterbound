@@ -124,6 +124,7 @@ import star.celestial_types;
 import star.interface_cursor;
 import star.ambient;
 import star.title_screen;
+import star.release_check;
 import star.font_texture_group;
 import star.anchor_types;
 import star.text_painter;
@@ -328,6 +329,13 @@ std::expected<void, StarException> TitleScreen::initialize(std::shared_ptr<Unive
   if (auto r = initMultiPlayerMenu(); !r) return std::unexpected(std::move(r.error()));
   if (auto r = initOptionsMenu(std::move(client)); !r) return std::unexpected(std::move(r.error()));
   if (auto r = initModsMenu(); !r) return std::unexpected(std::move(r.error()));
+  auto configuration = m_guiContext.root().configuration();
+  if (!configuration) return std::unexpected(std::move(configuration.error()));
+  auto automatic = (*configuration)->get("checkForUpdates", true).and_then([](Json const& value) { return value.to_bool(); });
+  if (!automatic) return std::unexpected(std::move(automatic.error()));
+  if (*automatic)
+    m_releaseCheck.start();
+  if (auto r = refreshUpdateButton(); !r) return std::unexpected(std::move(r.error()));
   return resetState();
 }
 
@@ -402,11 +410,17 @@ std::expected<bool, StarException> TitleScreen::handleInputEvent(InputEvent cons
 
 std::expected<void, StarException> TitleScreen::update(float dt) {
   if (auto r = m_cursor->update(dt); !r) return std::unexpected(std::move(r.error()));
-  auto width = m_guiContext.windowWidth();
-  if (!width)
-    return std::unexpected(std::move(width.error()));
+  if (m_releaseCheck.poll()) {
+    if (auto r = refreshUpdateButton(); !r) return std::unexpected(std::move(r.error()));
+  }
+  auto size = m_guiContext.windowSize();
+  if (!size) return std::unexpected(std::move(size.error()));
+  Vec2I viewport(Vec2F(*size) / m_guiContext.interfaceScale());
   for (auto const& p : m_rightAnchoredButtons)
-    p.first->setPosition(Vec2I(*width / m_guiContext.interfaceScale(), 0) + p.second);
+    p.first->setPosition(Vec2I(viewport[0], 0) + p.second);
+  if (m_titleState == TitleState::Main) {
+    if (auto r = positionUpdateButton(viewport); !r) return std::unexpected(std::move(r.error()));
+  }
   m_mainMenu->determineSizeFromChildren();
   m_backgroundMenu->determineSizeFromChildren();
   m_skyBackdrop->beginUpdate();
@@ -573,12 +587,30 @@ std::expected<void, StarException> TitleScreen::initMainMenu() {
     if (!rightAnchored) return std::unexpected(std::move(rightAnchored.error()));
     auto button = ButtonWidget::create(m_guiContext, callback->get(), *image, *hover, "", "");
     if (!button) return std::unexpected(std::move(button.error()));
+    if (*key == "mods")
+      m_modsButton = *button;
     (*button)->setPosition(*offset);
     if (*rightAnchored)
       m_rightAnchoredButtons.push_back({*button, *offset});
     if (auto r = (*key == "back" ? *backMenu : m_mainMenu)->addChild(*key, *button); !r)
       return std::unexpected(std::move(r.error()));
   }
+  GuiReader reader(m_guiContext);
+  reader.registerCallback("updates", [this](Widget&) -> std::expected<void, StarException> {
+    if (m_releaseCheck.state() == ReleaseCheck::State::Available) {
+      auto const& controller = m_guiContext.applicationController();
+      return refreshUpdateButton(!controller || !controller->openReleasePage());
+    }
+    if (m_releaseCheck.state() != ReleaseCheck::State::Checking)
+      m_releaseCheck.start();
+    return refreshUpdateButton();
+  });
+  auto updateLayout = (*assets)->json("/interface/title/updatebutton.config");
+  if (!updateLayout) return std::unexpected(std::move(updateLayout.error()));
+  if (auto r = reader.construct(*updateLayout, *m_mainMenu); !r) return std::unexpected(std::move(r.error()));
+  auto updateButton = m_mainMenu->requireChild<ButtonWidget>("updates");
+  if (!updateButton) return std::unexpected(std::move(updateButton.error()));
+  m_updateButton = std::move(*updateButton);
   m_mainMenu->setAnchor(PaneAnchor::BottomLeft);
   m_mainMenu->lockPosition();
   (*backMenu)->determineSizeFromChildren();
@@ -612,6 +644,71 @@ std::expected<void, StarException> TitleScreen::initMainMenu() {
   if (auto r = m_scriptComponent->set_scripts(std::move(*scripts)); !r) return std::unexpected(std::move(r.error()));
   auto initialized = recover_lua_script_error(m_scriptComponent->init());
   if (!initialized) return std::unexpected(std::move(initialized.error()));
+  return {};
+}
+
+std::expected<void, StarException> TitleScreen::refreshUpdateButton(bool openFailed) {
+  String key;
+  auto state = m_releaseCheck.state();
+  switch (state) {
+    case ReleaseCheck::State::Idle: key = "idle"; break;
+    case ReleaseCheck::State::Checking: key = "checking"; break;
+    case ReleaseCheck::State::Current: key = "current"; break;
+    case ReleaseCheck::State::Available: key = openFailed ? String("openFailed") : String("available"); break;
+    case ReleaseCheck::State::Failed: key = "failed"; break;
+  }
+  auto caption = m_updateButton->data().get_string(key);
+  if (!caption) return std::unexpected(std::move(caption.error()));
+  if (state == ReleaseCheck::State::Available && !openFailed) {
+    caption = caption->replace("<version>", m_releaseCheck.latest_version());
+    if (!caption) return std::unexpected(std::move(caption.error()));
+  }
+  m_updateButton->setText(*caption);
+  m_updateButton->setEnabled(state != ReleaseCheck::State::Checking);
+  return {};
+}
+
+std::expected<void, StarException> TitleScreen::positionUpdateButton(Vec2I const& viewport) {
+  constexpr int gap = 2;
+  auto size = m_updateButton->size();
+  // A layout without Mods gets the same bottom-right margin as a standalone button.
+  Vec2I anchor(viewport[0], gap);
+  Vec2I anchorSize(0, size[1]);
+  if (m_modsButton && m_modsButton->visibility() && m_modsButton->parent()) {
+    anchor = m_modsButton->position();
+    anchorSize = m_modsButton->size();
+  }
+  int middle = anchor[1] + (anchorSize[1] - size[1]) / 2;
+  int right = viewport[0] - size[0] - gap;
+  int top = viewport[1] - size[1] - gap;
+  auto screen = RectI::with_size(Vec2I(), viewport);
+  for (Vec2I pos : {Vec2I(anchor[0] - size[0] - gap, middle),
+           Vec2I(anchor[0] + anchorSize[0] + gap, middle),
+           Vec2I(std::clamp(anchor[0], 0, std::max(0, right)), anchor[1] + anchorSize[1] + gap),
+           Vec2I(std::clamp(anchor[0], 0, std::max(0, right)), anchor[1] - size[1] - gap),
+           Vec2I(right, gap), Vec2I(right, top), Vec2I(gap, top)}) {
+    auto bounds = RectI::with_size(pos, size);
+    if (!screen.contains(bounds))
+      continue;
+    bool occupied = false;
+    for (std::size_t i = 0, n = m_mainMenu->numChildren(); i < n; ++i) {
+      auto child = m_mainMenu->getChildNum(i);
+      if (!child) return std::unexpected(std::move(child.error()));
+      if (*child != m_updateButton && (*child)->visibility() &&
+          bounds.intersects(RectI::with_size((*child)->position(), (*child)->size()), false)) {
+        occupied = true;
+        break;
+      }
+    }
+    if (!occupied) {
+      m_updateButton->setPosition(pos);
+      if (!m_updateButton->visibility())
+        return m_updateButton->show();
+      return {};
+    }
+  }
+  if (m_updateButton->visibility())
+    return m_updateButton->hide();
   return {};
 }
 

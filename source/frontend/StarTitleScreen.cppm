@@ -40,6 +40,7 @@ import star.pane;
 import star.game_timers;
 import star.pane_manager;
 import star.registered_pane_manager;
+import star.release_check;
 
 import star.animation;
 
@@ -136,6 +137,8 @@ private:
   TitleScreen(GuiContext& context, std::shared_ptr<PlayerStorage> playerStorage, std::shared_ptr<Mixer> mixer);
   [[nodiscard]] std::expected<void, StarException> initialize(std::shared_ptr<UniverseClient> client);
   [[nodiscard]] std::expected<void, StarException> initMainMenu();
+  [[nodiscard]] std::expected<void, StarException> positionUpdateButton(Vec2I const& viewport);
+  [[nodiscard]] std::expected<void, StarException> refreshUpdateButton(bool openFailed = false);
   [[nodiscard]] std::expected<void, StarException> initCharSelectionMenu();
   [[nodiscard]] std::expected<void, StarException> initCharCreationMenu();
   [[nodiscard]] std::expected<void, StarException> initMultiPlayerMenu();
@@ -173,6 +176,9 @@ private:
   std::shared_ptr<Pane> m_mainMenu;
   std::shared_ptr<Pane> m_backgroundMenu;
   List<std::pair<std::shared_ptr<ButtonWidget>, Vec2I>> m_rightAnchoredButtons;
+  ReleaseCheck m_releaseCheck;
+  std::shared_ptr<ButtonWidget> m_modsButton;
+  std::shared_ptr<ButtonWidget> m_updateButton;
 
   std::shared_ptr<Player> m_mainAppPlayer;
   std::shared_ptr<PlayerStorage> m_playerStorage;
