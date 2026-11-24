@@ -144,7 +144,7 @@ local function repair(rule, id)
   sb.logInfo("[Asterbound Compatibility] Repaired collection asset %s (%s)", rule.path, rule.name)
 end
 
-for _, group in ipairs({"runtime", "arcana", "lua", "duplicates", "content", "recipes"}) do
+for _, group in ipairs({"runtime", "durations", "arcana", "lua", "duplicates", "content", "recipes"}) do
   local rules = assets.json("/scripts/asterbound/compat/collection_" .. group .. ".config")
   for i, rule in ipairs(rules) do
     repair(rule, group .. "-" .. i)
