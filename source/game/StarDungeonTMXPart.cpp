@@ -72,8 +72,8 @@ std::expected<bool, StarException> TMXMap::forEachTile(TileCallback const& callb
 }
 
 std::expected<bool, StarException> TMXTileLayer::forEachTile(TMXMap const& map, TileCallback const& callback) const {
-  for (int y = m_rect.y_min(); y <= m_rect.y_max(); ++y) {
-    for (int x = m_rect.x_min(); x <= m_rect.x_max(); ++x) {
+  for (std::int64_t y = m_rect.y_min(); y <= m_rect.y_max(); ++y) {
+    for (std::int64_t x = m_rect.x_min(); x <= m_rect.x_max(); ++x) {
       auto tile = getTile(map.tilesets(), Vec2I(x, y));
       if (!tile) return std::unexpected(std::move(tile.error()));
       if (!callback) return std::unexpected(DungeonException("Empty dungeon tile callback"));
@@ -99,20 +99,31 @@ std::expected<bool, StarException> TMXObjectGroup::forEachTile(TMXMap const& map
 }
 
 std::expected<bool, StarException> TMXObject::forEachTile(TMXMap const& map, TileCallback const& callback) const {
+  return visit_tiles(map, {}, callback);
+}
+
+std::expected<bool, StarException> TMXObject::visit_tiles(TMXMap const& map, std::optional<Vec2I> query, TileCallback const& callback) const {
+  auto emit = [&](Vec2I position) -> std::expected<bool, StarException> {
+    if (query && *query != position) return false;
+    if (!callback) return std::unexpected(DungeonException("Empty dungeon tile callback"));
+    return callback(position, tile());
+  };
   if (m_kind == ObjectKind::Stagehand) {
-    auto cPos = Vec2I(rect().center()[0], std::ceilf(RectF(rect()).center()[1]));
-    if (!callback) return std::unexpected(DungeonException("Empty dungeon tile callback"));
-    return callback(Vec2I(cPos[0], map.height() - cPos[1]), tile());
+    auto center_y = static_cast<int>(std::ceilf(RectF(rect()).center()[1]));
+    return emit(Vec2I(rect().center().x(), map.height() - center_y));
   }
-  if (m_kind == ObjectKind::Tile) {
-    if (!callback) return std::unexpected(DungeonException("Empty dungeon tile callback"));
-    return callback(Vec2I(pos().x(), map.height() - pos().y()), tile());
-  }
+  if (m_kind == ObjectKind::Tile)
+    return emit(Vec2I(pos().x(), map.height() - pos().y()));
   if (m_kind == ObjectKind::Rectangle) {
+    if (query) {
+      auto y = static_cast<std::int64_t>(map.height()) - 1 - query->y();
+      if (query->x() < m_rect.x_min() || query->x() >= m_rect.x_max() || y < m_rect.y_min() || y >= m_rect.y_max())
+        return false;
+      return emit(*query);
+    }
     for (int x = m_rect.min().x(); x < m_rect.max().x(); ++x) {
       for (int y = m_rect.min().y(); y < m_rect.max().y(); ++y) {
-        if (!callback) return std::unexpected(DungeonException("Empty dungeon tile callback"));
-        auto result = callback(Vec2I(x, map.height() - 1 - y), tile());
+        auto result = emit(Vec2I(x, map.height() - 1 - y));
         if (!result) return std::unexpected(std::move(result.error()));
         if (*result) return true;
       }
@@ -123,8 +134,7 @@ std::expected<bool, StarException> TMXObject::forEachTile(TMXMap const& map, Til
     Star::star_assert_failed((m_kind == ObjectKind::Polyline));
   for (Vec2I point : m_polyline) {
     Vec2I position(m_rect.min().x() + point.x(), map.height() - 1 - m_rect.min().y() - point.y());
-    if (!callback) return std::unexpected(DungeonException("Empty dungeon tile callback"));
-    auto result = callback(position, tile());
+    auto result = emit(position);
     if (!result) return std::unexpected(std::move(result.error()));
     if (*result) return true;
   }
@@ -164,36 +174,7 @@ std::expected<bool, StarException> TMXObjectGroup::forEachTileAt(Vec2I pos, TMXM
 }
 
 std::expected<bool, StarException> TMXObject::forEachTileAt(Vec2I pos, TMXMap const& map, TileCallback const& callback) const {
-  if (m_kind == ObjectKind::Stagehand) {
-    Vec2I cPos(rect().center()[0], std::ceilf(RectF(rect()).center()[1]));
-    if (pos == cPos) {
-      if (!callback) return std::unexpected(DungeonException("Empty dungeon tile callback"));
-      return callback(Vec2I(pos[0], map.height() - 1 - pos[1]), tile());
-    }
-    return false;
-  }
-  if (m_kind == ObjectKind::Tile) {
-    if (Vec2I(pos.x(), map.height() - pos.y()) != m_rect.min()) return false;
-    if (!callback) return std::unexpected(DungeonException("Empty dungeon tile callback"));
-    return callback(pos, tile());
-  }
-  if (m_kind == ObjectKind::Rectangle) {
-    if (!m_rect.contains(Vec2I(pos.x(), map.height() - 1 - pos.y()))) return false;
-    if (!callback) return std::unexpected(DungeonException("Empty dungeon tile callback"));
-    return callback(pos, tile());
-  }
-  if constexpr (Star::debug_enabled)
-    Star::star_assert_failed((m_kind == ObjectKind::Polyline));
-  for (Vec2I point : m_polyline) {
-    Vec2I pointPos(m_rect.min().x() + point.x(), map.height() - 1 - m_rect.min().y() - point.y());
-    if (pos == pointPos) {
-      if (!callback) return std::unexpected(DungeonException("Empty dungeon tile callback"));
-      auto result = callback(pos, tile());
-      if (!result) return std::unexpected(std::move(result.error()));
-      if (*result) return true;
-    }
-  }
-  return false;
+  return visit_tiles(map, pos, callback);
 }
 
 std::expected<std::shared_ptr<TMXTileLayer>, StarException> TMXTileLayer::create(Json const& layer) {
@@ -206,10 +187,17 @@ std::expected<std::shared_ptr<TMXTileLayer>, StarException> TMXTileLayer::create
   if (!x) return std::unexpected(std::move(x.error()));
   auto y = layer.get_int("y", 0);
   if (!y) return std::unexpected(std::move(y.error()));
-  int originX = *x, originY = *y;
-  unsigned layerWidth = *width, layerHeight = *height;
-  result->m_rect = RectI({originX, originY},
-                         {originX + static_cast<int>(layerWidth) - 1, originY + static_cast<int>(layerHeight) - 1});
+  // Finite tile layers have a nonempty inclusive RectI. Validate before
+  // narrowing, including the last tile at an offset origin.
+  if (*width <= 0 || *height <= 0 || !std::in_range<int>(*width) || !std::in_range<int>(*height)
+      || !std::in_range<int>(*x) || !std::in_range<int>(*y)
+      || !std::in_range<int>(*x + *width - 1) || !std::in_range<int>(*y + *height - 1))
+    return std::unexpected(StarException("Invalid TMX tile layer dimensions or bounds"));
+  auto area = static_cast<std::uint64_t>(*width) * static_cast<std::uint64_t>(*height);
+  if (area > std::numeric_limits<std::size_t>::max() / sizeof(std::uint32_t))
+    return std::unexpected(StarException("TMX tile layer byte size is not representable"));
+  auto byte_count = static_cast<std::size_t>(area) * sizeof(std::uint32_t);
+  result->m_rect = RectI(Vec2I(*x, *y), Vec2I(*x + *width - 1, *y + *height - 1));
   auto name = layer.get_string("name");
   if (!name) return std::unexpected(std::move(name.error()));
   result->m_name = std::move(*name);
@@ -220,11 +208,17 @@ std::expected<std::shared_ptr<TMXTileLayer>, StarException> TMXTileLayer::create
   auto compressed = layer.contains("compression");
   if (!compressed) return std::unexpected(std::move(compressed.error()));
   if (!*compressed) {
-    auto data = layer.get_array("data");
+    auto json = layer.get("data");
+    if (!json) return std::unexpected(std::move(json.error()));
+    auto data = json->array_ptr();
     if (!data) return std::unexpected(std::move(data.error()));
-    for (Json const& index : *data) {
+    if ((*data)->size() != area)
+      return std::unexpected(StarException("TMX tile layer GID count does not match its dimensions"));
+    result->m_tileData.reserve(static_cast<std::size_t>(area));
+    for (Json const& index : **data) {
       auto gid = index.to_uint();
       if (!gid) return std::unexpected(std::move(gid.error()));
+      if (!std::in_range<std::uint32_t>(*gid)) return std::unexpected(StarException("Invalid TMX layer GID"));
       result->m_tileData.push_back(*gid & ~TileFlip::AllBits);
     }
   } else {
@@ -232,28 +226,30 @@ std::expected<std::shared_ptr<TMXTileLayer>, StarException> TMXTileLayer::create
     if (!compression) return std::unexpected(std::move(compression.error()));
     auto data = layer.get_string("data");
     if (!data) return std::unexpected(std::move(data.error()));
-    auto base64Data = base64_decode(data->utf8());
+    auto base64_data = base64_decode(data->utf8());
     ByteArray bytes;
     if (*compression == "") {
-      bytes = std::move(base64Data);
+      bytes = std::move(base64_data);
     } else {
       auto decoded = [&]() -> std::expected<ByteArray, StarException> {
-        if (*compression == "gzip") return decompress_gzip(base64Data, max_uncompressed_size);
-        if (*compression == "zlib") return decompress(base64Data, max_uncompressed_size);
-        if (*compression == "zstd") return ZstdCompression::decompress(base64Data);
+        auto limit = std::min(byte_count, max_uncompressed_size);
+        if (*compression == "gzip") return decompress_gzip(base64_data, limit);
+        if (*compression == "zlib") return decompress(base64_data, limit);
+        if (*compression == "zstd") return ZstdCompression::decompress(base64_data, limit);
         return std::unexpected(StarException::format("TMXTileLayer does not support compression mode {}", *compression));
       }();
       if (!decoded) return std::unexpected(std::move(decoded.error()));
       bytes = std::move(*decoded);
     }
-    for (std::size_t i = 0; i + 3 < bytes.size(); i += 4) {
+    if (bytes.size() != byte_count)
+      return std::unexpected(StarException("TMX tile layer byte count does not match its dimensions"));
+    result->m_tileData.reserve(static_cast<std::size_t>(area));
+    for (std::size_t i = 0; i < byte_count; i += 4) {
       std::uint32_t gid = static_cast<std::uint8_t>(bytes[i]) | (static_cast<std::uint8_t>(bytes[i + 1]) << 8)
         | (static_cast<std::uint8_t>(bytes[i + 2]) << 16) | (static_cast<std::uint8_t>(bytes[i + 3]) << 24);
       result->m_tileData.push_back(gid & ~TileFlip::AllBits);
     }
   }
-  if (result->m_tileData.size() != layerWidth * layerHeight)
-    return std::unexpected(StarException("TMXTileLayer data length was inconsistent with width/height"));
   return result;
 }
 
@@ -267,9 +263,11 @@ std::expected<std::shared_ptr<TMXMap>, StarException> TMXMap::create(Root& root,
   auto result = std::shared_ptr<TMXMap>(new TMXMap);
   auto width = tmx.get_uint("width");
   if (!width) return std::unexpected(std::move(width.error()));
+  if (!std::in_range<int>(*width)) return std::unexpected(StarException("Invalid TMX map width"));
   result->m_width = *width;
   auto height = tmx.get_uint("height");
   if (!height) return std::unexpected(std::move(height.error()));
+  if (!std::in_range<int>(*height)) return std::unexpected(StarException("Invalid TMX map height"));
   result->m_height = *height;
   auto tilesetsJson = tmx.get("tilesets");
   if (!tilesetsJson) return std::unexpected(std::move(tilesetsJson.error()));
@@ -300,7 +298,7 @@ std::expected<std::reference_wrapper<Tiled::Tile const>, StarException> TMXTileL
   if (!m_rect.contains(pos)) return std::cref(tilesets->nullTile());
   int dx = pos.x() - m_rect.x_min();
   int dy = pos.y() - m_rect.y_min();
-  return tilesets->getTile(m_tileData[dx + dy * width()], m_layer);
+  return tilesets->getTile(m_tileData[dx + static_cast<std::size_t>(dy) * width()], m_layer);
 }
 
 [[nodiscard]] std::expected<String, StarException> tilesetAssetPath(String const& relativePath) {
@@ -615,6 +613,7 @@ std::expected<void, StarException> TMXPartReader::forEachTile(TileCallback const
   for (auto const& map : m_maps) {
     auto result = map.second->forEachTile(callback);
     if (!result) return std::unexpected(std::move(result.error()));
+    if (*result) break;
   }
   return {};
 }
@@ -623,6 +622,7 @@ std::expected<void, StarException> TMXPartReader::forEachTileAt(Vec2I pos, TileC
   for (auto const& map : m_maps) {
     auto result = map.second->forEachTileAt(pos, callback);
     if (!result) return std::unexpected(std::move(result.error()));
+    if (*result) break;
   }
   return {};
 }

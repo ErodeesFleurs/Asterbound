@@ -619,6 +619,16 @@ with a conservative earliest-timestamp bound; negative smear, TTL changes and
 failed-insertion timestamps must remain covered. Filtered cleanup still visits
 every entry. Revisiting evicted cells re-executes their deterministic callbacks.
 
+### Dungeon generation
+
+`game_tests --gtest_filter='*Dungeon*:WorldSnapshot.FixedCoordinateGenerationIsDeterministic'`
+checks TMX layer decoding and query order, part footprints, connector candidate
+order, liquid pressure and the fixed planetary fingerprint. Use real assets.
+`STAR_BUILD_BENCHMARKS=ON` also builds `dungeon_generation_benchmark`. Run both
+binaries with the same assets, `-dungeonWorld`, `-repetitions` and `-reportevery`.
+Timing starts after loading Root and includes world creation, storage and server
+shutdown; it is not a measurement of an individual generation pass.
+
 ### Weighted selection compatibility
 
 `WeightedPool` retains original positive weights and entry order for JSON and

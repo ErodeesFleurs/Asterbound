@@ -81,13 +81,13 @@ namespace Dungeon {
     return Biome5MaterialId;
   }
 
-  [[nodiscard]] std::expected<std::shared_ptr<Connector const>, StarException> chooseOption(List<std::shared_ptr<Connector const>>& options, RandomSource& rnd) {
+  [[nodiscard]] std::expected<std::reference_wrapper<Connector const>, StarException> choose_option(ConnectorCandidates& options, RandomSource& rnd) {
     float distribution = 0;
     for (std::size_t i = 0; i < options.size(); i++)
-      distribution += options[i]->part().chance();
+      distribution += options[i].get().part().chance();
     float pick = rnd.uniform_float() * distribution;
     for (std::size_t i = 0; i < options.size(); i++) {
-      pick -= options[i]->part().chance();
+      pick -= options[i].get().part().chance();
       if (pick <= 0)
         return options.take_at(i);
     }
@@ -901,18 +901,15 @@ namespace Dungeon {
 
   std::expected<bool, StarException> Part::collidesWithPlaces(Vec2I pos, Set<Vec2I>& places) const {
     if (m_overrideAllowAlways) return true;
-    bool result = false;
-    auto visited = m_reader->forEachTile([this, &result, pos, &places](Vec2I tilePos, Tile const& tile) -> std::expected<bool, StarException> {
-      if (tile.collidesWithPlaces() && places.contains(pos + tilePos)) {
-        auto logged = this->root().logger().debug("Tile collided with place at {}", pos + tilePos);
+    for (auto offset : m_occupied_offsets) {
+      auto position = pos + offset;
+      if (places.contains(position)) {
+        auto logged = root().logger().debug("Tile collided with place at {}", position);
         if (!logged) return std::unexpected(std::move(logged.error()));
-        result = true;
         return true;
       }
-      return false;
-    });
-    if (!visited) return std::unexpected(std::move(visited.error()));
-    return result;
+    }
+    return false;
   }
 
   std::expected<bool, StarException> Part::canPlace(Vec2I pos, DungeonGeneratorWriter& writer) const {
@@ -1046,7 +1043,10 @@ namespace Dungeon {
     int highestLiquid = -1;
     auto visited = m_reader->forEachTile([&](Vec2I pos, Tile const& tile) -> std::expected<bool, StarException> {
         int x = pos.x(), y = pos.y();
-        if (tile.collidesWithPlaces()) {
+        if (tile.modifiesPlaces())
+          m_modified_offsets.push_back(pos);
+        if (tile.usesPlaces()) {
+          m_occupied_offsets.push_back(pos);
           cx += x;
           cy += y;
           cc++;
@@ -1110,21 +1110,17 @@ namespace Dungeon {
   Connector::Connector(Part const& part, String value, bool forwardOnly, Direction direction, Vec2I offset)
       : m_value(std::move(value)), m_forwardOnly(forwardOnly), m_direction(direction), m_offset(offset), m_part(part) {}
 
-  std::expected<bool, StarException> Connector::connectsTo(std::shared_ptr<Connector const> connector) const {
+  std::expected<bool, StarException> Connector::accepts_direction_from(Connector const& connector) const {
     if (m_forwardOnly)
       return false;
-    if (m_value != connector->m_value)
-      return false;
-    if (m_direction == Direction::Any || connector->m_direction == Direction::Any)
+    if (m_direction == Direction::Any || connector.m_direction == Direction::Any)
       return true;
-    auto flipped = flipDirection(connector->m_direction);
+    auto flipped = flipDirection(connector.m_direction);
     if (!flipped) return std::unexpected(std::move(flipped.error()));
-    if (m_direction != *flipped)
-      return false;
-    return true;
+    return m_direction == *flipped;
   }
 
-  String Connector::value() const {
+  String const& Connector::value() const {
     return m_value;
   }
 
@@ -1322,51 +1318,38 @@ namespace Dungeon {
     m_currentBounds.set_max(Vec2I{std::numeric_limits<std::int32_t>::min(), std::numeric_limits<std::int32_t>::min()});
   }
 
-  std::expected<void, StarException> DungeonGeneratorWriter::flushLiquid() {
-    // For each liquid type, find each contiguous region of liquid, then
-    // pressurize that region based on the highest position in the region
+  std::expected<void, StarException> pressurize_liquids(Map<Vec2I, LiquidStore>& liquids) {
+    Map<LiquidId, Set<Vec2I>> unpressurized_liquids;
+    for (auto const& [position, liquid] : liquids)
+      unpressurized_liquids[liquid.liquid].add(position);
 
-    Map<LiquidId, Set<Vec2I>> unpressurizedLiquids;
-    for (auto& p : m_pendingLiquids)
-      unpressurizedLiquids[p.second.liquid].add(p.first);
-
-    for (auto& liquidPair : unpressurizedLiquids) {
-      auto& unpressurized = liquidPair.second;
+    List<Vec2I> region;
+    for (auto& [liquid_id, unpressurized] : unpressurized_liquids) {
       while (!unpressurized.empty()) {
-        // Start with the first unpressurized block as the open set.
         auto first = unpressurized.take_first();
         if (!first) return std::unexpected(std::move(first.error()));
-        Vec2I firstBlock = *first;
-        List<Vec2I> openSet = {firstBlock};
-        Set<Vec2I> contiguousRegion = {firstBlock};
-
-        // For each element in the previous open set, add all connected blocks
-        // in
-        // the unpressurized set to the new open set and to the total contiguous
-        // region, taking them from the unpressurized set.
-        while (!openSet.empty()) {
-          auto oldOpenSet = std::exchange(openSet, {});
-          for (auto const& p : oldOpenSet) {
-            for (auto dir : {Vec2I(1, 0), Vec2I(-1, 0), Vec2I(0, 1), Vec2I(0, -1)}) {
-              Vec2I pos = p + dir;
-              if (unpressurized.remove(pos)) {
-                contiguousRegion.add(pos);
-                openSet.push_back(pos);
-              }
+        region.clear();
+        region.push_back(*first);
+        int highest_y = (*first)[1];
+        for (std::size_t i = 0; i < region.size(); ++i) {
+          auto const current = region[i]; // Appending neighbors can invalidate references.
+          for (auto dir : {Vec2I(1, 0), Vec2I(-1, 0), Vec2I(0, 1), Vec2I(0, -1)}) {
+            auto pos = current + dir;
+            if (unpressurized.remove(pos)) {
+              region.push_back(pos);
+              highest_y = std::max(highest_y, pos[1]);
             }
           }
         }
-
-        // Once we have found no more blocks in the unpressurized set to add to
-        // the open set, then we have taken a contiguous region out of the
-        // unpressurized set.  Pressurize it based on the highest point.
-        int highestPoint = std::numeric_limits<int>::lowest();
-        for (auto const& p : contiguousRegion)
-          highestPoint = std::max(highestPoint, p[1]);
-        for (auto const& p : contiguousRegion)
-          m_pendingLiquids[p].pressure = 1.0f + highestPoint - p[1];
+        for (auto const& pos : region)
+          liquids[pos].pressure = 1.0f + highest_y - pos[1];
       }
     }
+    return {};
+  }
+
+  std::expected<void, StarException> DungeonGeneratorWriter::flush_liquids() {
+    if (auto result = pressurize_liquids(m_pendingLiquids); !result) return result;
 
     for (auto& p : m_pendingLiquids)
       setLiquid(p.first, p.second);
@@ -1616,6 +1599,10 @@ std::expected<std::shared_ptr<DungeonDefinition>, StarException> DungeonDefiniti
     auto const& partName = (*part)->name();
     result->m_parts.insert(partName, std::move(*part));
   }
+  // Iterate the completed part map, not the JSON list: bucket order is draw order.
+  for (auto const& entry : result->m_parts)
+    for (auto const& connection : entry.second->connections())
+      result->m_connectors_by_value[connection->value()].push_back(std::cref(*connection));
   if (auto gravityJson = result->m_metadata.maybe("gravity")) {
     auto gravity = gravityJson->to_float();
     if (!gravity) return std::unexpected(std::move(gravity.error()));
@@ -1745,12 +1732,8 @@ std::expected<std::pair<List<RectI>, Set<Vec2I>>, StarException> DungeonGenerato
 
   auto placePart = [&](Dungeon::Part const& part, Vec2I const& placePos) -> std::expected<void, StarException> {
       Set<Vec2I> clearTileEntityPositions;
-      auto cleared = part.forEachTile([&](Vec2I tilePos, Dungeon::Tile const& tile) -> std::expected<bool, StarException> {
-          if (tile.modifiesPlaces())
-            clearTileEntityPositions.insert(writer.wrapPosition(placePos + tilePos));
-          return false;
-        });
-      if (!cleared) return std::unexpected(std::move(cleared.error()));
+      for (auto offset : part.modified_offsets())
+        clearTileEntityPositions.insert(writer.wrapPosition(placePos + offset));
       auto partBounds = RectI::with_size(placePos, Vec2I(part.size()));
       if (auto result = writer.clearTileEntities(partBounds, clearTileEntityPositions, part.clearAnchoredObjects()); !result) return std::unexpected(std::move(result.error()));
 
@@ -1762,15 +1745,10 @@ std::expected<std::pair<List<RectI>, Set<Vec2I>>, StarException> DungeonGenerato
       if (auto result = part.place(placePos, preserveTiles, writer); !result) return std::unexpected(std::move(result.error()));
       writer.finishPart();
 
-      auto marked = part.forEachTile([&](Vec2I tilePos, Dungeon::Tile const& tile) -> std::expected<bool, StarException> {
-          if (tile.usesPlaces())
-            preserveTiles.insert(placePos + tilePos);
-          if (tile.modifiesPlaces())
-            modifiedTiles.insert(placePos + tilePos);
-          return false;
-        });
-
-      if (!marked) return std::unexpected(std::move(marked.error()));
+      for (auto offset : part.occupied_offsets())
+        preserveTiles.insert(placePos + offset);
+      for (auto offset : part.modified_offsets())
+        modifiedTiles.insert(placePos + offset);
       openSet.push_back({std::cref(part), placePos});
 
       placementCounter[part.name()]++;
@@ -1793,21 +1771,23 @@ std::expected<std::pair<List<RectI>, Set<Vec2I>>, StarException> DungeonGenerato
     Vec2I parentPos = next->second;
     if (auto logged = this->root().logger().debug("Trying to add part {} at {} connectors: {}", parentPart.name(), parentPos, parentPart.connections().size()); !logged) return std::unexpected(std::move(logged.error()));
     for (std::size_t i = 0; i < parentPart.connections().size(); i++) {
-      auto connector = parentPart.connections()[i];
+      auto const& connector = parentPart.connections()[i];
       Vec2I connectorPos = parentPos + connector->offset();
       if (closedConnectors.contains(connectorPos))
         continue;
-      auto foundOptions = findConnectablePart(connector);
-      if (!foundOptions) return std::unexpected(std::move(foundOptions.error()));
-      auto options = std::move(*foundOptions);
+      auto found_options = m_def->find_connectable_parts(*connector);
+      if (!found_options) return std::unexpected(std::move(found_options.error()));
+      auto options = std::move(*found_options);
       while (!options.empty()) {
-        auto chosenOption = chooseOption(options, m_rand);
-        if (!chosenOption) return std::unexpected(std::move(chosenOption.error()));
-        auto option = std::move(*chosenOption);
-        if (auto logged = this->root().logger().debug("Trying part {}", option->part().name()); !logged) return std::unexpected(std::move(logged.error()));
-        Vec2I partPos = connectorPos - option->offset() + option->positionAdjustment();
-        Vec2I optionPos = connectorPos + option->positionAdjustment();
-        if (!option->part().ignoresPartMaximum()) {
+        auto chosen_option = choose_option(options, m_rand);
+        if (!chosen_option) return std::unexpected(std::move(chosen_option.error()));
+        auto const& option = chosen_option->get();
+        auto const& option_part = option.part();
+        if (auto logged = this->root().logger().debug("Trying part {}", option_part.name()); !logged) return std::unexpected(std::move(logged.error()));
+        auto adjustment = option.positionAdjustment();
+        Vec2I partPos = connectorPos - option.offset() + adjustment;
+        Vec2I optionPos = connectorPos + adjustment;
+        if (!option_part.ignoresPartMaximum()) {
           if (piecesPlaced >= m_def->maxParts())
             continue;
 
@@ -1816,36 +1796,36 @@ std::expected<std::pair<List<RectI>, Set<Vec2I>>, StarException> DungeonGenerato
             continue;
           }
         }
-        if (!option->part().allowsPlacement(placementCounter[option->part().name()])) {
+        if (!option_part.allowsPlacement(placementCounter[option_part.name()])) {
           if (auto logged = this->root().logger().debug("part failed in allowsPlacement"); !logged) return std::unexpected(std::move(logged.error()));
           continue;
         }
-        if (!option->part().checkPartCombinationsAllowed(placementCounter)) {
+        if (!option_part.checkPartCombinationsAllowed(placementCounter)) {
           if (auto logged = this->root().logger().debug("part failed in checkPartCombinationsAllowed"); !logged) return std::unexpected(std::move(logged.error()));
           continue;
         }
-        auto collides = option->part().collidesWithPlaces(partPos, preserveTiles);
+        auto collides = option_part.collidesWithPlaces(partPos, preserveTiles);
         if (!collides) return std::unexpected(std::move(collides.error()));
         if (*collides) {
           if (auto logged = this->root().logger().debug("part failed in collidesWithPlaces"); !logged) return std::unexpected(std::move(logged.error()));
           continue;
         }
-        if (option->part().minimumThreatLevel() && m_threatLevel < *option->part().minimumThreatLevel()) {
+        if (option_part.minimumThreatLevel() && m_threatLevel < *option_part.minimumThreatLevel()) {
           if (auto logged = this->root().logger().debug("part failed in minimumThreatLevel"); !logged) return std::unexpected(std::move(logged.error()));
           continue;
         }
-        if (option->part().maximumThreatLevel() && m_threatLevel > *option->part().maximumThreatLevel()) {
+        if (option_part.maximumThreatLevel() && m_threatLevel > *option_part.maximumThreatLevel()) {
           if (auto logged = this->root().logger().debug("part failed in maximumThreatLevel"); !logged) return std::unexpected(std::move(logged.error()));
           continue;
         }
         bool allowed = forcePlacement;
         if (!allowed) {
-          auto canPlace = option->part().canPlace(partPos, writer);
+          auto canPlace = option_part.canPlace(partPos, writer);
           if (!canPlace) return std::unexpected(std::move(canPlace.error()));
           allowed = *canPlace;
         }
         if (allowed) {
-          auto placed = placePart(option->part(), partPos);
+          auto placed = placePart(option_part, partPos);
           if (!placed) return std::unexpected(std::move(placed.error()));
           closedConnectors.add(connectorPos);
           closedConnectors.add(optionPos);
@@ -1857,7 +1837,7 @@ std::expected<std::pair<List<RectI>, Set<Vec2I>>, StarException> DungeonGenerato
     }
   }
   if (auto logged = this->root().logger().debug("Settling dungeon water."); !logged) return std::unexpected(std::move(logged.error()));
-  if (auto result = writer.flushLiquid(); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = writer.flush_liquids(); !result) return std::unexpected(std::move(result.error()));
   if (auto logged = this->root().logger().debug("Flushing dungeon into the worldgen."); !logged) return std::unexpected(std::move(logged.error()));
   if (auto result = writer.flush(); !result) return std::unexpected(std::move(result.error()));
 
@@ -1865,29 +1845,31 @@ std::expected<std::pair<List<RectI>, Set<Vec2I>>, StarException> DungeonGenerato
 }
 
 std::expected<std::shared_ptr<Dungeon::Part const>, StarException> DungeonGenerator::pickAnchor() {
-  List<String> validAnchors;
+  List<std::reference_wrapper<std::shared_ptr<Dungeon::Part const> const>> valid_anchors;
+  valid_anchors.reserve(m_def->anchors().size());
   for (auto const& name : m_def->anchors()) {
     auto part = m_def->parts().get(name);
     if (!part) return std::unexpected(std::move(part.error()));
     auto const& anchor = part->get();
     if ((!anchor->minimumThreatLevel() || m_threatLevel >= *anchor->minimumThreatLevel())
         && (!anchor->maximumThreatLevel() || m_threatLevel <= *anchor->maximumThreatLevel()))
-      validAnchors.push_back(name);
+      valid_anchors.push_back(std::cref(anchor));
   }
-  if (validAnchors.empty()) return std::shared_ptr<Dungeon::Part const>();
-  auto name = m_rand.sample_ref(validAnchors);
-  if (!name) return std::unexpected(std::move(name.error()));
-  auto part = m_def->parts().get(name->get());
-  if (!part) return std::unexpected(std::move(part.error()));
-  return part->get();
+  if (valid_anchors.empty()) return std::shared_ptr<Dungeon::Part const>();
+  auto selected = m_rand.sample_ref(valid_anchors);
+  if (!selected) return std::unexpected(std::move(selected.error()));
+  return selected->get().get();
 }
 
-std::expected<List<std::shared_ptr<Dungeon::Connector const>>, StarException> DungeonGenerator::findConnectablePart(std::shared_ptr<Dungeon::Connector const> connector) const {
-  List<std::shared_ptr<Dungeon::Connector const>> result;
-  for (auto const& partPair : m_def->parts()) {
-    if (partPair.second->doesNotConnectTo(connector->part())) continue;
-    for (auto const& connection : partPair.second->connections()) {
-      auto connects = connection->connectsTo(connector);
+std::expected<Dungeon::ConnectorCandidates, StarException> DungeonDefinition::find_connectable_parts(Dungeon::Connector const& connector) const {
+  Dungeon::ConnectorCandidates result;
+  auto bucket = m_connectors_by_value.find(connector.value());
+  if (bucket == m_connectors_by_value.end()) return result;
+  auto same_part = [](auto a, auto b) { return &a.get().part() == &b.get().part(); };
+  for (auto group : bucket->second | std::views::chunk_by(same_part)) {
+    if (group.front().get().part().doesNotConnectTo(connector.part())) continue;
+    for (auto connection : group) {
+      auto connects = connection.get().accepts_direction_from(connector);
       if (!connects) return std::unexpected(std::move(connects.error()));
       if (*connects)
         result.push_back(connection);

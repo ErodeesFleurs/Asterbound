@@ -21,6 +21,10 @@ foreach(name IN ITEMS dump_versioned_json make_versioned_json)
   star_add_utility(${name} TRUE)
 endforeach()
 
+if(STAR_BUILD_BENCHMARKS)
+  star_add_utility(dungeon_generation_benchmark TRUE)
+endif()
+
 # Maintenance utilities are kept outside release builds.
 if(STAR_BUILD_DEV_TOOLS)
   star_add_utility(update_tilesets TRUE tileset_updater.cpp)

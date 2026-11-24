@@ -39,18 +39,7 @@ module star.micro_dungeon;
 import star.algorithm;
 namespace Star {
 
-// Placed on server so it can keep a cacheing system which allows for a quick
-// scan if a piece fits.
-
-MicroDungeonFactory::MicroDungeonFactory(Root& root) : m_root(root) {
-  m_generating = false;
-
-  m_placementshifts.push_back(0);
-  for (int i = 1; i < 4; ++i)
-    m_placementshifts.push_back(i);
-  for (int i = 1; i < 4; ++i)
-    m_placementshifts.push_back(-i);
-}
+MicroDungeonFactory::MicroDungeonFactory(Root& root) : m_root(root) {}
 
 std::expected<std::optional<std::pair<List<RectI>, Set<Vec2I>>>, StarException> MicroDungeonFactory::generate(RectI const& bounds,
     String const& dungeonName,
@@ -80,23 +69,20 @@ std::expected<std::optional<std::pair<List<RectI>, Set<Vec2I>>>, StarException> 
       if (!built) return std::unexpected(std::move(built.error()));
       return std::optional<std::pair<List<RectI>, Set<Vec2I>>>(std::move(*built));
     }
-    for (int dy : m_placementshifts) {
+    static constexpr std::array placement_shifts{0, 1, 2, 3, -1, -2, -3};
+    for (int dy : placement_shifts) {
       auto pos = position - (*anchorPart)->anchorPoint() + Vec2I{0, dy};
       if (!bounds.contains(pos) || !bounds.contains(pos + Vec2I{(*anchorPart)->size()} - Vec2I{1, 1}))
         continue;
       bool collision = false;
-      auto visited = (*anchorPart)->forEachTile([&](Vec2I tilePos, Dungeon::Tile const& tile) -> std::expected<bool, StarException> {
-        if (tile.usesPlaces()) {
-          auto dungeonId = facade->getDungeonIdAt(pos + tilePos);
-          if (!dungeonId) return std::unexpected(std::move(dungeonId.error()));
-          if (*dungeonId != no_dungeon_id) {
-            collision = true;
-            return true;
-          }
+      for (auto offset : (*anchorPart)->occupied_offsets()) {
+        auto dungeon_id = facade->getDungeonIdAt(pos + offset);
+        if (!dungeon_id) return std::unexpected(std::move(dungeon_id.error()));
+        if (*dungeon_id != no_dungeon_id) {
+          collision = true;
+          break;
         }
-        return false;
-      });
-      if (!visited) return std::unexpected(std::move(visited.error()));
+      }
       if (!collision) {
         auto canPlace = (*anchorPart)->canPlace(pos, writer);
         if (!canPlace) return std::unexpected(std::move(canPlace.error()));

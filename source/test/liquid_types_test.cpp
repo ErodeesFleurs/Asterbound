@@ -2,6 +2,8 @@ import std;
 import star.algorithm;
 import star.assets;
 import star.cellular_liquid;
+import star.dungeon_generator;
+import star.map;
 import star.format;
 import star.file;
 import star.game_test;
@@ -17,6 +19,29 @@ import star.liquid_types;
 #include "gtest/gtest.h"
 
 using namespace Star;
+
+TEST(DungeonLiquidTest, PressureTracksHighestConnectedCellOfSameLiquid) {
+  Map<Vec2I, LiquidStore> liquids;
+  auto add = [&](int x, int y, LiquidId id) {
+    liquids[{x, y}] = LiquidStore::filled(id, 0.5f);
+  };
+  add(0, -2, 1);
+  add(1, -2, 1);
+  add(1, -1, 1);
+  liquids[{1, 0}] = LiquidStore::endless(1, 9.0f);
+  add(0, -1, 2); // Touches water; its pressure must be independent.
+  add(2, 1, 1);  // Diagonal contact is not connected.
+  ASSERT_TRUE(Dungeon::pressurize_liquids(liquids));
+  auto cell = [&](int x, int y) -> LiquidStore const& { return liquids[{x, y}]; };
+  EXPECT_EQ(cell(0, -2).pressure, 3.0f);
+  EXPECT_EQ(cell(1, -2).pressure, 3.0f);
+  EXPECT_EQ(cell(1, -1).pressure, 2.0f);
+  EXPECT_EQ(cell(1, 0).pressure, 1.0f);
+  EXPECT_TRUE(cell(1, 0).source);
+  EXPECT_EQ(cell(0, -1).pressure, 1.0f);
+  EXPECT_EQ(cell(2, 1).pressure, 1.0f);
+  EXPECT_EQ(cell(0, -2).level, 0.5f);
+}
 
 TEST(LiquidStoreTest, OverfullLevelSaturatesNetworkUpdates) {
   auto store = LiquidStore::filled(1, 0.5f);

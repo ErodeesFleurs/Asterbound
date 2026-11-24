@@ -49,6 +49,7 @@ import star.networked_animator;
 import star.networked_animator_lua_bindings;
 import star.scripted_animator_lua_bindings;
 import star.drawable;
+import star.dungeon_generator;
 import star.item;
 import star.item_bag;
 import star.item_database;
@@ -196,6 +197,31 @@ const GameTestRegistration warp_target_wire("WarpTargetTest", "LegacyWireAndJson
   ASSERT_TRUE(trash);
   EXPECT_EQ(*swap, hex_decode("02"));
   EXPECT_EQ(*trash, hex_decode("03"));
+});
+
+const GameTestRegistration dungeon_part_offsets("DungeonPartTest", "OutpostOffsetsMatchOrderedTileEvents", [](GameTest& fixture) {
+  auto definitions = fixture.root().dungeonDefinitions();
+  ASSERT_TRUE(definitions) << definitions.error().what();
+  auto definition = (*definitions)->get("outpost");
+  ASSERT_TRUE(definition) << definition.error().what();
+  std::size_t occupied_count = 0;
+  for (auto const& [name, part] : (*definition)->parts()) {
+    SCOPED_TRACE(name.utf8());
+    List<Vec2I> occupied;
+    List<Vec2I> modified;
+    auto visited = part->forEachTile([&](Vec2I pos, Dungeon::Tile const& tile) -> std::expected<bool, StarException> {
+      if (tile.usesPlaces())
+        occupied.push_back(pos);
+      if (tile.modifiesPlaces())
+        modified.push_back(pos);
+      return false;
+    });
+    ASSERT_TRUE(visited) << visited.error().what();
+    EXPECT_TRUE(std::ranges::equal(occupied, part->occupied_offsets()));
+    EXPECT_TRUE(std::ranges::equal(modified, part->modified_offsets()));
+    occupied_count += occupied.size();
+  }
+  EXPECT_GT(occupied_count, 0u);
 });
 
 const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {

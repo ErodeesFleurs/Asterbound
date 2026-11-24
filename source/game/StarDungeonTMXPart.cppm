@@ -135,6 +135,7 @@ namespace Dungeon {
 
   private:
     TMXObject() = default;
+    [[nodiscard]] std::expected<bool, StarException> visit_tiles(TMXMap const& map, std::optional<Vec2I> query, TileCallback const& callback) const;
     // "Tile Objects" in Tiled are objects that contain an image from a tileset,
     // and have a bunch of their own Tile Object-specific properties.
     struct TileObjectInfo {

@@ -76,6 +76,8 @@ namespace Dungeon {
   class Part;
   struct Tile;
 
+  [[nodiscard]] std::expected<void, StarException> pressurize_liquids(Map<Vec2I, LiquidStore>& liquids);
+
   class DungeonGeneratorWriter {
     Root& m_root;
   public:
@@ -114,7 +116,7 @@ namespace Dungeon {
 
     [[nodiscard]] std::expected<void, StarException> clearTileEntities(RectI const& bounds, Set<Vec2I> const& positions, bool clearAnchoredObjects);
 
-    [[nodiscard]] std::expected<void, StarException> flushLiquid();
+    [[nodiscard]] std::expected<void, StarException> flush_liquids();
     [[nodiscard]] std::expected<void, StarException> flush();
 
     List<RectI> boundingBoxes() const;
@@ -601,9 +603,9 @@ namespace Dungeon {
   public:
     Connector(Part const& part, String value, bool forwardOnly, Direction direction, Vec2I offset);
 
-    [[nodiscard]] std::expected<bool, StarException> connectsTo(std::shared_ptr<Connector const> connector) const;
+    [[nodiscard]] std::expected<bool, StarException> accepts_direction_from(Connector const& connector) const;
 
-    String value() const;
+    String const& value() const;
     Vec2I positionAdjustment() const;
     Part const& part() const;
     Vec2I offset() const;
@@ -615,6 +617,8 @@ namespace Dungeon {
     Vec2I m_offset;
     std::reference_wrapper<Part const> m_part;
   };
+
+  using ConnectorCandidates = List<std::reference_wrapper<Connector const>>;
 
   // Callback errors propagate through readers, scans and placement. A successful
   // true still means the original early exit, not a generation failure.
@@ -662,6 +666,8 @@ namespace Dungeon {
     List<std::shared_ptr<Connector const>> const& connections() const;
     bool doesNotConnectTo(Part const& part) const;
     bool checkPartCombinationsAllowed(StringMap<int> const& placementCounts) const;
+    std::span<Vec2I const> occupied_offsets() const { return m_occupied_offsets; }
+    std::span<Vec2I const> modified_offsets() const { return m_modified_offsets; }
     [[nodiscard]] std::expected<bool, StarException> collidesWithPlaces(Vec2I pos, Set<Vec2I>& places) const;
 
     [[nodiscard]] std::expected<bool, StarException> canPlace(Vec2I pos, DungeonGeneratorWriter& writer) const;
@@ -686,6 +692,8 @@ namespace Dungeon {
     List<std::shared_ptr<Rule const>> m_rules;
 
     List<std::shared_ptr<Connector const>> m_connections;
+    List<Vec2I> m_occupied_offsets;
+    List<Vec2I> m_modified_offsets;
     Vec2I m_anchorPoint;
     bool m_overrideAllowAlways;
     std::optional<float> m_minimumThreatLevel;
@@ -733,6 +741,7 @@ public:
   std::optional<float> gravity() const;
   std::optional<bool> breathable() const;
   StringMap<std::shared_ptr<Dungeon::Part const>> const& parts() const;
+  [[nodiscard]] std::expected<Dungeon::ConnectorCandidates, StarException> find_connectable_parts(Dungeon::Connector const& connector) const;
 
   List<String> const& anchors() const;
   std::optional<Json> const& optTileset() const;
@@ -752,6 +761,7 @@ private:
   bool m_isProtected;
   List<std::shared_ptr<Dungeon::Rule const>> m_rules;
   StringMap<std::shared_ptr<Dungeon::Part const>> m_parts;
+  StringMap<Dungeon::ConnectorCandidates> m_connectors_by_value;
   List<String> m_anchors;
   std::optional<Json> m_tileset;
 
@@ -791,7 +801,6 @@ public:
 
   [[nodiscard]] std::expected<std::pair<List<RectI>, Set<Vec2I>>, StarException> buildDungeon(std::shared_ptr<Dungeon::Part const> anchor, Vec2I pos, Dungeon::DungeonGeneratorWriter& writer, bool forcePlacement);
   [[nodiscard]] std::expected<std::shared_ptr<Dungeon::Part const>, StarException> pickAnchor();
-  [[nodiscard]] std::expected<List<std::shared_ptr<Dungeon::Connector const>>, StarException> findConnectablePart(std::shared_ptr<Dungeon::Connector const> connector) const;
 
   std::shared_ptr<DungeonDefinition const> definition() const;
 
@@ -818,6 +827,7 @@ export namespace Star {
 }
 
 export namespace Star::Dungeon {
+  using ::Star::Dungeon::pressurize_liquids;
   using ::Star::Dungeon::DungeonGeneratorWriter;
   using ::Star::Dungeon::PartReader;
   using ::Star::Dungeon::Part;
@@ -825,6 +835,7 @@ export namespace Star::Dungeon {
   using ::Star::Dungeon::Brush;
   using ::Star::Dungeon::Tile;
   using ::Star::Dungeon::Connector;
+  using ::Star::Dungeon::ConnectorCandidates;
   using ::Star::Dungeon::WorldGenMustContainAirRule;
   using ::Star::Dungeon::WorldGenMustContainSolidRule;
   using ::Star::Dungeon::WorldGenMustContainLiquidRule;
