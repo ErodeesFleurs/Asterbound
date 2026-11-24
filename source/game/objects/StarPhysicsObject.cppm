@@ -92,7 +92,7 @@ public:
 
   RectF metaBoundBox() const override;
 
-  [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> forceRegions() const override;
+  [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> force_regions() const override;
 
   std::size_t movingCollisionCount() const override;
   [[nodiscard]] std::expected<std::optional<PhysicsMovingCollision>, StarException> movingCollision(std::size_t positionIndex) const override;
@@ -100,7 +100,7 @@ public:
 private:
   explicit PhysicsObject(Root& rootContext);
   struct PhysicsForceConfig {
-    PhysicsForceRegion forceRegion;
+    PhysicsForceRegion force_region;
     NetElementBool enabled;
   };
 
@@ -111,7 +111,7 @@ private:
     NetElementBool enabled;
   };
 
-  OrderedHashMap<String, PhysicsForceConfig> m_physicsForces;
+  OrderedHashMap<String, PhysicsForceConfig> m_physics_forces;
   OrderedHashMap<String, PhysicsCollisionConfig> m_physicsCollisions;
 
   RectF m_metaBoundBox;

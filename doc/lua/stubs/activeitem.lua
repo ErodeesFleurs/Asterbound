@@ -93,11 +93,11 @@ function activeItem.setShieldPolys(shieldPolys) end
 ---@param shieldPolys? PolyF[]
 function activeItem.setItemShieldPolys(shieldPolys) end
 
---- Sets a list of active physics force regions with coordinates relative to the owner's position or clears them if unspecified. ---
+--- Sets world-space force regions, or clears them if omitted. ---
 ---@param forceRegions? PhysicsForceRegion[]
 function activeItem.setForceRegions(forceRegions) end
 
---- Sets a list of active physics force regions with coordinates relative to the item's hand position or clears them if unspecified. ---
+--- Sets hand-local force regions, transforming both gradient endpoints with the polygon. Omit to clear. ---
 ---@param forceRegions? PhysicsForceRegion[]
 function activeItem.setItemForceRegions(forceRegions) end
 

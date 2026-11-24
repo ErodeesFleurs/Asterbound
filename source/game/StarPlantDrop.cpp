@@ -326,7 +326,7 @@ if (!result337) return std::unexpected(std::move(result337.error()));
   parameters.collisionPoly = collisionPoly;
   parameters.ignorePlatformCollision = true;
   parameters.gravityMultiplier = 0.2f;
-  parameters.physicsEffectCategories = StringSet({"plantdrop"});
+  parameters.physics_effect_categories = StringSet({"plantdrop"});
   auto result338 = m_movementController->applyParameters(parameters);
 if (!result338) return std::unexpected(std::move(result338.error()));
   return {};

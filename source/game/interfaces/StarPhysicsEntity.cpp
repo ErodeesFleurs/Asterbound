@@ -49,7 +49,7 @@ std::expected<PhysicsMovingCollision, StarException> PhysicsMovingCollision::fro
   if (!kind)
     return std::unexpected(std::move(kind.error()));
   pmc.collisionKind = *kind;
-  auto filter = jsonToPhysicsCategoryFilter(json);
+  auto filter = json_to_physics_category_filter(json);
   if (!filter)
     return std::unexpected(std::move(filter.error()));
   pmc.categoryFilter = std::move(*filter);
@@ -120,7 +120,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
   return std::ref(ds);
 }
 
-std::expected<List<PhysicsForceRegion>, StarException> PhysicsEntity::forceRegions() const {
+std::expected<List<PhysicsForceRegion>, StarException> PhysicsEntity::force_regions() const {
   return List<PhysicsForceRegion>{};
 }
 

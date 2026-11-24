@@ -259,7 +259,7 @@ public:
   [[nodiscard]] std::expected<std::optional<String>, StarException> activeWeather(Vec2F const& pos) const override;
   [[nodiscard]] std::expected<bool, StarException> isUnderground(Vec2F const& pos) const override;
   [[nodiscard]] std::expected<bool, StarException> disableDeathDrops() const override;
-  [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> forceRegions() const override;
+  [[nodiscard]] std::span<PhysicsForceRegion const> force_regions() const override;
   [[nodiscard]] std::expected<Json, StarException> getProperty(String const& propertyName, Json const& def = Json()) const override;
   [[nodiscard]] std::expected<void, StarException> setProperty(String const& propertyName, Json const& property) override;
   void timer(float delay, WorldAction worldAction) override;
@@ -472,7 +472,7 @@ private:
 
   void setTileProtection(DungeonId dungeonId, bool isProtected);
 
-  [[nodiscard]] std::expected<void, StarException> setupForceRegions();
+  [[nodiscard]] std::expected<void, StarException> setup_force_regions();
 
   Json m_clientConfig;
   std::shared_ptr<WorldTemplate> m_worldTemplate;
@@ -609,7 +609,7 @@ private:
   HashMap<Uuid, RpcPromise<Json>> m_entityMessagePromises;
   HashMap<Uuid, RpcPromiseKeeper<InteractAction>> m_entityInteractionResponses;
 
-  List<PhysicsForceRegion> m_forceRegions;
+  List<PhysicsForceRegion> m_force_regions;
 
   BroadcastCallback m_broadcastCallback;
   struct BroadcastVerifiers {

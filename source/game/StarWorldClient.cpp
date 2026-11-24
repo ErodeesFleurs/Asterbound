@@ -3379,9 +3379,8 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
     m_particles = std::make_shared<ParticleManager>(this->root(), m_geometry, m_tileArray);
     m_particles->setUndergroundLevel(m_worldTemplate->undergroundLevel());
     
-    auto result260 = setupForceRegions();
-    if (!result260)
-      return std::unexpected(std::move(result260.error()));
+    if (auto result = setup_force_regions(); !result)
+      return std::unexpected(std::move(result.error()));
     
     auto result261 = Sky::create(this->root());
     if (!result261)
@@ -3637,7 +3636,7 @@ std::expected<void, StarException> WorldClient::clearWorld() {
     remember(response.second.cancel("Client world closed"));
   m_entityMessagePromises = {};
 
-  m_forceRegions.clear();
+  m_force_regions.clear();
   
   m_expiryTimer.reset();
   m_requestedDestroy = false;
@@ -3939,8 +3938,8 @@ std::expected<bool, StarException> WorldClient::disableDeathDrops() const {
   return false;
 }
 
-std::expected<List<PhysicsForceRegion>, StarException> WorldClient::forceRegions() const {
-  return m_forceRegions;
+std::span<PhysicsForceRegion const> WorldClient::force_regions() const {
+  return m_force_regions;
 }
 
 std::expected<Json, StarException> WorldClient::getProperty(String const& propertyName, Json const& def) const {
@@ -4265,15 +4264,20 @@ std::expected<void, StarException> WorldClient::renderCollisionDebug() {
     return std::unexpected(std::move(physicsEntities.error()));
   for (auto const& physics : *physicsEntities) {
     {
-      auto result312 = physics->forceRegions();
-      if (!result312)
-        return std::unexpected(std::move(result312.error()));
-      for (auto const& forceRegion : (std::move(*result312))) {
-        if (std::holds_alternative<DirectionalForceRegion>(forceRegion)) {
-          log_poly(std::get<DirectionalForceRegion>(forceRegion).region, {}, 1.0f, 1.0f, 0.0f);
-        } else if (std::holds_alternative<RadialForceRegion>(forceRegion)) {
-          log_poly(PolyF(std::get<RadialForceRegion>(forceRegion).boundBox()), {}, 0.0f, 1.0f, 1.0f);
-        }
+      auto forces = physics->force_regions();
+      if (!forces)
+        return std::unexpected(std::move(forces.error()));
+      auto& logger = root().spatialLogger();
+      for (auto const& force : *forces) {
+        std::visit([&]<physics_force_region Region>(Region const& region) {
+          if constexpr (std::same_as<Region, RadialForceRegion>) {
+            logger.log_poly("world", PolyF(region.bounding_box()), {0, 255, 255, 255});
+          } else {
+            logger.log_poly("world", region.region, {255, 255, 0, 255});
+            if constexpr (std::same_as<Region, GradientForceRegion>)
+              logger.log_line("world", region.gradient, {255, 255, 0, 255});
+          }
+        }, force);
       }
     }
     
@@ -4354,73 +4358,17 @@ std::expected<void, StarException> WorldClient::inform_tile_prediction(Vec2I con
   return {};
 }
 
-std::expected<void, StarException> WorldClient::setupForceRegions() {
-  m_forceRegions.clear();
-  
-  if (!currentTemplate() || !currentTemplate()->worldParameters()) {
-    return {};
-  }
-  
-  auto forceRegionType = currentTemplate()->worldParameters()->worldEdgeForceRegions;
-  
-  if (forceRegionType == WorldEdgeForceRegionType::None) {
-    return {};
-  }
-  
-  bool addTopRegion = forceRegionType == WorldEdgeForceRegionType::Top || forceRegionType == WorldEdgeForceRegionType::TopAndBottom;
-  bool addBottomRegion = forceRegionType == WorldEdgeForceRegionType::Bottom || forceRegionType == WorldEdgeForceRegionType::TopAndBottom;
-  
-  auto result318 = this->root().assets();
-  if (!result318)
-    return std::unexpected(std::move(result318.error()));
-  auto result319 = (std::move(*result318))->json("/worldserver.config");
-  if (!result319)
-    return std::unexpected(std::move(result319.error()));
-  auto worldServerConfig = (std::move(*result319));
-  
-  auto result320 = worldServerConfig.get_float("worldEdgeForceRegionHeight");
-  if (!result320)
-    return std::unexpected(std::move(result320.error()));
-  auto regionHeight = (std::move(*result320));
-  auto result321 = worldServerConfig.get_float("worldEdgeForceRegionForce");
-  if (!result321)
-    return std::unexpected(std::move(result321.error()));
-  auto regionForce = (std::move(*result321));
-  auto result322 = worldServerConfig.get_float("worldEdgeForceRegionVelocity");
-  if (!result322)
-    return std::unexpected(std::move(result322.error()));
-  auto regionVelocity = (std::move(*result322));
-  auto regionCategoryFilter = PhysicsCategoryFilter::whitelist({"player", "monster", "npc", "vehicle"});
-  auto worldSize = Vec2F(currentTemplate()->size());
-  
-  if (addTopRegion) {
-    auto topForceRegion = GradientForceRegion();
-    topForceRegion.region = PolyF({
-        {0, worldSize[1] - regionHeight},
-        {worldSize[0], worldSize[1] - regionHeight},
-        (worldSize),
-        {0, worldSize[1]}});
-    topForceRegion.gradient = Line2F({0, worldSize[1]}, {0, worldSize[1] - regionHeight});
-    topForceRegion.baseTargetVelocity = regionVelocity;
-    topForceRegion.baseControlForce = regionForce;
-    topForceRegion.categoryFilter = regionCategoryFilter;
-    m_forceRegions.push_back(topForceRegion);
-  }
-  
-  if (addBottomRegion) {
-    auto bottomForceRegion = GradientForceRegion();
-    bottomForceRegion.region = PolyF({
-        {0, 0},
-        {worldSize[0], 0},
-        {worldSize[0], regionHeight},
-        {0, regionHeight}});
-    bottomForceRegion.gradient = Line2F({0, 0}, {0, regionHeight});
-    bottomForceRegion.baseTargetVelocity = regionVelocity;
-    bottomForceRegion.baseControlForce = regionForce;
-    bottomForceRegion.categoryFilter = regionCategoryFilter;
-    m_forceRegions.push_back(bottomForceRegion);
-  }
-  return {};
+std::expected<void, StarException> WorldClient::setup_force_regions() {
+  m_force_regions.clear();
+  if (!m_worldTemplate) return {};
+  auto parameters = m_worldTemplate->worldParameters();
+  if (!parameters || parameters->world_edge_force_regions == WorldEdgeForceRegionType::None) return {};
+  auto assets = root().assets();
+  if (!assets) return std::unexpected(std::move(assets.error()));
+  auto config = (*assets)->json("/worldserver.config");
+  if (!config) return std::unexpected(std::move(config.error()));
+  return parameters->append_edge_force_regions(m_force_regions, *config, Vec2F(m_worldTemplate->size()),
+      PhysicsCategoryFilter::whitelist({"player", "monster", "npc", "vehicle"}));
 }
 
 bool WorldClient::shouldExpire() {

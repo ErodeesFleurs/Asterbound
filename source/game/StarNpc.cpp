@@ -2588,8 +2588,8 @@ auto damageSource = std::move(*result520);
   return damageSources;
 }
 
-std::expected<List<PhysicsForceRegion>, StarException> Npc::forceRegions() const {
-  return m_tools->forceRegions();
+std::expected<List<PhysicsForceRegion>, StarException> Npc::force_regions() const {
+  return m_tools->force_regions();
 }
 
 

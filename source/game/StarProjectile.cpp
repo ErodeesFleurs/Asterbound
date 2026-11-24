@@ -795,16 +795,8 @@ PolyF Projectile::statusEffectArea() const {
   return m_config->statusEffectArea;
 }
 
-std::expected<List<PhysicsForceRegion>, StarException> Projectile::forceRegions() const {
-  List<PhysicsForceRegion> forces;
-  for (auto const& p : m_physicsForces) {
-    if (p.second.enabled.get()) {
-      PhysicsForceRegion forceRegion = p.second.forceRegion;
-      std::visit([pos = position()](auto& fr) { fr.translate(pos); }, forceRegion);
-      forces.push_back(std::move(forceRegion));
-    }
-  }
-  return forces;
+std::expected<List<PhysicsForceRegion>, StarException> Projectile::force_regions() const {
+  return collect_force_regions(m_physics_forces, *this);
 }
 
 std::size_t Projectile::movingCollisionCount() const {
@@ -1746,18 +1738,18 @@ if (!result707) return std::unexpected(std::move(result707.error()));
 m_animationCycle = std::move(*result707);
   m_collision = false;
 
-  auto result708 = m_config->physicsForces.iterate_object();
+  auto result708 = m_config->physics_forces.iterate_object();
   if (!result708)
     return std::unexpected(std::move(result708.error()));
   for (auto const& p : std::move(*result708)) {
-    auto& forceConfig = m_physicsForces[p.first];
+    auto& force_config = m_physics_forces[p.first];
 
-    auto result709 = jsonToPhysicsForceRegion(p.second);
+    auto result709 = json_to_physics_force_region(p.second);
 if (!result709) return std::unexpected(std::move(result709.error()));
-forceConfig.forceRegion = std::move(*result709);
+force_config.force_region = std::move(*result709);
     auto result710 = p.second.get_bool("enabled", true);
 if (!result710) return std::unexpected(std::move(result710.error()));
-forceConfig.enabled.set(std::move(*result710));
+force_config.enabled.set(std::move(*result710));
   }
 
   auto result711 = m_config->physicsCollisions.iterate_object();
@@ -1774,8 +1766,8 @@ if (!result713) return std::unexpected(std::move(result713.error()));
 forceConfig.enabled.set(std::move(*result713));
   }
 
-  m_physicsForces.sort_by_key();
-  for (auto& p : m_physicsForces)
+  m_physics_forces.sort_by_key();
+  for (auto& p : m_physics_forces)
     {
 auto result714 = m_netGroup.add_net_element(p.second.enabled);
 if (!result714) return std::unexpected(std::move(result714.error()));

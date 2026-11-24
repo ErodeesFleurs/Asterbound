@@ -20,38 +20,38 @@ struct PhysicsCategoryFilter {
   static PhysicsCategoryFilter whitelist(StringSet categories);
   static PhysicsCategoryFilter blacklist(StringSet categories);
 
-  PhysicsCategoryFilter();
+  PhysicsCategoryFilter() = default;
   PhysicsCategoryFilter(Type type, StringSet categories = {});
 
   bool check(StringSet const& categories) const;
 
-  bool operator==(PhysicsCategoryFilter const& rhs) const;
+  bool operator==(PhysicsCategoryFilter const&) const = default;
 
-  Type type;
+  Type type = Blacklist;
   StringSet categories;
 };
 
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, PhysicsCategoryFilter& rfr);
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, PhysicsCategoryFilter const& rfr);
 
-[[nodiscard]] std::expected<PhysicsCategoryFilter, StarException> jsonToPhysicsCategoryFilter(Json const& json);
+[[nodiscard]] std::expected<PhysicsCategoryFilter, StarException> json_to_physics_category_filter(Json const& json);
 
 struct DirectionalForceRegion {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DirectionalForceRegion& region);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, DirectionalForceRegion const& region);
-  [[nodiscard]] static std::expected<DirectionalForceRegion, StarException> fromJson(Json const& json);
+  [[nodiscard]] static std::expected<DirectionalForceRegion, StarException> from_json(Json const& json);
 
-  RectF boundBox() const;
+  RectF bounding_box() const;
 
   void translate(Vec2F const& pos);
 
-  bool operator==(DirectionalForceRegion const& rhs) const;
+  bool operator==(DirectionalForceRegion const&) const = default;
 
   PolyF region;
-  std::optional<float> xTargetVelocity;
-  std::optional<float> yTargetVelocity;
-  float controlForce;
-  PhysicsCategoryFilter categoryFilter;
+  std::optional<float> x_target_velocity;
+  std::optional<float> y_target_velocity;
+  float control_force = 0;
+  PhysicsCategoryFilter category_filter;
 };
 
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, DirectionalForceRegion& rfr);
@@ -60,20 +60,20 @@ struct DirectionalForceRegion {
 struct RadialForceRegion {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, RadialForceRegion& region);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, RadialForceRegion const& region);
-  [[nodiscard]] static std::expected<RadialForceRegion, StarException> fromJson(Json const& json);
+  [[nodiscard]] static std::expected<RadialForceRegion, StarException> from_json(Json const& json);
 
-  RectF boundBox() const;
+  RectF bounding_box() const;
 
   void translate(Vec2F const& pos);
 
-  bool operator==(RadialForceRegion const& rhs) const;
+  bool operator==(RadialForceRegion const&) const = default;
 
   Vec2F center;
-  float outerRadius;
-  float innerRadius;
-  float targetRadialVelocity;
-  float controlForce;
-  PhysicsCategoryFilter categoryFilter;
+  float outer_radius = 0;
+  float inner_radius = 0;
+  float target_radial_velocity = 0;
+  float control_force = 0;
+  PhysicsCategoryFilter category_filter;
 };
 
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, RadialForceRegion& rfr);
@@ -82,27 +82,32 @@ struct RadialForceRegion {
 struct GradientForceRegion {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, GradientForceRegion& region);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, GradientForceRegion const& region);
-  [[nodiscard]] static std::expected<GradientForceRegion, StarException> fromJson(Json const& json);
+  [[nodiscard]] static std::expected<GradientForceRegion, StarException> from_json(Json const& json);
 
-  RectF boundBox() const;
+  RectF bounding_box() const;
 
   void translate(Vec2F const& pos);
 
-  bool operator==(GradientForceRegion const& rhs) const;
+  bool operator==(GradientForceRegion const&) const = default;
 
   PolyF region;
   Line2F gradient;
-  float baseTargetVelocity;
-  float baseControlForce;
-  PhysicsCategoryFilter categoryFilter;
+  float base_target_velocity = 0;
+  float base_control_force = 0;
+  PhysicsCategoryFilter category_filter;
 };
 
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, GradientForceRegion& rfr);
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, GradientForceRegion const& rfr);
 
+template <typename T>
+concept physics_force_region = std::same_as<std::remove_cvref_t<T>, DirectionalForceRegion>
+    || std::same_as<std::remove_cvref_t<T>, RadialForceRegion>
+    || std::same_as<std::remove_cvref_t<T>, GradientForceRegion>;
+
 using PhysicsForceRegion = std::variant<DirectionalForceRegion, RadialForceRegion, GradientForceRegion>;
 
-[[nodiscard]] std::expected<PhysicsForceRegion, StarException> jsonToPhysicsForceRegion(Json const& json);
+[[nodiscard]] std::expected<PhysicsForceRegion, StarException> json_to_physics_force_region(Json const& json);
 
 }
 
@@ -114,6 +119,7 @@ export namespace Star {
   using ::Star::RadialForceRegion;
   using ::Star::GradientForceRegion;
   using ::Star::PhysicsForceRegion;
-  using ::Star::jsonToPhysicsCategoryFilter;
-  using ::Star::jsonToPhysicsForceRegion;
+  using ::Star::physics_force_region;
+  using ::Star::json_to_physics_category_filter;
+  using ::Star::json_to_physics_force_region;
 }

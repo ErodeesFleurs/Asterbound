@@ -185,7 +185,8 @@ public:
   [[nodiscard]] virtual std::expected<std::optional<String>, StarException> activeWeather(Vec2F const& pos) const = 0;
   [[nodiscard]] virtual std::expected<bool, StarException> isUnderground(Vec2F const& pos) const = 0;
   [[nodiscard]] virtual std::expected<bool, StarException> disableDeathDrops() const = 0;
-  [[nodiscard]] virtual std::expected<List<PhysicsForceRegion>, StarException> forceRegions() const = 0;
+  // Borrow only during the current world-thread operation, never across a template change or teardown.
+  [[nodiscard]] virtual std::span<PhysicsForceRegion const> force_regions() const = 0;
 
   // Gets / sets world-wide properties
   [[nodiscard]] virtual std::expected<Json, StarException> getProperty(String const& propertyName, Json const& def = {}) const = 0;

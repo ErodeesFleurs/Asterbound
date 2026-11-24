@@ -529,7 +529,7 @@ public:
   ActorMovementController& movementController() override;
   StatusController& statusController() override;
 
-  [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> forceRegions() const override;
+  [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> force_regions() const override;
 
   std::shared_ptr<StatusController> statusControllerPtr();
   std::shared_ptr<ActorMovementController> movementControllerPtr();

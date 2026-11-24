@@ -140,13 +140,13 @@ Sets a list of active shield polygons with coordinates relative to the item's ha
 
 #### `void` activeItem.setForceRegions([`List<PhysicsForceRegion>` forceRegions])
 
-Sets a list of active physics force regions with coordinates relative to the owner's position or clears them if unspecified.
+Sets force regions in world coordinates, without applying the owner's position or arm pose. Omit the list to clear it.
 
 ---
 
 #### `void` activeItem.setItemForceRegions([`List<PhysicsForceRegion>` forceRegions])
 
-Sets a list of active physics force regions with coordinates relative to the item's hand position or clears them if unspecified.
+Sets force regions in hand-local coordinates. The engine rotates their geometry by the arm angle, mirrors it when facing left, and translates it to the hand. For a gradient region this transforms both the polygon and the endpoints of `gradient`. Omit the list to clear it.
 
 ---
 

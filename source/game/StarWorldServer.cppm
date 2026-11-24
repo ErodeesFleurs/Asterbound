@@ -274,7 +274,7 @@ public:
   [[nodiscard]] std::expected<std::optional<String>, StarException> activeWeather(Vec2F const& pos) const override;
   [[nodiscard]] std::expected<bool, StarException> isUnderground(Vec2F const& pos) const override;
   [[nodiscard]] std::expected<bool, StarException> disableDeathDrops() const override;
-  [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> forceRegions() const override;
+  [[nodiscard]] std::span<PhysicsForceRegion const> force_regions() const override;
   [[nodiscard]] std::expected<Json, StarException> getProperty(String const& propertyName, Json const& def = Json()) const override;
   [[nodiscard]] std::expected<void, StarException> setProperty(String const& propertyName, Json const& property) override;
   void timer(float delay, WorldAction worldAction) override;
@@ -480,7 +480,7 @@ private:
 
   bool isFloatingDungeonWorld() const;
 
-  [[nodiscard]] std::expected<void, StarException> setupForceRegions();
+  [[nodiscard]] std::expected<void, StarException> setup_force_regions();
   [[nodiscard]] std::expected<void, StarException> setupWeatherDomains(bool preserveNonSurface = false);
   std::shared_ptr<ServerWeather> weatherForDomain(std::optional<String> const& domain) const;
   [[nodiscard]] std::expected<std::shared_ptr<ServerWeather>, StarException> weatherAt(Vec2F const& position) const;
@@ -562,7 +562,7 @@ private:
   HashMap<Uuid, std::pair<ConnectionId, std::variant<std::monostate, ConnectionId, RpcPromiseKeeper<Json>>>> m_entityMessageResponses;
   HashMap<Uuid, std::pair<ConnectionId, RpcPromise<Json>>> m_entityMessagePromises;
 
-  List<PhysicsForceRegion> m_forceRegions;
+  List<PhysicsForceRegion> m_force_regions;
 
   String m_worldId;
 

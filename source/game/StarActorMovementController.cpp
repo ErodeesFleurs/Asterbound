@@ -1028,7 +1028,7 @@ std::expected<void, StarException> ActorMovementController::tick_master(float dt
     }
 
     if (m_control_path_move && !m_path_move_result) {
-      if (appliedForceRegion()) {
+      if (applied_force_region()) {
         m_path_controller->reset();
       } else if (!m_path_controller->pathfinding()) {
         auto path_result = m_path_controller->move(*this, active_parameters, active_modifiers, m_control_path_move->second, dt);
@@ -1070,7 +1070,7 @@ std::expected<void, StarException> ActorMovementController::tick_master(float dt
 
         // MovementController still handles updating liquid percentage and updating force regions
         if (auto result = updateLiquidPercentage(); !result) return std::unexpected(std::move(result.error()));
-        if (auto result = updateForceRegions(dt); !result) return std::unexpected(std::move(result.error()));
+        if (auto result = update_force_regions(); !result) return std::unexpected(std::move(result.error()));
         // onGround flag needs to be manually set, won't be set by MovementController::tickMaster
         setOnGround(on_ground);
         // Hold the receipt until the next request, not the finished edge list.
@@ -1381,7 +1381,7 @@ std::expected<void, StarException> ActorMovementController::apply_mc_parameters(
   mc_parameters.maximumPlatformCorrection = parameters.maximum_platform_correction;
   mc_parameters.maximumPlatformCorrectionVelocityFactor = parameters.maximum_platform_correction_velocity_factor;
 
-  mc_parameters.physicsEffectCategories = parameters.physics_effect_categories;
+  mc_parameters.physics_effect_categories = parameters.physics_effect_categories;
 
   mc_parameters.maximumCorrection = parameters.maximum_correction;
   mc_parameters.speedLimit = parameters.speed_limit;

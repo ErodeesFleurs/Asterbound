@@ -210,7 +210,7 @@ public:
   [[nodiscard]] std::expected<Vec2F, StarException> mouth_position(bool ignore_adjustments) const override;
   List<ChatAction> pull_pending_chat_actions() override;
 
-  [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> forceRegions() const override;
+  [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> force_regions() const override;
 
   [[nodiscard]] std::expected<InteractAction, StarException> interact(InteractRequest const& request) override;
   bool isInteractive() const override;
@@ -274,7 +274,7 @@ private:
   mutable LuaActorScript m_scriptComponent;
   LuaAnimationScript m_scriptedAnimator;
 
-  NetElementData<List<PhysicsForceRegion>> m_physicsForces;
+  NetElementData<List<PhysicsForceRegion>> m_physics_forces;
 
   NetElementData<std::optional<float>> m_monsterLevelNetState;
   NetElementBool m_damageOnTouchNetState;
@@ -310,4 +310,3 @@ export namespace Star {
   using ::Star::StatusController;
   using ::Star::BehaviorState;
 }
-

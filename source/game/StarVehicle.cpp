@@ -305,16 +305,16 @@ if (!result1063) return std::unexpected(std::move(result1063.error()));
 auto result1064 = std::move(*result1063).iterate_object();
 if (!result1064) return std::unexpected(std::move(result1064.error()));
 for (auto const& pair : std::move(*result1064)) {
-    auto& forceRegionConfig = m_forceRegions[pair.first];
-    auto result1065 = jsonToPhysicsForceRegion(pair.second);
+    auto& force_region_config = m_force_regions[pair.first];
+    auto result1065 = json_to_physics_force_region(pair.second);
 if (!result1065) return std::unexpected(std::move(result1065.error()));
-forceRegionConfig.forceRegion = std::move(*result1065);
+force_region_config.force_region = std::move(*result1065);
     auto result1066 = pair.second.opt_string("attachToPart");
 if (!result1066) return std::unexpected(std::move(result1066.error()));
-forceRegionConfig.attachToPart = std::move(*result1066);
+force_region_config.attach_to_part = std::move(*result1066);
     auto result1067 = pair.second.get_bool("enabled", true);
 if (!result1067) return std::unexpected(std::move(result1067.error()));
-forceRegionConfig.enabled.set(std::move(*result1067));
+force_region_config.enabled.set(std::move(*result1067));
   }
 
   auto result1068 = configValue("damageSources", JsonObject());
@@ -382,8 +382,8 @@ if (!result1086) return std::unexpected(std::move(result1086.error()));
 auto result1087 = MovementParameters::create(std::move(*result1086));
 if (!result1087) return std::unexpected(std::move(result1087.error()));
 auto movementParameters = std::move(*result1087);
-  if (!movementParameters.physicsEffectCategories)
-    movementParameters.physicsEffectCategories = StringSet({"vehicle"});
+  if (!movementParameters.physics_effect_categories)
+    movementParameters.physics_effect_categories = StringSet({"vehicle"});
   auto result1088 = m_movementController->resetParameters(movementParameters);
 if (!result1088) return std::unexpected(std::move(result1088.error()));
 
@@ -425,8 +425,8 @@ for (auto& p : m_movingCollisions) {
     return std::unexpected(std::move(result1099.error()));
 }
 
-m_forceRegions.sort_by_key();
-for (auto& p : m_forceRegions) {
+m_force_regions.sort_by_key();
+for (auto& p : m_force_regions) {
   auto result1100 = m_netGroup.add_net_element(p.second.enabled);
   if (!result1100)
     return std::unexpected(std::move(result1100.error()));
@@ -1109,24 +1109,20 @@ std::expected<void, StarException> Vehicle::loungeAim(std::size_t index, Vec2F c
   return {};
 }
 
-std::expected<List<PhysicsForceRegion>, StarException> Vehicle::forceRegions() const {
+std::expected<List<PhysicsForceRegion>, StarException> Vehicle::force_regions() const {
   List<PhysicsForceRegion> forces;
-  for (auto const& p : m_forceRegions) {
-    if (p.second.enabled.get()) {
-      PhysicsForceRegion forceRegion = p.second.forceRegion;
-
-      Vec2F translatePos = position();
-      if (p.second.attachToPart) {
-        auto result1127 = m_networkedAnimator->finalPartTransformation(*p.second.attachToPart);
-if (!result1127) return std::unexpected(std::move(result1127.error()));
-Mat3F partTransformation = std::move(*result1127);
-        Vec2F localTranslation = partTransformation.transform_point(Vec2F());
-        translatePos += localTranslation;
-      }
-
-      std::visit([translatePos](auto& fr) { fr.translate(translatePos); }, forceRegion);
-      forces.push_back(std::move(forceRegion));
+  for (auto const& [name, config] : m_force_regions) {
+    if (!config.enabled.get())
+      continue;
+    Vec2F translation = position();
+    if (config.attach_to_part) {
+      auto transform = m_networkedAnimator->finalPartTransformation(*config.attach_to_part);
+      if (!transform)
+        return std::unexpected(std::move(transform.error()));
+      translation += transform->transform_point(Vec2F{});
     }
+    auto& force = forces.emplace_back(config.force_region);
+    std::visit([&](physics_force_region auto& region) { region.translate(translation); }, force);
   }
   return forces;
 }
@@ -1361,7 +1357,7 @@ result985->get().enabled.set(enabled);
 if (!result1118) return std::unexpected(std::move(result1118.error()));
 
   auto result1119 = callbacks.register_callback("setForceRegionEnabled", [this](String const& name, bool enabled)  -> std::expected<void, StarException> {
-      auto result984 = m_forceRegions.get(name);
+      auto result984 = m_force_regions.get(name);
 if (!result984) return std::unexpected(std::move(result984.error()));
 result984->get().enabled.set(enabled);
       return {};

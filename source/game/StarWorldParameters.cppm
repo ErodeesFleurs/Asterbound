@@ -52,7 +52,6 @@ enum class WorldEdgeForceRegionType : std::uint8_t {
   Bottom,
   TopAndBottom
 };
-extern std::expected<EnumMap<WorldEdgeForceRegionType>, StarException> const WorldEdgeForceRegionTypeNames;
 
 struct VisitableWorldParameters {
   virtual void query_type(TypeQuery& query) const noexcept {
@@ -63,6 +62,8 @@ struct VisitableWorldParameters {
   VisitableWorldParameters() = default;
   VisitableWorldParameters(VisitableWorldParameters const& visitableWorldParameters) = default;
   [[nodiscard]] std::expected<void, StarException> load(Json const& store);
+  [[nodiscard]] std::expected<void, StarException> append_edge_force_regions(List<PhysicsForceRegion>& regions,
+      Json const& config, Vec2F const& size, PhysicsCategoryFilter filter) const;
 
   virtual ~VisitableWorldParameters() = default;
 
@@ -85,7 +86,7 @@ struct VisitableWorldParameters {
   BeamUpRule beamUpRule;
   bool disableDeathDrops{false};
   bool terraformed{false};
-  WorldEdgeForceRegionType worldEdgeForceRegions{WorldEdgeForceRegionType::None};
+  WorldEdgeForceRegionType world_edge_force_regions{WorldEdgeForceRegionType::None};
 };
 
 struct TerrestrialWorldParameters : VisitableWorldParameters {
@@ -237,7 +238,6 @@ export namespace Star {
   using ::Star::BeamUpRule;
   using ::Star::BeamUpRuleNames;
   using ::Star::WorldEdgeForceRegionType;
-  using ::Star::WorldEdgeForceRegionTypeNames;
   using ::Star::diskStoreVisitableWorldParameters;
   using ::Star::diskLoadVisitableWorldParameters;
   using ::Star::net_store_visitable_world_parameters;

@@ -101,7 +101,7 @@ public:
   [[nodiscard]]
   virtual std::expected<List<PolyF>, StarException> shieldPolys() const;
   [[nodiscard]]
-  virtual std::expected<List<PhysicsForceRegion>, StarException> forceRegions() const;
+  virtual std::expected<List<PhysicsForceRegion>, StarException> force_regions() const;
 
   bool initialized() const;
 

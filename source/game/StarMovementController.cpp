@@ -3,6 +3,7 @@ import star.json;
 import star.json_extra;
 import star.interpolation;
 import star.id_map;
+import star.line;
 import star.poly;
 import star.casting;
 import star.vector;
@@ -153,12 +154,12 @@ std::expected<MovementParameters, StarException> MovementParameters::create(Json
   auto maximumPlatformCorrectionVelocityFactorResult = config.opt_float("maximumPlatformCorrectionVelocityFactor");
   if (!maximumPlatformCorrectionVelocityFactorResult) return std::unexpected(std::move(maximumPlatformCorrectionVelocityFactorResult.error()));
   value.maximumPlatformCorrectionVelocityFactor = *maximumPlatformCorrectionVelocityFactorResult;
-  auto physicsEffectCategoriesConfig = config.opt("physicsEffectCategories");
-  if (!physicsEffectCategoriesConfig) return std::unexpected(std::move(physicsEffectCategoriesConfig.error()));
-  if (*physicsEffectCategoriesConfig) {
-    auto physicsEffectCategoriesValue = json_to_string_set(**physicsEffectCategoriesConfig);
-    if (!physicsEffectCategoriesValue) return std::unexpected(std::move(physicsEffectCategoriesValue.error()));
-    value.physicsEffectCategories = std::move(*physicsEffectCategoriesValue);
+  auto categories_config = config.opt("physicsEffectCategories");
+  if (!categories_config) return std::unexpected(std::move(categories_config.error()));
+  if (*categories_config) {
+    auto categories = json_to_string_set(**categories_config);
+    if (!categories) return std::unexpected(std::move(categories.error()));
+    value.physics_effect_categories = std::move(*categories);
   }
   auto restDurationResult = config.opt_int("restDuration");
   if (!restDurationResult) return std::unexpected(std::move(restDurationResult.error()));
@@ -193,7 +194,7 @@ MovementParameters MovementParameters::merge(MovementParameters const& rhs) cons
   merged.ignorePlatformCollision = (rhs.ignorePlatformCollision ? rhs.ignorePlatformCollision : ignorePlatformCollision);
   merged.maximumPlatformCorrection = (rhs.maximumPlatformCorrection ? rhs.maximumPlatformCorrection : maximumPlatformCorrection);
   merged.maximumPlatformCorrectionVelocityFactor = (rhs.maximumPlatformCorrectionVelocityFactor ? rhs.maximumPlatformCorrectionVelocityFactor : maximumPlatformCorrectionVelocityFactor);
-  merged.physicsEffectCategories = (rhs.physicsEffectCategories ? rhs.physicsEffectCategories : physicsEffectCategories);
+  merged.physics_effect_categories = rhs.physics_effect_categories ? rhs.physics_effect_categories : physics_effect_categories;
   merged.restDuration = (rhs.restDuration ? rhs.restDuration : restDuration);
 
   return merged;
@@ -202,8 +203,8 @@ MovementParameters MovementParameters::merge(MovementParameters const& rhs) cons
 std::expected<Json, StarException> MovementParameters::toJson() const {
   auto collisionPolyJson = json_from_optional(collisionPoly, json_from_polyf);
   if (!collisionPolyJson) return std::unexpected(std::move(collisionPolyJson.error()));
-  auto physicsEffectCategoriesJson = json_from_optional(physicsEffectCategories, json_from_string_set);
-  if (!physicsEffectCategoriesJson) return std::unexpected(std::move(physicsEffectCategoriesJson.error()));
+  auto categories_json = json_from_optional(physics_effect_categories, json_from_string_set);
+  if (!categories_json) return std::unexpected(std::move(categories_json.error()));
 
   return JsonObject{
     {"mass", json_from_optional(mass)},
@@ -229,7 +230,7 @@ std::expected<Json, StarException> MovementParameters::toJson() const {
     {"ignorePlatformCollision", json_from_optional(ignorePlatformCollision)},
     {"maximumPlatformCorrection", json_from_optional(maximumPlatformCorrection)},
     {"maximumPlatformCorrectionVelocityFactor", json_from_optional(maximumPlatformCorrectionVelocityFactor)},
-    {"physicsEffectCategories", *physicsEffectCategoriesJson},
+    {"physicsEffectCategories", *categories_json},
     {"restDuration", json_from_optional(restDuration)}
   };
 }
@@ -258,7 +259,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
   if (auto result = ds.read(movementParameters.ignorePlatformCollision); !result) return std::unexpected(std::move(result.error()));
   if (auto result = ds.read(movementParameters.maximumPlatformCorrection); !result) return std::unexpected(std::move(result.error()));
   if (auto result = ds.read(movementParameters.maximumPlatformCorrectionVelocityFactor); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.physicsEffectCategories); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movementParameters.physics_effect_categories); !result) return std::unexpected(std::move(result.error()));
   if (auto result = ds.read(movementParameters.restDuration); !result) return std::unexpected(std::move(result.error()));
 
   return std::ref(ds);
@@ -288,7 +289,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
   if (auto result = ds.write(movementParameters.ignorePlatformCollision); !result) return std::unexpected(std::move(result.error()));
   if (auto result = ds.write(movementParameters.maximumPlatformCorrection); !result) return std::unexpected(std::move(result.error()));
   if (auto result = ds.write(movementParameters.maximumPlatformCorrectionVelocityFactor); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.physicsEffectCategories); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movementParameters.physics_effect_categories); !result) return std::unexpected(std::move(result.error()));
   if (auto result = ds.write(movementParameters.restDuration); !result) return std::unexpected(std::move(result.error()));
 
   return std::ref(ds);
@@ -862,7 +863,7 @@ std::expected<void, StarException> MovementController::tickMaster(float dt) {
   
   setVelocity(newVelocity);
 
-  if (auto result = updateForceRegions(dt); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = update_force_regions(); !result) return std::unexpected(std::move(result.error()));
   return {};
 }
 
@@ -910,7 +911,7 @@ std::expected<void, StarException> MovementController::for_each_moving_collision
       if (!collision) return std::unexpected(std::move(collision.error()));
       if (!*collision) continue;
       auto& candidate = **collision;
-      auto const& categories = m_parameters.physicsEffectCategories;
+      auto const& categories = m_parameters.physics_effect_categories;
       if (!candidate.categoryFilter.check(categories ? *categories : empty_categories))
         continue;
       auto& poly = candidate.collision;
@@ -925,90 +926,106 @@ std::expected<void, StarException> MovementController::for_each_moving_collision
   return {};
 }
 
-std::expected<void, StarException> MovementController::updateForceRegions(float) {
-  auto activeWorld = world();
-  if (!activeWorld) return std::unexpected(std::move(activeWorld.error()));
-  World& worldRef = activeWorld->get();
-  auto geometry = worldRef.geometry();
-  auto pos = position();
-  auto body = collisionBody();
-  RectF boundBox = body.bounding_box();
+namespace {
+// Keep normalization and projection as two rounded operations. Inlining across
+// the zero-length guard lets fast-math cancel both lengths into a squared length.
+[[clang::noinline]] float gradient_falloff(Line2F const& gradient, Vec2F const& offset) {
+  auto normal = gradient.direction();
+  float projected = offset[0] * normal[0] + offset[1] * normal[1];
+  return 1.0 - std::clamp(projected / gradient.length(), -1.0f, 1.0f);
+}
+}
 
-  m_appliedForceRegion = false;
-  auto handleForceRegions = [&, &controller = *this](List<PhysicsForceRegion> const& forces) -> std::expected<void, StarException> {
-      for (auto const& force : forces) {
-        bool categoryCheck = std::visit([myCategories = controller.m_parameters.physicsEffectCategories.value_or(StringSet{})](auto& fr) {
-            return fr.categoryFilter.check(myCategories);
-          }, force);
-        if (!categoryCheck)
-          continue;
+std::expected<void, StarException> MovementController::update_force_regions() {
+  auto active_world = world();
+  if (!active_world) return std::unexpected(std::move(active_world.error()));
+  World& world_ref = active_world->get();
+  auto const geometry = world_ref.geometry();
+  auto const pos = position();
+  auto const body = collisionBody();
+  // An empty collision polygon still has a position for point-based radial forces.
+  auto const bounds = body.empty() ? RectF(pos, pos) : body.bounding_box();
+  static StringSet const empty_categories;
+  auto const& categories = m_parameters.physics_effect_categories ? *m_parameters.physics_effect_categories : empty_categories;
+  std::optional<float> body_area;
+  m_applied_force_region = false;
 
-        auto boundsCheck = std::visit([geometry, myBounds = controller.collisionBoundBox()](auto& fr) {
-            return geometry.rect_intersects_rect(myBounds, fr.boundBox());
-          }, force);
-        if (!boundsCheck) return std::unexpected(std::move(boundsCheck.error()));
-        if (!*boundsCheck)
-          continue;
+  auto apply_force = [&]<physics_force_region Region>(Region const& region) -> std::expected<bool, StarException> {
+    if (!region.category_filter.check(categories))
+      return false;
+    auto hit = geometry.rect_intersects_rect(bounds, region.bounding_box());
+    if (!hit || !*hit)
+      return hit;
 
-        controller.m_appliedForceRegion = true;
-        if (std::holds_alternative<DirectionalForceRegion>(force)) {
-          auto const& directionalForceRegion = std::get<DirectionalForceRegion>(force);
-          auto overlap = geometry.poly_overlap_area(directionalForceRegion.region, body);
-          if (!overlap) return std::unexpected(std::move(overlap.error()));
-          float forceEffect = *overlap / body.signed_area();
-          if (directionalForceRegion.xTargetVelocity)
-            controller.approachXVelocity(*directionalForceRegion.xTargetVelocity, directionalForceRegion.controlForce * forceEffect);
-          if (directionalForceRegion.yTargetVelocity)
-            controller.approachYVelocity(*directionalForceRegion.yTargetVelocity, directionalForceRegion.controlForce * forceEffect);
-
-        } else if (std::holds_alternative<RadialForceRegion>(force)) {
-          auto const& radialForceRegion = std::get<RadialForceRegion>(force);
-          Vec2F direction = geometry.diff(pos, radialForceRegion.center);
-          float distance = vmag(direction);
-          if (distance > 0 && distance < radialForceRegion.outerRadius) {
-            float incidence = std::min(1.0f - (distance - radialForceRegion.innerRadius) / (radialForceRegion.outerRadius - radialForceRegion.innerRadius), distance / radialForceRegion.innerRadius);
-            if (radialForceRegion.targetRadialVelocity < 0)
-              direction = -direction;
-            controller.approachVelocityAlongAngle(direction.angle(),
-                std::abs(radialForceRegion.targetRadialVelocity),
-                radialForceRegion.controlForce * incidence,
-                true);
-          }
-        } else if (std::holds_alternative<GradientForceRegion>(force)) {
-          auto const& gradientForceRegion = std::get<GradientForceRegion>(force);
-          auto overlap = geometry.poly_overlap_area(gradientForceRegion.region, body);
-          if (!overlap) return std::unexpected(std::move(overlap.error()));
-          float overlapFactor = *overlap / body.signed_area();
-
-          Vec2F gNorm = gradientForceRegion.gradient.direction();
-          Vec2F pDiff = geometry.diff(pos, gradientForceRegion.gradient.min());
-          float projected = pDiff[0] * gNorm[0] + pDiff[1] * gNorm[1];
-          float gradientFactor = 1.0 - std::clamp(projected / gradientForceRegion.gradient.length(), -1.0f, 1.0f);
-
-          controller.approachVelocityAlongAngle(gradientForceRegion.gradient.angle(),
-              gradientForceRegion.baseTargetVelocity * overlapFactor * gradientFactor,
-              gradientForceRegion.baseControlForce * overlapFactor * gradientFactor,
-              true);
-        }
+    if constexpr (std::same_as<Region, RadialForceRegion>) {
+      auto direction = geometry.diff(pos, region.center);
+      float distance = vmag(direction);
+      if (!(distance > 0 && distance < region.outer_radius) || region.inner_radius < 0 || region.inner_radius > region.outer_radius)
+        return false;
+      // At equal radii only the inner ramp exists; at zero inner radius only the outer ramp exists.
+      float incidence = distance < region.inner_radius
+          ? distance / region.inner_radius
+          : 1.0f - (distance - region.inner_radius) / (region.outer_radius - region.inner_radius);
+      float control = region.control_force * incidence;
+      if (!(control > 0))
+        return false;
+      if (region.target_radial_velocity < 0)
+        direction = -direction;
+      approachVelocityAlongAngle(direction.angle(), std::abs(region.target_radial_velocity), control, true);
+    } else {
+      if constexpr (std::same_as<Region, DirectionalForceRegion>) {
+        if ((!region.x_target_velocity && !region.y_target_velocity) || region.control_force == 0)
+          return false;
       }
-      return {};
-    };
+      if (!body_area)
+        body_area = body.signed_area();
+      if (*body_area == 0)
+        return false;
+      auto overlap = geometry.poly_overlap_area(region.region, body);
+      if (!overlap) return std::unexpected(std::move(overlap.error()));
+      if (*overlap == 0)
+        return false;
+      if constexpr (std::same_as<Region, DirectionalForceRegion>) {
+        float overlap_factor = *overlap / *body_area;
+        float control = region.control_force * overlap_factor;
+        if (!(control > 0))
+          return false;
+        if (region.x_target_velocity)
+          approachXVelocity(*region.x_target_velocity, control);
+        if (region.y_target_velocity)
+          approachYVelocity(*region.y_target_velocity, control);
+      } else {
+        if (!(region.gradient.length() > 0))
+          return false;
+        float falloff = gradient_falloff(region.gradient, geometry.diff(pos, region.gradient.min()));
+        float effect = (*overlap * falloff) / *body_area;
+        float control = region.base_control_force * effect;
+        if (!(control > 0))
+          return false;
+        approachVelocityAlongAngle(region.gradient.angle(), region.base_target_velocity * effect, control, true);
+      }
+    }
+    return true;
+  };
 
-  auto physicsEntities = worldRef.query<PhysicsEntity>(boundBox);
-  if (!physicsEntities) return std::unexpected(std::move(physicsEntities.error()));
-  for (auto& physicsEntity : *physicsEntities) {
-    if (m_ignorePhysicsEntities.contains(physicsEntity->entityId()))
+  auto apply_forces = [&](std::span<PhysicsForceRegion const> forces) -> std::expected<void, StarException> {
+    for (auto const& force : forces) {
+      auto applied = std::visit(apply_force, force);
+      if (!applied) return std::unexpected(std::move(applied.error()));
+      m_applied_force_region |= *applied;
+    }
+    return {};
+  };
+  auto entities = world_ref.query<PhysicsEntity>(bounds);
+  if (!entities) return std::unexpected(std::move(entities.error()));
+  for (auto const& entity : *entities) {
+    if (m_ignorePhysicsEntities.contains(entity->entityId()))
       continue;
-
-    auto forces = physicsEntity->forceRegions();
+    auto forces = entity->force_regions();
     if (!forces) return std::unexpected(std::move(forces.error()));
-    if (auto result = handleForceRegions(*forces); !result) return std::unexpected(std::move(result.error()));
+    if (auto result = apply_forces(*forces); !result) return std::unexpected(std::move(result.error()));
   }
-
-  auto forces = worldRef.forceRegions();
-  if (!forces) return std::unexpected(std::move(forces.error()));
-  if (auto result = handleForceRegions(*forces); !result) return std::unexpected(std::move(result.error()));
-  return {};
+  return apply_forces(world_ref.force_regions());
 }
 
 std::expected<void, StarException> MovementController::updateLiquidPercentage() {
@@ -1037,8 +1054,8 @@ void MovementController::setOnGround(bool onGround) {
   m_onGround.set(onGround);
 }
 
-bool MovementController::appliedForceRegion() const {
-  return m_appliedForceRegion;
+bool MovementController::applied_force_region() const {
+  return m_applied_force_region;
 }
 
 Vec2F MovementController::collisionCorrection() const {

@@ -12,6 +12,8 @@ import star.game_types;
 import star.strong_typedef;
 import star.bi_map;
 import star.list;
+import star.ordered_map;
+import star.string;
 
 
 import star.damage_types;
@@ -69,6 +71,27 @@ struct MovingCollisionId {
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, MovingCollisionId& mci);
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, MovingCollisionId const& mci);
 
+template <typename Config>
+concept enabled_force_config = requires(Config const& config) {
+  { config.enabled.get() } -> std::convertible_to<bool>;
+  { config.force_region } -> std::same_as<PhysicsForceRegion const&>;
+};
+
+template <enabled_force_config Config>
+[[nodiscard]] List<PhysicsForceRegion> collect_force_regions(OrderedHashMap<String, Config> const& configs, Entity const& source) {
+  List<PhysicsForceRegion> forces;
+  Vec2F position;
+  for (auto const& entry : configs) {
+    if (!entry.second.enabled.get())
+      continue;
+    if (forces.empty())
+      position = source.position();
+    auto& force = forces.emplace_back(entry.second.force_region);
+    std::visit([&](physics_force_region auto& region) { region.translate(position); }, force);
+  }
+  return forces;
+}
+
 class PhysicsEntity : public virtual Entity {
 public:
   void query_type(TypeQuery& query) const noexcept override {
@@ -76,7 +99,7 @@ public:
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PhysicsEntity>(); }
 
-  [[nodiscard]] virtual std::expected<List<PhysicsForceRegion>, StarException> forceRegions() const;
+  [[nodiscard]] virtual std::expected<List<PhysicsForceRegion>, StarException> force_regions() const;
 
   virtual std::size_t movingCollisionCount() const;
   [[nodiscard]] virtual std::expected<std::optional<PhysicsMovingCollision>, StarException> movingCollision(std::size_t positionIndex) const;
@@ -87,6 +110,7 @@ public:
 export module star.physics_entity;
 
 export namespace Star {
+  using ::Star::collect_force_regions;
   using ::Star::PhysicsEntity;
   using ::Star::PhysicsMovingCollision;
   using ::Star::MovingCollisionId;

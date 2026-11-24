@@ -64,6 +64,9 @@ import star.light_source;
 
 import star.beam_item;
 import star.active_item;
+import star.force_regions;
+import star.poly;
+import star.actor_movement_controller;
 import star.client_context;
 import star.casting;
 import star.codex_item;
@@ -1487,14 +1490,135 @@ const GameTestRegistration
     }
   });
 
+namespace {
+void with_scripted_item_owner(GameTest& fixture, String const& script, std::invocable<Root&, Player&> auto&& test) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(File::create_directories(overlay));
+  ASSERT_TRUE(File::write_file(script, File::relative_to(overlay, "active-item-test.lua")));
+  auto settings = fixture.rootSettings();
+  settings.assetSources.push_back(overlay);
+  settings.storageDirectory = File::relative_to(*directory, "storage");
+  settings.runtimeConfigFile = {};
+  settings.logDirectory = {};
+  settings.logFile = {};
+  settings.logLevel = LogLevel::Error;
+  settings.includeUGC = false;
+  auto created_root = Root::create(std::move(settings));
+  ASSERT_TRUE(created_root);
+  auto& root = **created_root;
+  auto storage = File::ephemeral_file(root.random());
+  ASSERT_TRUE(storage);
+  auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
+  ASSERT_TRUE(world) << world.error().what();
+  auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
+  (*world)->setSpawningEnabled(false);
+  auto factory = root.playerFactory();
+  ASSERT_TRUE(factory);
+  auto made = (*factory)->create();
+  ASSERT_TRUE(made);
+  auto& player = **made;
+  ASSERT_TRUE(player.finalizeCreation());
+  auto uuid = player.uuid();
+  ASSERT_TRUE(uuid);
+  auto context = ClientContext::create(root.logger(), Uuid(root.random()), *uuid, 1, {});
+  ASSERT_TRUE(context);
+  player.set_client_context(*context);
+  Entity& entity = player;
+  ASSERT_TRUE(entity.init(**world, 100, EntityMode::Master));
+  auto uninit_player = make_scope_exit([&] { EXPECT_TRUE(entity.uninit()); });
+  ASSERT_TRUE(player.refreshHumanoid());
+  ASSERT_TRUE(player.moveTo(Vec2F(1024, 1024)));
+  test(root, player);
+}
+}
+
+const GameTestRegistration item_force_geometry("ItemTest", "ActiveItemForceRegions", [](GameTest& fixture) {
+  with_scripted_item_owner(fixture, R"(
+function init()
+  local radial = {type="RadialForceRegion", center={2,3}, innerRadius=1, outerRadius=4,
+                  targetRadialVelocity=9, controlForce=2}
+  local area = {{1,2},{5,2},{1,6}}
+  activeItem.setArmAngle(0.7)
+  activeItem.setForceRegions({radial})
+  activeItem.setItemForceRegions({
+    {type="DirectionalForceRegion", polyRegion=area, xTargetVelocity=7, controlForce=2},
+    radial,
+    {type="GradientForceRegion", polyRegion=area, gradient={{2,3},{4,5}}, baseTargetVelocity=8, baseControlForce=3}
+  })
+  message.setHandler("clearLocal", function() activeItem.setItemForceRegions(nil) return true end)
+end
+)", [](Root& root, Player& player) {
+    Json config = JsonObject{{"itemName", "forcetest"}, {"rarity", "common"}, {"animation", JsonObject{}},
+        {"scripts", JsonArray{"/active-item-test.lua"}}};
+    auto item = ActiveItem::create(root, config, "/", JsonObject{});
+    ASSERT_TRUE(item);
+    auto empty = (*item)->force_regions();
+    ASSERT_TRUE(empty);
+    EXPECT_TRUE(empty->empty());
+    ASSERT_TRUE((*item)->init(player, ToolHand::Primary));
+    auto cleanup = make_scope_exit([&] {
+      if ((*item)->initialized())
+        EXPECT_TRUE((*item)->uninit());
+    });
+    auto& movement = player.movementController();
+    for (Direction facing : {Direction::Right, Direction::Left}) {
+      auto state = movement.store_state();
+      ASSERT_TRUE(state);
+      auto directed = state->set("facingDirection", facing == Direction::Left ? Json("left") : Json("right"));
+      ASSERT_TRUE(directed);
+      ASSERT_TRUE(movement.load_state(*directed));
+      ASSERT_EQ(player.facingDirection(), facing);
+      auto offset = player.handOffset(ToolHand::Primary, facing);
+      ASSERT_TRUE(offset);
+      auto arm = player.armPosition(ToolHand::Primary, facing, 0.7f, *offset);
+      ASSERT_TRUE(arm);
+      Vec2F origin = player.position() + *arm;
+      auto expected_point = [&](Vec2F point) {
+        point = point.rotate(0.7f);
+        if (facing == Direction::Left)
+          point[0] = -point[0];
+        return origin + point;
+      };
+      auto expected_area = PolyF{{1,2},{5,2},{1,6}};
+      expected_area.rotate(0.7f);
+      if (facing == Direction::Left)
+        expected_area.flip_horizontal();
+      expected_area.translate(origin);
+      auto regions = (*item)->force_regions();
+      ASSERT_TRUE(regions) << regions.error().what();
+      ASSERT_EQ(regions->size(), 4u);
+      ASSERT_TRUE(std::holds_alternative<RadialForceRegion>((*regions)[0]));
+      EXPECT_EQ(std::get<RadialForceRegion>((*regions)[0]).center, Vec2F(2,3));
+      ASSERT_TRUE(std::holds_alternative<DirectionalForceRegion>((*regions)[1]));
+      auto const& directional = std::get<DirectionalForceRegion>((*regions)[1]);
+      EXPECT_EQ(directional.region, expected_area);
+      EXPECT_EQ(directional.x_target_velocity, 7.f);
+      ASSERT_TRUE(std::holds_alternative<RadialForceRegion>((*regions)[2]));
+      EXPECT_EQ(std::get<RadialForceRegion>((*regions)[2]).center, expected_point({2,3}));
+      ASSERT_TRUE(std::holds_alternative<GradientForceRegion>((*regions)[3]));
+      auto const& gradient = std::get<GradientForceRegion>((*regions)[3]);
+      EXPECT_EQ(gradient.region, expected_area);
+      EXPECT_EQ(gradient.gradient.min(), expected_point({2,3}));
+      EXPECT_EQ(gradient.gradient.max(), expected_point({4,5}));
+    }
+    auto cleared = (*item)->receiveMessage("clearLocal", true, {});
+    ASSERT_TRUE(cleared);
+    ASSERT_TRUE(*cleared);
+    ASSERT_TRUE((*item)->uninit());
+    // World-space data remains available without a hand or owner.
+    auto detached = (*item)->force_regions();
+    ASSERT_TRUE(detached) << detached.error().what();
+    ASSERT_EQ(detached->size(), 1u);
+    EXPECT_EQ(std::get<RadialForceRegion>(detached->front()).center, Vec2F(2,3));
+  });
+});
+
 const GameTestRegistration activeItemScriptRecovery(
   "ItemTest", "ActiveItemScriptErrorsStayLocalAndAllowCleanReequip", [](GameTest& fixture) {
-    auto directory = File::temporary_directory(fixture.root().random());
-    ASSERT_TRUE(directory);
-    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-    auto overlay = File::relative_to(*directory, "assets");
-    ASSERT_TRUE(File::create_directories(overlay));
-    ASSERT_TRUE(File::write_file(String(R"(
+    with_scripted_item_owner(fixture, R"(
 local function visit(hook)
   activeItem.setInstanceValue("lastHook", hook)
   storage.lastHook = hook
@@ -1512,41 +1636,7 @@ end
 function activate() visit("activate") end
 function update() visit("update") end
 function uninit() visit("uninit") end
-)"), File::relative_to(overlay, "active-item-recovery.lua")));
-    auto settings = fixture.rootSettings();
-    settings.assetSources.push_back(overlay);
-    settings.storageDirectory = File::relative_to(*directory, "storage");
-    settings.runtimeConfigFile = {};
-    settings.logDirectory = {};
-    settings.logFile = {};
-    settings.logLevel = LogLevel::Error;
-    settings.includeUGC = false;
-    auto createdRoot = Root::create(std::move(settings));
-    ASSERT_TRUE(createdRoot);
-    auto& root = **createdRoot;
-    auto storage = File::ephemeral_file(root.random());
-    ASSERT_TRUE(storage);
-    auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
-    ASSERT_TRUE(world) << world.error().what();
-    auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
-    (*world)->setSpawningEnabled(false);
-    auto factory = root.playerFactory();
-    ASSERT_TRUE(factory);
-    auto made = (*factory)->create();
-    ASSERT_TRUE(made);
-    auto& player = **made;
-    ASSERT_TRUE(player.finalizeCreation());
-    auto uuid = player.uuid();
-    ASSERT_TRUE(uuid);
-    auto context = ClientContext::create(root.logger(), Uuid(root.random()), *uuid, 1, {});
-    ASSERT_TRUE(context);
-    player.set_client_context(*context);
-    Entity& entity = player;
-    ASSERT_TRUE(entity.init(**world, 100, EntityMode::Master));
-    auto uninitPlayer = make_scope_exit([&] { EXPECT_TRUE(entity.uninit()); });
-    ASSERT_TRUE(player.refreshHumanoid());
-    ASSERT_TRUE(player.moveTo(Vec2F(1024, 1024)));
-
+)", [](Root& root, Player& player) {
     class RecoveryLogSink final : public LogSink {
     public:
       std::vector<std::string> records;
@@ -1560,7 +1650,7 @@ function uninit() visit("uninit") end
     root.logger().add_sink(sink);
     Json config = JsonObject{
       {"itemName", "activeitemrecovery"}, {"rarity", "common"}, {"animation", JsonObject{}},
-      {"scripts", JsonArray{"/active-item-recovery.lua"}}, {"retainScriptStorageInItem", true}
+      {"scripts", JsonArray{"/active-item-test.lua"}}, {"retainScriptStorageInItem", true}
     };
     constexpr float dt = 1.f / 60;
     for (String failure : {String("init"), String("activate"), String("update"), String("message"), String("uninit")}) {
@@ -1615,6 +1705,7 @@ function uninit() visit("uninit") end
     EXPECT_FALSE((*invalid)->init(player, ToolHand::Primary));
     EXPECT_TRUE((*invalid)->uninit());
     EXPECT_FALSE((*invalid)->initialized());
+  });
   });
 
 const GameTestRegistration collection_resolution("CollectionTest", "UnlockRetryLazySourceAndBuilderDirectory", [](GameTest& fixture) {

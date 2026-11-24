@@ -768,19 +768,22 @@ bool ToolUser::firingAlt() const {
   return ds;
 }
 
-[[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> ToolUser::forceRegions() const {
-  if (m_suppress.get())
-    return {};
-
-  List<PhysicsForceRegion> ds;
-  for (auto const& item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
-    if (auto toolItem = as<ToolUserItem>(item)) {
-      auto regions = toolItem->forceRegions();
-      if (!regions) return std::unexpected(std::move(regions.error()));
-      ds.append_range(*regions);
+[[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> ToolUser::force_regions() const {
+  List<PhysicsForceRegion> forces;
+  if (!m_suppress.get()) {
+    for (auto const& item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
+      if (auto tool = as<ToolUserItem>(item)) {
+        auto regions = tool->force_regions();
+        if (!regions)
+          return std::unexpected(std::move(regions.error()));
+        if (forces.empty())
+          forces = std::move(*regions);
+        else
+          forces.append_range(std::move(*regions));
+      }
     }
   }
-  return ds;
+  return forces;
 }
 
 [[nodiscard]] std::expected<void, StarException> ToolUser::collectRenderEvents(RenderCallback& render_callback) {

@@ -1,6 +1,9 @@
 import star.json;
 import star.json_extra;
 import star.vector;
+import star.poly;
+import star.rect;
+import star.line;
 import star.game_types;
 import star.liquid_types;
 import star.color;
@@ -57,11 +60,35 @@ extern std::expected<EnumMap<BeamUpRule>, StarException> const BeamUpRuleNames =
   {BeamUpRule::Anywhere, "Anywhere"},
   {BeamUpRule::AnywhereWithWarning, "AnywhereWithWarning"}});
 
-extern std::expected<EnumMap<WorldEdgeForceRegionType>, StarException> const WorldEdgeForceRegionTypeNames = EnumMap<WorldEdgeForceRegionType>::create({
+static auto const world_edge_force_region_type_names = EnumMap<WorldEdgeForceRegionType>::create({
   {WorldEdgeForceRegionType::None, "None"},
   {WorldEdgeForceRegionType::Top, "Top"},
   {WorldEdgeForceRegionType::Bottom, "Bottom"},
   {WorldEdgeForceRegionType::TopAndBottom, "TopAndBottom"}});
+
+std::expected<void, StarException> VisitableWorldParameters::append_edge_force_regions(List<PhysicsForceRegion>& regions,
+    Json const& config, Vec2F const& size, PhysicsCategoryFilter filter) const {
+  if (world_edge_force_regions == WorldEdgeForceRegionType::None) return {};
+  auto height = config.get_float("worldEdgeForceRegionHeight");
+  if (!height) return std::unexpected(std::move(height.error()));
+  auto force = config.get_float("worldEdgeForceRegionForce");
+  if (!force) return std::unexpected(std::move(force.error()));
+  auto velocity = config.get_float("worldEdgeForceRegionVelocity");
+  if (!velocity) return std::unexpected(std::move(velocity.error()));
+
+  auto append = [&](float low, float high, float start, float end, PhysicsCategoryFilter categories) {
+    regions.emplace_back(GradientForceRegion{PolyF(RectF(0, low, size[0], high)),
+        Line2F({0, start}, {0, end}), *velocity, *force, std::move(categories)});
+  };
+  bool const top = world_edge_force_regions == WorldEdgeForceRegionType::Top;
+  bool const bottom = world_edge_force_regions == WorldEdgeForceRegionType::Bottom;
+  bool const both = world_edge_force_regions == WorldEdgeForceRegionType::TopAndBottom;
+  if (top || both)
+    append(size[1] - *height, size[1], size[1], size[1] - *height, both ? filter : std::move(filter));
+  if (bottom || both)
+    append(0, *height, 0, *height, std::move(filter));
+  return {};
+}
 
 std::expected<void, StarException> VisitableWorldParameters::load(Json const& store) {
   auto typeNameValue1 = store.get_string("typeName", "");
@@ -125,12 +152,12 @@ std::expected<void, StarException> VisitableWorldParameters::load(Json const& st
   auto terraformedValue1 = store.get_bool("terraformed", false);
   if (!terraformedValue1) return std::unexpected(std::move(terraformedValue1.error()));
   terraformed = std::move(*terraformedValue1);
-  auto worldEdgeForceRegionsValue1 = store.get_string("worldEdgeForceRegions", "None");
-  if (!worldEdgeForceRegionsValue1) return std::unexpected(std::move(worldEdgeForceRegionsValue1.error()));
-  if (!WorldEdgeForceRegionTypeNames) return std::unexpected(WorldEdgeForceRegionTypeNames.error());
-  auto worldEdgeForceRegionsValue2 = WorldEdgeForceRegionTypeNames->get_left((*worldEdgeForceRegionsValue1));
-  if (!worldEdgeForceRegionsValue2) return std::unexpected(std::move(worldEdgeForceRegionsValue2.error()));
-  worldEdgeForceRegions = worldEdgeForceRegionsValue2->get();
+  auto edge_name = store.get_string("worldEdgeForceRegions", "None");
+  if (!edge_name) return std::unexpected(std::move(edge_name.error()));
+  if (!world_edge_force_region_type_names) return std::unexpected(world_edge_force_region_type_names.error());
+  auto edge_type = world_edge_force_region_type_names->get_left(*edge_name);
+  if (!edge_type) return std::unexpected(std::move(edge_type.error()));
+  world_edge_force_regions = edge_type->get();
   return {};
 }
 
@@ -140,8 +167,8 @@ std::expected<Json, StarException> VisitableWorldParameters::store() const {
   if (!BeamUpRuleNames) return std::unexpected(BeamUpRuleNames.error());
   auto beam = BeamUpRuleNames->get_right(beamUpRule);
   if (!beam) return std::unexpected(std::move(beam.error()));
-  if (!WorldEdgeForceRegionTypeNames) return std::unexpected(WorldEdgeForceRegionTypeNames.error());
-  auto edge = WorldEdgeForceRegionTypeNames->get_right(worldEdgeForceRegions);
+  if (!world_edge_force_region_type_names) return std::unexpected(world_edge_force_region_type_names.error());
+  auto edge = world_edge_force_region_type_names->get_right(world_edge_force_regions);
   if (!edge) return std::unexpected(std::move(edge.error()));
   return JsonObject{{"typeName", typeName},
       {"threatLevel", threatLevel},
@@ -212,7 +239,7 @@ std::expected<void, StarException> VisitableWorldParameters::read(DataStream& ds
     if (!result) return std::unexpected(std::move(result.error()));
   }
   {
-    auto result = ds >> worldEdgeForceRegions;
+    auto result = ds >> world_edge_force_regions;
     if (!result) return std::unexpected(std::move(result.error()));
   }
   return {};
@@ -271,7 +298,7 @@ std::expected<void, StarException> VisitableWorldParameters::write(DataStream& d
     if (!result) return std::unexpected(std::move(result.error()));
   }
   {
-    auto result = ds << worldEdgeForceRegions;
+    auto result = ds << world_edge_force_regions;
     if (!result) return std::unexpected(std::move(result.error()));
   }
   return {};
@@ -1600,11 +1627,11 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
   auto edge_region_name = config.get_string("worldEdgeForceRegions", "Top");
   if (!edge_region_name)
     return std::unexpected(std::move(edge_region_name.error()));
-  if (!WorldEdgeForceRegionTypeNames) return std::unexpected(WorldEdgeForceRegionTypeNames.error());
-  auto edge_region = WorldEdgeForceRegionTypeNames->get_left((*edge_region_name));
+  if (!world_edge_force_region_type_names) return std::unexpected(world_edge_force_region_type_names.error());
+  auto edge_region = world_edge_force_region_type_names->get_left(*edge_region_name);
   if (!edge_region)
     return std::unexpected(std::move(edge_region.error()));
-  parameters->worldEdgeForceRegions = edge_region->get();
+  parameters->world_edge_force_regions = edge_region->get();
   auto parametersweatherPoolResult1 = biome_database->biome_weathers(primaryBiome, seed, threatLevel);
   if (!parametersweatherPoolResult1) return std::unexpected(std::move(parametersweatherPoolResult1.error()));
   parameters->weatherPool = std::move((*parametersweatherPoolResult1));
@@ -1733,11 +1760,11 @@ std::expected<std::shared_ptr<AsteroidsWorldParameters>, StarException> generate
   auto edge_region_name = asteroidsConfig.get_string("worldEdgeForceRegions", "TopAndBottom");
   if (!edge_region_name)
     return std::unexpected(std::move(edge_region_name.error()));
-  if (!WorldEdgeForceRegionTypeNames) return std::unexpected(WorldEdgeForceRegionTypeNames.error());
-  auto edge_region = WorldEdgeForceRegionTypeNames->get_left((*edge_region_name));
+  if (!world_edge_force_region_type_names) return std::unexpected(world_edge_force_region_type_names.error());
+  auto edge_region = world_edge_force_region_type_names->get_left(*edge_region_name);
   if (!edge_region)
     return std::unexpected(std::move(edge_region.error()));
-  parameters->worldEdgeForceRegions = edge_region->get();
+  parameters->world_edge_force_regions = edge_region->get();
 
   auto parametersasteroidTopLevelResult1 = asteroidsConfig.get_int("asteroidsTop");
   if (!parametersasteroidTopLevelResult1) return std::unexpected(std::move(parametersasteroidTopLevelResult1.error()));
@@ -1826,11 +1853,11 @@ std::expected<std::shared_ptr<FloatingDungeonWorldParameters>, StarException> ge
   auto edge_region_name = worldConfig.get_string("worldEdgeForceRegions", "Top");
   if (!edge_region_name)
     return std::unexpected(std::move(edge_region_name.error()));
-  if (!WorldEdgeForceRegionTypeNames) return std::unexpected(WorldEdgeForceRegionTypeNames.error());
-  auto edge_region = WorldEdgeForceRegionTypeNames->get_left((*edge_region_name));
+  if (!world_edge_force_region_type_names) return std::unexpected(world_edge_force_region_type_names.error());
+  auto edge_region = world_edge_force_region_type_names->get_left(*edge_region_name);
   if (!edge_region)
     return std::unexpected(std::move(edge_region.error()));
-  parameters->worldEdgeForceRegions = edge_region->get();
+  parameters->world_edge_force_regions = edge_region->get();
 
   auto parametersdungeonBaseHeightResult1 = worldConfig.get_int("dungeonBaseHeight");
   if (!parametersdungeonBaseHeightResult1) return std::unexpected(std::move(parametersdungeonBaseHeightResult1.error()));

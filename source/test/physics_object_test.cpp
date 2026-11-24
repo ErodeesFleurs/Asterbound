@@ -1,7 +1,12 @@
 #include "gtest/gtest.h"
 
 import std;
+import star.actor_movement_controller;
 import star.algorithm;
+import star.byte_array;
+import star.data_stream;
+import star.data_stream_devices;
+import star.data_stream_extra;
 import star.entity;
 import star.entity_map;
 import star.file;
@@ -18,6 +23,7 @@ import star.collision_block;
 import star.physics_entity;
 import star.object_database;
 import star.physics_object;
+import star.platformer_astar_types;
 import star.poly;
 import star.rect;
 import star.root;
@@ -29,6 +35,136 @@ import star.world_server;
 using namespace Star;
 
 namespace {
+
+static_assert(physics_force_region<DirectionalForceRegion const&> && physics_force_region<RadialForceRegion>
+    && physics_force_region<GradientForceRegion> && !physics_force_region<PhysicsForceRegion>);
+
+TEST(ForceRegions, JsonPrecedenceAndFilters) {
+  JsonObject config{{"type", "dIrEcTiOnAlFoRcErEgIoN"}, {"rectRegion", JsonArray{1, 2, 5, 6}},
+      {"xTargetVelocity", 0}, {"yTargetVelocity", Json()}, {"controlForce", -4}, {"categoryBlacklist", Json()}};
+  auto parsed = json_to_physics_force_region(config);
+  ASSERT_TRUE(parsed) << parsed.error().what();
+  auto const& directional = std::get<DirectionalForceRegion>(*parsed);
+  EXPECT_EQ(directional.bounding_box(), RectF(1, 2, 5, 6));
+  EXPECT_EQ(directional.x_target_velocity, 0);
+  EXPECT_FALSE(directional.y_target_velocity);
+  EXPECT_EQ(directional.control_force, -4);
+  EXPECT_TRUE(directional.category_filter.check({}));
+  EXPECT_TRUE(directional.category_filter.check({"actor"}));
+
+  config["type"] = "GradientForceRegion";
+  config["gradient"] = JsonArray{JsonArray{0, 0}, JsonArray{0, 1}};
+  config["baseTargetVelocity"] = -5;
+  config["baseControlForce"] = 6;
+  config["polyRegion"] = JsonArray{JsonArray{-4, -3}, JsonArray{0, -3}, JsonArray{-4, 0}};
+  config["categoryWhitelist"] = JsonArray{"actor"};
+  parsed = json_to_physics_force_region(config);
+  ASSERT_TRUE(parsed) << parsed.error().what();
+  auto const& gradient = std::get<GradientForceRegion>(*parsed);
+  EXPECT_EQ(gradient.bounding_box(), RectF(-4, -3, 0, 0));
+  EXPECT_TRUE(gradient.category_filter.check({"other", "actor"}));
+  EXPECT_FALSE(gradient.category_filter.check({}));
+  config["categoryBlacklist"] = JsonArray{"actor"};
+  auto conflict = json_to_physics_force_region(config);
+  ASSERT_FALSE(conflict);
+  EXPECT_NE(std::string_view(conflict.error().what()).find("Cannot specify both"), std::string_view::npos);
+  config["categoryWhitelist"] = Json();
+  auto blacklist = json_to_physics_category_filter(config);
+  ASSERT_TRUE(blacklist);
+  EXPECT_FALSE(blacklist->check({"actor"}));
+  EXPECT_TRUE(blacklist->check({"other"}));
+
+  // Explicit null is an invalid polygon, not a request to fall back to the valid rectangle.
+  config["polyRegion"] = Json();
+  EXPECT_FALSE(json_to_physics_force_region(config));
+  config["type"] = "other";
+  auto unknown = json_to_physics_force_region(config);
+  ASSERT_FALSE(unknown);
+  EXPECT_NE(std::string_view(unknown.error().what()).find("No such physics force region type 'other'"), std::string_view::npos);
+}
+
+TEST(ForceRegions, JsonGeometryDomain) {
+  JsonObject radial{{"outerRadius", 4}, {"innerRadius", 0}, {"targetRadialVelocity", -3}, {"controlForce", 2}};
+  auto parsed = RadialForceRegion::from_json(radial);
+  ASSERT_TRUE(parsed);
+  EXPECT_EQ(parsed->bounding_box(), RectF(-4, -4, 4, 4));
+  radial["innerRadius"] = 4;
+  EXPECT_TRUE(RadialForceRegion::from_json(radial));
+  radial["innerRadius"] = -1;
+  EXPECT_FALSE(RadialForceRegion::from_json(radial));
+  radial["innerRadius"] = 5;
+  EXPECT_FALSE(RadialForceRegion::from_json(radial));
+  radial["innerRadius"] = radial["outerRadius"] = 0;
+  EXPECT_TRUE(RadialForceRegion::from_json(radial));
+  radial["outerRadius"] = 1e100;
+  EXPECT_FALSE(RadialForceRegion::from_json(radial));
+  radial["outerRadius"] = 2;
+  radial["center"] = JsonArray{1e100, 0};
+  EXPECT_FALSE(RadialForceRegion::from_json(radial));
+
+  JsonObject gradient{{"rectRegion", JsonArray{0, 0, 2, 3}}, {"gradient", JsonArray{JsonArray{1, 2}, JsonArray{1, 2}}},
+      {"baseTargetVelocity", -1}, {"baseControlForce", 3}};
+  EXPECT_FALSE(GradientForceRegion::from_json(gradient));
+  gradient["gradient"] = JsonArray{JsonArray{0, 0}, JsonArray{1e30, 0}};
+  EXPECT_FALSE(GradientForceRegion::from_json(gradient)); // squared length overflows float
+  gradient["gradient"] = JsonArray{JsonArray{0, 0}, JsonArray{1, 0}};
+  gradient["baseControlForce"] = 1e100;
+  EXPECT_FALSE(GradientForceRegion::from_json(gradient));
+}
+
+TEST(ForceRegions, LegacyWireLayout) {
+  PolyF polygon(RectF(-1, -2, 3, 4));
+  auto filter = PhysicsCategoryFilter::whitelist({"actor"});
+  auto check = [](PhysicsForceRegion const& region, DataStreamBuffer const& legacy) {
+    auto bytes = DataStreamBuffer::serialize(region);
+    ASSERT_TRUE(bytes);
+    EXPECT_EQ(*bytes, legacy.data());
+    auto decoded = DataStreamBuffer::deserialize<PhysicsForceRegion>(legacy.span());
+    ASSERT_TRUE(decoded) << decoded.error().what();
+    EXPECT_EQ(*decoded, region);
+  };
+  DataStreamBuffer directional;
+  ASSERT_TRUE(directional << std::uint8_t{0} << polygon << false << true << -3.f << 2.f
+      << std::uint32_t{0} << StringSet{"actor"});
+  check(DirectionalForceRegion{polygon, {}, -3.f, 2.f, filter}, directional);
+  DataStreamBuffer radial;
+  ASSERT_TRUE(radial << std::uint8_t{1} << Vec2F(2, 4) << 5.f << 5.f << -1.f << 2.f
+      << std::uint32_t{1} << StringSet{});
+  check(RadialForceRegion{{2, 4}, 5, 5, -1, 2, {}}, radial);
+  DataStreamBuffer gradient;
+  ASSERT_TRUE(gradient << std::uint8_t{2} << polygon << Vec2F(1, 2) << Vec2F(-3, 4) << -6.f << 7.f
+      << std::uint32_t{0} << StringSet{"actor"});
+  check(GradientForceRegion{polygon, Line2F({1, 2}, {-3, 4}), -6, 7, filter}, gradient);
+}
+
+TEST(ForceRegions, InvalidWireDoesNotReplaceValues) {
+  RadialForceRegion original{{2, 3}, 4, 1, -6, 5, PhysicsCategoryFilter::whitelist({"actor"})};
+  auto radial = original;
+  auto check_radii = [&](std::uint32_t outer, float inner) {
+    DataStreamBuffer wire;
+    ASSERT_TRUE(wire << Vec2F() << outer << inner << 1.f << 2.f << std::uint32_t{1} << StringSet{});
+    auto result = DataStreamBuffer::deserialize(radial, wire.span());
+    ASSERT_FALSE(result);
+    EXPECT_TRUE(result.error().is<DataStreamException>());
+    EXPECT_EQ(radial, original);
+  };
+  check_radii(0x7fc00001u, 0.f); // NaN payload, independent of compiler floating-point assumptions
+  check_radii(0x7f800000u, 0.f);
+  check_radii(std::bit_cast<std::uint32_t>(2.f), 3.f);
+  check_radii(std::bit_cast<std::uint32_t>(2.f), -1.f);
+  DataStreamBuffer bad_gradient;
+  PolyF polygon(RectF(0, 0, 2, 3));
+  ASSERT_TRUE(bad_gradient << polygon << Vec2F(1, 2) << Vec2F(1, 2) << 3.f << 4.f << std::uint32_t{1} << StringSet{});
+  GradientForceRegion gradient{polygon, Line2F({3, 0}, {0, 4}), 3, 4, {}};
+  auto previous = gradient;
+  EXPECT_FALSE(DataStreamBuffer::deserialize(gradient, bad_gradient.span()));
+  EXPECT_EQ(gradient, previous);
+  DataStreamBuffer bad_filter;
+  ASSERT_TRUE(bad_filter << std::uint32_t{2} << StringSet{});
+  auto filter = original.category_filter;
+  EXPECT_FALSE(DataStreamBuffer::deserialize(filter, bad_filter.span()));
+  EXPECT_EQ(filter, original.category_filter);
+}
 
 std::shared_ptr<ObjectConfig> unanchored_physics_config() {
   auto config = std::make_shared<ObjectConfig>();
@@ -152,7 +288,7 @@ const GameTestRegistration legacy_orientation_order("ObjectDatabase", "LegacyOri
 });
 
 const GameTestRegistration
-  localForceBounds("PhysicsObject", "LocalBoundsAndWorldForcesAtLargeCoordinates", [](GameTest& fixture) {
+  local_force_bounds("PhysicsObject", "LocalBoundsAndWorldForcesAtLargeCoordinates", [](GameTest& fixture) {
     // The empty world is sparse: no sectors or terrain need to be generated to
     // initialize an anchor-free object and index its physics bounds.
     Vec2U worldSize(32768, 32768);
@@ -184,7 +320,7 @@ const GameTestRegistration
     }
   })");
     ASSERT_TRUE(forceConfig) << forceConfig.error().what();
-    RectF expectedBounds(-12, -9, 13, 6);
+    RectF expected_bounds(-12, -9, 13, 8);
     Vec2I farPosition(EntityMap::maximum_entity_bound_box + 1024, EntityMap::maximum_entity_bound_box + 2048);
     ASSERT_LT(farPosition[0] + 13, static_cast<int>(worldSize[0]));
     ASSERT_LT(farPosition[1] + 6, static_cast<int>(worldSize[1]));
@@ -220,7 +356,7 @@ const GameTestRegistration
         });
         Vec2F position(tilePosition);
         EXPECT_EQ(object->position(), position);
-        EXPECT_EQ(object->metaBoundBox(), expectedBounds);
+        EXPECT_EQ(object->metaBoundBox(), expected_bounds);
         if (firstBounds)
           EXPECT_EQ(object->metaBoundBox(), *firstBounds);
         else
@@ -228,7 +364,7 @@ const GameTestRegistration
         EXPECT_LT(object->metaBoundBox().width(), EntityMap::maximum_entity_bound_box);
         EXPECT_LT(object->metaBoundBox().height(), EntityMap::maximum_entity_bound_box);
 
-        auto output = object->forceRegions();
+        auto output = object->force_regions();
         ASSERT_TRUE(output) << output.error().what();
         if (enabled) {
           ASSERT_EQ(output->size(), 3u);
@@ -238,12 +374,12 @@ const GameTestRegistration
           auto const& directional = std::get<DirectionalForceRegion>((*output)[0]);
           auto const& gradient = std::get<GradientForceRegion>((*output)[1]);
           auto const& radial = std::get<RadialForceRegion>((*output)[2]);
-          EXPECT_EQ(directional.boundBox(), RectF(-12, -4, -8, 2).translated(position));
-          EXPECT_EQ(gradient.boundBox(), RectF(7, -9, 13, -5).translated(position));
+          EXPECT_EQ(directional.bounding_box(), RectF(-12, -4, -8, 2).translated(position));
+          EXPECT_EQ(gradient.bounding_box(), RectF(7, -9, 13, -5).translated(position));
           EXPECT_EQ(gradient.gradient.min(), position + Vec2F(7, -9));
           EXPECT_EQ(gradient.gradient.max(), position + Vec2F(13, -5));
           EXPECT_EQ(radial.center, position + Vec2F(3, 4));
-          EXPECT_EQ(radial.boundBox(), RectF(1, 2, 5, 6).translated(position));
+          EXPECT_EQ(radial.bounding_box(), RectF(-1, 0, 7, 8).translated(position));
         } else {
           EXPECT_TRUE(output->empty());
         }
@@ -464,7 +600,7 @@ const GameTestRegistration moving_collision_filter("MovementController", "Moving
   ASSERT_TRUE(added) << added.error().what();
   auto remove = make_scope_exit([&] { EXPECT_TRUE(world->removeEntity((*object)->entityId(), false)); });
   MovementParameters parameters;
-  parameters.physicsEffectCategories = StringSet{"actor"};
+  parameters.physics_effect_categories = StringSet{"actor"};
   auto controller = MovementController::create(fixture.root(), parameters);
   ASSERT_TRUE(controller) << controller.error().what();
   (*controller)->init(*world);
@@ -484,6 +620,127 @@ const GameTestRegistration moving_collision_filter("MovementController", "Moving
   ASSERT_TRUE(scan) << scan.error().what();
   EXPECT_EQ(visits, 1u);
   EXPECT_EQ(retained, (PolyF{{2047,256},{2049,256},{2049,257},{2047,257}}));
+});
+
+// Observe the production solver's protected result without making it public game API.
+class ForceTestController : public MovementController {
+public:
+  explicit ForceTestController(Root& root) : MovementController(root) {}
+  using MovementController::initialize;
+  using MovementController::applied_force_region;
+  using MovementController::update_force_regions;
+};
+
+const GameTestRegistration force_narrow_phase("MovementController", "ForceRegionNarrowPhaseAndOrder", [](GameTest& fixture) {
+  auto storage = File::ephemeral_file(fixture.root().random());
+  ASSERT_TRUE(storage);
+  auto world = WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);
+  ASSERT_TRUE(world) << world.error().what();
+  auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
+  auto config = Json::parse(R"({
+    "ring":{"type":"RadialForceRegion","innerRadius":4,"outerRadius":8,"targetRadialVelocity":10,"controlForce":8,"categoryWhitelist":["ring"]},
+    "cone":{"type":"RadialForceRegion","innerRadius":0,"outerRadius":8,"targetRadialVelocity":10,"controlForce":8,"categoryWhitelist":["cone"]},
+    "ramp":{"type":"RadialForceRegion","innerRadius":8,"outerRadius":8,"targetRadialVelocity":10,"controlForce":8,"categoryWhitelist":["ramp"]},
+    "triangle":{"type":"DirectionalForceRegion","polyRegion":[[-4,-4],[4,-4],[-4,4]],"controlForce":8,"xTargetVelocity":10,"categoryWhitelist":["triangle"]},
+    "collapsed":{"type":"GradientForceRegion","rectRegion":[-4,-4,4,4],"gradient":[[0,0],[0,0.000001]],"baseTargetVelocity":8,"baseControlForce":8,"categoryWhitelist":["collapsed"]},
+    "half":{"type":"DirectionalForceRegion","rectRegion":[-4,-4,2,4],"controlForce":8,"xTargetVelocity":10,"categoryWhitelist":["half"]},
+    "a_gradient":{"type":"GradientForceRegion","rectRegion":[-4,-4,4,4],"gradient":[[0,0],[4,0]],"baseTargetVelocity":4,"baseControlForce":4,"categoryWhitelist":["gradient","ordered"]},
+    "b_direct":{"type":"DirectionalForceRegion","rectRegion":[-4,-4,4,4],"controlForce":1,"xTargetVelocity":-2,"categoryWhitelist":["ordered"]},
+    "brake":{"type":"DirectionalForceRegion","rectRegion":[-4,-4,4,4],"controlForce":2,"xTargetVelocity":0,"categoryWhitelist":["brake"]},
+    "inactive":{"type":"DirectionalForceRegion","rectRegion":[-4,-4,4,4],"controlForce":0,"xTargetVelocity":8,"categoryWhitelist":["inactive"]},
+    "no_axes":{"type":"DirectionalForceRegion","rectRegion":[-4,-4,4,4],"controlForce":8,"categoryWhitelist":["no_axes"]}
+  })");
+  ASSERT_TRUE(config) << config.error().what();
+  auto object = PhysicsObject::create(fixture.root(), unanchored_physics_config(), JsonObject{{"physicsForces", *config}});
+  ASSERT_TRUE(object) << object.error().what();
+  ASSERT_TRUE((*object)->setTilePosition({0, 256}));
+  ASSERT_TRUE((*world)->addEntity(*object));
+  auto remove = make_scope_exit([&] { EXPECT_TRUE((*world)->removeEntity((*object)->entityId(), false)); });
+
+  MovementParameters parameters;
+  parameters.mass = 1;
+  parameters.collisionPoly = PolyF(RectF(-0.25f, -0.25f, 0.25f, 0.25f));
+  ForceTestController controller(fixture.root());
+  ASSERT_TRUE(controller.initialize(parameters));
+  controller.init(**world);
+  auto release = make_scope_exit([&] { controller.uninit(); });
+  controller.setTimestep(1);
+  auto sample = [&](String category, Vec2F offset, float initial, float expected, bool applied) {
+    SCOPED_TRACE(Star::format("{} at {} from {}", category, offset, initial));
+    MovementParameters patch;
+    patch.physics_effect_categories = StringSet{std::move(category)};
+    ASSERT_TRUE(controller.applyParameters(patch));
+    controller.setPosition(Vec2F(0, 256) + offset);
+    controller.setVelocity({initial, 0});
+    auto update = controller.update_force_regions();
+    ASSERT_TRUE(update) << update.error().what();
+    EXPECT_EQ(controller.applied_force_region(), applied);
+    EXPECT_NEAR(controller.xVelocity(), expected, 0.00001f);
+    EXPECT_NEAR(controller.yVelocity(), 0, 0.00001f);
+  };
+  sample("ring", {-6, 0}, 0, -4, true); // Beyond the old half-width, across the world seam.
+  sample("ring", {6, 6}, 0, 0, false); // In the bounding square, outside the circle.
+  sample("ring", {8, 0}, 0, 0, false);
+  sample("ring", {0, 0}, 0, 0, false);
+  sample("cone", {2, 0}, 0, 6, true);
+  sample("ramp", {2, 0}, 0, 2, true);
+  sample("triangle", {3, 3}, 0, 0, false); // Overlapping rectangles, disjoint polygons.
+  sample("half", {2, 0}, 0, 4, true); // Exactly half of the body's area is inside the field.
+  sample("collapsed", {2, 0}, 0, 0, false); // A valid local gradient collapses after world translation.
+  sample("gradient", {4, 0}, 0, 0, false); // Nonzero overlap but the gradient has faded.
+  sample("gradient", {-2, 0}, 0, 6, true);
+  sample("ordered", {2, 0}, 0, 1, true); // Gradient brings x to 2 before the later opposing force.
+  sample("brake", {1, 0}, 5, 3, true); // An explicit zero target brakes; it is not a missing target.
+  sample("brake", {1, 0}, 0, 0, true); // Already at target, but still under active control.
+  sample("inactive", {1, 0}, 1, 1, false);
+  sample("no_axes", {1, 0}, 1, 1, false);
+  sample("rejected", {1, 0}, 1, 1, false);
+  for (auto const& degenerate : {PolyF(Vec2F{}), PolyF{}}) {
+    MovementParameters body;
+    body.collisionPoly = degenerate;
+    ASSERT_TRUE(controller.applyParameters(body));
+    sample("ordered", {2, 0}, 0, 0, false);
+    sample("ring", {2, 0}, 0, 4, true);
+  }
+});
+
+const GameTestRegistration force_path_reset("MovementController", "ForceRegionResetsOnlyAnAffectedPath", [](GameTest& fixture) {
+  auto storage = File::ephemeral_file(fixture.root().random());
+  ASSERT_TRUE(storage);
+  auto world = WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);
+  ASSERT_TRUE(world) << world.error().what();
+  auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
+  ASSERT_TRUE((*world)->generateRegion(RectI(1008, 1008, 1040, 1040)));
+  auto config = Json::parse(R"({"field":{"type":"RadialForceRegion","innerRadius":4,"outerRadius":8,"targetRadialVelocity":0,"controlForce":8}})");
+  ASSERT_TRUE(config);
+  auto object = PhysicsObject::create(fixture.root(), unanchored_physics_config(), JsonObject{{"physicsForces", *config}});
+  ASSERT_TRUE(object) << object.error().what();
+  ASSERT_TRUE((*object)->setTilePosition({1024, 1024}));
+  ASSERT_TRUE((*world)->addEntity(*object));
+  auto remove = make_scope_exit([&] { EXPECT_TRUE((*world)->removeEntity((*object)->entityId(), false)); });
+  ActorMovementParameters parameters;
+  parameters.gravity_enabled = false;
+  parameters.fly_speed = 8;
+  parameters.path_explore_rate = 1000;
+  parameters.standing_poly = PolyF(RectF(-0.25f, -0.25f, 0.25f, 0.25f));
+  parameters.crouching_poly = parameters.standing_poly;
+  PlatformerAStar::Parameters search;
+  search.must_end_on_ground = false;
+  for (bool inside : {false, true}) {
+    auto actor = ActorMovementController::create(fixture.root(), parameters);
+    ASSERT_TRUE(actor) << actor.error().what();
+    (*actor)->init(**world);
+    auto release = make_scope_exit([&] { (*actor)->uninit(); });
+    Vec2F start(1030, inside ? 1024.25f : 1030.25f);
+    (*actor)->setPosition(start);
+    ASSERT_TRUE((*actor)->tick_master(1.f / 60));
+    auto request = (*actor)->control_path_move(start + Vec2F(3, 0), false, search);
+    ASSERT_TRUE(request) << request.error().what();
+    ASSERT_FALSE(request->has_value());
+    ASSERT_FALSE((*actor)->pathfinding()); // The path was found and is ready to move.
+    ASSERT_TRUE((*actor)->tick_master(1.f / 60));
+    EXPECT_EQ((*actor)->pathfinding(), inside); // Only a narrow-phase hit discards that path.
+  }
 });
 
 }// namespace

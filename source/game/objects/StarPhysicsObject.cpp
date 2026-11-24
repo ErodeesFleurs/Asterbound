@@ -91,26 +91,22 @@ std::expected<std::shared_ptr<PhysicsObject>, StarException> PhysicsObject::crea
   auto operation1 = object->initialize(std::move(config), parameters);
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
-  auto forcesConfigResult = object->configValue("physicsForces", JsonObject());
-  if (!forcesConfigResult)
-    return std::unexpected(std::move(forcesConfigResult.error()));
-  auto forcesConfig = std::move(*forcesConfigResult);
-  auto forcesResult = forcesConfig.to_object();
-  if (!forcesResult)
-    return std::unexpected(std::move(forcesResult.error()));
-  auto forces = std::move(*forcesResult);
-  for (auto const& pair : forces) {
-    auto& force = object->m_physicsForces[pair.first];
-    auto regionResult = jsonToPhysicsForceRegion(pair.second);
-    if (!regionResult)
-      return std::unexpected(std::move(regionResult.error()));
-    auto region = std::move(*regionResult);
-    force.forceRegion = std::move(region);
-    auto enabledResult = pair.second.get_bool("enabled", true);
-    if (!enabledResult)
-      return std::unexpected(std::move(enabledResult.error()));
-    auto enabled = std::move(*enabledResult);
-    force.enabled.set(enabled);
+  auto config_forces = object->configValue("physicsForces", JsonObject());
+  if (!config_forces)
+    return std::unexpected(std::move(config_forces.error()));
+  auto forces = config_forces->iterate_object();
+  if (!forces)
+    return std::unexpected(std::move(forces.error()));
+  for (auto const& [name, entry] : *forces) {
+    auto& force = object->m_physics_forces[name];
+    auto region = json_to_physics_force_region(entry);
+    if (!region)
+      return std::unexpected(std::move(region.error()));
+    force.force_region = std::move(*region);
+    auto enabled = entry.get_bool("enabled", true);
+    if (!enabled)
+      return std::unexpected(std::move(enabled.error()));
+    force.enabled.set(*enabled);
   }
   auto collisionsConfigResult = object->configValue("physicsCollisions", JsonObject());
   if (!collisionsConfigResult)
@@ -135,8 +131,8 @@ std::expected<std::shared_ptr<PhysicsObject>, StarException> PhysicsObject::crea
     auto enabled = std::move(*enabledResult);
     collision.enabled.set(enabled);
   }
-  object->m_physicsForces.sort_by_key();
-  for (auto& pair : object->m_physicsForces) {
+  object->m_physics_forces.sort_by_key();
+  for (auto& pair : object->m_physics_forces) {
     auto operation2 = object->m_netGroup.add_net_element(pair.second.enabled);
     if (!operation2)
       return std::unexpected(std::move(operation2.error()));
@@ -170,7 +166,7 @@ std::expected<void, StarException> PhysicsObject::init(World& world, EntityId en
   if (mode == EntityMode::Master) {
     LuaCallbacks callbacks;
     auto operation6 = callbacks.register_callback("setForceEnabled", [this](String const& force, bool enabled) -> std::expected<void, StarException> {
-  auto configResult = m_physicsForces.get(force);
+  auto configResult = m_physics_forces.get(force);
   if (!configResult)
     return std::unexpected(std::move(configResult.error()));
   auto& config = configResult->get();
@@ -212,8 +208,8 @@ std::expected<void, StarException> PhysicsObject::init(World& world, EntityId en
     return std::unexpected(std::move(initialized.error()));
   }
   m_metaBoundBox = Object::metaBoundBox();
-  for (auto const& pair : m_physicsForces)
-    m_metaBoundBox.combine(std::visit([](auto const& force) { return force.boundBox(); }, pair.second.forceRegion));
+  for (auto const& pair : m_physics_forces)
+    m_metaBoundBox.combine(std::visit([](physics_force_region auto const& force) { return force.bounding_box(); }, pair.second.force_region));
   return {};
 }
 
@@ -238,16 +234,8 @@ RectF PhysicsObject::metaBoundBox() const {
   return m_metaBoundBox;
 }
 
-std::expected<List<PhysicsForceRegion>, StarException> PhysicsObject::forceRegions() const {
-  List<PhysicsForceRegion> forces;
-  for (auto const& p : m_physicsForces) {
-    if (p.second.enabled.get()) {
-      PhysicsForceRegion forceRegion = p.second.forceRegion;
-      std::visit([pos = position()](auto& fr) { fr.translate(pos); }, forceRegion);
-      forces.push_back(std::move(forceRegion));
-    }
-  }
-  return forces;
+std::expected<List<PhysicsForceRegion>, StarException> PhysicsObject::force_regions() const {
+  return collect_force_regions(m_physics_forces, *this);
 }
 
 std::size_t PhysicsObject::movingCollisionCount() const {

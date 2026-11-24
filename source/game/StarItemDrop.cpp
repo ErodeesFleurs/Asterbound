@@ -784,8 +784,8 @@ std::expected<void, StarException> ItemDrop::initialize() {
   auto parameters = m_config.get("movementSettings", JsonObject()).and_then([](Json const& value) { return MovementParameters::create(value); });
   if (!parameters)
     return std::unexpected(std::move(parameters.error()));
-  if (!parameters->physicsEffectCategories)
-    parameters->physicsEffectCategories = StringSet({"itemdrop"});
+  if (!parameters->physics_effect_categories)
+    parameters->physics_effect_categories = StringSet({"itemdrop"});
   if (parameters->collisionPoly)
     m_boundBox = parameters->collisionPoly->bounding_box();
   else

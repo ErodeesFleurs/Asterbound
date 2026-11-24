@@ -394,9 +394,9 @@ if (!result140) return std::unexpected(std::move(result140.error()));
 std::ranges::for_each(*result140, [&](String& script) { script = AssetPath::relative_to(path, script); });
 projectileConfig->scripts = std::move(*result140);
 
-  auto result141 = config.get("physicsForces", JsonObject());
-if (!result141) return std::unexpected(std::move(result141.error()));
-projectileConfig->physicsForces = std::move(*result141);
+  auto physics_forces = config.get("physicsForces", JsonObject());
+  if (!physics_forces) return std::unexpected(std::move(physics_forces.error()));
+  projectileConfig->physics_forces = std::move(*physics_forces);
   auto result142 = config.get("physicsCollisions", JsonObject());
 if (!result142) return std::unexpected(std::move(result142.error()));
 projectileConfig->physicsCollisions = std::move(*result142);

@@ -259,7 +259,7 @@ public:
 
   [[nodiscard]] std::expected<List<DamageSource>, StarException> damageSources() const override;
 
-  [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> forceRegions() const override;
+  [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> force_regions() const override;
 
   using Entity::setUniqueId;
 
@@ -420,4 +420,3 @@ export namespace Star {
   using ::Star::Npc;
   using ::Star::StatusController;
 }
-

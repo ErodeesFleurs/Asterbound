@@ -133,7 +133,7 @@ public:
   [[nodiscard]] std::expected<List<DamageSource>, StarException> damageSources() const override;
   [[nodiscard]] std::expected<List<PolyF>, StarException> shieldPolys() const override;
 
-  [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> forceRegions() const override;
+  [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> force_regions() const override;
 
   bool holdingItem() const;
   std::optional<String> backArmFrame() const;
@@ -194,8 +194,8 @@ private:
   NetElementData<List<DamageSource>> m_itemDamageSources;
   NetElementData<List<PolyF>> m_shieldPolys;
   NetElementData<List<PolyF>> m_itemShieldPolys;
-  NetElementData<List<PhysicsForceRegion>> m_forceRegions;
-  NetElementData<List<PhysicsForceRegion>> m_itemForceRegions;
+  NetElementData<List<PhysicsForceRegion>> m_force_regions;
+  NetElementData<List<PhysicsForceRegion>> m_item_force_regions;
   NetElementHashMap<String, Json> m_scriptedAnimationParameters;
 };
 
@@ -206,4 +206,3 @@ export module star.active_item;
 export namespace Star {
   using ::Star::ActiveItem;
 }
-

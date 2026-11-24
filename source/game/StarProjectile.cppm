@@ -158,7 +158,7 @@ public:
   [[nodiscard]] std::expected<List<PersistentStatusEffect>, StarException> statusEffects() const override;
   PolyF statusEffectArea() const override;
 
-  [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> forceRegions() const override;
+  [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> force_regions() const override;
   std::size_t movingCollisionCount() const override;
   [[nodiscard]] std::expected<std::optional<PhysicsMovingCollision>, StarException> movingCollision(std::size_t positionIndex) const override;
 
@@ -173,7 +173,7 @@ private:
   [[nodiscard]] std::expected<void, StarException> initialize(std::shared_ptr<ProjectileConfig> const& config, Json const& parameters);
 
   struct PhysicsForceConfig {
-    PhysicsForceRegion forceRegion;
+    PhysicsForceRegion force_region;
     NetElementBool enabled;
   };
 
@@ -257,7 +257,7 @@ private:
 
   mutable LuaEntityScript m_scriptComponent;
 
-  OrderedHashMap<String, PhysicsForceConfig> m_physicsForces;
+  OrderedHashMap<String, PhysicsForceConfig> m_physics_forces;
   OrderedHashMap<String, PhysicsCollisionConfig> m_physicsCollisions;
 
   List<std::variant<std::shared_ptr<AudioInstance>, Particle, LightSource>> m_pendingRenderables;

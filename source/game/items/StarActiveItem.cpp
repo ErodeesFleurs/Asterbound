@@ -112,6 +112,16 @@ import star.line;
 import star.math_common;
 import star.algorithm;
 namespace Star {
+namespace {
+std::expected<Vec2F, StarException> active_hand_position(ToolUserEntity const& owner, ToolHand hand, Direction facing,
+                                                   float angle, Vec2F const& offset) {
+  auto hand_offset = owner.handOffset(hand, facing);
+  if (!hand_offset)
+    return std::unexpected(std::move(hand_offset.error()));
+  return owner.armPosition(hand, facing, angle, offset + *hand_offset);
+}
+}
+
 
 std::expected<std::shared_ptr<ActiveItem>, StarException> ActiveItem::create(Root& root, Json const& config, String const& directory, Json const& parameters) {
   auto item = std::shared_ptr<ActiveItem>(new ActiveItem(root));
@@ -157,7 +167,7 @@ std::expected<std::shared_ptr<ActiveItem>, StarException> ActiveItem::create(Roo
       item->m_twoHandedGrip, item->m_recoil, item->m_outsideOfHand,
       item->m_armAngle, item->m_facingDirection, item->m_damageSources,
       item->m_itemDamageSources, item->m_shieldPolys, item->m_itemShieldPolys,
-      item->m_forceRegions, item->m_itemForceRegions}) {
+      item->m_force_regions, item->m_item_force_regions}) {
     auto added = item->add_net_element(element);
     if (!added)
       return std::unexpected(std::move(added.error()));
@@ -400,16 +410,21 @@ std::expected<void, StarException> ActiveItem::update(float dt, FireMode fireMod
     if (isClient)
       root().spatialLogger().log_poly("world", shieldPoly, {255, 255, 0, 255});
   }
-  if (isClient) {
-    auto forces = forceRegions();
+  if (isClient && root().spatialLogger().observed()) {
+    auto forces = force_regions();
     if (!forces)
       return std::unexpected(std::move(forces.error()));
-    for (auto forceRegion : *forces) {
-      if (std::holds_alternative<DirectionalForceRegion>(forceRegion))
-        root().spatialLogger().log_poly("world", std::get<DirectionalForceRegion>(forceRegion).region,
-                                        {155, 0, 255, 255});
-      else if (std::holds_alternative<RadialForceRegion>(forceRegion))
-        root().spatialLogger().log_point("world", std::get<RadialForceRegion>(forceRegion).center, {155, 0, 255, 255});
+    auto& logger = root().spatialLogger();
+    for (auto const& force : *forces) {
+      std::visit([&]<physics_force_region Region>(Region const& region) {
+        if constexpr (std::same_as<Region, RadialForceRegion>) {
+          logger.log_point("world", region.center, {155, 0, 255, 255});
+        } else {
+          logger.log_poly("world", region.region, {155, 0, 255, 255});
+          if constexpr (std::same_as<Region, GradientForceRegion>)
+            logger.log_line("world", region.gradient, {155, 0, 255, 255});
+        }
+      }, force);
     }
   }
   return {};
@@ -466,37 +481,55 @@ std::expected<List<PolyF>, StarException> ActiveItem::shieldPolys() const {
   return shieldPolys;
 }
 
-std::expected<List<PhysicsForceRegion>, StarException> ActiveItem::forceRegions() const {
-  List<PhysicsForceRegion> forceRegions = m_forceRegions.get();
-  for (auto fr : m_itemForceRegions.get()) {
-    if (std::holds_alternative<DirectionalForceRegion>(fr)) {
-      auto& dfr = std::get<DirectionalForceRegion>(fr);
-      dfr.region.rotate(m_armAngle.get());
-      auto itemOwner = owner();
-      if (!itemOwner)
-        return std::unexpected(std::move(itemOwner.error()));
-      if (itemOwner->get().facingDirection() == Direction::Left)
-        dfr.region.flip_horizontal(0.0f);
-      auto position = handPosition(Vec2F());
-      if (!position)
-        return std::unexpected(std::move(position.error()));
-      dfr.region.translate(itemOwner->get().position() + *position);
-    } else if (std::holds_alternative<RadialForceRegion>(fr)) {
-      auto& rfr = std::get<RadialForceRegion>(fr);
-      rfr.center = rfr.center.rotate(m_armAngle.get());
-      auto itemOwner = owner();
-      if (!itemOwner)
-        return std::unexpected(std::move(itemOwner.error()));
-      if (itemOwner->get().facingDirection() == Direction::Left)
-        rfr.center[0] *= -1;
-      auto position = handPosition(Vec2F());
-      if (!position)
-        return std::unexpected(std::move(position.error()));
-      rfr.center += itemOwner->get().position() + *position;
-    }
-    forceRegions.push_back(std::move(fr));
+std::expected<List<PhysicsForceRegion>, StarException> ActiveItem::force_regions() const {
+  auto const& local = m_item_force_regions.get();
+  auto const& world = m_force_regions.get();
+  if (local.empty())
+    return world;
+
+  auto item_owner = owner();
+  if (!item_owner)
+    return std::unexpected(std::move(item_owner.error()));
+  auto item_hand = hand();
+  if (!item_hand)
+    return std::unexpected(std::move(item_hand.error()));
+  auto const& actor = item_owner->get();
+  auto facing = actor.facingDirection();
+  float angle = m_armAngle.get();
+  auto hand_offset = active_hand_position(actor, *item_hand, facing, angle, {});
+  if (!hand_offset)
+    return std::unexpected(std::move(hand_offset.error()));
+  auto origin = actor.position() + *hand_offset;
+  bool mirror = facing == Direction::Left;
+  float cosine = std::cos(angle), sine = std::sin(angle);
+  auto transform = [&](Vec2F point) {
+    float x = point[0] * cosine - point[1] * sine;
+    return origin + Vec2F(mirror ? -x : x, point[0] * sine + point[1] * cosine);
+  };
+
+  List<PhysicsForceRegion> forces;
+  forces.reserve(world.size() + local.size());
+  forces.append_range(world);
+  for (auto const& value : local) {
+    auto& force = forces.emplace_back(value);
+    std::visit([&]<physics_force_region Region>(Region& region) {
+      if constexpr (std::same_as<Region, RadialForceRegion>) {
+        region.center = transform(region.center);
+      } else {
+        for (auto& vertex : region.region)
+          vertex = transform(vertex);
+        if (mirror)
+          std::ranges::reverse(region.region);
+        if constexpr (std::same_as<Region, GradientForceRegion>) {
+          region.gradient.min() = transform(region.gradient.min());
+          region.gradient.max() = transform(region.gradient.max());
+        } else {
+          static_assert(std::same_as<Region, DirectionalForceRegion>);
+        }
+      }
+    }, force);
   }
-  return forceRegions;
+  return forces;
 }
 
 bool ActiveItem::holdingItem() const {
@@ -654,16 +687,13 @@ std::expected<Vec2F, StarException> ActiveItem::armPosition(Vec2F const& offset)
 }
 
 std::expected<Vec2F, StarException> ActiveItem::handPosition(Vec2F const& offset) const {
-  auto itemOwner = owner();
-  if (!itemOwner)
-    return std::unexpected(std::move(itemOwner.error()));
-  auto itemHand = hand();
-  if (!itemHand)
-    return std::unexpected(std::move(itemHand.error()));
-  auto handOffset = itemOwner->get().handOffset(*itemHand, itemOwner->get().facingDirection());
-  if (!handOffset)
-    return std::unexpected(std::move(handOffset.error()));
-  return armPosition(offset + *handOffset);
+  auto item_owner = owner();
+  if (!item_owner)
+    return std::unexpected(std::move(item_owner.error()));
+  auto item_hand = hand();
+  if (!item_hand)
+    return std::unexpected(std::move(item_hand.error()));
+  return active_hand_position(item_owner->get(), *item_hand, item_owner->get().facingDirection(), m_armAngle.get(), offset);
 }
 
 std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks() {
@@ -809,13 +839,13 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       List<PhysicsForceRegion> regions;
       if (values) {
         for (auto const& value : *values) {
-          auto region = jsonToPhysicsForceRegion(value);
+          auto region = json_to_physics_force_region(value);
           if (!region)
             return std::unexpected(std::move(region.error()));
           regions.push_back(std::move(*region));
         }
       }
-      m_forceRegions.set(std::move(regions));
+      m_force_regions.set(std::move(regions));
       return {};
     }); !added)
     return std::unexpected(std::move(added.error()));
@@ -823,13 +853,13 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       List<PhysicsForceRegion> regions;
       if (values) {
         for (auto const& value : *values) {
-          auto region = jsonToPhysicsForceRegion(value);
+          auto region = json_to_physics_force_region(value);
           if (!region)
             return std::unexpected(std::move(region.error()));
           regions.push_back(std::move(*region));
         }
       }
-      m_itemForceRegions.set(std::move(regions));
+      m_item_force_regions.set(std::move(regions));
       return {};
     }); !added)
     return std::unexpected(std::move(added.error()));

@@ -153,7 +153,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> loungeControl(std::size_t positionIndex, LoungeControl loungeControl) override;
   [[nodiscard]] std::expected<void, StarException> loungeAim(std::size_t positionIndex, Vec2F const& aimPosition) override;
 
-  [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> forceRegions() const override;
+  [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> force_regions() const override;
   std::size_t movingCollisionCount() const override;
   [[nodiscard]] std::expected<std::optional<PhysicsMovingCollision>, StarException> movingCollision(std::size_t positionIndex) const override;
 
@@ -208,8 +208,8 @@ private:
   };
 
   struct ForceRegionConfig {
-    PhysicsForceRegion forceRegion;
-    std::optional<String> attachToPart;
+    PhysicsForceRegion force_region;
+    std::optional<String> attach_to_part;
     NetElementBool enabled;
   };
 
@@ -235,7 +235,7 @@ private:
   bool m_receiveExtraControls;
   OrderedHashMap<String, LoungePositionConfig> m_loungePositions;
   OrderedHashMap<String, MovingCollisionConfig> m_movingCollisions;
-  OrderedHashMap<String, ForceRegionConfig> m_forceRegions;
+  OrderedHashMap<String, ForceRegionConfig> m_force_regions;
 
   ClientEntityMode m_clientEntityMode;
 

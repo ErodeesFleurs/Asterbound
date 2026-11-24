@@ -911,7 +911,7 @@ std::expected<void, StarException> Monster::update(float dt, std::uint64_t) {
       m_knockoutTimer -= dt;
     } else {
       if (m_scriptComponent.update_ready())
-        m_physicsForces.set({});
+        m_physics_forces.set({});
       auto result140 = recover_lua_script_error(m_scriptComponent.update(m_scriptComponent.update_dt(dt)));
 if (!result140) return std::unexpected(std::move(result140.error()));
 
@@ -1201,11 +1201,11 @@ if (!result195) return std::unexpected(std::move(result195.error()));
   auto result196 = callbacks.register_callback("setPhysicsForces", [this](JsonArray const& forces) -> std::expected<void, StarException> {
       List<PhysicsForceRegion> parsed;
       for (auto const& force : forces) {
-        auto region = jsonToPhysicsForceRegion(force);
+        auto region = json_to_physics_force_region(force);
         if (!region) return std::unexpected(std::move(region.error()));
         parsed.push_back(std::move(*region));
       }
-      m_physicsForces.set(std::move(parsed));
+      m_physics_forces.set(std::move(parsed));
       return {};
     });
 if (!result196) return std::unexpected(std::move(result196.error()));
@@ -1343,7 +1343,7 @@ if (!result223) return std::unexpected(std::move(result223.error()));
   auto result224 = m_netGroup.add_net_element(m_dropPoolNetState);
 if (!result224) return std::unexpected(std::move(result224.error()));
 
-  auto result225 = m_netGroup.add_net_element(m_physicsForces);
+  auto result225 = m_netGroup.add_net_element(m_physics_forces);
 if (!result225) return std::unexpected(std::move(result225.error()));
 
 
@@ -1534,8 +1534,8 @@ List<ChatAction> Monster::pull_pending_chat_actions() {
   return std::move(m_pending_chat_actions);
 }
 
-std::expected<List<PhysicsForceRegion>, StarException> Monster::forceRegions() const {
-  return m_physicsForces.get();
+std::expected<List<PhysicsForceRegion>, StarException> Monster::force_regions() const {
+  return m_physics_forces.get();
 }
 
 std::expected<InteractAction, StarException> Monster::interact(InteractRequest const& request) {

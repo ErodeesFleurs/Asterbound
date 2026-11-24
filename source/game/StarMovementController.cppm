@@ -95,7 +95,7 @@ struct MovementParameters {
   std::optional<float> maximumPlatformCorrection;
   std::optional<float> maximumPlatformCorrectionVelocityFactor;
 
-  std::optional<StringSet> physicsEffectCategories;
+  std::optional<StringSet> physics_effect_categories;
 
   std::optional<int> restDuration;
 };
@@ -232,13 +232,13 @@ public:
   [[nodiscard]] std::expected<void, StarException> for_each_moving_collision(RectF const& region, MovingCollisionCallback const& callback);
 
 protected:
-  // forces the movement controller onGround status, used when manually controlling movement outside the movement controller
-  [[nodiscard]] std::expected<void, StarException> updateForceRegions(float dt);
+  [[nodiscard]] std::expected<void, StarException> update_force_regions();
   [[nodiscard]] std::expected<void, StarException> updateLiquidPercentage();
+  // Force the onGround status when movement is controlled outside this controller.
   void setOnGround(bool onGround);
 
-  // whether force regions were applied in the last update
-  bool appliedForceRegion() const;
+  // True for an actionable force, even when velocity already matches its target.
+  bool applied_force_region() const;
   // The collision correction applied during the most recent update, if any.
   Vec2F collisionCorrection() const;
   // Horizontal slope of the ground the collision body has collided with, if
@@ -326,7 +326,7 @@ private:
   NetElementFloat m_xRelativeSurfaceMovingCollisionPosition;
   NetElementFloat m_yRelativeSurfaceMovingCollisionPosition;
 
-  bool m_appliedForceRegion = false;
+  bool m_applied_force_region = false;
   Vec2F m_collisionCorrection;
   Vec2F m_surfaceSlope;
   Vec2F m_surfaceMovingCollisionPosition;

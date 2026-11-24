@@ -97,7 +97,7 @@ public:
   bool firingAlt() const;
 
   [[nodiscard]] std::expected<List<DamageSource>, StarException> damageSources() const;
-  [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> forceRegions() const;
+  [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> force_regions() const;
 
   [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& render_callback);
 

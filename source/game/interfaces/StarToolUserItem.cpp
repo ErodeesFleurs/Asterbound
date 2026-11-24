@@ -105,7 +105,7 @@ std::expected<List<PolyF>, StarException> ToolUserItem::shieldPolys() const {
   return List<PolyF>{};
 }
 
-std::expected<List<PhysicsForceRegion>, StarException> ToolUserItem::forceRegions() const {
+std::expected<List<PhysicsForceRegion>, StarException> ToolUserItem::force_regions() const {
   return List<PhysicsForceRegion>{};
 }
 

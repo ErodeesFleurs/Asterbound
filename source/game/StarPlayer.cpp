@@ -4529,8 +4529,8 @@ StatusController& Player::statusController() {
   return *m_statusController;
 }
 
-std::expected<List<PhysicsForceRegion>, StarException> Player::forceRegions() const {
-  return m_tools->forceRegions();
+std::expected<List<PhysicsForceRegion>, StarException> Player::force_regions() const {
+  return m_tools->force_regions();
 }
 
 

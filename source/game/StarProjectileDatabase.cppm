@@ -125,7 +125,7 @@ struct ProjectileConfig {
   List<PersistentStatusEffect> persistentStatusEffects;
   PolyF statusEffectArea;
 
-  Json physicsForces;
+  Json physics_forces;
   Json physicsCollisions;
 };
 

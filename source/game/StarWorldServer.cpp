@@ -2925,9 +2925,8 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
   if (!result316)
     return std::unexpected(std::move(result316.error()));
 
-  auto result317 = setupForceRegions();
-  if (!result317)
-    return std::unexpected(std::move(result317.error()));
+  if (auto result = setup_force_regions(); !result)
+    return std::unexpected(std::move(result.error()));
 
   auto result318 = setTileProtection(protected_zero_g_dungeon_id, true);
   if (!result318)
@@ -4238,8 +4237,8 @@ std::expected<bool, StarException> WorldServer::disableDeathDrops() const {
   return false;
 }
 
-std::expected<List<PhysicsForceRegion>, StarException> WorldServer::forceRegions() const {
-  return m_forceRegions;
+std::span<PhysicsForceRegion const> WorldServer::force_regions() const {
+  return m_force_regions;
 }
 
 std::expected<Json, StarException> WorldServer::getProperty(String const& propertyName, Json const& def) const {
@@ -4716,65 +4715,13 @@ std::expected<RpcPromise<InteractAction>, StarException> WorldServer::interact(I
   return RpcPromise<InteractAction>::make_fulfilled(InteractAction());
 }
 
-std::expected<void, StarException> WorldServer::setupForceRegions() {
-  m_forceRegions.clear();
-
-  if (!worldTemplate() || !worldTemplate()->worldParameters()) {
-    return {};
-  }
-
-  auto forceRegionType = worldTemplate()->worldParameters()->worldEdgeForceRegions;
-
-  if (forceRegionType == WorldEdgeForceRegionType::None) {
-    return {};
-  }
-
-  bool addTopRegion = forceRegionType == WorldEdgeForceRegionType::Top || forceRegionType == WorldEdgeForceRegionType::TopAndBottom;
-  bool addBottomRegion = forceRegionType == WorldEdgeForceRegionType::Bottom || forceRegionType == WorldEdgeForceRegionType::TopAndBottom;
-
-  auto result514 = m_serverConfig.get_float("worldEdgeForceRegionHeight");
-  if (!result514)
-    return std::unexpected(std::move(result514.error()));
-  auto regionHeight = std::move(*result514);
-  auto result515 = m_serverConfig.get_float("worldEdgeForceRegionForce");
-  if (!result515)
-    return std::unexpected(std::move(result515.error()));
-  auto regionForce = std::move(*result515);
-  auto result516 = m_serverConfig.get_float("worldEdgeForceRegionVelocity");
-  if (!result516)
-    return std::unexpected(std::move(result516.error()));
-  auto regionVelocity = std::move(*result516);
-  auto regionCategoryFilter = PhysicsCategoryFilter::whitelist({"player", "monster", "npc", "vehicle", "itemdrop"});
-  auto worldSize = Vec2F(worldTemplate()->size());
-
-  if (addTopRegion) {
-    auto topForceRegion = GradientForceRegion();
-    topForceRegion.region = PolyF({
-        {0, worldSize[1] - regionHeight},
-        {worldSize[0], worldSize[1] - regionHeight},
-        (worldSize),
-        {0, worldSize[1]}});
-    topForceRegion.gradient = Line2F({0, worldSize[1]}, {0, worldSize[1] - regionHeight});
-    topForceRegion.baseTargetVelocity = regionVelocity;
-    topForceRegion.baseControlForce = regionForce;
-    topForceRegion.categoryFilter = regionCategoryFilter;
-    m_forceRegions.push_back(topForceRegion);
-  }
-
-  if (addBottomRegion) {
-    auto bottomForceRegion = GradientForceRegion();
-    bottomForceRegion.region = PolyF({
-        {0, 0},
-        {worldSize[0], 0},
-        {worldSize[0], regionHeight},
-        {0, regionHeight}});
-    bottomForceRegion.gradient = Line2F({0, 0}, {0, regionHeight});
-    bottomForceRegion.baseTargetVelocity = regionVelocity;
-    bottomForceRegion.baseControlForce = regionForce;
-    bottomForceRegion.categoryFilter = regionCategoryFilter;
-    m_forceRegions.push_back(bottomForceRegion);
-  }
-  return {};
+std::expected<void, StarException> WorldServer::setup_force_regions() {
+  m_force_regions.clear();
+  if (!m_worldTemplate) return {};
+  auto parameters = m_worldTemplate->worldParameters();
+  if (!parameters || parameters->world_edge_force_regions == WorldEdgeForceRegionType::None) return {};
+  return parameters->append_edge_force_regions(m_force_regions, m_serverConfig, Vec2F(m_worldTemplate->size()),
+      PhysicsCategoryFilter::whitelist({"player", "monster", "npc", "vehicle", "itemdrop"}));
 }
 
 std::expected<void, StarException> WorldServer::setTemplate(std::shared_ptr<WorldTemplate> newTemplate) {
