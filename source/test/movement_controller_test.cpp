@@ -17,6 +17,7 @@ import star.game_types;
 import star.poly;
 import star.rect;
 import star.vector;
+import star.line;
 import star.actor_movement_controller;
 import star.data_stream_devices;
 import star.byte_array;
@@ -125,6 +126,29 @@ const GameTestRegistration movementTerrainContactPreservesPositionAndVelocity(
     for (int y = 1; y <= 8; ++y)
       ASSERT_TRUE(place(origin + Vec2I(8, y), TileCollisionOverride::Block));
     ASSERT_TRUE(place(origin + Vec2I(2, 3), TileCollisionOverride::Platform));
+
+    // A ray starting inside the floor must replace farther edge hits with
+    // distance zero and discard their normals, even when visiting in tile order.
+    auto inside = Vec2F(origin) + Vec2F(4.25f, 0.75f);
+    auto above = Vec2F(origin) + Vec2F(4.25f, 2.0f);
+    auto hit = world->line_collision(Line2F(inside, above));
+    ASSERT_TRUE(hit) << hit.error().what();
+    ASSERT_TRUE(*hit);
+    EXPECT_EQ((*hit)->first, inside);
+    EXPECT_FALSE((*hit)->second);
+    hit = world->line_collision(Line2F(above, inside));
+    ASSERT_TRUE(hit) << hit.error().what();
+    ASSERT_TRUE(*hit);
+    EXPECT_EQ((*hit)->first, Vec2F(origin) + Vec2F(4.25f, 1.0f));
+    ASSERT_TRUE((*hit)->second);
+    EXPECT_FLOAT_EQ((*(*hit)->second)[0], 0.0f);
+    EXPECT_FLOAT_EQ((*(*hit)->second)[1], 1.0f);
+    auto point_hit = world->point_collision(inside);
+    ASSERT_TRUE(point_hit) << point_hit.error().what();
+    EXPECT_TRUE(*point_hit);
+    auto empty = world->poly_collision(PolyF(RectF::with_size(above, {0.25f, 0.25f})));
+    ASSERT_TRUE(empty) << empty.error().what();
+    EXPECT_FALSE(*empty);
 
     MovementParameters parameters;
     parameters.collisionPoly = PolyF(RectF(-0.25f, -0.25f, 0.25f, 0.25f));

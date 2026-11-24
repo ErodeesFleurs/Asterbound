@@ -110,6 +110,91 @@ namespace WorldImpl {
     { tiles.tile(position).isColliding(kinds) } -> std::same_as<bool>;
   };
 
+  template <typename Tiles>
+  concept collision_cache_tiles = std::derived_from<typename Tiles::Tile, WorldTile>
+      && std::same_as<Tiles, TileSectorArray<typename Tiles::Tile, Tiles::sector_size>>;
+
+  template <collision_cache_tiles Tiles>
+  void invalidate_collision_cache(Tiles& tiles, RectI const& changed) {
+    auto size = tiles.size();
+    if (changed.is_empty() || !size[0] || !size[1]) return;
+    constexpr std::int64_t radius = CollisionGenerator::block_influence_radius;
+    auto width = static_cast<std::int64_t>(size[0]);
+    auto span = std::min(width, std::int64_t(changed.x_max()) - changed.x_min() + 2 * radius);
+    auto first = std::int64_t(changed.x_min()) - radius;
+    if (span == width) {
+      first = 0;
+    } else if (!std::in_range<int>(first) || !std::in_range<int>(first + span)) {
+      first %= width;
+      if (first + span > width) first -= width;
+    }
+    auto y_min = std::clamp<std::int64_t>(std::int64_t(changed.y_min()) - radius, 0, size[1]);
+    auto y_max = std::clamp<std::int64_t>(std::int64_t(changed.y_max()) + radius, 0, size[1]);
+    RectI const affected(static_cast<int>(first), static_cast<int>(y_min), static_cast<int>(first + span), static_cast<int>(y_max));
+    tiles.visit_loaded_sectors(affected,
+        [](typename Tiles::Array& sector, RectI const& window, Vec2I const&) {
+      for (int x = window.x_min(); x < window.x_max(); ++x)
+        for (int y = window.y_min(); y < window.y_max(); ++y)
+          sector(x, y).collision_cache_dirty = true;
+    });
+  }
+
+  template <collision_cache_tiles Tiles>
+  [[nodiscard]] std::expected<void, StarException> refresh_collision_cache(Tiles& tiles, RectI const& region,
+      CollisionGenerator const& generator) {
+    return tiles.visit_loaded_sectors(region, [&](typename Tiles::Array& sector, RectI const& window,
+        Vec2I const& source_min) -> std::expected<void, StarException> {
+      RectI dirty = RectI::null();
+      for (int x = window.x_min(); x < window.x_max(); ++x)
+        for (int y = window.y_min(); y < window.y_max(); ++y)
+          if (sector(x, y).collision_cache_dirty)
+            dirty.combine(RectI(x, y, x + 1, y + 1));
+      if (dirty.is_null()) return {};
+
+      // Only output is clipped to the window. The generator still samples its
+      // complete halo, including adjacent sectors and wrapped coordinates.
+      auto blocks = generator.get_blocks(RectI::with_size(source_min + (dirty.min() - window.min()), dirty.size()));
+      if (!blocks) return std::unexpected(std::move(blocks.error()));
+      for (int x = dirty.x_min(); x < dirty.x_max(); ++x) {
+        for (int y = dirty.y_min(); y < dirty.y_max(); ++y) {
+          auto& tile = sector(x, y);
+          tile.collision_cache.clear();
+          tile.collision_cache_dirty = true;
+        }
+      }
+      for (auto& block : *blocks) {
+        auto local = (block.space - source_min) + window.min();
+        auto appended = sector(local[0], local[1]).collision_cache.push_back(std::move(block));
+        if (!appended) return std::unexpected(std::move(appended.error()));
+      }
+      for (int x = dirty.x_min(); x < dirty.x_max(); ++x)
+        for (int y = dirty.y_min(); y < dirty.y_max(); ++y)
+          sector(x, y).collision_cache_dirty = false;
+      return {};
+    });
+  }
+
+  template <collision_cache_tiles Tiles, typename KindFor>
+    requires std::invocable<KindFor&, Vec2I const&, typename Tiles::Tile const&>
+        && std::same_as<std::invoke_result_t<KindFor&, Vec2I const&, typename Tiles::Tile const&>, CollisionKind>
+  [[nodiscard]] std::expected<bool, StarException> collision_blocks_satisfy(Tiles& tiles, RectI const& region,
+      CollisionGenerator const& generator, KindFor&& kind_for,
+      std::function<std::expected<bool, StarException>(CollisionBlock const&)> const& predicate) {
+    if (!predicate) return std::unexpected(StarException("Empty collision block predicate"));
+    if (auto refreshed = refresh_collision_cache(tiles, region, generator); !refreshed)
+      return std::unexpected(std::move(refreshed.error()));
+    return tiles.tile_satisfies(region, [&](Vec2I const& pos, typename Tiles::Tile const& tile) -> std::expected<bool, StarException> {
+      if (std::invoke(kind_for, pos, tile) == CollisionKind::Null)
+        return predicate(CollisionBlock::null_block(pos));
+      if constexpr (Star::debug_enabled) Star::star_assert_failed(!tile.collision_cache_dirty);
+      for (auto const& block : tile.collision_cache) {
+        auto matched = predicate(block);
+        if (!matched || *matched) return matched;
+      }
+      return false;
+    });
+  }
+
   [[nodiscard]]
   inline std::expected<TileDamageParameters, StarException> tileDamageParameters(Root& root, WorldTile& tile, TileLayer layer, TileDamage const& tileDamage);
   template <typename TileSectorArray>
@@ -614,7 +699,7 @@ namespace WorldImpl {
     bool liquidBreathable = remainder >= tile.liquid.level;
     bool foregroundBreathable = true;
     if (tile.getCollision() == CollisionKind::Block) {
-      auto collision = world.pointCollision(pos);
+      auto collision = world.point_collision(pos);
       if (!collision)
         return std::unexpected(std::move(collision.error()));
       foregroundBreathable = !*collision;
@@ -812,6 +897,9 @@ namespace WorldImpl {
 export module star.world_impl;
 
 export namespace Star::WorldImpl {
+  using ::Star::WorldImpl::invalidate_collision_cache;
+  using ::Star::WorldImpl::refresh_collision_cache;
+  using ::Star::WorldImpl::collision_blocks_satisfy;
   using ::Star::WorldImpl::tileIsOccupied;
   using ::Star::WorldImpl::tileCollisionKind;
   using ::Star::WorldImpl::rectTileCollision;

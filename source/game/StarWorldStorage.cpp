@@ -67,6 +67,7 @@ import star.celestial_parameters;
 import star.world_layout;
 import star.collision_generator;
 import star.world_tiles;
+import star.world_impl;
 import star.interaction_types;
 import star.quest_descriptor;
 import star.interactive_entity;
@@ -1181,9 +1182,11 @@ std::expected<void, StarException> WorldStorage::loadSectorToLevel(Sector const&
         if (!autosectorStoreResult1) return std::unexpected(std::move(autosectorStoreResult1.error()));
         auto sectorStore = std::move((*autosectorStoreResult1));
         m_tileArray->load_sector(sector, std::move(sectorStore.tiles));
+        WorldImpl::invalidate_collision_cache(*m_tileArray, m_tileArray->sector_region(sector));
         metadata.generationLevel = sectorStore.generationLevel;
       } else if (!m_tileArray->is_sector_loaded(sector)) {
         m_tileArray->load_default_sector(sector);
+        WorldImpl::invalidate_collision_cache(*m_tileArray, m_tileArray->sector_region(sector));
       }
       metadata.loadLevel = currentLoad;
       {
@@ -1379,6 +1382,7 @@ std::expected<bool, StarException> WorldStorage::unloadSectorToLevel(Sector cons
     if (metadata.loadLevel > SectorLoadLevel::None && !entitiesOverlap) {
       TileSectorStore sectorStore;
       sectorStore.tiles = m_tileArray->unload_sector(sector);
+      WorldImpl::invalidate_collision_cache(*m_tileArray, m_tileArray->sector_region(sector));
       sectorStore.generationLevel = metadata.generationLevel;
       {
         auto operationResult1 = tileSectorKey(sector);

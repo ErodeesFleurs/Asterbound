@@ -12,6 +12,9 @@ import star.game_types;
 import star.json;
 import star.line;
 import star.list;
+import star.movement_controller;
+import star.collision_block;
+import star.physics_entity;
 import star.object_database;
 import star.physics_object;
 import star.poly;
@@ -24,6 +27,20 @@ import star.world_server;
 using namespace Star;
 
 namespace {
+
+std::shared_ptr<ObjectConfig> unanchored_physics_config() {
+  auto config = std::make_shared<ObjectConfig>();
+  config->name = "physics-bounds-test";
+  config->path = "/";
+  config->config = JsonObject();
+  config->health = 1;
+  auto orientation = std::make_shared<ObjectOrientation>();
+  orientation->config = JsonObject();
+  orientation->boundBox = RectI(0, 0, 0, 0);
+  orientation->metaBoundBox = RectF(-1, -1, 1, 1);
+  config->orientations.push_back(std::move(orientation));
+  return config;
+}
 
 const GameTestRegistration legacy_orientation_order("ObjectDatabase", "LegacyOrientationExpansion", [](GameTest& fixture) {
   auto parse = [&](Json const& entries) {
@@ -77,16 +94,7 @@ const GameTestRegistration
     // A minimal configuration is input to the real PhysicsObject implementation,
     // not a substitute Entity or World. An anchor-free orientation gives the
     // non-force bounds a known extent without requiring terrain.
-    auto config = std::make_shared<ObjectConfig>();
-    config->name = "physics-bounds-test";
-    config->path = "/";
-    config->config = JsonObject();
-    config->health = 1;
-    auto orientation = std::make_shared<ObjectOrientation>();
-    orientation->config = JsonObject();
-    orientation->boundBox = RectI(0, 0, 0, 0);
-    orientation->metaBoundBox = RectF(-1, -1, 1, 1);
-    config->orientations.push_back(orientation);
+    auto config = unanchored_physics_config();
 
     auto forceConfig = Json::parse(R"({
     "directional": {
@@ -261,5 +269,48 @@ const GameTestRegistration
       }
     }
   });
+
+const GameTestRegistration moving_collision_filter("MovementController", "MovingPlatformAcrossSeam", [](GameTest& fixture) {
+  auto storage = File::ephemeral_file(fixture.root().random());
+  ASSERT_TRUE(storage) << storage.error().what();
+  auto created = WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);
+  ASSERT_TRUE(created) << created.error().what();
+  auto world = *created;
+  auto close_world = make_scope_exit([&] { EXPECT_TRUE(world->close()); });
+  // Indices follow key order: reject 0 by category, accept 1, stop before 2.
+  auto shapes = Json::parse(R"({
+    "a":{"collision":[[-1,0],[1,0],[1,1],[-1,1]],"categoryWhitelist":["vehicle"]},
+    "b":{"collision":[[-1,0],[1,0],[1,1],[-1,1]],"collisionKind":"platform","categoryWhitelist":["actor"]},
+    "c":{"collision":[[-1,0],[1,0],[1,1],[-1,1]]}
+  })");
+  ASSERT_TRUE(shapes) << shapes.error().what();
+  auto object = PhysicsObject::create(fixture.root(), unanchored_physics_config(), JsonObject{{"physicsCollisions", *shapes}});
+  ASSERT_TRUE(object) << object.error().what();
+  ASSERT_TRUE((*object)->setTilePosition({0, 256}));
+  auto added = world->addEntity(*object);
+  ASSERT_TRUE(added) << added.error().what();
+  auto remove = make_scope_exit([&] { EXPECT_TRUE(world->removeEntity((*object)->entityId(), false)); });
+  MovementParameters parameters;
+  parameters.physicsEffectCategories = StringSet{"actor"};
+  auto controller = MovementController::create(fixture.root(), parameters);
+  ASSERT_TRUE(controller) << controller.error().what();
+  (*controller)->init(*world);
+  auto release = make_scope_exit([&] { (*controller)->uninit(); });
+  std::size_t visits = 0;
+  PolyF retained;
+  auto scan = (*controller)->for_each_moving_collision(RectF(2047.25f, 256, 2047.75f, 257),
+      [&](MovingCollisionId id, CollisionKind kind, PolyF&& poly, RectF const& bounds) -> std::expected<bool, StarException> {
+        ++visits;
+        EXPECT_EQ(id.physicsEntityId, (*object)->entityId());
+        EXPECT_EQ(id.collisionIndex, 1u);
+        EXPECT_EQ(kind, CollisionKind::Platform);
+        EXPECT_EQ(bounds, RectF(2047, 256, 2049, 257));
+        retained = std::move(poly);
+        return false;
+      });
+  ASSERT_TRUE(scan) << scan.error().what();
+  EXPECT_EQ(visits, 1u);
+  EXPECT_EQ(retained, (PolyF{{2047,256},{2049,256},{2049,257},{2047,257}}));
+});
 
 }// namespace

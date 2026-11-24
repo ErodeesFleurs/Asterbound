@@ -1163,7 +1163,7 @@ std::expected<void, StarException> ActorMovementController::tick_master(float dt
       } else if (!m_ground_movement_sustain_timer.ready() && ground_check_distance > 0.0f && max_ground_sustain - m_ground_movement_sustain_timer.timer > min_ground_sustain) {
         PolyF collision_body = MovementController::collisionBody();
         collision_body.translate(Vec2F(0, -ground_check_distance));
-        auto collision = world_ref.polyCollision(collision_body, {CollisionKind::Block, CollisionKind::Dynamic, CollisionKind::Platform, CollisionKind::Slippery});
+        auto collision = world_ref.poly_collision(collision_body, {CollisionKind::Block, CollisionKind::Dynamic, CollisionKind::Platform, CollisionKind::Slippery});
         if (!collision) return std::unexpected(std::move(collision.error()));
         if (!*collision)
           m_ground_movement_sustain_timer = GameTimer(0);
@@ -1742,7 +1742,7 @@ std::expected<bool, StarException> PathController::validate_edge(ActorMovementCo
   };
   auto poly = movement_controller.collisionPoly();
   poly.translate(edge.target.position);
-  auto world_collision = m_world.get().polyCollision(poly);
+  auto world_collision = m_world.get().poly_collision(poly);
   if (!world_collision)
     return std::unexpected(std::move(world_collision.error()));
   bool collided = *world_collision;
@@ -1799,9 +1799,9 @@ std::expected<bool, StarException> PathController::validate_edge(ActorMovementCo
 std::expected<bool, StarException> PathController::moving_collision(ActorMovementController& movement_controller,
                                                                     PolyF const& collision_poly) {
   bool collided = false;
-  auto scanned = movement_controller.forEachMovingCollision(
+  auto scanned = movement_controller.for_each_moving_collision(
     collision_poly.bounding_box(),
-    [&](MovingCollisionId, PhysicsMovingCollision, PolyF poly, RectF) -> std::expected<bool, StarException> {
+    [&](MovingCollisionId, CollisionKind, PolyF const& poly, RectF const&) -> std::expected<bool, StarException> {
       if (poly.intersects(collision_poly)) {
         // set collided and stop iterating
         collided = true;

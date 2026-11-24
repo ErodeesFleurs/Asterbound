@@ -530,6 +530,21 @@ area. For movement changes run the existing `performance_benchmarks` with
 labels between builds before comparing timings. One iteration is 64 moves;
 these workloads do not measure clipping or hull construction.
 
+`CollisionGenerator.*` checks all 256 platform neighborhoods, ordered marching
+squares shapes and the two-tile halo. `TileSectorArrayTest.WrappedCollisionCacheRebuild`
+and `CollisionRefillFailureRetriesWholeWindow` exercise wrapped writeback and
+retry; a full-width query must not append the same physical cell twice. The three
+cache slots are a bound **per generation coordinate**, not per query.
+
+For the real consumers, run `MovementController.TerrainContactPreservesPositionAndVelocity`,
+`MovementController.MovingPlatformAcrossSeam`,
+`WorldClientTest.LiquidPacketPreservesPredictedTerrain` and
+`TileSectorArrayTest.ObjectCollisionInvalidation` with private asset storage.
+`Collision/*` starts with prepared candidates. To compare whole path searches
+that consume the terrain cache, use the existing `game_benchmarks` workloads
+`Game/AStar/flat_walk8` and `Game/AStar/flat_walk32_budget4` and check their
+input/output labels. Neither suite measures isolated cache rebuild throughput.
+
 `WorldGeometryTest.*` covers wrapped circle containment, directed polygon
 hits and integer limits. An interval ending exactly on the seam has one
 piece. Signed coordinate queries saturate only when their result does not

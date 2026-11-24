@@ -13,6 +13,8 @@ import star.sector_array_2d;
 import star.worker_pool;
 import star.tile_sector_array;
 import star.collision_block;
+import star.collision_generator;
+import star.poly;
 import star.world_geometry;
 import star.world_impl;
 import star.world_tiles;
@@ -25,6 +27,152 @@ import star.root;
 using namespace Star;
 
 namespace {
+
+TEST(CollisionGenerator, RejectsUnrepresentableHaloBeforeReadingAnyTile) {
+  constexpr int low = std::numeric_limits<int>::min();
+  constexpr int high = std::numeric_limits<int>::max();
+  CollisionGenerator generator;
+  unsigned reads = 0;
+  generator.init([&](int, int) { ++reads; return CollisionKind::None; });
+
+  for (auto const& region : {
+         RectI({low + 1, 0}, {low + 2, 1}), RectI({0, high - 2}, {1, high - 1}),
+         RectI({low + 2, 0}, {0, 1}), RectI({0, -2}, {1, high - 2})})
+    EXPECT_FALSE(generator.get_blocks(region));
+  EXPECT_EQ(reads, 0u);
+
+  auto blocks = generator.get_blocks(RectI({low + 2, high - 3}, {low + 3, high - 2}));
+  ASSERT_TRUE(blocks);
+  EXPECT_TRUE(blocks->empty());
+  EXPECT_EQ(reads, 25u);
+}
+
+TEST(CollisionGenerator, AllPlatformNeighborhoodsPreserveDirectedSegmentsAndCapacity) {
+  // Legacy directed segment sequences. Bits name the eight neighbors in
+  // row-major order from bottom left, skipping the platform at the center.
+  // x = rising then falling, R/F = slope followed by its upward extension.
+  static constexpr std::string_view sequences =
+    "-r--ff------ffff-r-r-r-r--------"
+    "ffffffff----ffff-r-r-r-r--------"
+    "-r--ff------ff---r---r----------"
+    "-f--FF------ff---r---r----------"
+    "rrrrrrrr----ffff-r-r-r-r--------"
+    "-r-rfxfx----ffff-r-r-r-r--------"
+    "-R--rR------ff---r---r----------"
+    "-R--Fx-x----ff---r---r----------";
+  static_assert(sequences.size() == 256);
+  static_assert(CollisionGenerator::maximum_collisions_per_space == 3);
+  // The negative x also checks that segment origins are not normalized.
+  Vec2I const space(-7, 11);
+  unsigned mask = 0;
+  CollisionGenerator generator;
+  generator.init([&](int x, int y) {
+    int dx = x - space[0], dy = y - space[1];
+    if (dx < -1 || dx > 1 || dy < -1 || dy > 1)
+      return CollisionKind::None;
+    int index = (dy + 1) * 3 + dx + 1;
+    if (index == 4)
+      return CollisionKind::Platform;
+    return mask & (1u << (index < 4 ? index : index - 1)) ? CollisionKind::Platform : CollisionKind::Block;
+  });
+  std::size_t largest = 0;
+  for (; mask < sequences.size(); ++mask) {
+    SCOPED_TRACE(mask);
+    auto blocks = generator.get_blocks(RectI::with_size(space, {1, 1}));
+    ASSERT_TRUE(blocks);
+    largest = std::max(largest, blocks->size());
+    ASSERT_LE(blocks->size(), CollisionGenerator::maximum_collisions_per_space);
+    // A non-platform at the upper-left, upper-right or lower-right marching
+    // corner contributes exactly one solid polygon, before any segments.
+    constexpr unsigned surrounding_corners = (1u << 6) | (1u << 7) | (1u << 4);
+    bool has_solid = (mask & surrounding_corners) != surrounding_corners;
+    char sequence = sequences[mask];
+    bool has_second = sequence == 'x' || sequence == 'R' || sequence == 'F';
+    ASSERT_EQ(blocks->size(), std::size_t(has_solid + 1 + has_second));
+    if (has_solid)
+      EXPECT_EQ((*blocks)[0].kind, CollisionKind::Block);
+    for (auto const& block : *blocks) {
+      EXPECT_EQ(block.space, space);
+      EXPECT_EQ(block.poly_bounds, block.poly.bounding_box());
+    }
+    auto check_segment = [&](std::size_t index, Vec2F start, Vec2F end) {
+      auto const& block = (*blocks)[index];
+      EXPECT_EQ(block.kind, CollisionKind::Platform);
+      ASSERT_EQ(block.poly.sides(), 2u);
+      EXPECT_EQ(block.poly.vertices()[0], Vec2F(space) + start);
+      EXPECT_EQ(block.poly.vertices()[1], Vec2F(space) + end);
+    };
+    if (sequence == '-')
+      check_segment(has_solid, {0, 1}, {1, 1});
+    else if (sequence == 'f' || sequence == 'F')
+      check_segment(has_solid, {1, 0}, {0, 1});
+    else
+      check_segment(has_solid, {0, 0}, {1, 1});
+    if (sequence == 'x')
+      check_segment(has_solid + 1, {1, 0}, {0, 1});
+    else if (sequence == 'R')
+      check_segment(has_solid + 1, {1, 1}, {2, 2});
+    else if (sequence == 'F')
+      check_segment(has_solid + 1, {0, 1}, {-1, 2});
+  }
+  EXPECT_EQ(largest, CollisionGenerator::maximum_collisions_per_space);
+}
+
+TEST(CollisionGenerator, MarchingMasksAndSpecialCornersPreserveOrderedShapes) {
+  // Each digit is a half-tile vertex, clockwise from the bottom-left
+  // corner; 8 is the center. A space separates the two hollow-corner parts.
+  static constexpr std::array<std::string_view, 20> sequences = {
+    "", "123", "345", "1245", "756", "123567", "7346", "12467",
+    "017", "0237", "013457", "02457", "0156", "02356", "01346", "0246",
+    "5678", "0187", "0238 0856", "0186 6834"
+  };
+  static constexpr std::array<unsigned, 4> special_masks = {4, 8, 13, 14};
+  std::array<Vec2I, 4> const corners = {Vec2I(0, 1), Vec2I(1, 1), Vec2I(1, 0), Vec2I(0, 0)};
+  std::array<CollisionKind, 4> const kinds = {
+    CollisionKind::Slippery, CollisionKind::Dynamic, CollisionKind::Block, CollisionKind::Dynamic
+  };
+  std::array<Vec2F, 9> const offsets = {
+    Vec2F(.5f, .5f), Vec2F(.5f, 1), Vec2F(.5f, 1.5f), Vec2F(1, 1.5f), Vec2F(1.5f, 1.5f),
+    Vec2F(1.5f, 1), Vec2F(1.5f, .5f), Vec2F(1, .5f), Vec2F(1, 1)
+  };
+  Vec2I const space(5, -7);
+  for (unsigned shape = 0; shape < sequences.size(); ++shape) {
+    SCOPED_TRACE(shape);
+    unsigned mask = shape < 16 ? shape : special_masks[shape - 16];
+    CollisionKind expected_kind = CollisionKind::None;
+    for (unsigned i = 0; i < corners.size(); ++i)
+      if (mask & (1u << i))
+        expected_kind = std::max(expected_kind, kinds[i]);
+    CollisionGenerator generator;
+    generator.init([&](int x, int y) {
+      auto delta = Vec2I(x, y) - space;
+      for (unsigned i = 0; i < corners.size(); ++i)
+        if (delta == corners[i])
+          return (mask & (1u << i)) ? kinds[i] : CollisionKind::None;
+      if ((shape == 16 && delta == Vec2I(2, 0)) || (shape == 17 && delta == Vec2I(-1, 0)) ||
+          (shape == 18 && (delta == Vec2I(0, 2) || delta == Vec2I(2, 0))) ||
+          (shape == 19 && (delta == Vec2I(1, 2) || delta == Vec2I(-1, 0))))
+        return CollisionKind::Block;
+      return CollisionKind::None;
+    });
+    auto blocks = generator.get_blocks(RectI::with_size(space, {1, 1}));
+    ASSERT_TRUE(blocks);
+    ASSERT_EQ(blocks->size(), shape == 0 ? 0u : shape >= 18 ? 2u : 1u);
+    auto sequence = sequences[shape];
+    for (auto const& block : *blocks) {
+      EXPECT_EQ(block.space, space);
+      EXPECT_EQ(block.kind, expected_kind);
+      EXPECT_EQ(block.poly_bounds, block.poly.bounding_box());
+      auto end = sequence.find(' ');
+      auto vertices = sequence.substr(0, end);
+      ASSERT_EQ(block.poly.sides(), vertices.size());
+      for (std::size_t i = 0; i < vertices.size(); ++i)
+        EXPECT_EQ(block.poly.vertices()[i], Vec2F(space) + offsets[vertices[i] - '0']);
+      sequence.remove_prefix(vertices.size() + (end != sequence.npos));
+    }
+    EXPECT_TRUE(sequence.empty());
+  }
+}
 
 using VisitGrid = SectorArray2D<int, 2>;
 
@@ -604,6 +752,127 @@ const GameTestRegistration tile_geometry_extremes("TileSectorArrayTest", "EmptyW
   ASSERT_TRUE(no_rows);
   EXPECT_TRUE(no_rows->empty());
   EXPECT_FALSE(tiles.tile_satisfies({high, 0}, 1, [](Vec2I const&, int) -> std::expected<bool, StarException> { return false; }));
+});
+
+const GameTestRegistration wrapped_cache_rebuild("TileSectorArrayTest", "WrappedCollisionCacheRebuild", [](GameTest&) {
+  TileSectorArray<ServerTile, 4> tiles({12, 4});
+  tiles.load_default_sector({0, 0});
+  tiles.load_default_sector({2, 0});
+  ASSERT_TRUE(tiles.tile_eval({0, 0, 12, 4}, [](Vec2I const&, ServerTile& tile) -> std::expected<void, StarException> {
+    tile.update_collision(CollisionKind::Platform);
+    return {};
+  }));
+  bool fail = false;
+  int samples = 0;
+  CollisionGenerator generator;
+  generator.init([&](int x, int y) -> std::expected<CollisionKind, StarException> {
+    ++samples;
+    if (fail) return std::unexpected(StarException("collision sample failed"));
+    return tiles.tile({x, y}).getCollision();
+  });
+
+  auto expect_flat = [&](int x) {
+    auto const& cache = tiles.tile({x, 1}).collision_cache;
+    ASSERT_EQ(cache.size(), 1u);
+    auto const& block = cache.front();
+    EXPECT_EQ(block.kind, CollisionKind::Platform);
+    EXPECT_EQ(block.space, Vec2I(x, 1));
+    ASSERT_EQ(block.poly.sides(), 2u);
+    EXPECT_EQ(block.poly.vertices()[0], Vec2F(x, 2));
+    EXPECT_EQ(block.poly.vertices()[1], Vec2F(x + 1, 2));
+    EXPECT_EQ(block.poly_bounds, block.poly.bounding_box());
+  };
+  ASSERT_TRUE(WorldImpl::refresh_collision_cache(tiles, {-1, 1, 1, 2}, generator));
+  expect_flat(-1);
+  expect_flat(0);
+
+  WorldImpl::invalidate_collision_cache(tiles, {-1, 1, 1, 2});
+  fail = true;
+  EXPECT_FALSE(WorldImpl::refresh_collision_cache(tiles, {-1, 1, 1, 2}, generator));
+  EXPECT_TRUE(tiles.tile({-1, 1}).collision_cache_dirty);
+  expect_flat(-1); // Failure cannot publish empty or partially generated geometry.
+  fail = false;
+  RectI const multi_wrap(-20, 1, 28, 2);
+  ASSERT_TRUE(WorldImpl::refresh_collision_cache(tiles, multi_wrap, generator));
+  for (int x : {0, 1, 2, 3, 8, 9, 10, 11}) expect_flat(x);
+
+  samples = 0;
+  ASSERT_TRUE(WorldImpl::refresh_collision_cache(tiles, multi_wrap, generator));
+  EXPECT_EQ(samples, 0);
+  tiles.modify_tile({0, 1})->get().collision_cache_dirty = true;
+  tiles.modify_tile({11, 1})->get().collision_cache_dirty = true;
+  ASSERT_TRUE(WorldImpl::refresh_collision_cache(tiles, multi_wrap, generator));
+  EXPECT_EQ(samples, 2 * 5 * 5); // Two one-tile rebuilds with their full halos.
+
+  int visits = 0;
+  auto any = WorldImpl::collision_blocks_satisfy(tiles, {4, 1, 8, 2}, generator,
+      [](Vec2I const&, ServerTile const& tile) { return tile.getCollision(); },
+      [&](CollisionBlock const& block) -> std::expected<bool, StarException> {
+        ++visits;
+        EXPECT_EQ(block.kind, CollisionKind::Null);
+        EXPECT_EQ(block.space, Vec2I(4, 1));
+        return true;
+      });
+  ASSERT_TRUE(any);
+  EXPECT_TRUE(*any);
+  EXPECT_EQ(visits, 1);
+
+  tiles.unload_sector({0, 0});
+  WorldImpl::invalidate_collision_cache(tiles, tiles.sector_region({0, 0}));
+  EXPECT_TRUE(tiles.tile({11, 1}).collision_cache_dirty);
+  EXPECT_TRUE(tiles.tile({10, 1}).collision_cache_dirty);
+  EXPECT_FALSE(tiles.tile({9, 1}).collision_cache_dirty);
+
+  WorldImpl::invalidate_collision_cache(tiles, {std::numeric_limits<int>::min(), std::numeric_limits<int>::min(),
+      std::numeric_limits<int>::max(), std::numeric_limits<int>::max()});
+  EXPECT_TRUE(tiles.tile({9, 1}).collision_cache_dirty);
+});
+
+// Use real fixed-capacity storage with a smaller limit to force publication
+// failure. Production tiles can hold every legal single-coordinate result.
+struct SingleBlockTile : ServerTile {
+  StaticList<CollisionBlock, 1> collision_cache;
+};
+
+const GameTestRegistration cache_refill_retry("TileSectorArrayTest", "CollisionRefillFailureRetriesWholeWindow", [](GameTest&) {
+  TileSectorArray<SingleBlockTile, 4> tiles({4, 4});
+  tiles.load_default_sector({0, 0});
+  CollisionGenerator generator;
+  generator.init([&](int x, int y) -> std::expected<CollisionKind, StarException> {
+    return tiles.tile({x, y}).getCollision();
+  });
+  tiles.modify_tile({1, 1})->get().update_collision(CollisionKind::Platform);
+  RectI const row(0, 1, 3, 2);
+  ASSERT_TRUE(WorldImpl::refresh_collision_cache(tiles, row, generator));
+  ASSERT_FALSE(tiles.tile({1, 1}).collision_cache_dirty);
+  for (Vec2I pos : {Vec2I(0, 0), Vec2I(0, 2), Vec2I(2, 0), Vec2I(2, 2)})
+    tiles.modify_tile(pos)->get().update_collision(CollisionKind::Platform);
+  tiles.modify_tile({0, 1})->get().collision_cache_dirty = true;
+  tiles.modify_tile({2, 1})->get().collision_cache_dirty = true;
+  ASSERT_FALSE(WorldImpl::refresh_collision_cache(tiles, row, generator));
+  for (int x = 0; x < 3; ++x) EXPECT_TRUE(tiles.tile({x, 1}).collision_cache_dirty);
+  tiles.modify_tile({0, 2})->get().update_collision(CollisionKind::None);
+  ASSERT_TRUE(WorldImpl::refresh_collision_cache(tiles, row, generator));
+  for (int x = 0; x < 3; ++x) EXPECT_FALSE(tiles.tile({x, 1}).collision_cache_dirty);
+  ASSERT_EQ(tiles.tile({1, 1}).collision_cache.size(), 1u);
+  EXPECT_EQ(tiles.tile({1, 1}).collision_cache.front().poly.vertices()[0], Vec2F(1, 1));
+});
+
+const GameTestRegistration effective_tile_collision("TileSectorArrayTest", "ObjectCollisionInvalidation", [](GameTest&) {
+  ServerTile tile;
+  ASSERT_TRUE(tile.update_collision(CollisionKind::Block));
+  tile.collision_cache_dirty = false;
+  EXPECT_FALSE(tile.update_object_collision(CollisionKind::Platform));
+  EXPECT_FALSE(tile.collision_cache_dirty);
+  EXPECT_TRUE(tile.update_collision(CollisionKind::None));
+  EXPECT_EQ(tile.getCollision(), CollisionKind::Platform);
+  EXPECT_TRUE(tile.collision_cache_dirty);
+  ASSERT_TRUE(tile.update_object_collision(CollisionKind::Dynamic));
+  tile.collision_cache_dirty = false;
+  EXPECT_FALSE(tile.update_collision(CollisionKind::Block));
+  EXPECT_FALSE(tile.collision_cache_dirty);
+  EXPECT_TRUE(tile.update_object_collision(CollisionKind::None));
+  EXPECT_EQ(tile.getCollision(), CollisionKind::Block);
 });
 
 }

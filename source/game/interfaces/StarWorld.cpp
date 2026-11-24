@@ -175,70 +175,53 @@ std::expected<std::shared_ptr<Entity>, StarException> World::closestEntityInSigh
                        });
 }
 
-std::expected<bool, StarException> World::pointCollision(Vec2F const& point, CollisionSet const& collisionSet) const {
-  bool collided = false;
-  auto scanned = forEachCollisionBlock(RectI::with_center(Vec2I(point), {3, 3}), [&](CollisionBlock const& block) -> std::expected<void, StarException> {
-    if (collided || !isColliding(block.kind, collisionSet))
-      return {};
-    if (block.poly.contains(point))
-      collided = true;
+std::expected<bool, StarException> World::point_collision(Vec2F const& point, CollisionSet const& collision_set) const {
+  return collision_blocks_satisfy(RectI::with_center(Vec2I(point), {3, 3}),
+      [&](CollisionBlock const& block) -> std::expected<bool, StarException> {
+        return collision_set.contains(block.kind) && block.poly.contains(point);
+      });
+}
+
+std::expected<std::optional<std::pair<Vec2F, std::optional<Vec2F>>>, StarException> World::line_collision(Line2F const& line, CollisionSet const& collision_set) const {
+  auto const& geometry = this->geometry();
+  auto delta = line.diff();
+  std::optional<float> closest;
+  std::optional<Vec2F> normal;
+  auto region = RectI::integral(RectF::bound_box_of(line.min(), line.max()).padded(1));
+  auto scanned = for_each_collision_block(region, [&](CollisionBlock const& block) -> std::expected<void, StarException> {
+    if (!block.poly.empty() && collision_set.contains(block.kind)) {
+      auto start = geometry.nearest_to(block.poly.center(), line.min());
+      auto hit = block.poly.line_intersection(Line2F(start, start + delta));
+      if (hit && (!closest || hit->along < *closest)) {
+        closest = hit->along;
+        normal = hit->intersected_side.transform([&](std::size_t side) { return block.poly.normal(side); });
+      }
+    }
     return {};
   });
   if (!scanned)
     return std::unexpected(std::move(scanned.error()));
-  return collided;
-}
-
-std::expected<std::optional<std::pair<Vec2F, std::optional<Vec2F>>>, StarException> World::lineCollision(Line2F const& line, CollisionSet const& collisionSet) const {
-  auto geometry = this->geometry();
-  std::optional<PolyF> intersectPoly;
-  std::optional<PolyF::LineIntersectResult> closestIntersection;
-
-  auto scanned = forEachCollisionBlock(RectI::integral(RectF::bound_box_of(line.min(), line.max()).padded(1)), [&](CollisionBlock const& block) -> std::expected<void, StarException> {
-      if (block.poly.empty() || !isColliding(block.kind, collisionSet))
-        return {};
-
-      Vec2F nearMin = geometry.nearest_to(block.poly.center(), line.min());
-      auto intersection = block.poly.line_intersection(Line2F(nearMin, nearMin + line.diff()));
-      if (intersection && (!closestIntersection || intersection->along < closestIntersection->along)) {
-        intersectPoly = block.poly;
-        closestIntersection = intersection;
-      }
-      return {};
-    });
-  if (!scanned)
-    return std::unexpected(std::move(scanned.error()));
-
-  if (closestIntersection) {
-    auto point = line.eval(closestIntersection->along);
-    auto normal = closestIntersection->intersected_side.transform([&](std::uint64_t side) { return intersectPoly->normal(side); });
-    return std::make_pair(point, normal);
-  }
+  if (closest)
+    return std::make_pair(line.eval(*closest), normal);
   return {};
 }
 
-std::expected<bool, StarException> World::polyCollision(PolyF const& poly, CollisionSet const& collisionSet) const {
-  auto geometry = this->geometry();
-  Vec2F polyCenter = poly.center();
-  PolyF translatedPoly;
-  bool collided = false;
-
-  auto scanned = forEachCollisionBlock(RectI::integral(poly.bounding_box()).padded(1), [&](CollisionBlock const& block) -> std::expected<void, StarException> {
-      if (collided || !isColliding(block.kind, collisionSet))
-        return {};
-
-      Vec2F center = block.poly.center();
-      Vec2F newCenter = geometry.nearest_to(polyCenter, center);
-      translatedPoly = block.poly;
-      translatedPoly.translate(newCenter - center);
-      if (poly.intersects(translatedPoly))
-        collided = true;
-      return {};
-    });
-  if (!scanned)
-    return std::unexpected(std::move(scanned.error()));
-
-  return collided;
+std::expected<bool, StarException> World::poly_collision(PolyF const& poly, CollisionSet const& collision_set) const {
+  auto const& geometry = this->geometry();
+  auto poly_center = poly.center();
+  PolyF translated;
+  return collision_blocks_satisfy(RectI::integral(poly.bounding_box()).padded(1),
+      [&](CollisionBlock const& block) -> std::expected<bool, StarException> {
+        if (!collision_set.contains(block.kind))
+          return false;
+        auto center = block.poly.center();
+        auto offset = geometry.nearest_to(poly_center, center) - center;
+        if (offset == Vec2F())
+          return poly.intersects(block.poly);
+        translated = block.poly;
+        translated.translate(offset);
+        return poly.intersects(translated);
+      });
 }
 
 }

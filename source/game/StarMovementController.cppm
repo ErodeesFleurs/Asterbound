@@ -227,8 +227,9 @@ public:
   [[nodiscard]] std::expected<void, StarException> tickSlave(float dt);
 
   void setIgnorePhysicsEntities(Set<EntityId> ignorePhysicsEntities);
-  // iterate over all physics entity collision polys in the region, iteration stops if the callback returns false
-  [[nodiscard]] std::expected<void, StarException> forEachMovingCollision(RectF const& region, std::function<std::expected<bool, StarException>(MovingCollisionId, PhysicsMovingCollision, PolyF, RectF)> callback);
+  // Transfers each world-space shape to the callback; false stops enumeration.
+  using MovingCollisionCallback = std::function<std::expected<bool, StarException>(MovingCollisionId, CollisionKind, PolyF&&, RectF const&)>;
+  [[nodiscard]] std::expected<void, StarException> for_each_moving_collision(RectF const& region, MovingCollisionCallback const& callback);
 
 protected:
   // forces the movement controller onGround status, used when manually controlling movement outside the movement controller
@@ -260,40 +261,39 @@ private:
   struct CollisionResult {
     Vec2F movement;
     Vec2F correction;
-    std::optional<MovingCollisionId> surfaceMovingCollisionId;
-    bool isStuck = false;
-    bool onGround = false;
-    Vec2F groundSlope;
-    CollisionKind collisionKind = CollisionKind::Null;
+    std::optional<MovingCollisionId> surface_moving_collision_id;
+    bool is_stuck = false;
+    bool on_ground = false;
+    Vec2F ground_slope;
+    CollisionKind collision_kind = CollisionKind::Null;
   };
 
   struct CollisionSeparation {
     Vec2F correction;
-    bool solutionFound = false;
-    std::optional<MovingCollisionId> movingCollisionId;
-    CollisionKind collisionKind = CollisionKind::Null;
+    bool solution_found = false;
+    std::optional<MovingCollisionId> moving_collision_id;
+    CollisionKind collision_kind = CollisionKind::Null;
   };
 
   struct CollisionPoly {
     PolyF poly;
-    RectF polyBounds;
-    Vec2F sortPosition;
-    std::optional<MovingCollisionId> movingCollisionId;
-    CollisionKind collisionKind = CollisionKind::Null;
-    float sortDistance;
+    RectF poly_bounds;
+    Vec2F sort_position;
+    std::optional<MovingCollisionId> moving_collision_id;
+    CollisionKind collision_kind = CollisionKind::Null;
+    float sort_distance;
   };
 
-  static CollisionKind maxOrNullCollision(CollisionKind a, CollisionKind b);
-  static CollisionResult collisionMove(List<CollisionPoly>& collisionPolys, PolyF const& body, Vec2F const& movement,
-      bool ignorePlatforms, bool enableSurfaceSlopeCorrection, float maximumCorrection, float maximumPlatformCorrection, Vec2F sortCenter, float dt);
-  static CollisionSeparation collisionSeparate(List<CollisionPoly> const& collisionPolys, PolyF const& poly,
-                                               bool ignorePlatforms, float maximumPlatformCorrection, bool upward,
-                                               float separationTolerance);
+  static CollisionKind max_or_null_collision(CollisionKind a, CollisionKind b);
+  static CollisionResult collision_move(List<CollisionPoly>& collision_polys, PolyF const& body, Vec2F const& movement,
+      bool ignore_platforms, bool enable_surface_slope_correction, float maximum_correction, float maximum_platform_correction, Vec2F sort_center, float dt);
+  static CollisionSeparation collision_separate(List<CollisionPoly> const& collision_polys, PolyF const& poly,
+      bool ignore_platforms, float maximum_platform_correction, bool upward, float separation_tolerance, PolyF& scratch);
 
   [[nodiscard]] std::expected<void, StarException> updateParameters(MovementParameters parameters);
   void updatePositionInterpolators();
 
-  [[nodiscard]] std::expected<void, StarException> queryCollisions(RectF const& region);
+  [[nodiscard]] std::expected<void, StarException> query_collisions(RectF const& region);
 
   [[nodiscard]] std::expected<float, StarException> gravity();
 
@@ -338,8 +338,8 @@ private:
   float m_timeStep;
   std::uint64_t m_presentationEpoch = 0;
 
-  List<CollisionPoly> m_workingCollisions;
-  List<PolyF> m_collisionBuffers;
+  List<CollisionPoly> m_working_collisions;
+  List<PolyF> m_collision_buffers;
 };
 
 }

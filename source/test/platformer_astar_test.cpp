@@ -185,7 +185,7 @@ void expect_simulated_landing(WorldServer& world, PlatformerAStar::Path const& p
     auto const& edge = path[i];
     if (i > 0)
       EXPECT_EQ(edge.source, path[i - 1].target);
-    auto collided = world.polyCollision(PolyF(full_bounds.translated(edge.target.position)));
+    auto collided = world.poly_collision(PolyF(full_bounds.translated(edge.target.position)));
     ASSERT_TRUE(collided) << collided.error().what();
     EXPECT_FALSE(*collided);
     if (edge.action == PlatformerAStar::Action::Arc) {
@@ -341,7 +341,7 @@ const GameTestRegistration
           detoured |= edge.target.position[1] >= origin[1] + 6.25f;
           auto collision_poly = *parameters.standing_poly;
           collision_poly.translate(edge.target.position);
-          auto collided = world.polyCollision(collision_poly);
+          auto collided = world.poly_collision(collision_poly);
           ASSERT_TRUE(collided) << collided.error().what();
           EXPECT_FALSE(*collided);
         }

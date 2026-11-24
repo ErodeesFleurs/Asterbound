@@ -503,13 +503,11 @@ std::expected<WorldStructure, StarException> WorldServer::setCentralStructure(Wo
         auto result18 = materialDatabase->materialCollisionKind(foregroundBlock.materialId);
         if (!result18)
           return std::unexpected(std::move(result18.error()));
-        tile->get().updateCollision(std::move(*result18));
+        if (tile->get().update_collision(*result18))
+          WorldImpl::invalidate_collision_cache(*m_tileArray, RectI::with_size(foregroundBlock.position, {1, 1}));
         auto result19 = queueTileUpdates(foregroundBlock.position);
         if (!result19)
           return std::unexpected(std::move(result19.error()));
-        auto result20 = dirtyCollision(RectI::with_size(foregroundBlock.position, {1, 1}));
-        if (!result20)
-          return std::unexpected(std::move(result20.error()));
       }
     }
   }
@@ -615,10 +613,8 @@ std::expected<void, StarException> WorldServer::removeCentralStructure() {
         if (tile->get().foreground == foregroundBlock.materialId) {
           tile->get().foreground = EmptyMaterialId;
           tile->get().foregroundMod = NoModId;
-          tile->get().updateCollision(CollisionKind::None);
-          auto result36 = dirtyCollision(RectI::with_size(foregroundBlock.position, {1, 1}));
-          if (!result36)
-            return std::unexpected(std::move(result36.error()));
+          if (tile->get().update_collision(CollisionKind::None))
+            WorldImpl::invalidate_collision_cache(*m_tileArray, RectI::with_size(foregroundBlock.position, {1, 1}));
           auto result37 = queueTileUpdates(foregroundBlock.position);
           if (!result37)
             return std::unexpected(std::move(result37.error()));
@@ -2018,31 +2014,10 @@ std::expected<CollisionKind, StarException> WorldServer::tileCollisionKind(Vec2I
 }
 
 
-std::expected<void, StarException> WorldServer::forEachCollisionBlock(RectI const& region, std::function<std::expected<void, StarException>(CollisionBlock const&)> const& iterator) const {
-  if (auto result = const_cast<WorldServer&>(*this).freshenCollision(region); !result)
-    return std::unexpected(std::move(result.error()));
-  auto result211 = m_tileArray->tile_each(region, [iterator](Vec2I const& pos, ServerTile const& tile) -> std::expected<void, StarException> {
-    if (!iterator)
-      return std::unexpected(WorldServerException("Empty collision block iterator"));
-    if (tile.getCollision() == CollisionKind::Null) {
-      auto result209 = iterator(CollisionBlock::nullBlock(pos));
-      if (!result209)
-        return std::unexpected(std::move(result209.error()));
-    } else {
-      if constexpr (Star::debug_enabled) {
-        Star::star_assert_failed((!tile.collisionCacheDirty));
-      }
-      for (auto const& block : tile.collisionCache) {
-        auto result210 = iterator(block);
-        if (!result210)
-          return std::unexpected(std::move(result210.error()));
-      }
-    }
-    return {};
-  });
-  if (!result211)
-    return std::unexpected(std::move(result211.error()));
-  return {};
+std::expected<bool, StarException> WorldServer::collision_blocks_satisfy(RectI const& region,
+    std::function<std::expected<bool, StarException>(CollisionBlock const&)> const& predicate) const {
+  return WorldImpl::collision_blocks_satisfy(*m_tileArray, region, m_collision_generator,
+      [](Vec2I const&, ServerTile const& tile) { return tile.getCollision(); }, predicate);
 }
 
 std::expected<bool, StarException> WorldServer::isTileConnectable(Vec2I const& pos, TileLayer layer, bool tilesOnly) const {
@@ -2916,8 +2891,8 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
   m_entityMessageResponses = {};
   m_entityMessagePromises = {};
 
-  m_collisionGenerator.init([&world = *this](int x, int y) -> std::expected<CollisionKind, StarException> {
-  return world.m_tileArray->tile({x, y}).getCollision();
+  m_collision_generator.init([&world = *this](int x, int y) -> std::expected<CollisionKind, StarException> {
+    return world.m_tileArray->tile({x, y}).getCollision();
   });
 
   auto result312 = m_serverConfig.query("interpolationSettings.normal");
@@ -3151,13 +3126,16 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
         }
 
         tile->get().foregroundColorVariant = DefaultMaterialColorVariant;
-        if (placeMaterial.collisionOverride != TileCollisionOverride::None)
-          tile->get().updateCollision(collisionKindFromOverride(placeMaterial.collisionOverride)); else {
-          auto result339 = materialDatabase->materialCollisionKind(tile->get().foreground);
-          if (!result339)
-            return std::unexpected(std::move(result339.error()));
-          tile->get().updateCollision(std::move(*result339));
+        CollisionKind kind;
+        if (placeMaterial.collisionOverride != TileCollisionOverride::None) {
+          kind = collisionKindFromOverride(placeMaterial.collisionOverride);
+        } else {
+          auto material_kind = materialDatabase->materialCollisionKind(tile->get().foreground);
+          if (!material_kind) return std::unexpected(std::move(material_kind.error()));
+          kind = *material_kind;
         }
+        if (tile->get().update_collision(kind))
+          WorldImpl::invalidate_collision_cache(*m_tileArray, RectI::with_size(pos, {1, 1}));
         if (tile->get().foreground == EmptyMaterialId) {
           // Remove the foreground mod if removing the foreground.
           tile->get().foregroundMod = NoModId;
@@ -3179,11 +3157,6 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
         m_fallingBlocksAgent->visitLocation(pos);
       }
 
-      if (placeMaterial.layer == TileLayer::Foreground) {
-        auto result342 = dirtyCollision(RectI::with_size(pos, {1, 1}));
-        if (!result342)
-          return std::unexpected(std::move(result342.error()));
-      }
       auto result343 = queueTileUpdates(pos);
       if (!result343)
         return std::unexpected(std::move(result343.error()));
@@ -3329,22 +3302,20 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
     if (tile) {
       tile->get().rootSource = {};
       bool updatedTile = false;
-      bool updatedCollision = false;
+      bool collision_changed = false;
       if (isBiomeMaterial(materialSpace.material) || tile->get().foreground == materialSpace.material) {
         // if the world is old, the materialSpace's collision may still be in the tile
         tile->get().foreground = EmptyMaterialId;
         tile->get().foregroundMod = NoModId;
         updatedTile = true;
-        updatedCollision = tile->get().updateCollision(CollisionKind::None);
+        collision_changed = tile->get().update_collision(CollisionKind::None);
       }
-      if (tile->get().updateObjectCollision(CollisionKind::None))
-        updatedTile = updatedCollision = true;
-      if (updatedCollision) {
+      if (tile->get().update_object_collision(CollisionKind::None))
+        updatedTile = collision_changed = true;
+      if (collision_changed) {
         m_liquid_engine->visit_location(pos);
         m_fallingBlocksAgent->visitLocation(pos);
-        auto result356 = dirtyCollision(RectI::with_size(pos, { 1, 1 }));
-        if (!result356)
-          return std::unexpected(std::move(result356.error()));
+        WorldImpl::invalidate_collision_cache(*m_tileArray, RectI::with_size(pos, {1, 1}));
       }
       if (updatedTile) {
         auto result357 = queueTileUpdates(pos);
@@ -3363,7 +3334,7 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
       Vec2I pos = materialSpace.space + entity->tilePosition();
 
       bool updatedTile = false;
-      bool updatedCollision = false;
+      bool collision_changed = false;
       auto tile = m_tileArray->modify_tile(pos);
       if (tile) {
         if (tile->get().foreground == EmptyMaterialId) {
@@ -3377,14 +3348,13 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
         auto result358 = materialDatabase->materialCollisionKind(materialSpace.material);
         if (!result358)
           return std::unexpected(std::move(result358.error()));
-        updatedTile |= updatedCollision = tile->get().updateObjectCollision(std::move(*result358));
+        collision_changed = tile->get().update_object_collision(*result358);
+        updatedTile |= collision_changed;
       }
-      if (updatedCollision) {
+      if (collision_changed) {
         m_liquid_engine->visit_location(pos);
         m_fallingBlocksAgent->visitLocation(pos);
-        auto result359 = dirtyCollision(RectI::with_size(pos, { 1, 1 }));
-        if (!result359)
-          return std::unexpected(std::move(result359.error()));
+        WorldImpl::invalidate_collision_cache(*m_tileArray, RectI::with_size(pos, {1, 1}));
       }
       if (updatedTile) {
         auto result360 = queueTileUpdates(pos);
@@ -3496,9 +3466,8 @@ std::expected<std::optional<std::reference_wrapper<ServerTile>>, StarException> 
 
   auto tile = m_tileArray->modify_tile(position);
   if (tile) {
-    auto result370 = dirtyCollision(RectI::with_size(position, {1, 1}));
-    if (!result370)
-      return std::unexpected(std::move(result370.error()));
+    // A mutable borrow escapes here, so invalidate before the unknown edit.
+    WorldImpl::invalidate_collision_cache(*m_tileArray, RectI::with_size(position, {1, 1}));
     m_liquid_engine->visit_location(position);
     auto result371 = queueTileUpdates(position);
     if (!result371)
@@ -3649,10 +3618,8 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
       tile->get().foregroundColorVariant = DefaultMaterialColorVariant;
       tile->get().foregroundHueShift = 0;
       tile->get().foregroundMod = NoModId;
-      tile->get().updateCollision(CollisionKind::None);
-      auto result389 = dirtyCollision(RectI::with_size(pos, {1, 1}));
-      if (!result389)
-        return std::unexpected(std::move(result389.error()));
+      if (tile->get().update_collision(CollisionKind::None))
+        WorldImpl::invalidate_collision_cache(*m_tileArray, RectI::with_size(pos, {1, 1}));
     }
 
     tile->get().foregroundDamage.reset();
@@ -4108,50 +4075,6 @@ std::expected<void, StarException> WorldServer::writeNetTile(Vec2I const& pos, N
   return {};
 }
 
-std::expected<void, StarException> WorldServer::dirtyCollision(RectI const& region) {
-  auto dirtyRegion = region.padded(CollisionGenerator::BlockInfluenceRadius);
-  for (int x = dirtyRegion.x_min(); x < dirtyRegion.x_max(); ++x) {
-    for (int y = dirtyRegion.y_min(); y < dirtyRegion.y_max(); ++y) {
-      if (auto tile = m_tileArray->modify_tile({x, y}))
-        tile->get().collisionCacheDirty = true;
-    }
-  }
-  return {};
-}
-
-std::expected<void, StarException> WorldServer::freshenCollision(RectI const& region) {
-  RectI freshenRegion = RectI::null();
-  for (int x = region.x_min(); x < region.x_max(); ++x) {
-    for (int y = region.y_min(); y < region.y_max(); ++y) {
-      if (auto tile = m_tileArray->modify_tile({x, y})) {
-        if (tile->get().collisionCacheDirty)
-          freshenRegion.combine(RectI(x, y, x + 1, y + 1));
-      }
-    }
-  }
-
-  if (!freshenRegion.is_null()) {
-    for (int x = freshenRegion.x_min(); x < freshenRegion.x_max(); ++x) {
-      for (int y = freshenRegion.y_min(); y < freshenRegion.y_max(); ++y) {
-        if (auto tile = m_tileArray->modify_tile({x, y})) {
-          tile->get().collisionCacheDirty = false;
-          tile->get().collisionCache.clear();
-        }
-      }
-    }
-
-    auto result439 = m_collisionGenerator.getBlocks(freshenRegion);
-    if (!result439)
-      return std::unexpected(std::move(result439.error()));
-    for (auto collisionBlock : std::move(*result439)) {
-      if (auto tile = m_tileArray->modify_tile(collisionBlock.space)) {
-        if (auto appended = tile->get().collisionCache.push_back(std::move(collisionBlock)); !appended)
-          return std::unexpected(std::move(appended.error()));
-      }
-    }
-  }
-  return {};
-}
 
 std::expected<void, StarException> WorldServer::removeEntity(EntityId entityId, bool andDie) {
   auto entity = m_entityMap->entity(entityId);
@@ -4289,7 +4212,7 @@ std::expected<bool, StarException> WorldServer::exposedToWeather(Vec2F const& po
       return std::unexpected(std::move(result456.error()));
     auto offset = Vec2F(-std::move(*result456)->wind() * weatherRayCheckWindInfluence, weatherRayCheckDistance).normalized() * weatherRayCheckDistance;
 
-    return !lineCollision({pos, pos + offset});
+    return !line_collision({pos, pos + offset});
   }
 
   return false;

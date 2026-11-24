@@ -117,28 +117,24 @@ std::expected<void, StarException> ServerTile::read(DataStream& ds, VersionNumbe
     if (!source)
       return std::unexpected(std::move(source.error()));
   }
-  collisionCacheDirty = true;
+  collision_cache_dirty = true;
   return {};
 }
 
-bool ServerTile::updateCollision(CollisionKind kind) {
-  if (collision != kind) {
-    collision = kind;
-    collisionCacheDirty = true;
-    collisionCache.clear();
-    return true;
-  }
-  return false;
+bool ServerTile::update_collision(CollisionKind kind) {
+  auto before = getCollision();
+  collision = kind;
+  bool changed = before != getCollision();
+  collision_cache_dirty |= changed;
+  return changed;
 }
 
-bool ServerTile::updateObjectCollision(CollisionKind kind) {
-  if (objectCollision != kind) {
-    objectCollision = kind;
-    collisionCacheDirty = true;
-    collisionCache.clear();
-    return true;
-  }
-  return false;
+bool ServerTile::update_object_collision(CollisionKind kind) {
+  auto before = getCollision();
+  objectCollision = kind;
+  bool changed = before != getCollision();
+  collision_cache_dirty |= changed;
+  return changed;
 }
 
 CollisionKind ServerTile::getCollision() const {

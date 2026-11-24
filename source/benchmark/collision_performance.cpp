@@ -43,7 +43,7 @@ struct MovementCollisionBenchmarkAccess {
   }
 
   static Result move(Fixture const& fixture, List<Candidate>& candidates) {
-    return MovementController::collisionMove(candidates, fixture.body, fixture.movement, fixture.ignorePlatforms,
+    return MovementController::collision_move(candidates, fixture.body, fixture.movement, fixture.ignorePlatforms,
                                              fixture.slopeCorrection, fixture.maximumCorrection,
                                              fixture.maximumPlatformCorrection, fixture.body.center(), fixture.dt);
   }
@@ -54,10 +54,10 @@ struct MovementCollisionBenchmarkAccess {
     auto bits = [](float value) { return std::bit_cast<std::uint32_t>(value); };
     return std::format("m={:08x},{:08x};c={:08x},{:08x};s={:08x},{:08x};stuck={};ground={};kind={};platform={}:{}",
                        bits(result.movement[0]), bits(result.movement[1]), bits(result.correction[0]),
-                       bits(result.correction[1]), bits(result.groundSlope[0]), bits(result.groundSlope[1]),
-                       result.isStuck, result.onGround, static_cast<unsigned>(result.collisionKind),
-                       result.surfaceMovingCollisionId ? result.surfaceMovingCollisionId->physicsEntityId : 0,
-                       result.surfaceMovingCollisionId ? result.surfaceMovingCollisionId->collisionIndex : 0);
+                       bits(result.correction[1]), bits(result.ground_slope[0]), bits(result.ground_slope[1]),
+                       result.is_stuck, result.on_ground, static_cast<unsigned>(result.collision_kind),
+                       result.surface_moving_collision_id ? result.surface_moving_collision_id->physicsEntityId : 0,
+                       result.surface_moving_collision_id ? result.surface_moving_collision_id->collisionIndex : 0);
   }
   static std::uint64_t permutation(List<Candidate> const& candidates) {
     std::uint64_t hash = 14695981039346656037ull;
@@ -68,9 +68,9 @@ struct MovementCollisionBenchmarkAccess {
       }
     };
     for (auto const& candidate : candidates) {
-      append(static_cast<unsigned>(candidate.collisionKind));
-      append(candidate.movingCollisionId ? candidate.movingCollisionId->physicsEntityId : 0);
-      append(candidate.movingCollisionId ? candidate.movingCollisionId->collisionIndex : 0);
+      append(static_cast<unsigned>(candidate.collision_kind));
+      append(candidate.moving_collision_id ? candidate.moving_collision_id->physicsEntityId : 0);
+      append(candidate.moving_collision_id ? candidate.moving_collision_id->collisionIndex : 0);
       for (auto const& vertex : candidate.poly) {
         append(std::bit_cast<std::uint32_t>(vertex[0]));
         append(std::bit_cast<std::uint32_t>(vertex[1]));
@@ -84,13 +84,13 @@ struct MovementCollisionBenchmarkAccess {
       return std::bit_cast<std::uint32_t>(x[0]) == std::bit_cast<std::uint32_t>(y[0])
         && std::bit_cast<std::uint32_t>(x[1]) == std::bit_cast<std::uint32_t>(y[1]);
     };
-    bool sameId = a.surfaceMovingCollisionId.has_value() == b.surfaceMovingCollisionId.has_value();
-    if (sameId && a.surfaceMovingCollisionId)
-      sameId = a.surfaceMovingCollisionId->physicsEntityId == b.surfaceMovingCollisionId->physicsEntityId
-        && a.surfaceMovingCollisionId->collisionIndex == b.surfaceMovingCollisionId->collisionIndex;
+    bool same_id = a.surface_moving_collision_id.has_value() == b.surface_moving_collision_id.has_value();
+    if (same_id && a.surface_moving_collision_id)
+      same_id = a.surface_moving_collision_id->physicsEntityId == b.surface_moving_collision_id->physicsEntityId
+        && a.surface_moving_collision_id->collisionIndex == b.surface_moving_collision_id->collisionIndex;
     return sameVector(a.movement, b.movement) && sameVector(a.correction, b.correction)
-      && sameVector(a.groundSlope, b.groundSlope) && sameId && a.isStuck == b.isStuck && a.onGround == b.onGround
-      && a.collisionKind == b.collisionKind;
+      && sameVector(a.ground_slope, b.ground_slope) && same_id && a.is_stuck == b.is_stuck && a.on_ground == b.on_ground
+      && a.collision_kind == b.collision_kind;
   }
 
   static std::vector<Fixture> fixtures() {
@@ -239,27 +239,27 @@ struct MovementCollisionBenchmarkAccess {
 
     // Simple boundary invariants supplement the recorded complex-fixture oracle.
     if (fixture.name == "MovingPlatformIdentity"
-        && (!reference.surfaceMovingCollisionId || reference.surfaceMovingCollisionId->physicsEntityId != 42
-            || reference.surfaceMovingCollisionId->collisionIndex != 3 || !reference.onGround || reference.isStuck)) {
+        && (!reference.surface_moving_collision_id || reference.surface_moving_collision_id->physicsEntityId != 42
+            || reference.surface_moving_collision_id->collisionIndex != 3 || !reference.on_ground || reference.is_stuck)) {
       session.fail(state, std::format("Moving platform contact identity/ground invariant failed: {}", expected));
       return;
     }
     if ((fixture.name == "IgnoredPlatform" || fixture.name == "EmptyCandidates" || fixture.name == "NullBody")
-        && (reference.movement != fixture.movement || reference.correction != Vec2F() || reference.isStuck)) {
+        && (reference.movement != fixture.movement || reference.correction != Vec2F() || reference.is_stuck)) {
       session.fail(state, "Unobstructed movement invariant failed");
       return;
     }
     if ((fixture.name == "CorridorMultiPassFallback" || fixture.name == "UniqueDistanceDenseFallback")
-        && (reference.movement != Vec2F() || reference.isStuck)) {
+        && (reference.movement != Vec2F() || reference.is_stuck)) {
       session.fail(state, std::format("Fallback must recover the original unobstructed body: {}", expected));
       return;
     }
     if (fixture.name == "CorrectionLimitStuckFallback"
-        && (!reference.isStuck || reference.movement != Vec2F() || reference.correction != -fixture.movement)) {
+        && (!reference.is_stuck || reference.movement != Vec2F() || reference.correction != -fixture.movement)) {
       session.fail(state, std::format("Correction limit must reject normal and fallback displacement: {}", expected));
       return;
     }
-    if (fixture.name == "ZeroMovementStuck" && !reference.isStuck) {
+    if (fixture.name == "ZeroMovementStuck" && !reference.is_stuck) {
       session.fail(state, "Unsolvable zero-movement corridor must remain stuck");
       return;
     }

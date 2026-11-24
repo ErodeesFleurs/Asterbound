@@ -77,8 +77,8 @@ struct WorldTile {
   // a tile through it (the members used to be indeterminate there).
   CollisionKind collision = CollisionKind::Null;
 
-  bool collisionCacheDirty = true;
-  StaticList<CollisionBlock, CollisionGenerator::MaximumCollisionsPerSpace> collisionCache;
+  bool collision_cache_dirty = true;
+  StaticList<CollisionBlock, CollisionGenerator::maximum_collisions_per_space> collision_cache;
 
   BiomeIndex blockBiomeIndex;
   BiomeIndex environmentBiomeIndex;
@@ -108,11 +108,9 @@ struct ServerTile : public WorldTile {
   [[nodiscard]]
   std::expected<void, StarException> read(DataStream& ds, VersionNumber serializationVersion);
 
-  // Updates collision, clears cache, and if the collision kind does not
-  // support liquid destroys it.
-  bool updateCollision(CollisionKind kind);
-  // Used for setting the second collision kind calculated by object material spaces.
-  bool updateObjectCollision(CollisionKind kind);
+  // Update the stored input, returning whether the effective geometry changed.
+  bool update_collision(CollisionKind kind);
+  bool update_object_collision(CollisionKind kind);
 
   // Calculates the actually-used collision kind based on the tile and object collision kinds.
   CollisionKind getCollision() const;
@@ -274,7 +272,7 @@ inline WorldTile& WorldTile::operator=(WorldTile const& worldTile) {
   backgroundColorVariant = worldTile.backgroundColorVariant;
 
   // Don't bother copying collision cache
-  collisionCacheDirty = true;
+  collision_cache_dirty = true;
 
   collision = worldTile.collision;
   blockBiomeIndex = worldTile.blockBiomeIndex;

@@ -470,6 +470,52 @@ const GameTestRegistration alt_music_lifecycle("WorldClientTest", "AltMusicStopA
   EXPECT_FALSE(take_alt_voice()) << "The new world must not inherit the old playlist";
 });
 
+const GameTestRegistration prediction_liquid_update("WorldClientTest", "LiquidPacketPreservesPredictedTerrain", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  auto universe = TestUniverse::create(root, {100, 100});
+  ASSERT_TRUE(universe) << universe.error().what();
+  auto close = make_scope_exit([&] { EXPECT_TRUE((*universe)->close()); });
+  auto player = (*universe)->client()->mainPlayer();
+  auto uuid = player->uuid();
+  ASSERT_TRUE(uuid) << uuid.error().what();
+  ASSERT_TRUE((*universe)->warpPlayer(ClientShipWorldId(*uuid)));
+  auto world = (*universe)->worldClient();
+  ASSERT_TRUE(world);
+  auto materials = root.materialDatabase();
+  ASSERT_TRUE(materials) << materials.error().what();
+  auto dirt = (*materials)->materialId("dirt");
+  ASSERT_TRUE(dirt) << dirt.error().what();
+  // A local packet batch gives us a known loaded neighborhood, independently
+  // of the ship layout. No network tick can acknowledge our pending edit.
+  NetTile air;
+  air.background = *dirt;
+  air.foreground = EmptyMaterialId;
+  air.collision = CollisionKind::None;
+  air.dungeonId = no_dungeon_id;
+  auto patch = std::make_shared<TileArrayUpdatePacket>();
+  patch->min = {8, 8};
+  ASSERT_TRUE(patch->array.set_size({7, 7}, air));
+  ASSERT_TRUE(world->handleIncomingPackets({patch}));
+  Vec2I const position(11, 11);
+  auto change = world->applyTileModifications({{position, PlaceMaterial{TileLayer::Foreground, *dirt, 0, TileCollisionOverride::Block}}}, true);
+  ASSERT_TRUE(change) << change.error().what();
+  ASSERT_TRUE(change->empty());
+  auto inside = Vec2F(position) + Vec2F(0.625f, 0.625f);
+  auto cached = world->point_collision(inside);
+  ASSERT_TRUE(cached) << cached.error().what();
+  ASSERT_TRUE(*cached);
+
+  auto liquid = std::make_shared<TileLiquidUpdatePacket>(position, air.liquid);
+  auto neighbor = std::make_shared<TileUpdatePacket>();
+  neighbor->position = position + Vec2I(1, 0);
+  neighbor->tile = air;
+  neighbor->tile.collision = CollisionKind::Platform;
+  ASSERT_TRUE(world->handleIncomingPackets({liquid, neighbor}));
+  auto rebuilt = world->point_collision(inside);
+  ASSERT_TRUE(rebuilt) << rebuilt.error().what();
+  EXPECT_TRUE(*rebuilt) << "Neighbor refresh lost a foreground prediction after an unrelated liquid packet";
+});
+
 const GameTestRegistration signed_broadcast_lifecycle("RootTest", "SignedBroadcastPublicationAndKeyReplacement", [](GameTest& fixture) {
   auto& root = fixture.root();
   auto universe = TestUniverse::create(root, Vec2U(100, 100));

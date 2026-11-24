@@ -237,7 +237,7 @@ public:
   [[nodiscard]] std::expected<std::shared_ptr<Entity>, StarException> findEntityAtTile(Vec2I const& pos, EntityFilterOf<TileEntity> entityFilter) const override;
   [[nodiscard]] std::expected<bool, StarException> tileIsOccupied(Vec2I const& pos, TileLayer layer, bool includeEphemeral = false, bool checkCollision = false) const override;
   [[nodiscard]] std::expected<CollisionKind, StarException> tileCollisionKind(Vec2I const& pos) const override;
-  [[nodiscard]] std::expected<void, StarException> forEachCollisionBlock(RectI const& region, std::function<std::expected<void, StarException>(CollisionBlock const&)> const& iterator) const override;
+  [[nodiscard]] std::expected<bool, StarException> collision_blocks_satisfy(RectI const& region, std::function<std::expected<bool, StarException>(CollisionBlock const&)> const& predicate) const override;
   [[nodiscard]] std::expected<bool, StarException> isTileConnectable(Vec2I const& pos, TileLayer layer, bool tilesOnly = false) const override;
   [[nodiscard]] std::expected<bool, StarException> pointTileCollision(Vec2F const& point, CollisionSet const& collisionSet = DefaultCollisionSet) const override;
   [[nodiscard]] std::expected<bool, StarException> lineTileCollision(Vec2F const& begin, Vec2F const& end, CollisionSet const& collisionSet = DefaultCollisionSet) const override;
@@ -460,12 +460,12 @@ private:
 
   // Populates foregroundTransparent / backgroundTransparent flag on ClientTile
   // based on transparency rules.
-  [[nodiscard]] std::expected<bool, StarException> readNetTile(Vec2I const& pos, NetTile const& netTile, bool updateCollision = true);
-  void dirtyCollision(RectI const& region);
-  [[nodiscard]] std::expected<void, StarException> freshenCollision(RectI const& region);
+  [[nodiscard]] std::expected<bool, StarException> read_net_tile(Vec2I const& pos, NetTile const& net_tile, bool invalidate = true);
+  CollisionKind effective_collision(Vec2I const& pos, ClientTile const& tile) const;
+  void invalidate_prediction_change(Vec2I const& pos, std::optional<CollisionKind> before, std::optional<CollisionKind> after);
   [[nodiscard]] std::expected<void, StarException> renderCollisionDebug();
 
-  [[nodiscard]] std::expected<void, StarException> informTilePrediction(Vec2I const& pos, TileModification const& modification);
+  [[nodiscard]] std::expected<void, StarException> inform_tile_prediction(Vec2I const& pos, TileModification const& modification);
 
   void setTileProtection(DungeonId dungeonId, bool isProtected);
 
@@ -516,7 +516,7 @@ private:
 
   std::shared_ptr<Sky> m_sky;
 
-  CollisionGenerator m_collisionGenerator;
+  CollisionGenerator m_collision_generator;
 
   std::shared_ptr<WorldClientState> m_clientState;
   std::optional<ConnectionId> m_clientId;
@@ -594,7 +594,7 @@ private:
   std::shared_ptr<AmbientNoisesDescription const> m_alt_music_description;
 
   int m_modifiedTilePredictionTimeout;
-  HashMap<Vec2I, PredictedTile> m_predictedTiles;
+  HashMap<Vec2I, PredictedTile> m_predicted_tiles;
   HashSet<EntityId> m_startupHiddenEntities;
 
   HashMap<DungeonId, float> m_dungeonIdGravity;

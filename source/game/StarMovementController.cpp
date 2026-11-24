@@ -721,13 +721,13 @@ std::expected<void, StarException> MovementController::tickMaster(float dt) {
 
       RectF queryBounds = body.bounding_box().padded(maximumCorrection);
       queryBounds.combine(queryBounds.translated(movement));
-      if (auto result = queryCollisions(queryBounds); !result) return std::unexpected(std::move(result.error()));
-      auto result = collisionMove(m_workingCollisions, body, movement, ignorePlatforms, (*m_parameters.enableSurfaceSlopeCorrection) && !zeroG(),
+      if (auto result = query_collisions(queryBounds); !result) return std::unexpected(std::move(result.error()));
+      auto result = collision_move(m_working_collisions, body, movement, ignorePlatforms, (*m_parameters.enableSurfaceSlopeCorrection) && !zeroG(),
           maximumCorrection, maximumPlatformCorrection, bodyCenter, dtSteps);
 
       setPosition(position() + result.movement);
 
-      if (result.collisionKind == CollisionKind::Null) {
+      if (result.collision_kind == CollisionKind::Null) {
         m_nullColliding.set(true);
         break;
       } else {
@@ -737,16 +737,16 @@ std::expected<void, StarException> MovementController::tickMaster(float dt) {
       Vec2F correction = result.correction;
       Vec2F normCorrection = vnorm(correction);
 
-      m_surfaceSlope = result.groundSlope;
-      m_surfaceMovingCollision.set(result.surfaceMovingCollisionId);
+      m_surfaceSlope = result.ground_slope;
+      m_surfaceMovingCollision.set(result.surface_moving_collision_id);
       m_collisionCorrection += correction;
-      m_colliding.set(correction != Vec2F() || result.isStuck);
-      m_onGround.set(!zeroG() && result.onGround);
-      m_collisionStuck.set(result.isStuck);
+      m_colliding.set(correction != Vec2F() || result.is_stuck);
+      m_onGround.set(!zeroG() && result.on_ground);
+      m_collisionStuck.set(result.is_stuck);
 
       // If we have collided, apply either sticky or normal (bouncing) collision physics
       if (correction != Vec2F()) {
-        if ((*m_parameters.stickyCollision) && result.collisionKind != CollisionKind::Slippery) {
+        if ((*m_parameters.stickyCollision) && result.collision_kind != CollisionKind::Slippery) {
           // When sticking, cancel all velocity and apply stickyForce in the
           // opposite of the direction of collision correction.
           relativeVelocity = -normCorrection * (*m_parameters.stickyForce) / mass() * dtSteps;
@@ -792,8 +792,6 @@ std::expected<void, StarException> MovementController::tickMaster(float dt) {
     m_stickingDirection.set({});
   
   Vec2F newVelocity = relativeVelocity + m_surfaceVelocity;
-
-  PolyF body = collisionBody();
 
   if (auto result = updateLiquidPercentage(); !result) return std::unexpected(std::move(result.error()));
 
@@ -896,33 +894,32 @@ void MovementController::setIgnorePhysicsEntities(Set<EntityId> ignorePhysicsEnt
   m_ignorePhysicsEntities = std::move(ignorePhysicsEntities);
 }
 
-std::expected<void, StarException> MovementController::forEachMovingCollision(RectF const& region, std::function<std::expected<bool, StarException>(MovingCollisionId id, PhysicsMovingCollision, PolyF, RectF)> callback) {
-  auto activeWorld = world();
-  if (!activeWorld) return std::unexpected(std::move(activeWorld.error()));
-  World& worldRef = activeWorld->get();
-  auto geometry = worldRef.geometry();
-  auto physicsEntities = worldRef.query<PhysicsEntity>(region);
-  if (!physicsEntities) return std::unexpected(std::move(physicsEntities.error()));
-  for (auto& physicsEntity : *physicsEntities) {
-    if (m_ignorePhysicsEntities.contains(physicsEntity->entityId()))
+std::expected<void, StarException> MovementController::for_each_moving_collision(RectF const& region, MovingCollisionCallback const& callback) {
+  auto active_world = world();
+  if (!active_world) return std::unexpected(std::move(active_world.error()));
+  World& world_ref = active_world->get();
+  auto geometry = world_ref.geometry();
+  auto physics_entities = world_ref.query<PhysicsEntity>(region);
+  if (!physics_entities) return std::unexpected(std::move(physics_entities.error()));
+  static StringSet const empty_categories;
+  for (auto const& entity : *physics_entities) {
+    if (m_ignorePhysicsEntities.contains(entity->entityId()))
       continue;
-    for (std::size_t i = 0; i < physicsEntity->movingCollisionCount(); ++i) {
-      auto collisionResult = physicsEntity->movingCollision(i);
-      if (!collisionResult) return std::unexpected(std::move(collisionResult.error()));
-      if (auto mc = *collisionResult) {
-        if (mc->categoryFilter.check(m_parameters.physicsEffectCategories.value_or(StringSet{}))) {
-          PolyF poly = std::move(mc->collision);
-          poly.translate(geometry.nearest_to(region.min(), mc->position));
-          RectF polyBounds = poly.bounding_box();
-
-          if (region.intersects(polyBounds)) {
-            // early exit if the callback returns false
-            auto keepGoing = callback({physicsEntity->entityId(), i}, *mc, poly, polyBounds);
-            if (!keepGoing) return std::unexpected(std::move(keepGoing.error()));
-            if (!*keepGoing) return {};
-          }
-        }
-      }
+    for (std::size_t i = 0; i < entity->movingCollisionCount(); ++i) {
+      auto collision = entity->movingCollision(i);
+      if (!collision) return std::unexpected(std::move(collision.error()));
+      if (!*collision) continue;
+      auto& candidate = **collision;
+      auto const& categories = m_parameters.physicsEffectCategories;
+      if (!candidate.categoryFilter.check(categories ? *categories : empty_categories))
+        continue;
+      auto& poly = candidate.collision;
+      poly.translate(geometry.nearest_to(region.min(), candidate.position));
+      auto bounds = poly.bounding_box();
+      if (!region.intersects(bounds)) continue;
+      auto keep_going = callback({entity->entityId(), i}, candidate.collisionKind, std::move(poly), bounds);
+      if (!keep_going) return std::unexpected(std::move(keep_going.error()));
+      if (!*keep_going) return {};
     }
   }
   return {};
@@ -1062,234 +1059,218 @@ std::expected<std::reference_wrapper<World>, StarException> MovementController::
   return *m_world;
 }
 
-CollisionKind MovementController::maxOrNullCollision(CollisionKind a, CollisionKind b) {
+CollisionKind MovementController::max_or_null_collision(CollisionKind a, CollisionKind b) {
   if (a == CollisionKind::Null || b == CollisionKind::Null)
     return CollisionKind::Null;
   else
     return std::max(a, b);
 }
 
-MovementController::CollisionResult MovementController::collisionMove(List<CollisionPoly>& collisionPolys, PolyF const& body, Vec2F const& movement,
-    bool ignorePlatforms, bool enableSurfaceSlopeCorrection, float maximumCorrection, float maximumPlatformCorrection, Vec2F sortCenter, float dt) {
-  unsigned const MaximumSeparationLoops = 3;
-  float const SlideAngle = std::numbers::pi / 3;
-  float const SlideCorrectionLimit = 0.2f;
-  float separationTolerance = 0.001f * (dt * 60.f);
-  maximumPlatformCorrection *= (dt * 60.f);
+MovementController::CollisionResult MovementController::collision_move(List<CollisionPoly>& collision_polys, PolyF const& body, Vec2F const& movement,
+    bool ignore_platforms, bool enable_surface_slope_correction, float maximum_correction, float maximum_platform_correction, Vec2F sort_center, float dt) {
+  constexpr unsigned maximum_separation_loops = 3;
+  constexpr float slide_angle = std::numbers::pi / 3;
+  constexpr float slide_correction_limit = 0.2f;
+  float separation_tolerance = 0.001f * (dt * 60.f);
+  maximum_platform_correction *= (dt * 60.f);
 
   if (body.empty())
     return {movement, Vec2F(), {}, false, false, Vec2F(1, 0), CollisionKind::None};
 
   // The center and candidate positions stay fixed through all separation passes.
   // Cache their distances, but not an unstable sort's permutation of equal keys.
-  for (auto& cp : collisionPolys)
-    cp.sortDistance = vmag_squared(cp.sortPosition - sortCenter);
+  for (auto& cp : collision_polys)
+    cp.sort_distance = vmag_squared(cp.sort_position - sort_center);
 
-  PolyF translatedBody = body;
-  translatedBody.translate(movement);
-  PolyF checkBody = translatedBody;
-  Vec2F totalCorrection = Vec2F();
-  CollisionKind maxCollided = CollisionKind::None;
-  std::optional<MovingCollisionId> surfaceMovingCollisionId;
+  PolyF check_body = body;
+  check_body.translate(movement);
+  PolyF scratch;
+  Vec2F total_correction{};
+  CollisionKind max_collided = CollisionKind::None;
+  std::optional<MovingCollisionId> surface_moving_collision_id;
 
   CollisionSeparation separation = {};
-  bool firstSeparation = true;
-  std::optional<bool> repeatSort;
-  auto separate = [&](bool platformsIgnored, bool upward) {
-    bool sortRequired = std::exchange(firstSeparation, false);
-    if (!sortRequired) {
-      // Only inspect the sorted keys if a second pass is actually needed.
+  bool first_separation = true;
+  std::optional<bool> repeat_sort;
+  auto separate = [&](bool platforms_ignored, bool upward) {
+    bool sort_required = std::exchange(first_separation, false);
+    if (!sort_required) {
       // Strictly increasing keys have exactly one order. Ties and unordered
-      // comparisons must retain every legacy sort, including its tie reshuffle:
-      // contact corrections, moving-platform identity and ground slope use it.
-      if (!repeatSort.has_value()) {
-        repeatSort = std::adjacent_find(collisionPolys.begin(), collisionPolys.end(),
-                                        [](auto const& a, auto const& b) { return !(a.sortDistance < b.sortDistance); })
-          != collisionPolys.end();
+      // comparisons must retain every legacy sort, including its tie reshuffle.
+      if (!repeat_sort.has_value()) {
+        repeat_sort = std::adjacent_find(collision_polys.begin(), collision_polys.end(),
+            [](CollisionPoly const& a, CollisionPoly const& b) { return !(a.sort_distance < b.sort_distance); }) != collision_polys.end();
       }
-      sortRequired = *repeatSort;
+      sort_required = *repeat_sort;
     }
-    if (sortRequired) {
-      std::sort(collisionPolys.begin(), collisionPolys.end(),
-                [](auto const& a, auto const& b) { return a.sortDistance < b.sortDistance; });
+    if (sort_required) {
+      std::sort(collision_polys.begin(), collision_polys.end(),
+          [](CollisionPoly const& a, CollisionPoly const& b) { return a.sort_distance < b.sort_distance; });
     }
-    return collisionSeparate(collisionPolys, checkBody, platformsIgnored, maximumPlatformCorrection, upward,
-                             separationTolerance);
+    return collision_separate(collision_polys, check_body, platforms_ignored, maximum_platform_correction, upward,
+        separation_tolerance, scratch);
   };
 
-  if (enableSurfaceSlopeCorrection) {
-    // First try separating with our ground sliding cheat.
-    separation = separate(ignorePlatforms, true);
-    totalCorrection += separation.correction;
-    checkBody.translate(separation.correction);
-    maxCollided = maxOrNullCollision(maxCollided, separation.collisionKind);
-    surfaceMovingCollisionId = separation.movingCollisionId;
-    Vec2F upwardResult = movement + separation.correction;
-    float upMag = upwardResult.magnitude();
-    // Angle off of horizontal (minimum of either direction)
-    float angleHoriz = std::min(Vec2F(1, 0).angle_between_normalized(upwardResult / upMag),
-                                Vec2F(-1, 0).angle_between_normalized(upwardResult / upMag));
-
-    // We need to make sure that even if we found a solution with the sliding
-    // cheat, we are not beyond the angle and correction limits for the ground
-    // cheat correction.
-    if (separation.solutionFound)
-      separation.solutionFound = upMag < SlideCorrectionLimit || angleHoriz < SlideAngle;
-
-    if (separation.solutionFound) {
-      if (totalCorrection.magnitude() > maximumCorrection)
-        separation.solutionFound = false;
+  if (enable_surface_slope_correction) {
+    // Try separating upward first. Leave the translated body intact for the
+    // normal pass unless the slope correction is accepted.
+    separation = separate(ignore_platforms, true);
+    total_correction += separation.correction;
+    max_collided = max_or_null_collision(max_collided, separation.collision_kind);
+    surface_moving_collision_id = separation.moving_collision_id;
+    if (separation.solution_found) {
+      Vec2F upward_result = movement + separation.correction;
+      float up_mag = upward_result.magnitude();
+      if (!(up_mag < slide_correction_limit)) {
+        float angle_horiz = std::min(Vec2F(1, 0).angle_between_normalized(upward_result / up_mag),
+                                    Vec2F(-1, 0).angle_between_normalized(upward_result / up_mag));
+        separation.solution_found = angle_horiz < slide_angle;
+      }
+      if (separation.solution_found && total_correction.magnitude() > maximum_correction)
+        separation.solution_found = false;
+      if (separation.solution_found)
+        check_body.translate(separation.correction);
     }
   }
 
-  if (!separation.solutionFound) {
-    checkBody = translatedBody;
-    totalCorrection = Vec2F();
-    for (std::size_t i = 0; i < MaximumSeparationLoops; ++i) {
-      separation = separate(ignorePlatforms, false);
-      totalCorrection += separation.correction;
-      checkBody.translate(separation.correction);
-      maxCollided = maxOrNullCollision(maxCollided, separation.collisionKind);
-      surfaceMovingCollisionId = {};
+  if (!separation.solution_found) {
+    total_correction = Vec2F();
+    for (std::size_t i = 0; i < maximum_separation_loops; ++i) {
+      separation = separate(ignore_platforms, false);
+      total_correction += separation.correction;
+      check_body.translate(separation.correction);
+      max_collided = max_or_null_collision(max_collided, separation.collision_kind);
+      surface_moving_collision_id = {};
 
-      if (totalCorrection.magnitude() > maximumCorrection) {
-        separation.solutionFound = false;
+      if (total_correction.magnitude() > maximum_correction) {
+        separation.solution_found = false;
         break;
       }
-
-      if (separation.solutionFound)
+      if (separation.solution_found)
         break;
     }
   }
 
-  if (!separation.solutionFound && movement != Vec2F()) {
-    // No collision solution found! Move checkBody back to original body before
-    // applying movement and try one last time to correct.
-    checkBody = body;
-    totalCorrection = -movement;
-    for (std::size_t i = 0; i < MaximumSeparationLoops; ++i) {
+  if (!separation.solution_found && movement != Vec2F()) {
+    // Retry from the original body, ignoring platforms.
+    check_body = body;
+    total_correction = -movement;
+    for (std::size_t i = 0; i < maximum_separation_loops; ++i) {
       separation = separate(true, false);
-      totalCorrection += separation.correction;
-      checkBody.translate(separation.correction);
-      maxCollided = maxOrNullCollision(maxCollided, separation.collisionKind);
+      total_correction += separation.correction;
+      check_body.translate(separation.correction);
+      max_collided = max_or_null_collision(max_collided, separation.collision_kind);
 
-      if (totalCorrection.magnitude() > maximumCorrection) {
-        separation.solutionFound = false;
+      if (total_correction.magnitude() > maximum_correction) {
+        separation.solution_found = false;
         break;
       }
-
-      if (separation.solutionFound)
+      if (separation.solution_found)
         break;
     }
   }
 
-  if (separation.solutionFound) {
-    CollisionResult result;
-    result.movement = movement + totalCorrection;
-    result.correction = totalCorrection;
-    result.isStuck = false;
-    result.onGround = result.correction[1] > separationTolerance;
-    result.surfaceMovingCollisionId = surfaceMovingCollisionId;
-    result.collisionKind = maxCollided;
-    result.groundSlope = Vec2F(1, 0);
-    if (result.onGround) {
-      // If we are on the ground and need to find the ground slope, look for a
-      // vertex on the body being moved that is touching an edge of one of the
-      // collision polys.  We only want a slope to be produced from an edge of
-      // colision geometry, not an edge of the colliding body.  Pick the
-      // touching edge that is the most horizontally overlapped with the
-      // geometry, rather than off to the side.
-      float maxSideHorizontalOverlap = 0.0f;
-      RectF touchingBounds = checkBody.bounding_box();
-      touchingBounds.pad(separationTolerance);
-      for (auto const& cp : collisionPolys) {
-        if (!cp.polyBounds.intersects(touchingBounds))
-          continue;
+  if (!separation.solution_found)
+    return {Vec2F(), -movement, {}, true, true, Vec2F(1, 0), max_collided};
 
-        for (std::size_t i = 0; i < cp.poly.sides(); ++i) {
-          auto side = cp.poly.side(i);
-          RectF sideBounds = RectF::bound_box_of(side.min(), side.max());
-          float thisSideHorizontalOverlap = sideBounds.overlap(touchingBounds).width();
+  CollisionResult result;
+  result.movement = movement + total_correction;
+  result.correction = total_correction;
+  result.on_ground = result.correction[1] > separation_tolerance;
+  result.surface_moving_collision_id = surface_moving_collision_id;
+  result.collision_kind = max_collided;
+  result.ground_slope = Vec2F(1, 0);
+  if (result.on_ground) {
+    // Ground slope comes from the touching terrain edge with the greatest
+    // horizontal overlap, not from an edge of the moving body.
+    float max_side_horizontal_overlap = 0.0f;
+    RectF touching_bounds = check_body.bounding_box();
+    touching_bounds.pad(separation_tolerance);
+    for (auto const& cp : collision_polys) {
+      if (!cp.poly_bounds.intersects(touching_bounds))
+        continue;
 
-          if (thisSideHorizontalOverlap > maxSideHorizontalOverlap) {
-            for (auto const& bodyVertex : checkBody) {
-              float t = std::clamp(side.line_projection(bodyVertex), 0.0f, 1.0f);
-              Vec2F nearPoint = side.eval(t);
-              if (nearPoint[1] > cp.sortPosition[1]) {
-                if (vmag_squared(bodyVertex - nearPoint) <= square(separationTolerance)) {
-                  maxSideHorizontalOverlap = thisSideHorizontalOverlap;
-                  result.groundSlope = side.diff().normalized();
-                  if (result.groundSlope[0] < 0)
-                    result.groundSlope *= -1;
-                }
+      for (std::size_t i = 0; i < cp.poly.sides(); ++i) {
+        auto side = cp.poly.side(i);
+        RectF side_bounds = RectF::bound_box_of(side.min(), side.max());
+        float side_horizontal_overlap = side_bounds.overlap(touching_bounds).width();
+        if (side_horizontal_overlap > max_side_horizontal_overlap) {
+          for (auto const& body_vertex : check_body) {
+            float t = std::clamp(side.line_projection(body_vertex), 0.0f, 1.0f);
+            Vec2F near_point = side.eval(t);
+            if (near_point[1] > cp.sort_position[1]) {
+              // Keep the original vertex walk: an early break changes Release
+              // vectorization and the published slope by one ULP on flat edges.
+              if (vmag_squared(body_vertex - near_point) <= square(separation_tolerance)) {
+                max_side_horizontal_overlap = side_horizontal_overlap;
+                result.ground_slope = side.diff().normalized();
+                if (result.ground_slope[0] < 0)
+                  result.ground_slope *= -1;
               }
             }
           }
         }
       }
     }
-
-    return result;
-  } else {
-    return {Vec2F(), -movement, {}, true, true, Vec2F(1, 0), maxCollided};
   }
+  return result;
 }
 
-MovementController::CollisionSeparation MovementController::collisionSeparate(List<CollisionPoly> const& collisionPolys,
-                                                                              PolyF const& poly, bool ignorePlatforms,
-                                                                              float maximumPlatformCorrection,
-                                                                              bool upward, float separationTolerance) {
-
+MovementController::CollisionSeparation MovementController::collision_separate(List<CollisionPoly> const& collision_polys,
+    PolyF const& poly, bool ignore_platforms, float maximum_platform_correction, bool upward, float separation_tolerance, PolyF& scratch) {
   CollisionSeparation separation = {};
-  separation.collisionKind = CollisionKind::None;
-  bool intersects = false;
+  separation.collision_kind = CollisionKind::None;
+  separation.solution_found = true;
+  if (collision_polys.empty())
+    return separation;
 
-  PolyF::IntersectResult intersectResult;
-  PolyF correctedPoly = poly;
-  RectF correctedBoundBox = correctedPoly.bounding_box();
-  for (auto const& cp : collisionPolys) {
-    if ((ignorePlatforms && cp.collisionKind == CollisionKind::Platform) || !correctedBoundBox.intersects(cp.polyBounds, false))
+  bool corrected = false;
+  RectF corrected_bounds = poly.bounding_box();
+  for (auto const& cp : collision_polys) {
+    if ((ignore_platforms && cp.collision_kind == CollisionKind::Platform) || !corrected_bounds.intersects(cp.poly_bounds, false))
       continue;
 
+    auto const& current = corrected ? scratch : poly;
+    PolyF::IntersectResult hit;
     if (upward)
-      intersectResult = correctedPoly.directional_sat_intersection(cp.poly, Vec2F(0, 1), false);
-    else if (cp.collisionKind == CollisionKind::Platform)
-      intersectResult = correctedPoly.directional_sat_intersection(cp.poly, Vec2F(0, 1), true);
+      hit = current.directional_sat_intersection(cp.poly, Vec2F(0, 1), false);
+    else if (cp.collision_kind == CollisionKind::Platform)
+      hit = current.directional_sat_intersection(cp.poly, Vec2F(0, 1), true);
     else
-      intersectResult = correctedPoly.sat_intersection(cp.poly);
+      hit = current.sat_intersection(cp.poly);
 
-    if (cp.collisionKind == CollisionKind::Platform && intersectResult.intersects) {
-      if (intersectResult.overlap[1] <= 0 || intersectResult.overlap[1] > maximumPlatformCorrection)
-        intersectResult.intersects = false;
-    }
+    if (!hit.intersects || (cp.collision_kind == CollisionKind::Platform
+        && (hit.overlap[1] <= 0 || hit.overlap[1] > maximum_platform_correction)))
+      continue;
 
-    if (intersectResult.intersects) {
-      intersects = true;
-      correctedPoly.translate(intersectResult.overlap);
-      correctedBoundBox = correctedPoly.bounding_box();
-      separation.correction += intersectResult.overlap;
-      if (cp.movingCollisionId)
-        separation.movingCollisionId = cp.movingCollisionId;
-      separation.collisionKind = maxOrNullCollision(separation.collisionKind, cp.collisionKind);
+    // Copy only at the first accepted correction, reusing capacity from any
+    // previous pass. The caller moves its body once by the accumulated vector;
+    // this scratch must instead receive each individual overlap in order.
+    if (!corrected) {
+      scratch = poly;
+      corrected = true;
     }
+    scratch.translate(hit.overlap);
+    corrected_bounds = scratch.bounding_box();
+    separation.correction += hit.overlap;
+    if (cp.moving_collision_id)
+      separation.moving_collision_id = cp.moving_collision_id;
+    separation.collision_kind = max_or_null_collision(separation.collision_kind, cp.collision_kind);
   }
 
-  separation.solutionFound = true;
-  float separationToleranceSquared = square(separationTolerance);
-  if (intersects) {
-    for (auto const& cp : collisionPolys) {
-      if (cp.collisionKind == CollisionKind::Platform || !correctedBoundBox.intersects(cp.polyBounds, false))
+  if (corrected) {
+    float separation_tolerance_squared = square(separation_tolerance);
+    for (auto const& cp : collision_polys) {
+      if (cp.collision_kind == CollisionKind::Platform || !corrected_bounds.intersects(cp.poly_bounds, false))
         continue;
-
-      intersectResult = correctedPoly.sat_intersection(cp.poly);
-      if (intersectResult.intersects && intersectResult.overlap.magnitude_squared() > separationToleranceSquared) {
-        separation.collisionKind = maxOrNullCollision(separation.collisionKind, cp.collisionKind);
-        separation.solutionFound = false;
+      auto hit = scratch.sat_intersection(cp.poly);
+      if (hit.intersects && hit.overlap.magnitude_squared() > separation_tolerance_squared) {
+        separation.collision_kind = max_or_null_collision(separation.collision_kind, cp.collision_kind);
+        separation.solution_found = false;
         break;
       }
     }
   }
-
   return separation;
 }
 
@@ -1340,59 +1321,46 @@ void MovementController::updatePositionInterpolators() {
     });
 }
 
-std::expected<void, StarException> MovementController::queryCollisions(RectF const& region) {
-  auto activeWorld = world();
-  if (!activeWorld) return std::unexpected(std::move(activeWorld.error()));
-  World& worldRef = activeWorld->get();
-  while (!m_workingCollisions.empty()) {
-    m_collisionBuffers.push_back(std::move(m_workingCollisions.back().poly));
-    m_workingCollisions.pop_back();
+std::expected<void, StarException> MovementController::query_collisions(RectF const& region) {
+  auto active_world = world();
+  if (!active_world) return std::unexpected(std::move(active_world.error()));
+  World& world_ref = active_world->get();
+  while (!m_working_collisions.empty()) {
+    auto& candidate = m_working_collisions.back();
+    if (!candidate.moving_collision_id)
+      m_collision_buffers.push_back(std::move(candidate.poly));
+    m_working_collisions.pop_back();
   }
 
-  auto newCollisionPoly = [&collisionBuffers = m_collisionBuffers, &workingCollisions = m_workingCollisions]() -> CollisionPoly& {
-    if (!collisionBuffers.empty()) {
-      auto poly = std::move(collisionBuffers.back());
-      collisionBuffers.pop_back();
-      return workingCollisions.emplace_back(CollisionPoly{std::move(poly), {}, {}, {}, {}, {}});
-    }
-    else
-      return workingCollisions.emplace_back(CollisionPoly{});
-  };
-
-  auto geometry = worldRef.geometry();
-
-  auto blocks = worldRef.forEachCollisionBlock(RectI::integral(region.padded(1)), [&](CollisionBlock const& block) -> std::expected<void, StarException> {
-      if (block.kind != CollisionKind::None && !block.poly.empty()) {
-        RectF polyBounds = block.polyBounds;
-        Vec2F basePosition = block.poly.vertex(0);
-        Vec2F nearTranslation = geometry.nearest_to(region.min(), basePosition) - basePosition;
-        polyBounds.translate(nearTranslation);
-
-        if (region.intersects(polyBounds)) {
-          CollisionPoly& collisionPoly = newCollisionPoly();
-          collisionPoly.poly = block.poly;
-          collisionPoly.poly.translate(nearTranslation);
-          collisionPoly.polyBounds = polyBounds;
-          collisionPoly.sortPosition = center_of_tile(block.space);
-          collisionPoly.movingCollisionId = {};
-          collisionPoly.collisionKind = block.kind;
-        }
-      }
+  auto geometry = world_ref.geometry();
+  auto blocks = world_ref.for_each_collision_block(RectI::integral(region.padded(1)), [&](CollisionBlock const& block) -> std::expected<void, StarException> {
+    if (block.kind == CollisionKind::None || block.poly.empty())
       return {};
-    });
+    RectF bounds = block.poly_bounds;
+    Vec2F base_position = block.poly.vertex(0);
+    Vec2F translation = geometry.nearest_to(region.min(), base_position) - base_position;
+    bounds.translate(translation);
+    if (region.intersects(bounds)) {
+      auto& candidate = m_working_collisions.emplace_back();
+      if (!m_collision_buffers.empty()) {
+        candidate.poly = std::move(m_collision_buffers.back());
+        m_collision_buffers.pop_back();
+      }
+      candidate.poly = block.poly;
+      candidate.poly.translate(translation);
+      candidate.poly_bounds = bounds;
+      candidate.sort_position = center_of_tile(block.space);
+      candidate.collision_kind = block.kind;
+    }
+    return {};
+  });
   if (!blocks) return std::unexpected(std::move(blocks.error()));
 
-  auto moving = forEachMovingCollision(region, [&](MovingCollisionId id, PhysicsMovingCollision mc, PolyF poly, RectF bounds) -> std::expected<bool, StarException> {
-    CollisionPoly& collisionPoly = newCollisionPoly();
-    collisionPoly.poly = std::move(poly);
-    collisionPoly.polyBounds = bounds;
-    collisionPoly.sortPosition = collisionPoly.poly.center();
-    collisionPoly.movingCollisionId = id;
-    collisionPoly.collisionKind = mc.collisionKind;
+  return for_each_moving_collision(region, [&](MovingCollisionId id, CollisionKind kind, PolyF&& poly, RectF const& bounds) -> std::expected<bool, StarException> {
+    auto center = poly.center();
+    m_working_collisions.emplace_back(CollisionPoly{std::move(poly), bounds, center, id, kind, {}});
     return true;
   });
-  if (!moving) return std::unexpected(std::move(moving.error()));
-  return {};
 }
 
 std::expected<float, StarException> MovementController::gravity() {

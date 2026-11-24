@@ -252,7 +252,7 @@ public:
   [[nodiscard]] std::expected<std::shared_ptr<Entity>, StarException> findEntityAtTile(Vec2I const& pos, EntityFilterOf<TileEntity> entityFilter) const override;
   [[nodiscard]] std::expected<bool, StarException> tileIsOccupied(Vec2I const& pos, TileLayer layer, bool includeEphemeral = false, bool checkCollision = false) const override;
   [[nodiscard]] std::expected<CollisionKind, StarException> tileCollisionKind(Vec2I const& pos) const override;
-  [[nodiscard]] std::expected<void, StarException> forEachCollisionBlock(RectI const& region, std::function<std::expected<void, StarException>(CollisionBlock const&)> const& iterator) const override;
+  [[nodiscard]] std::expected<bool, StarException> collision_blocks_satisfy(RectI const& region, std::function<std::expected<bool, StarException>(CollisionBlock const&)> const& predicate) const override;
   [[nodiscard]] std::expected<bool, StarException> isTileConnectable(Vec2I const& pos, TileLayer layer, bool tilesOnly = false) const override;
   [[nodiscard]] std::expected<bool, StarException> pointTileCollision(Vec2F const& point, CollisionSet const& collisionSet = DefaultCollisionSet) const override;
   [[nodiscard]] std::expected<bool, StarException> lineTileCollision(Vec2F const& begin, Vec2F const& end, CollisionSet const& collisionSet = DefaultCollisionSet) const override;
@@ -471,8 +471,6 @@ private:
   [[nodiscard]] std::expected<void, StarException> queueTileDamageUpdates(Vec2I const& pos, TileLayer layer);
   [[nodiscard]] std::expected<void, StarException> writeNetTile(Vec2I const& pos, NetTile& netTile) const;
 
-  [[nodiscard]] std::expected<void, StarException> dirtyCollision(RectI const& region);
-  [[nodiscard]] std::expected<void, StarException> freshenCollision(RectI const& region);
 
   [[nodiscard]] std::expected<Vec2F, StarException> findPlayerStart(std::optional<Vec2F> firstTry = {});
   [[nodiscard]] std::expected<Vec2F, StarException> findPlayerSpaceStart(float targetX);
@@ -534,8 +532,7 @@ private:
 
   std::shared_ptr<Clock> m_referenceClock;
 
-  CollisionGenerator m_collisionGenerator;
-  List<CollisionBlock> m_workingCollisionBlocks;
+  CollisionGenerator m_collision_generator;
 
   HashMap<NetCompatibilityRules, HashMap<std::pair<EntityId, std::uint64_t>, std::pair<ByteArray, std::uint64_t>>> m_netStateCache;
   OrderedHashMap<ConnectionId, std::shared_ptr<ClientInfo>> m_clientInfo;

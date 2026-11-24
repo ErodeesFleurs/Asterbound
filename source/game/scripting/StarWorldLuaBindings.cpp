@@ -272,9 +272,8 @@ namespace LuaBindings {
     [[nodiscard]] std::expected<bool, StarException> line_tile_collision(World& world, Vec2F const& begin, Vec2F const& end, std::optional<CollisionSet> const& collision_set);
     [[nodiscard]] std::expected<std::optional<std::pair<Vec2F, Vec2I>>, StarException> line_tile_collision_point(World& world, Vec2F const& begin, Vec2F const& end, std::optional<CollisionSet> const& collision_set);
     [[nodiscard]] std::expected<bool, StarException> rectTileCollision(World& world, RectF const& arg1, std::optional<CollisionSet> const& arg2);
-    [[nodiscard]] std::expected<bool, StarException> pointCollision(World& world, Vec2F const& point, std::optional<CollisionSet> const& collisionSet);
-    [[nodiscard]] std::expected<LuaTupleReturn<std::optional<Vec2F>, std::optional<Vec2F>>, StarException> lineCollision(World& world, Vec2F const& start, Vec2F const& end, std::optional<CollisionSet> const& maybeCollisionSet);
-    [[nodiscard]] std::expected<bool, StarException> polyCollision(World& world, PolyF const& arg1, std::optional<Vec2F> const& arg2, std::optional<CollisionSet> const& arg3);
+    [[nodiscard]] std::expected<LuaTupleReturn<std::optional<Vec2F>, std::optional<Vec2F>>, StarException> line_collision(World& world, Vec2F const& start, Vec2F const& end, std::optional<CollisionSet> const& kinds);
+    [[nodiscard]] std::expected<bool, StarException> poly_collision(World& world, PolyF const& poly, std::optional<Vec2F> const& offset, std::optional<CollisionSet> const& kinds);
     [[nodiscard]] std::expected<List<Vec2I>, StarException> collision_blocks_along_line(World& world, Vec2F const& begin, Vec2F const& end, std::optional<CollisionSet> const& collision_set, std::optional<int> const& max_size);
     [[nodiscard]] std::expected<std::optional<Vec2F>, StarException> resolvePolyCollision(World& world, PolyF poly, Vec2F const& position, float maximumCorrection, std::optional<CollisionSet> const& collisionSet);
   }
@@ -2241,7 +2240,7 @@ namespace LuaBindings {
     if (auto result = callbacks.register_callback_with_signature<bool, Vec2F, std::optional<CollisionSet>>(
           "pointCollision",
           [&world](Vec2F const& point, std::optional<CollisionSet> const& kinds) {
-            return WorldCollisionCallbacks::pointCollision(world, point, kinds);
+            return world.point_collision(point, kinds.value_or(DefaultCollisionSet));
           });
         !result)
       return std::unexpected(std::move(result.error()));
@@ -2250,7 +2249,7 @@ namespace LuaBindings {
                                                   Vec2F, std::optional<CollisionSet>>(
             "lineCollision",
             [&world](Vec2F const& start, Vec2F const& end, std::optional<CollisionSet> const& kinds) {
-              return WorldCollisionCallbacks::lineCollision(world, start, end, kinds);
+              return WorldCollisionCallbacks::line_collision(world, start, end, kinds);
             });
         !result)
       return std::unexpected(std::move(result.error()));
@@ -2259,7 +2258,7 @@ namespace LuaBindings {
             "polyCollision",
             [&world](PolyF const& poly, std::optional<Vec2F> const& position,
                      std::optional<CollisionSet> const& kinds) {
-              return WorldCollisionCallbacks::polyCollision(world, poly, position, kinds);
+              return WorldCollisionCallbacks::poly_collision(world, poly, position, kinds);
             });
         !result)
       return std::unexpected(std::move(result.error()));
@@ -2339,10 +2338,7 @@ namespace LuaBindings {
   std::expected<bool, StarException> WorldCollisionCallbacks::rectCollision(World& world, RectF const& arg1, std::optional<CollisionSet> const& arg2) {
     PolyF body = PolyF(arg1);
 
-    if (arg2)
-      return world.polyCollision(body, *arg2);
-    else
-      return world.polyCollision(body);
+    return world.poly_collision(body, arg2.value_or(DefaultCollisionSet));
   }
 
   std::expected<bool, StarException> WorldCollisionCallbacks::pointTileCollision(World& world, Vec2F const& arg1, std::optional<CollisionSet> const& arg2) {
@@ -2371,38 +2367,24 @@ namespace LuaBindings {
       return world.rectTileCollision(region);
   }
 
-  std::expected<bool, StarException> WorldCollisionCallbacks::pointCollision(World& world, Vec2F const& point, std::optional<CollisionSet> const& collisionSet) {
-    return world.pointCollision(point, collisionSet.value_or(DefaultCollisionSet));
+  std::expected<LuaTupleReturn<std::optional<Vec2F>, std::optional<Vec2F>>, StarException> WorldCollisionCallbacks::line_collision(
+      World& world, Vec2F const& start, Vec2F const& end, std::optional<CollisionSet> const& kinds) {
+    auto hit = world.line_collision(Line2F(start, end), kinds.value_or(DefaultCollisionSet));
+    if (!hit)
+      return std::unexpected(std::move(hit.error()));
+    if (*hit)
+      return lua_tuple_return(std::optional<Vec2F>((*hit)->first), (*hit)->second);
+    return lua_tuple_return(std::optional<Vec2F>{}, std::optional<Vec2F>{});
   }
 
-  std::expected<LuaTupleReturn<std::optional<Vec2F>, std::optional<Vec2F>>, StarException> WorldCollisionCallbacks::lineCollision(World& world, Vec2F const& start, Vec2F const& end, std::optional<CollisionSet> const& collisionSet) {
-    std::optional<Vec2F> point;
-    std::optional<Vec2F> normal;
-    auto collisionResult = world.lineCollision(Line2F(start, end), collisionSet.value_or(DefaultCollisionSet));
-    if (!collisionResult)
-      return std::unexpected(std::move(collisionResult.error()));
-    auto collision = std::move(*collisionResult);
-    if (collision) {
-      point = collision->first;
-      normal = collision->second;
-    }
-    return lua_tuple_return(point, normal);
-  }
-
-  std::expected<bool, StarException> WorldCollisionCallbacks::polyCollision(
-      World& world, PolyF const& arg1, std::optional<Vec2F> const& arg2, std::optional<CollisionSet> const& arg3) {
-    PolyF body = arg1;
-
-    Vec2F center;
-    if (arg2) {
-      center = *arg2;
-      body.translate(center);
-    }
-
-    if (arg3)
-      return world.polyCollision(body, *arg3);
-    else
-      return world.polyCollision(body);
+  std::expected<bool, StarException> WorldCollisionCallbacks::poly_collision(
+      World& world, PolyF const& poly, std::optional<Vec2F> const& offset, std::optional<CollisionSet> const& kinds) {
+    auto collision_set = kinds.value_or(DefaultCollisionSet);
+    if (!offset)
+      return world.poly_collision(poly, collision_set);
+    PolyF translated = poly;
+    translated.translate(*offset);
+    return world.poly_collision(translated, collision_set);
   }
 
   std::expected<List<Vec2I>, StarException> WorldCollisionCallbacks::collision_blocks_along_line(
@@ -2421,7 +2403,7 @@ namespace LuaBindings {
     poly.translate(position);
     List<CollisionPoly> collisions;
     CollisionSet collisionSet = maybeCollisionSet.value_or(DefaultCollisionSet);
-    auto blocksResult = world.forEachCollisionBlock(RectI::integral(poly.bounding_box().padded(maximumCorrection + 1.0f)),
+    auto blocksResult = world.for_each_collision_block(RectI::integral(poly.bounding_box().padded(maximumCorrection + 1.0f)),
         [&](auto const& block) -> std::expected<void, StarException> {
           if (collisionSet.contains(block.kind))
             collisions.push_back({block.poly, Vec2F(block.space), 0.0f});

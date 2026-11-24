@@ -131,7 +131,17 @@ public:
   // Iterate over the collision block for each tile in the region.  Collision
   // polys for tiles can extend to a maximum of 1 tile outside of the natural
   // tile bounds.
-  [[nodiscard]] virtual std::expected<void, StarException> forEachCollisionBlock(RectI const& region, std::function<std::expected<void, StarException>(CollisionBlock const&)> const& iterator) const = 0;
+  [[nodiscard]] virtual std::expected<bool, StarException> collision_blocks_satisfy(RectI const& region, std::function<std::expected<bool, StarException>(CollisionBlock const&)> const& predicate) const = 0;
+  template <typename Visitor> requires std::invocable<Visitor&, CollisionBlock const&>
+      && std::same_as<std::invoke_result_t<Visitor&, CollisionBlock const&>, std::expected<void, StarException>>
+  [[nodiscard]] std::expected<void, StarException> for_each_collision_block(RectI const& region, Visitor&& visitor) const {
+    auto scanned = collision_blocks_satisfy(region, [&](CollisionBlock const& block) -> std::expected<bool, StarException> {
+      if (auto result = std::invoke(visitor, block); !result) return std::unexpected(std::move(result.error()));
+      return false;
+    });
+    if (!scanned) return std::unexpected(std::move(scanned.error()));
+    return {};
+  }
 
   // Is there some connectable tile / tile based entity in this position?  If
   // tilesOnly is true, only checks to see whether that tile is a connectable
@@ -218,19 +228,19 @@ public:
 
   [[nodiscard]] std::expected<TileDamageResult, StarException> damageTile(Vec2I const& tilePosition, TileLayer layer, Vec2F const& sourcePosition, TileDamage const& tileDamage, std::optional<EntityId> sourceEntity = {});
 
-  // Returns closest entity for which lineCollision between the given center
+  // Returns closest entity for which line_collision between the given center
   // position and the entity position returns false.
   [[nodiscard]] std::expected<std::shared_ptr<Entity>, StarException> closestEntityInSight(Vec2F const& center, float radius, CollisionSet const& collisionSet = DefaultCollisionSet, EntityFilter selector = {}) const;
 
   // Returns whether point collides with any collision geometry.
-  [[nodiscard]] std::expected<bool, StarException> pointCollision(Vec2F const& point, CollisionSet const& collisionSet = DefaultCollisionSet) const;
+  [[nodiscard]] std::expected<bool, StarException> point_collision(Vec2F const& point, CollisionSet const& collision_set = DefaultCollisionSet) const;
 
   // Returns first point along line that collides with any collision geometry, along
   // with the normal of the intersected line, if any.
-  [[nodiscard]] std::expected<std::optional<std::pair<Vec2F, std::optional<Vec2F>>>, StarException> lineCollision(Line2F const& line, CollisionSet const& collisionSet = DefaultCollisionSet) const;
+  [[nodiscard]] std::expected<std::optional<std::pair<Vec2F, std::optional<Vec2F>>>, StarException> line_collision(Line2F const& line, CollisionSet const& collision_set = DefaultCollisionSet) const;
 
   // Returns whether poly collides with any collision geometry.
-  [[nodiscard]] std::expected<bool, StarException> polyCollision(PolyF const& poly, CollisionSet const& collisionSet = DefaultCollisionSet) const;
+  [[nodiscard]] std::expected<bool, StarException> poly_collision(PolyF const& poly, CollisionSet const& collision_set = DefaultCollisionSet) const;
 
   // Helper template methods.  Only queries entities of the given template
   // type, and casts them to the appropriate pointer type.

@@ -201,7 +201,7 @@ std::expected<std::optional<bool>, StarException> PathFinder::explore(std::optio
     Vec2F back_ground_pos = direction < 0 ? Vec2F(bounds.x_max(), bounds.y_min()) : Vec2F(bounds.x_min(), bounds.y_min());
     RectI tile_bounds = RectI::integral(bounds);
     RectI ground_rect(Vec2I(tile_bounds.x_min(), tile_bounds.y_min() - 1), Vec2I(tile_bounds.x_max(), tile_bounds.y_min()));
-    auto collision_scan = m_world.get().forEachCollisionBlock(
+    auto collision_scan = m_world.get().for_each_collision_block(
       ground_rect.padded(1),
       [&, &world = m_world.get()](CollisionBlock const& block) -> std::expected<void, StarException> {
         if (slope_up || slope_down)

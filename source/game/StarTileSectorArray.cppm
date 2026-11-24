@@ -224,6 +224,39 @@ public:
     return {};
   }
 
+  // Visit each loaded sector window once. Local bounds index the borrowed
+  // sector; source_min retains query-space coordinates across the seam.
+  template <typename Function>
+    requires std::invocable<Function&, Array&, RectI const&, Vec2I const&>
+        && (std::same_as<std::invoke_result_t<Function&, Array&, RectI const&, Vec2I const&>, void>
+            || std::same_as<std::invoke_result_t<Function&, Array&, RectI const&, Vec2I const&>, std::expected<void, StarException>>)
+  auto visit_loaded_sectors(RectI const& region, Function&& function)
+      -> std::invoke_result_t<Function&, Array&, RectI const&, Vec2I const&> {
+    using Result = std::invoke_result_t<Function&, Array&, RectI const&, Vec2I const&>;
+    for (auto const split : split_rects(y_clamp_rect(region))) {
+      auto const& rect = split.rect;
+      if (rect.is_empty()) continue;
+      auto first = SectorArray::sector_for(rect.x_min(), rect.y_min());
+      auto last = SectorArray::sector_for(rect.x_max() - 1, rect.y_max() - 1);
+      for (std::size_t x = first[0]; x <= last[0]; ++x) {
+        for (std::size_t y = first[1]; y <= last[1]; ++y) {
+          auto sector = m_tile_sectors.sector({x, y});
+          if (!sector) continue;
+          auto corner = Vec2I(SectorArray::sector_corner({x, y}));
+          auto local = rect.translated(-corner);
+          RectI const window(std::max(local.x_min(), 0), std::max(local.y_min(), 0),
+              std::min(local.x_max(), static_cast<int>(sector_size)), std::min(local.y_max(), static_cast<int>(sector_size)));
+          Vec2I const source_min(split.source_x(corner[0] + window.x_min()), corner[1] + window.y_min());
+          if constexpr (std::is_void_v<Result>)
+            std::invoke(function, sector->get(), window, source_min);
+          else if (auto result = std::invoke(function, sector->get(), window, source_min); !result)
+            return result;
+        }
+      }
+    }
+    if constexpr (!std::is_void_v<Result>) return {};
+  }
+
   template <typename Function> requires tile_array_callback<Function, Tile&>
   [[nodiscard]] std::expected<void, StarException> tile_eval(RectI const& region, Function&& function) {
     for (auto const split : split_rects(region)) {

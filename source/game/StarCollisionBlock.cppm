@@ -86,12 +86,12 @@ CollisionKind maxCollision(CollisionKind first, CollisionKind second);
 
 struct CollisionBlock {
   // Make a null collision block for the given space.
-  static CollisionBlock nullBlock(Vec2I const& space);
+  static CollisionBlock null_block(Vec2I const& space);
 
   CollisionKind kind;
   Vec2I space;
   PolyF poly;
-  RectF polyBounds;
+  RectF poly_bounds;
 };
 
 inline CollisionSet::CollisionSet()
@@ -130,18 +130,11 @@ inline CollisionKind maxCollision(CollisionKind first, CollisionKind second) {
   return std::max(first, second);
 }
 
-inline CollisionBlock CollisionBlock::nullBlock(Vec2I const& space) {
-  CollisionBlock block;
-  block.kind = CollisionKind::Null;
-  block.space = space;
-  block.poly = {
-    Vec2F(space) + Vec2F(0, 0),
-    Vec2F(space) + Vec2F(1, 0),
-    Vec2F(space) + Vec2F(1, 1),
-    Vec2F(space) + Vec2F(0, 1)
-  };
-  block.polyBounds = RectF::with_size(Vec2F(space), Vec2F(1, 1));
-  return block;
+inline CollisionBlock CollisionBlock::null_block(Vec2I const& space) {
+  Vec2F const origin(space);
+  return {CollisionKind::Null, space,
+          {origin + Vec2F(0, 0), origin + Vec2F(1, 0), origin + Vec2F(1, 1), origin + Vec2F(0, 1)},
+          RectF::with_size(origin, Vec2F(1, 1))};
 }
 
 }

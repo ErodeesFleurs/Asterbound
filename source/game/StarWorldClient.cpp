@@ -295,15 +295,8 @@ std::expected<void, StarException> WorldClient::initialize(std::shared_ptr<Playe
 
   centerClientWindowOnPlayer(Vec2U(100, 100));
   
-  m_collisionGenerator.init([&self = *this](int x, int y)  -> std::expected<CollisionKind, StarException> {
-    if (!self.m_predictedTiles.empty()) {
-      if (auto p = self.m_predictedTiles.find_ref({x, y})) {
-        if (p->get().collision) {
-          return *p->get().collision;
-        }
-      }
-    }
-    return self.m_tileArray->tile({x, y}).collision;
+  m_collision_generator.init([&self = *this](int x, int y) -> std::expected<CollisionKind, StarException> {
+    return self.effective_collision({x, y}, self.m_tileArray->tile({x, y}));
   });
   
   auto result7 = m_clientConfig.get_float("modifiedTilePredictionTimeout");
@@ -466,15 +459,8 @@ std::expected<void, StarException> WorldClient::initialize(ClientSubWorldId subW
   m_luaRoot->add_callbacks("universe", m_luaThreadCallbacks["universe"]);
   m_luaRoot->add_callbacks("celestial", m_luaThreadCallbacks["celestial"]);
   
-  m_collisionGenerator.init([&self = *this](int x, int y)  -> std::expected<CollisionKind, StarException> {
-    if (!self.m_predictedTiles.empty()) {
-      if (auto p = self.m_predictedTiles.find_ref({x, y})) {
-        if (p->get().collision) {
-          return *p->get().collision;
-        }
-      }
-    }
-    return self.m_tileArray->tile({x, y}).collision;
+  m_collision_generator.init([&self = *this](int x, int y) -> std::expected<CollisionKind, StarException> {
+    return self.effective_collision({x, y}, self.m_tileArray->tile({x, y}));
   });
   
   auto result42 = m_clientConfig.get_float("modifiedTilePredictionTimeout");
@@ -752,24 +738,29 @@ std::expected<CollisionKind, StarException> WorldClient::tileCollisionKind(Vec2I
   return WorldImpl::tileCollisionKind(m_tileArray, m_entityMap, pos);
 }
 
-std::expected<void, StarException> WorldClient::forEachCollisionBlock(RectI const& region, std::function<std::expected<void, StarException>(CollisionBlock const&)> const& iterator) const {
-  if (!inWorld())
-    return {};
-  auto freshened = const_cast<WorldClient&>(*this).freshenCollision(region);
-  if (!freshened)
-    return std::unexpected(std::move(freshened.error()));
-  return m_tileArray->tile_each(region, [iterator](Vec2I const& pos, ClientTile const& tile) -> std::expected<void, StarException> {
-    if (tile.getCollision() == CollisionKind::Null)
-      return iterator(CollisionBlock::nullBlock(pos));
-    if constexpr (Star::debug_enabled)
-      Star::star_assert_failed((!tile.collisionCacheDirty));
-    for (auto const& block : tile.collisionCache) {
-      auto visited = iterator(block);
-      if (!visited)
-        return std::unexpected(std::move(visited.error()));
-    }
-    return {};
-  });
+CollisionKind WorldClient::effective_collision(Vec2I const& pos, ClientTile const& tile) const {
+  if (!m_predicted_tiles.empty()) {
+    auto prediction = m_predicted_tiles.find_ref(m_geometry.xwrap(pos));
+    if (prediction && prediction->get().collision && (tile.collision != CollisionKind::Null || m_tileArray->tile_loaded(pos)))
+      return *prediction->get().collision;
+  }
+  return tile.collision;
+}
+
+void WorldClient::invalidate_prediction_change(Vec2I const& pos, std::optional<CollisionKind> before, std::optional<CollisionKind> after) {
+  if (before == after) return;
+  if (auto tile = m_tileArray->modify_tile(pos)) {
+    auto authoritative = tile->get().collision;
+    if (before.value_or(authoritative) != after.value_or(authoritative))
+      WorldImpl::invalidate_collision_cache(*m_tileArray, RectI::with_size(pos, {1, 1}));
+  }
+}
+
+std::expected<bool, StarException> WorldClient::collision_blocks_satisfy(RectI const& region,
+    std::function<std::expected<bool, StarException>(CollisionBlock const&)> const& predicate) const {
+  if (!inWorld()) return false;
+  return WorldImpl::collision_blocks_satisfy(*m_tileArray, region, m_collision_generator,
+      [&self = *this](Vec2I const& pos, ClientTile const& tile) { return self.effective_collision(pos, tile); }, predicate);
 }
 
 std::expected<bool, StarException> WorldClient::isTileConnectable(Vec2I const& pos, TileLayer layer, bool tilesOnly) const {
@@ -864,7 +855,7 @@ std::expected<TileModificationList, StarException> WorldClient::applyTileModific
           return std::unexpected(std::move(result.error()));
         }
         if (result->first) {
-          auto predicted = informTilePrediction(pair.first, pair.second);
+          auto predicted = inform_tile_prediction(m_geometry.xwrap(pair.first), pair.second);
           if (!predicted) {
             return std::unexpected(std::move(predicted.error()));
           }
@@ -1294,7 +1285,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& renderDa
   if (!result74)
     return std::unexpected(std::move(result74.error()));
 
-  for (auto&& pair : m_predictedTiles) {
+  for (auto&& pair : m_predicted_tiles) {
     Vec2I tileArrayPos(m_geometry.pdiff(pair.first[0], renderData.tileMinPosition[0]), pair.first[1] - renderData.tileMinPosition[1]);
     if (tileArrayPos[0] >= 0 && tileArrayPos[0] < static_cast<int>(renderData.tiles.extent(0)) && tileArrayPos[1] >= 0
         && tileArrayPos[1] < static_cast<int>(renderData.tiles.extent(1))) {
@@ -1709,19 +1700,19 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
           return std::unexpected(std::move(result113.error()));
         for (auto const& sector : (std::move(*result113))) {
           m_tileArray->load_default_sector(sector);
+          WorldImpl::invalidate_collision_cache(*m_tileArray, m_tileArray->sector_region(sector));
         }
       }
       
       for (int x = tileRegion.x_min(); x < tileRegion.x_max(); ++x) {
         for (int y = tileRegion.y_min(); y < tileRegion.y_max(); ++y) {
-          auto result114 = readNetTile({x, y}, tileArrayUpdate->array(x - tileRegion.x_min(), y - tileRegion.y_min()), false);
+          auto result114 = read_net_tile({x, y}, tileArrayUpdate->array(x - tileRegion.x_min(), y - tileRegion.y_min()), false);
           if (!result114)
             return std::unexpected(std::move(result114.error()));
         }
       }
-      dirtyCollision(tileRegion);
     } else if (auto tileUpdate = as<TileUpdatePacket>(packet)) {
-      auto result115 = readNetTile(tileUpdate->position, tileUpdate->tile);
+      auto result115 = read_net_tile(tileUpdate->position, tileUpdate->tile);
       if (!result115)
         return std::unexpected(std::move(result115.error()));
     } else if (auto tileDamageUpdate = as<TileDamageUpdatePacket>(packet)) {
@@ -1740,17 +1731,17 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       // may be context hints with tile modifications to figure out what to do
       // with failures.
       for (auto& modification : tileModificationFailure->modifications) {
-        auto findPrediction = m_predictedTiles.find(modification.first);
-        if (findPrediction != m_predictedTiles.end()) {
-          auto& p = findPrediction->second;
+        auto prediction = m_predicted_tiles.find(m_geometry.xwrap(modification.first));
+        if (prediction != m_predicted_tiles.end()) {
+          auto& p = prediction->second;
           if (std::holds_alternative<PlaceMaterial>(modification.second)) {
             auto const& placeMaterial = std::get<PlaceMaterial>(modification.second);
             if (placeMaterial.layer == TileLayer::Foreground) {
               p.foreground.reset();
               p.foregroundHueShift.reset();
               if (p.collision) {
+                invalidate_prediction_change(prediction->first, p.collision, {});
                 p.collision.reset();
-                dirtyCollision(RectI::with_size(modification.first, { 1, 1 }));
               }
             } else {
               p.background.reset();
@@ -1777,7 +1768,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
           }
           
           if (!p) {
-            m_predictedTiles.erase(findPrediction);
+            m_predicted_tiles.erase(prediction);
           }
         }
         
@@ -1808,7 +1799,11 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         }
       }
     } else if (auto liquidUpdate = as<TileLiquidUpdatePacket>(packet)) {
-      m_predictedTiles.remove(liquidUpdate->position);
+      auto prediction = m_predicted_tiles.find(m_geometry.xwrap(liquidUpdate->position));
+      if (prediction != m_predicted_tiles.end()) {
+        prediction->second.liquid.reset();
+        if (!prediction->second) m_predicted_tiles.erase(prediction);
+      }
       if (auto tile = m_tileArray->modify_tile(liquidUpdate->position)) {
         tile->get().liquid = liquidUpdate->liquidUpdate.liquidLevel();
       }
@@ -2117,14 +2112,14 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     std::chrono::duration<float, std::milli>(static_cast<float>((m_latency + std::chrono::milliseconds(800)).count())),
     std::chrono::duration<float, std::milli>(2000.f));
   auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
-  Star::erase_if(m_predictedTiles, [&, &self = *this](auto&& pair) {
+  Star::erase_if(m_predicted_tiles, [&, &self = *this](auto&& pair) {
     float expiry = std::chrono::duration<float, std::milli>(float((now - pair.second.time).count())) / expireTime;
     auto center = Vec2F(pair.first) + Vec2F::filled(0.5f);
     auto size = Vec2F::filled(0.875f - expiry * 0.875f);
     auto poly = PolyF(RectF::with_center(center, size));
     self.root().spatialLogger().log_poly("world", poly, Color::palette_cyan.mix(Color::palette_red, expiry).to_rgba());
     if (expiry >= 1.0f) {
-      self.dirtyCollision(RectI::with_size(pair.first, { 1, 1 }));
+      self.invalidate_prediction_change(pair.first, pair.second.collision, {});
       return true;
     } else {
       return false;
@@ -2555,6 +2550,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
   for (auto sector : loadedSectors) {
     if (!neededSectors.contains(sector)) {
       m_tileArray->unload_sector(sector);
+      WorldImpl::invalidate_collision_cache(*m_tileArray, m_tileArray->sector_region(sector));
     }
   }
   
@@ -2749,7 +2745,7 @@ std::expected<void, StarException> WorldClient::collectLiquid(List<Vec2I> const&
   for (auto& pos : tilePositions) {
     if (isTileProtected(pos))
       continue;
-    auto& p = m_predictedTiles[pos];
+    auto& p = m_predicted_tiles[m_geometry.xwrap(pos)];
     auto const& tile = m_tileArray->tile(pos);
     if ((p.liquid ? p.liquid->liquid : tile.liquid.liquid) == liquidId) {
       if (!p.liquid) {
@@ -2761,7 +2757,7 @@ std::expected<void, StarException> WorldClient::collectLiquid(List<Vec2I> const&
         nextUnit = bucketSize;
         
         for (std::size_t i = 0; i < maybeDrainTiles.size(); ++i) {
-          m_predictedTiles[pos].liquid.emplace(EmptyLiquidId, 0.0f);
+          p.liquid.emplace(EmptyLiquidId, 0.0f);
         }
         
         maybeDrainTiles.clear();
@@ -3382,8 +3378,8 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
     m_entityMap = std::make_shared<EntityMap>(m_worldTemplate->size(), entitySpace.first, entitySpace.second);
     m_tileArray = std::make_shared<ClientTileSectorArray>(m_worldTemplate->size());
     m_tileGetterFunction = [&self = *this, tile = ClientTile()](Vec2I pos) mutable -> std::expected<std::reference_wrapper<ClientTile const>, StarException> {
-      if (!self.m_predictedTiles.empty()) {
-        if (auto p = self.m_predictedTiles.find_ref(pos)) {
+      if (!self.m_predicted_tiles.empty()) {
+        if (auto p = self.m_predicted_tiles.find_ref(self.m_geometry.xwrap(pos))) {
           p->get().apply(tile = self.m_tileArray->tile(pos));
           if (p->get().liquid) {
             if (p->get().liquid->liquid == tile.liquid.liquid) {
@@ -3628,6 +3624,7 @@ std::expected<void, StarException> WorldClient::clearWorld() {
   m_worldProperties.clear();
 
   m_tileArray.reset();
+  m_predicted_tiles.clear();
 
   m_damageManager.reset();
 
@@ -3774,67 +3771,72 @@ std::expected<std::shared_ptr<Biome const>, StarException> WorldClient::mainEnvi
   return m_worldTemplate->environmentBiome(pos[0], pos[1]);
 }
 
-std::expected<bool, StarException> WorldClient::readNetTile(Vec2I const& pos, NetTile const& netTile, bool updateCollision) {
+std::expected<bool, StarException> WorldClient::read_net_tile(Vec2I const& pos, NetTile const& net_tile, bool invalidate) {
   auto tile = m_tileArray->modify_tile(pos);
   if (!tile) {
     return false;
   }
   
-  if (!m_predictedTiles.empty()) {
-    auto findPrediction = m_predictedTiles.find(pos);
-    if (findPrediction != m_predictedTiles.end()) {
-      auto& p = findPrediction->second;
+  bool collision_changed = invalidate && tile->get().collision != net_tile.collision;
+  if (!m_predicted_tiles.empty()) {
+    auto prediction = m_predicted_tiles.find(m_geometry.xwrap(pos));
+    if (prediction != m_predicted_tiles.end()) {
+      auto& p = prediction->second;
       
-      if (p.collision && *p.collision == netTile.collision) {
+      // Whether confirmed or retained, an override keeps the same effective kind.
+      collision_changed &= !p.collision;
+      if (p.collision && *p.collision == net_tile.collision) {
         p.collision.reset();
       }
-      if (p.foreground && (*p.foreground == StructureMaterialId || *p.foreground == netTile.foreground)) {
+      if (p.foreground && (*p.foreground == StructureMaterialId || *p.foreground == net_tile.foreground)) {
         p.foreground.reset();
       }
-      if (p.foregroundMod && *p.foregroundMod == netTile.foregroundMod) {
+      if (p.foregroundMod && *p.foregroundMod == net_tile.foregroundMod) {
         p.foregroundMod.reset();
       }
-      if (p.foregroundHueShift && *p.foregroundHueShift == netTile.foregroundHueShift) {
+      if (p.foregroundHueShift && *p.foregroundHueShift == net_tile.foregroundHueShift) {
         p.foregroundHueShift.reset();
       }
-      if (p.foregroundModHueShift && *p.foregroundModHueShift == netTile.foregroundModHueShift) {
+      if (p.foregroundModHueShift && *p.foregroundModHueShift == net_tile.foregroundModHueShift) {
         p.foregroundModHueShift.reset();
       }
       
-      if (p.background && *p.background == netTile.background) {
+      if (p.background && *p.background == net_tile.background) {
         p.background.reset();
       }
-      if (p.backgroundMod && *p.backgroundMod == netTile.backgroundMod) {
+      if (p.backgroundMod && *p.backgroundMod == net_tile.backgroundMod) {
         p.backgroundMod.reset();
       }
-      if (p.backgroundHueShift && *p.backgroundHueShift == netTile.backgroundHueShift) {
+      if (p.backgroundHueShift && *p.backgroundHueShift == net_tile.backgroundHueShift) {
         p.backgroundHueShift.reset();
       }
-      if (p.backgroundModHueShift && *p.backgroundModHueShift == netTile.backgroundModHueShift) {
+      if (p.backgroundModHueShift && *p.backgroundModHueShift == net_tile.backgroundModHueShift) {
         p.backgroundModHueShift.reset();
       }
       
       if (!p) {
-        m_predictedTiles.erase(findPrediction);
+        m_predicted_tiles.erase(prediction);
       }
     }
   }
   
-  tile->get().background = netTile.background;
-  tile->get().backgroundHueShift = netTile.backgroundHueShift;
-  tile->get().backgroundColorVariant = netTile.backgroundColorVariant;
-  tile->get().backgroundMod = netTile.backgroundMod;
-  tile->get().backgroundModHueShift = netTile.backgroundModHueShift;
-  tile->get().foreground = netTile.foreground;
-  tile->get().foregroundHueShift = netTile.foregroundHueShift;
-  tile->get().foregroundColorVariant = netTile.foregroundColorVariant;
-  tile->get().foregroundMod = netTile.foregroundMod;
-  tile->get().foregroundModHueShift = netTile.foregroundModHueShift;
-  tile->get().collision = netTile.collision;
-  tile->get().blockBiomeIndex = netTile.blockBiomeIndex;
-  tile->get().environmentBiomeIndex = netTile.environmentBiomeIndex;
-  tile->get().liquid = netTile.liquid.liquidLevel();
-  tile->get().dungeonId = netTile.dungeonId;
+  tile->get().background = net_tile.background;
+  tile->get().backgroundHueShift = net_tile.backgroundHueShift;
+  tile->get().backgroundColorVariant = net_tile.backgroundColorVariant;
+  tile->get().backgroundMod = net_tile.backgroundMod;
+  tile->get().backgroundModHueShift = net_tile.backgroundModHueShift;
+  tile->get().foreground = net_tile.foreground;
+  tile->get().foregroundHueShift = net_tile.foregroundHueShift;
+  tile->get().foregroundColorVariant = net_tile.foregroundColorVariant;
+  tile->get().foregroundMod = net_tile.foregroundMod;
+  tile->get().foregroundModHueShift = net_tile.foregroundModHueShift;
+  tile->get().collision = net_tile.collision;
+  tile->get().blockBiomeIndex = net_tile.blockBiomeIndex;
+  tile->get().environmentBiomeIndex = net_tile.environmentBiomeIndex;
+  tile->get().liquid = net_tile.liquid.liquidLevel();
+  tile->get().dungeonId = net_tile.dungeonId;
+  if (collision_changed)
+    WorldImpl::invalidate_collision_cache(*m_tileArray, RectI::with_size(m_geometry.xwrap(pos), {1, 1}));
   
   auto result298 = this->root().materialDatabase();
   if (!result298)
@@ -3850,66 +3852,9 @@ std::expected<bool, StarException> WorldClient::readNetTile(Vec2I const& pos, Ne
   tile->get().foregroundLightTransparent =
       (std::move(*result301)) && tile->get().collision != CollisionKind::Dynamic;
   
-  if (updateCollision) {
-    dirtyCollision(RectI::with_size(pos, {1, 1}));
-  }
-  
   return true;
 }
 
-void WorldClient::dirtyCollision(RectI const& region) {
-  if (!inWorld())
-    return;
-
-  auto dirtyRegion = region.padded(CollisionGenerator::BlockInfluenceRadius);
-  for (int x = dirtyRegion.x_min(); x < dirtyRegion.x_max(); ++x) {
-    for (int y = dirtyRegion.y_min(); y < dirtyRegion.y_max(); ++y) {
-      if (auto tile = m_tileArray->modify_tile({x, y}))
-        tile->get().collisionCacheDirty = true;
-    }
-  }
-}
-
-std::expected<void, StarException> WorldClient::freshenCollision(RectI const& region) {
-  if (!inWorld()) {
-    return {};
-  }
-  
-  RectI freshenRegion = RectI::null();
-  for (int x = region.x_min(); x < region.x_max(); ++x) {
-    for (int y = region.y_min(); y < region.y_max(); ++y) {
-      if (auto tile = m_tileArray->modify_tile({x, y})) {
-        if (tile->get().collisionCacheDirty) {
-          freshenRegion.combine(RectI(x, y, x + 1, y + 1));
-        }
-      }
-    }
-  }
-  
-  if (!freshenRegion.is_null()) {
-    for (int x = freshenRegion.x_min(); x < freshenRegion.x_max(); ++x) {
-      for (int y = freshenRegion.y_min(); y < freshenRegion.y_max(); ++y) {
-        if (auto tile = m_tileArray->modify_tile({x, y})) {
-          tile->get().collisionCacheDirty = false;
-          tile->get().collisionCache.clear();
-        }
-      }
-    }
-    
-    auto blocks = m_collisionGenerator.getBlocks(freshenRegion);
-    if (!blocks) {
-      return std::unexpected(std::move(blocks.error()));
-    }
-    for (auto& collisionBlock : *blocks) {
-      if (auto tile = m_tileArray->modify_tile(collisionBlock.space)) {
-        auto appended = tile->get().collisionCache.push_back(std::move(collisionBlock));
-        if (!appended)
-          return std::unexpected(std::move(appended.error()));
-      }
-    }
-  }
-  return {};
-}
 
 std::expected<float, StarException> WorldClient::lightLevel(Vec2F const& pos) const {
   if (!inWorld()) {
@@ -3996,7 +3941,7 @@ std::expected<bool, StarException> WorldClient::exposedToWeather(Vec2F const& po
       return std::unexpected(std::move(result307.error()));
     float weatherRayCheckWindInfluence = (std::move(*result307));
     auto offset = Vec2F(-m_weather->wind() * weatherRayCheckWindInfluence, weatherRayCheckDistance).normalized() * weatherRayCheckDistance;
-    auto result308 = lineCollision({pos, pos + offset});
+    auto result308 = line_collision({pos, pos + offset});
     if (!result308)
       return std::unexpected(std::move(result308.error()));
     return !(std::move(*result308));
@@ -4327,7 +4272,7 @@ std::expected<void, StarException> WorldClient::renderCollisionDebug() {
                                          {float_to_byte(r, true), float_to_byte(g, true), float_to_byte(b, true), 255});
   };
 
-  auto result311 = forEachCollisionBlock(clientWindow, [&](auto const& block) -> std::expected<void, StarException> {
+  auto result311 = for_each_collision_block(clientWindow, [&](auto const& block) -> std::expected<void, StarException> {
     log_poly(block.poly, Vec2F{}, 1.0f, 0.0f, 0.0f);
     return {};
   });
@@ -4374,9 +4319,9 @@ std::expected<void, StarException> WorldClient::renderCollisionDebug() {
   return {};
 }
 
-std::expected<void, StarException> WorldClient::informTilePrediction(Vec2I const& pos, TileModification const& modification) {
+std::expected<void, StarException> WorldClient::inform_tile_prediction(Vec2I const& pos, TileModification const& modification) {
   auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
-  auto& p = m_predictedTiles[pos];
+  auto& p = m_predicted_tiles[pos];
   p.time = now;
   if (std::holds_alternative<PlaceMaterial>(modification)) {
     auto const& placeMaterial = std::get<PlaceMaterial>(modification);
@@ -4397,6 +4342,7 @@ std::expected<void, StarException> WorldClient::informTilePrediction(Vec2I const
           p.foreground = StructureMaterialId;
         }
       }
+      auto previous = p.collision;
       if (placeMaterial.collisionOverride != TileCollisionOverride::None) {
         p.collision = collisionKindFromOverride(placeMaterial.collisionOverride);
       } else {
@@ -4405,7 +4351,7 @@ std::expected<void, StarException> WorldClient::informTilePrediction(Vec2I const
           return std::unexpected(std::move(result317.error()));
         p.collision = (std::move(*result317));
       }
-      dirtyCollision(RectI::with_size(pos, { 1, 1 }));
+      invalidate_prediction_change(pos, previous, p.collision);
     } else {
       p.background = placeMaterial.material;
       p.backgroundHueShift = placeMaterial.materialHueShift;
