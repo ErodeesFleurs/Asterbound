@@ -137,6 +137,8 @@ TEST(BlocksAlongLine, BorrowsVisitorAndReturnsItsFirstError) {
 TEST(BlocksAlongLine, RejectsInvalidCoordinatesBeforeVisiting) {
   constexpr double below = double(std::numeric_limits<int>::min()) - 0.25;
   constexpr double above = double(std::numeric_limits<int>::max()) + 1;
+  // Materialize NaNs at compile time: runtime quiet_NaN() can be optimized away under -fno-honor-nans.
+  constexpr float nan_f = std::numeric_limits<float>::quiet_NaN();
   constexpr double nan = std::numeric_limits<double>::quiet_NaN();
   constexpr double inf = std::numeric_limits<double>::infinity();
   int calls = 0;
@@ -157,7 +159,7 @@ TEST(BlocksAlongLine, RejectsInvalidCoordinatesBeforeVisiting) {
   reject(Vec2D(nan, 0), Vec2D(1, 1));
   reject(Vec2D(0, -inf), Vec2D(0, 0));
   reject(Vec2D(0, 0), Vec2D(inf, 0));
-  reject(Vec2F(0, 0), Vec2F(0, std::numeric_limits<float>::quiet_NaN()));
+  reject(Vec2F(0, 0), Vec2F(0, nan_f));
   float const largest = std::numeric_limits<float>::max();
   reject(Vec2F(largest, 0), Vec2F(largest, 0));
   EXPECT_EQ(calls, 0);

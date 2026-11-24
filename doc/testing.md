@@ -778,6 +778,11 @@ steps diagonally without reporting the two cells touched only at that point.
 Visitor `false` means early termination, not an error. World collision queries
 apply the hit limit before excluding glancing contacts.
 
+`BlocksAlongLine.RejectsInvalidCoordinatesBeforeVisiting` requires an
+`OutOfRangeException` before the first visitor call. Keep its NaN inputs
+constant-initialized: under `-fno-honor-nans`, a runtime `quiet_NaN()` call
+need not deliver a NaN to the code under test.
+
 ### Asset locators
 
 - `core_tests --gtest_filter='AssetPathTest.*:PathEmbedTest.*:ImageDirectivePipelineTest.*'`
