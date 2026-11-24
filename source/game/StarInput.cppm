@@ -2,6 +2,7 @@ module;
 import std;
 import star.string;
 import star.list;
+import star.small_vector;
 import star.map;
 import star.format;
 import star.hash;
@@ -21,7 +22,13 @@ struct InputExceptionTag {
 };
 using InputException = StarError<InputExceptionTag, StarException>;
 
-using InputVariant = std::variant<Key, MouseButton, ControllerButton>;
+struct ControllerSource {
+  ControllerId controller = 0;
+  ControllerButton button = ControllerButton::Invalid;
+  bool operator==(ControllerSource const&) const = default;
+};
+
+using InputVariant = std::variant<Key, MouseButton, ControllerSource>;
 
 template <>
 struct ValueHash<InputVariant> {
@@ -29,22 +36,17 @@ struct ValueHash<InputVariant> {
 };
 
 class Input {
-public:
+  struct ConstructionKey { explicit ConstructionKey() = default; };
 
-  [[nodiscard]] static std::expected<Json, StarException> inputEventToJson(InputEvent const& event);
+public:
+  Input(ConstructionKey, Root& root);
+
+  [[nodiscard]] static std::expected<Json, StarException> input_event_to_json(InputEvent const& event, std::optional<bool> processed = {});
 
   struct KeyBind {
     Key key = Key::Zero;
     KeyMod mods = KeyMod::NoMod;
     std::uint8_t priority = 0;
-
-    inline bool operator<(KeyBind const& rhs) const {
-      return priority < rhs.priority;
-    }
-
-    inline bool operator>(KeyBind const& rhs) const {
-      return priority > rhs.priority;
-    }
   };
 
   struct MouseBind {
@@ -53,97 +55,37 @@ public:
     std::uint8_t priority = 0;
   };
 
-  struct ControllerBind {
-    unsigned int controller = 0;
-    ControllerButton button = ControllerButton::Invalid;
-  };
+  using ControllerBind = ControllerSource;
 
   using Bind = std::variant<std::monostate, KeyBind, MouseBind, ControllerBind>;
 
-  [[nodiscard]] static std::expected<Bind, StarException> bindFromJson(Json const& json);
-  [[nodiscard]] static std::expected<Json, StarException> bindToJson(Bind const& bind);
-
-  struct BindCategory;
+  [[nodiscard]] static std::expected<Bind, StarException> bind_from_json(Json const& json);
+  [[nodiscard]] static std::expected<Json, StarException> bind_to_json(Bind const& bind);
 
   struct BindEntry {
-    Input& owner;
-    // The internal ID of this entry.
-    String id;
-    // The user-facing name of this entry.
-    String name;
-    // The category this entry belongs to.
-    std::reference_wrapper<BindCategory const> category;
-    // Associated string tags that become active when this bind is pressed.
     StringList tags;
+    List<Bind> default_binds;
+    // Missing uses defaults; an engaged empty list explicitly unbinds the action.
+    std::optional<List<Bind>> custom_binds;
+    std::size_t state_id = 0;
 
-    // The default binds.
-    List<Bind> defaultBinds;
-    // The user-configured binds.
-    List<Bind> customBinds;
-    std::size_t stateId;
-
-    explicit BindEntry(Input& owner, BindCategory const& category);
-    [[nodiscard]] static std::expected<BindEntry, StarException> create(Input& owner, String entryId, Json const& config, BindCategory const& parentCategory);
-    [[nodiscard]] std::expected<void, StarException> updated();
+    List<Bind> const& binds() const { return custom_binds ? *custom_binds : default_binds; }
   };
 
   struct BindRef {
     KeyMod mods;
-    std::uint8_t priority = 0;  
-    std::reference_wrapper<BindEntry> entry; // Invalidated on reload; mappings are rebuilt together.
-
-    BindRef(BindEntry& bindEntry, KeyBind& keyBind);
-    BindRef(BindEntry& bindEntry, MouseBind& mouseBind);
-    BindRef(BindEntry& bindEntry);
+    std::uint8_t priority;
+    std::reference_wrapper<BindEntry const> entry;
   };
 
-  struct BindCategory {
-    Input& owner;
-    String id;
-    String name;
-    Json config = JsonObject{};
-
-    StableHashMap<String, BindEntry> entries;
-
-    explicit BindCategory(Input& owner);
-    [[nodiscard]] std::expected<void, StarException> mergeJson(String const& categoryId, Json const& categoryConfig);
-  };
-
-  struct InputState {
-    unsigned presses = 0;
-    unsigned releases = 0;
-    bool pressed = false;
+  struct BindMapping {
+    List<BindRef> candidates;
+    SmallVector<std::size_t, 1> held_entries;
     bool held = false;
-    bool released = false;
-
-    // Calls the passed functions for each press and release.
-    template <typename PressFunction, typename ReleaseFunction>
-    void forEach(PressFunction&& pressed, ReleaseFunction&& released) {
-      for (std::size_t i = 0; i != releases; ++i) {
-        pressed();
-        released();
-      }
-    }
-
-    inline void reset() {
-      presses = releases = 0;
-      pressed = released = false;
-    }
-
-    inline void press() { pressed = ++presses; held = true; }
-    inline void release() { released = ++releases; held = false; }
   };
 
-  struct KeyInputState : InputState {
-    KeyMod mods = KeyMod::NoMod;
-  };
+  using BindCategory = StableHashMap<String, BindEntry>;
 
-  struct MouseInputState : InputState {
-    List<Vec2F> pressPositions;
-    List<Vec2F> releasePositions;
-  };
-
-  using ControllerInputState = InputState;
 
   [[nodiscard]] static std::expected<std::shared_ptr<Input>, StarException> create(Root& root);
   ~Input();
@@ -151,100 +93,118 @@ public:
   Input(Input const&) = delete;
   Input& operator=(Input const&) = delete;
 
-  List<std::pair<InputEvent, bool>> const& inputEventsThisFrame() const;
+  List<std::pair<InputEvent, bool>> const& input_events_this_frame() const;
 
   // Retire transients once per logic tick, never for a render-only iteration.
-  void reset(bool clear = false);
-
-  void update();
+  void finish_tick();
+  // Rebinding invalidates action attribution, not physical keyboard modifiers or pending event history.
+  void clear_binding_state();
+  void clear_input_state();
 
   // Handles an input event.
-  [[nodiscard]] std::expected<bool, StarException> handleInput(InputEvent const& input, bool gameProcessed);
-
-  void rebuildMappings();
+  void handle_input(InputEvent const& input, bool game_processed = false);
 
   // Loads input categories and their binds from Assets.
   [[nodiscard]] std::expected<void, StarException> reload();
 
-  void setTextInputActive(bool active);
+  void set_text_input_active(bool active);
 
-  std::optional<unsigned> bindDown(String const& categoryId, String const& bindId);
-  bool            bindHeld(String const& categoryId, String const& bindId);
-  std::optional<unsigned> bindUp  (String const& categoryId, String const& bindId);
+  std::optional<unsigned> bind_down(String const& category_id, String const& bind_id);
+  bool bind_held(String const& category_id, String const& bind_id);
+  std::optional<unsigned> bind_up(String const& category_id, String const& bind_id);
 
-  std::optional<unsigned> keyDown(Key key, std::optional<KeyMod> keyMod);
-  bool            keyHeld(Key key);
-  std::optional<unsigned> keyUp  (Key key);
+  std::optional<unsigned> key_down(Key key, std::optional<KeyMod> key_mod) const;
+  bool key_held(Key key) const;
+  std::optional<unsigned> key_up(Key key) const;
 
-  std::optional<List<Vec2F>> mouseDown(MouseButton button);
-  bool               mouseHeld(MouseButton button);
-  std::optional<List<Vec2F>> mouseUp  (MouseButton button);
+  // Borrowed until the next input or state transition. Empty means no such event this tick.
+  std::span<Vec2F const> mouse_down(MouseButton button) const;
+  bool mouse_held(MouseButton button) const;
+  std::span<Vec2F const> mouse_up(MouseButton button) const;
+  Vec2F mouse_position() const;
 
-  Vec2F mousePosition() const;
+  [[nodiscard]] std::expected<void, StarException> reset_binds(String const& category_id, String const& bind_id);
+  [[nodiscard]] std::expected<void, StarException> set_binds(String const& category_id, String const& bind_id, Json const& binds);
+  [[nodiscard]] std::expected<Json, StarException> get_default_binds(String const& category_id, String const& bind_id);
+  [[nodiscard]] std::expected<Json, StarException> get_binds(String const& category_id, String const& bind_id);
 
-  [[nodiscard]] std::expected<void, StarException> resetBinds(String const& categoryId, String const& bindId);
-  [[nodiscard]] std::expected<void, StarException> setBinds(String const& categoryId, String const& bindId, Json const& binds);
-  [[nodiscard]] std::expected<Json, StarException> getDefaultBinds(String const& categoryId, String const& bindId); 
-  [[nodiscard]] std::expected<Json, StarException> getBinds(String const& categoryId, String const& bindId);
-
-  unsigned getTag(String const& tagName) const;
+  unsigned get_tag(String const& tag_name) const;
 
   class ClipboardUnlock {
   public:
     ClipboardUnlock(Input& input);
     ClipboardUnlock(ClipboardUnlock const&) = delete;
-    ClipboardUnlock(ClipboardUnlock&&);
+    ClipboardUnlock(ClipboardUnlock&&) noexcept;
     ~ClipboardUnlock();
 
   private:
     std::optional<std::reference_wrapper<Input>> m_input;
   };
 
-  ClipboardUnlock unlockClipboard();
-  bool clipboardAllowed() const;
+  ClipboardUnlock unlock_clipboard();
+  bool clipboard_allowed() const;
 private:
-  explicit Input(Root& root);
-  List<std::reference_wrapper<BindEntry>> filterBindEntries(List<BindRef> const& binds, KeyMod mods) const;
+  void press_source(InputVariant source, KeyMod mods);
+  void release_source(InputVariant source);
 
-  std::optional<std::reference_wrapper<BindEntry>> maybeBindEntry(String const& categoryId, String const& bindId);
-  [[nodiscard]] std::expected<std::reference_wrapper<BindEntry>, StarException> bindEntry(String const& categoryId, String const& bindId);
+  std::optional<std::reference_wrapper<BindEntry>> maybe_bind_entry(String const& category_id, String const& bind_id);
+  [[nodiscard]] std::expected<std::reference_wrapper<BindEntry>, StarException> bind_entry(String const& category_id, String const& bind_id);
+  [[nodiscard]] std::expected<void, StarException> write_binds(String const& category_id, String const& bind_id,
+      BindEntry& entry, std::optional<List<Bind>> replacement);
 
-  std::optional<std::reference_wrapper<InputState>> maybeBindState(String const& categoryId, String const& bindId);
-
-  InputState& addBindState(BindEntry const& bindEntry);
+  struct BindInputState {
+    std::reference_wrapper<BindEntry const> entry;
+    unsigned sources = 0;
+    unsigned presses = 0;
+    unsigned releases = 0;
+    explicit BindInputState(BindEntry const& entry) : entry(entry) {}
+  };
+  std::optional<std::reference_wrapper<BindInputState>> maybe_bind_state(String const& category_id, String const& bind_id);
 
   Root& m_root;
 
-  // Regenerated on reload.
-  StableHashMap<String, BindCategory> m_bindCategories;
-  // Contains references to bind entries in categories, so also regenerated on reload.
-  HashMap<InputVariant, List<BindRef>> m_bindMappings;
+  using BindCategories = StringMap<BindCategory>;
+  using BindMappings = HashMap<InputVariant, BindMapping>;
+  struct Replacement {
+    std::size_t state_id;
+    List<Bind> const& binds;
+  };
+  static BindMappings rebuild_mappings(BindCategories const& categories, std::optional<Replacement> replacement);
+
+  // Publish these together: mappings borrow the stable entry nodes in the catalog.
+  BindCategories m_bind_categories;
+  BindMappings m_bind_mappings;
 
   std::shared_ptr<Listener> m_root_reload_listener;
   ListenerSubscription m_root_reload_subscription;
 
   // Per-frame input event storage for Lua.
-  List<std::pair<InputEvent, bool>> m_inputEvents;
+  List<std::pair<InputEvent, bool>> m_input_events;
 
-  // Per-frame input state maps.
-  //Input states
-  HashMap<Key, KeyInputState> m_keyStates;
-  HashMap<MouseButton, MouseInputState> m_mouseStates;
-  HashMap<ControllerButton, ControllerInputState> m_controllerStates;
-  //Bind states
-  struct BindInputState : InputState {
-    std::reference_wrapper<BindEntry const> entry;
-    explicit BindInputState(BindEntry const& entry) : entry(entry) {}
+  struct ModifierPresses {
+    KeyMod mods;
+    unsigned count;
   };
-  HashMap<std::size_t, BindInputState> m_bindStates;
-  std::size_t m_nextBindEntryId = 0;
-  StringMap<unsigned> m_activeTags;
+  struct KeyInputState {
+    SmallVector<ModifierPresses, 1> presses;
+    unsigned releases = 0;
+    bool held = false;
+  };
+  struct MouseInputState {
+    SmallVector<Vec2F, 1> press_positions;
+    SmallVector<Vec2F, 1> release_positions;
+    bool held = false;
+  };
+  HashMap<Key, KeyInputState> m_key_states;
+  HashMap<MouseButton, MouseInputState> m_mouse_states;
+  HashMap<std::size_t, BindInputState> m_bind_states;
+  StringMap<unsigned> m_active_tags;
 
-  KeyMod m_pressedMods;
-  bool m_textInputActive = false;
-  Vec2F m_mousePosition;
+  KeyMod m_pressed_mods = KeyMod::NoMod;
+  bool m_text_input_active = false;
+  Vec2F m_mouse_position;
 
-  unsigned m_clipboardAllowed = 0;
+  unsigned m_clipboard_allowed = 0;
 };
 
 }
@@ -258,6 +218,7 @@ export namespace Star {
 
 
 export namespace Star {
+  using ::Star::ControllerSource;
   using ::Star::Input;
   using ::Star::InputExceptionTag;
   using ::Star::InputException;

@@ -57,6 +57,7 @@ protected:
   [[nodiscard]] std::expected<void, StarException> renderInit(std::shared_ptr<Renderer> renderer) override;
 
   [[nodiscard]] std::expected<void, StarException> windowChanged(WindowMode windowMode, Vec2U screenSize) override;
+  void window_focus_lost() override;
 
   [[nodiscard]] std::expected<void, StarException> processInput(InputEvent const& event) override;
 

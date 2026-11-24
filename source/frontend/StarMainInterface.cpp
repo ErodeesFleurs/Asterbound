@@ -1184,7 +1184,7 @@ std::expected<bool, StarException> MainInterface::handleInputEvent(InputEvent co
       if (userSubmit) {
         auto input = context().input();
         if (!input) return std::unexpected(std::move(input.error()));
-        clipboardUnlock.emplace(input->get().unlockClipboard());
+        clipboardUnlock.emplace(input->get().unlock_clipboard());
       }
       consumed = recover_lua_script_error(m_uiController->invoke<bool>("input", data));
     }
@@ -1264,7 +1264,7 @@ std::expected<bool, StarException> MainInterface::handleInputEvent(InputEvent co
               if (m_lastCommand.empty()) return {};
               auto input = context().input();
               if (!input) return std::unexpected(std::move(input.error()));
-              auto clipboardUnlock = input->get().unlockClipboard();
+              auto clipboardUnlock = input->get().unlock_clipboard();
               auto results = executeClientCommand(m_lastCommand);
               if (!results) return std::unexpected(std::move(results.error()));
               for (auto const& result : *results) {

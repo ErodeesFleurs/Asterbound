@@ -126,7 +126,7 @@ std::expected<std::shared_ptr<BindingsMenu>, StarException> BindingsMenu::create
   auto input = guiContext.input();
   if (!input)
     return std::unexpected(std::move(input.error()));
-  auto callbacks = LuaBindings::makeInputCallbacks(input->get());
+  auto callbacks = LuaBindings::make_input_callbacks(input->get());
   if (!callbacks)
     return std::unexpected(std::move(callbacks.error()));
   if (auto result = menu->add_callbacks("input", std::move(*callbacks)); !result)

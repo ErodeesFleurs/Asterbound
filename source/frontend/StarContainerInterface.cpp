@@ -873,7 +873,7 @@ std::expected<void, StarException> ContainerPane::update(float dt) {
       }
     }
   
-    if (input.bindDown("opensb", "takeAll")) {
+    if (input.bind_down("opensb", "takeAll")) {
       auto clearContainerResult331 = m_containerInteractor->clearContainer();
       if (!clearContainerResult331)
         return std::unexpected(std::move(clearContainerResult331.error()));

@@ -1011,45 +1011,206 @@ const GameTestRegistration clearedModBind("InputBindings", "ExplicitUnbindSurviv
   ASSERT_TRUE((*config)->set("modBindings", JsonObject{}));
   auto input = Input::create(fixture.root());
   ASSERT_TRUE(input) << input.error().what();
-  auto defaults = (*input)->getDefaultBinds("opensb", "zoomIn");
+  auto defaults = (*input)->get_default_binds("opensb", "zoomIn");
   ASSERT_TRUE(defaults);
   ASSERT_NE(*defaults, Json(JsonArray{}));
-  EXPECT_EQ((*input)->getBinds("opensb", "zoomIn").value(), *defaults);
-  ASSERT_TRUE((*input)->setBinds("opensb", "zoomIn", JsonArray{}));
+  EXPECT_EQ((*input)->get_binds("opensb", "zoomIn").value(), *defaults);
+  ASSERT_TRUE((*input)->set_binds("opensb", "zoomIn", JsonArray{}));
   auto reopened = Input::create(fixture.root());
   ASSERT_TRUE(reopened) << reopened.error().what();
-  EXPECT_EQ((*reopened)->getBinds("opensb", "zoomIn").value(), Json(JsonArray{}));
-  ASSERT_TRUE((*reopened)->resetBinds("opensb", "zoomIn"));
-  EXPECT_EQ((*reopened)->getBinds("opensb", "zoomIn").value(), *defaults);
+  EXPECT_EQ((*reopened)->get_binds("opensb", "zoomIn").value(), Json(JsonArray{}));
+  ASSERT_TRUE((*reopened)->reset_binds("opensb", "zoomIn"));
+  EXPECT_EQ((*reopened)->get_binds("opensb", "zoomIn").value(), *defaults);
+});
+
+std::expected<Root::Settings, StarException> binding_test_settings(GameTest& fixture, String const& directory) {
+  auto assets = File::relative_to(directory, "assets");
+  if (auto r = File::create_directory(assets); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = File::write_file(String("[]"), File::relative_to(assets, "preload.config")); !r)
+    return std::unexpected(std::move(r.error()));
+  auto settings = fixture.rootSettings();
+  settings.assetDirectories.clear();
+  settings.assetSources = {assets};
+  settings.assetsSettings.worker_pool_size = 1;
+  settings.storageDirectory = File::relative_to(directory, "storage");
+  settings.runtimeConfigFile = String("input.config");
+  settings.logFile = {};
+  settings.includeUGC = false;
+  return settings;
+}
+
+const GameTestRegistration failed_binding_reload("InputBindings", "FailedAssetReloadKeepsHeldEntriesAndMappings",
+    [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto settings = binding_test_settings(fixture, *directory);
+  ASSERT_TRUE(settings);
+  auto const& assets = settings->assetSources[0];
+  ASSERT_TRUE(File::write_file(String(R"({"test":{"binds":{"hold":{"tags":["held"]}}}})"),
+                               File::relative_to(assets, "tags.binds")));
+  auto path = File::relative_to(assets, "controls.binds");
+  ASSERT_TRUE(File::write_file(String(R"({"test":{"binds":{"hold":{"default":[42,{"type":"key","value":"A"}]}}}})"), path));
+  auto root = Root::create(std::move(*settings));
+  ASSERT_TRUE(root);
+  auto config = (*root)->configuration();
+  ASSERT_TRUE(config);
+  // A nonempty override containing only malformed descriptors still falls back.
+  ASSERT_TRUE((*config)->set("modBindings", JsonObject{{"test", JsonObject{{"hold", JsonArray{false}}}}}));
+  auto input = Input::create(**root);
+  ASSERT_TRUE(input) << input.error().what();
+  Json key_a = JsonArray{JsonObject{{"type", "key"}, {"value", "A"}}};
+  EXPECT_EQ((*input)->get_binds("test", "hold"), key_a);
+  (*input)->handle_input(KeyDownEvent{Key::A, KeyMod::NoMod}, false);
+  ASSERT_TRUE((*input)->bind_held("test", "hold"));
+  EXPECT_EQ((*input)->get_tag("held"), 1u);
+
+  // The Root listener must not publish partially rebuilt state.
+  ASSERT_TRUE(File::write_file(String(R"({"test":{"binds":{"broken":{"tags":17}}}})"), path));
+  EXPECT_FALSE((*root)->reload());
+  EXPECT_EQ((*input)->get_default_binds("test", "hold"), key_a);
+  EXPECT_FALSE((*input)->get_binds("test", "broken"));
+  EXPECT_TRUE((*input)->bind_held("test", "hold"));
+  EXPECT_EQ((*input)->get_tag("held"), 1u);
+  (*input)->handle_input(KeyUpEvent{Key::A}, true);
+  EXPECT_EQ((*input)->bind_up("test", "hold"), 1u);
+  (*input)->finish_tick();
+  EXPECT_EQ((*input)->get_tag("held"), 0u);
+  (*input)->handle_input(KeyDownEvent{Key::A, KeyMod::NoMod}, false);
+  EXPECT_TRUE((*input)->bind_held("test", "hold"));
+
+  ASSERT_TRUE(File::write_file(String(R"({"test":{"binds":{"hold":{"default":[{"type":"key","value":"B"}]}}}})"), path));
+  ASSERT_TRUE((*root)->reload());
+  EXPECT_FALSE((*input)->bind_held("test", "hold"));
+  EXPECT_EQ((*input)->get_tag("held"), 0u);
+  (*input)->handle_input(KeyDownEvent{Key::A, KeyMod::NoMod}, false);
+  EXPECT_FALSE((*input)->bind_down("test", "hold"));
+  (*input)->handle_input(KeyDownEvent{Key::B, KeyMod::NoMod}, false);
+  EXPECT_EQ((*input)->bind_down("test", "hold"), 1u);
+});
+
+const GameTestRegistration literal_binding_ids("InputBindings", "LiteralOverridesPreserveSiblingsAcrossColdStart",
+    [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto settings = binding_test_settings(fixture, *directory);
+  ASSERT_TRUE(settings);
+  ASSERT_TRUE(File::write_file(String(R"({"cat.a[0]":{"binds":{
+    "do.[1]":{"default":[{"type":"key","value":"A"}]}, "also.b":{}
+  }}})"), File::relative_to(settings->assetSources[0], "literal.binds")));
+  String category = "cat.a[0]", action = "do.[1]";
+  Json key_b = JsonArray{JsonObject{{"type", "key"}, {"value", "B"}}};
+  Json empty = JsonArray{};
+  Json originals = JsonObject{{"cat", 12}, {category, JsonObject{{"keep[0]", 34}}}};
+  Json expected = JsonObject{{"cat", 12}, {category, JsonObject{{"keep[0]", 34}, {action, empty}, {"also.b", key_b}}}};
+  Json game = JsonObject{{"same.id", JsonArray{17}}};
+  {
+    auto root = Root::create(*settings);
+    ASSERT_TRUE(root);
+    auto config = (*root)->configuration();
+    ASSERT_TRUE(config);
+    ASSERT_TRUE((*config)->set("bindings", game));
+    ASSERT_TRUE((*config)->set("modBindings", originals));
+    auto first = Input::create(**root);
+    auto second = Input::create(**root);
+    ASSERT_TRUE(first && second);
+    (*first)->handle_input(KeyDownEvent{Key::A, KeyMod::NoMod}, false);
+    ASSERT_TRUE((*first)->bind_held(category, action));
+    auto revision = (*config)->snapshot().revision;
+    EXPECT_FALSE((*first)->set_binds(category, action, JsonArray{JsonObject{{"type","key"},{"value","C"}}, 17}));
+    EXPECT_EQ((*config)->snapshot().revision, revision);
+    EXPECT_EQ((*config)->get("modBindings"), originals);
+    EXPECT_TRUE((*first)->bind_held(category, action));
+    ASSERT_TRUE((*first)->set_binds(category, action, empty));
+    EXPECT_FALSE((*first)->bind_held(category, action));
+    ASSERT_TRUE((*second)->set_binds(category, "also.b", JsonArray{JsonObject{{"type","key"},{"value","b"}}}));
+    EXPECT_EQ((*config)->snapshot().revision, revision + 2);
+    EXPECT_EQ((*config)->get("modBindings"), expected);
+  }
+  auto reopened = Root::create(std::move(*settings));
+  ASSERT_TRUE(reopened);
+  auto config = (*reopened)->configuration();
+  ASSERT_TRUE(config);
+  auto input = Input::create(**reopened);
+  ASSERT_TRUE(input);
+  EXPECT_EQ((*config)->get("bindings"), game);
+  EXPECT_EQ((*config)->get("modBindings"), expected);
+  EXPECT_EQ((*input)->get_binds(category, action), empty);
+  EXPECT_EQ((*input)->get_binds(category, "also.b"), key_b);
+  ASSERT_TRUE((*input)->reset_binds(category, action));
+  EXPECT_EQ((*input)->get_binds(category, action), Json(JsonArray{JsonObject{{"type","key"},{"value","A"}}}));
+  EXPECT_EQ((*input)->get_binds(category, "also.b"), key_b);
+});
+
+const GameTestRegistration failed_binding_write("InputBindings", "UnavailableConfigurationKeepsLastBindingAndHeldSource",
+    [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto settings = binding_test_settings(fixture, *directory);
+  ASSERT_TRUE(settings);
+  auto path = File::relative_to(settings->storageDirectory, *settings->runtimeConfigFile);
+  ASSERT_TRUE(File::write_file(String(R"({"test":{"binds":{"hold":{"default":[{"type":"key","value":"A"}]}}}})"),
+                               File::relative_to(settings->assetSources[0], "controls.binds")));
+  auto root = Root::create(std::move(*settings));
+  ASSERT_TRUE(root);
+  auto input = Input::create(**root);
+  ASSERT_TRUE(input);
+  Json key_b = JsonArray{JsonObject{{"type", "key"}, {"value", "B"}}};
+  Json key_c = JsonArray{JsonObject{{"type", "key"}, {"value", "C"}}};
+  ASSERT_TRUE((*input)->set_binds("test", "hold", key_b));
+  ASSERT_TRUE((*root)->reload()); // Flush and release the previous Configuration.
+  auto original = File::read_file_string(path);
+  ASSERT_TRUE(original);
+  (*input)->handle_input(KeyDownEvent{Key::B, KeyMod::NoMod}, false);
+  ASSERT_TRUE((*input)->bind_held("test", "hold"));
+
+  // Real configuration load failure: corrupt input cannot be backed up over a directory.
+  ASSERT_TRUE(File::create_directory(path + ".old"));
+  ASSERT_TRUE(File::write_file(String("{broken"), path));
+  ASSERT_FALSE((*root)->reload());
+  EXPECT_FALSE((*input)->set_binds("test", "hold", key_c));
+  EXPECT_FALSE((*input)->reset_binds("test", "hold"));
+  EXPECT_EQ((*input)->get_binds("test", "hold"), key_b);
+  EXPECT_TRUE((*input)->bind_held("test", "hold"));
+  (*input)->handle_input(KeyUpEvent{Key::B}, true);
+  EXPECT_EQ((*input)->bind_up("test", "hold"), 1u);
+
+  ASSERT_TRUE(File::write_file(*original, path));
+  ASSERT_TRUE((*input)->set_binds("test", "hold", key_c));
+  EXPECT_FALSE((*input)->bind_up("test", "hold"));
+  (*input)->handle_input(KeyDownEvent{Key::C, KeyMod::NoMod}, false);
+  EXPECT_TRUE((*input)->bind_held("test", "hold"));
 });
 
 const GameTestRegistration inputEventNames("InputNameSerialization", "EventJsonPreservesCanonicalNamesAndUnknownEnumErrors", [](GameTest&) {
-  auto key = Input::inputEventToJson(KeyDownEvent{Key::F16, KeyMod::LGui | KeyMod::AltGr});
+  auto key = Input::input_event_to_json(KeyDownEvent{Key::F16, KeyMod::LGui | KeyMod::AltGr});
   ASSERT_TRUE(key) << key.error().what();
   EXPECT_EQ(*key, Json(JsonObject{{"type", "KeyDown"}, {"data", JsonObject{
       {"key", "F16"}, {"mods", JsonArray{"LGui", "AltGr"}}}}}));
-  auto mouse = Input::inputEventToJson(MouseButtonUpEvent{MouseButton::FourthButton, Vec2F(3, 4)});
+  auto mouse = Input::input_event_to_json(MouseButtonUpEvent{MouseButton::FourthButton, Vec2F(3, 4)});
   ASSERT_TRUE(mouse) << mouse.error().what();
   EXPECT_EQ(*mouse, Json(JsonObject{{"type", "MouseButtonUp"}, {"data", JsonObject{
       {"mouseButton", "MouseFourth"}, {"mousePosition", JsonArray{3.0, 4.0}}}}}));
-  auto controller = Input::inputEventToJson(ControllerButtonDownEvent{7, ControllerButton::Invalid});
+  auto controller = Input::input_event_to_json(ControllerButtonDownEvent{7, ControllerButton::Invalid});
   ASSERT_TRUE(controller) << controller.error().what();
   EXPECT_EQ(*controller, Json(JsonObject{{"type", "ControllerButtonDown"}, {"data", JsonObject{
       {"controllerButton", "Invalid"}, {"controller", 7}}}}));
-  auto axis = Input::inputEventToJson(ControllerAxisEvent{2, ControllerAxis::TriggerRight, 0.5f});
+  auto axis = Input::input_event_to_json(ControllerAxisEvent{2, ControllerAxis::TriggerRight, 0.5f});
   ASSERT_TRUE(axis) << axis.error().what();
   EXPECT_EQ(*axis, Json(JsonObject{{"type", "ControllerAxis"}, {"data", JsonObject{
       {"controllerAxis", "TriggerRight"}, {"controllerAxisValue", 0.5}, {"controller", 2}}}}));
-  auto unknownKey = Input::inputEventToJson(KeyUpEvent{static_cast<Key>(65535)});
+  auto unknownKey = Input::input_event_to_json(KeyUpEvent{static_cast<Key>(65535)});
   ASSERT_FALSE(unknownKey);
   EXPECT_TRUE(unknownKey.error().is<MapException>());
-  auto unknownAxis = Input::inputEventToJson(ControllerAxisEvent{2, ControllerAxis::Invalid, 0.5f});
+  auto unknownAxis = Input::input_event_to_json(ControllerAxisEvent{2, ControllerAxis::Invalid, 0.5f});
   ASSERT_FALSE(unknownAxis);
   EXPECT_TRUE(unknownAxis.error().is<MapException>());
 });
 
 const GameTestRegistration inputBindNames("InputNameSerialization", "BindJsonPreservesCaseFirstErrorsAndUnknownNames", [](GameTest&) {
-  auto key = Input::bindFromJson(JsonObject{{"type", "key"}, {"value", "eSc"},
+  auto key = Input::bind_from_json(JsonObject{{"type", "key"}, {"value", "eSc"},
       {"mods", JsonArray{"rShIfT", "lCtRl", "RSHIFT", "LMeta", "RGui", "Scroll"}}});
   ASSERT_TRUE(key) << key.error().what();
   ASSERT_TRUE(std::holds_alternative<Input::KeyBind>(*key));
@@ -1057,11 +1218,11 @@ const GameTestRegistration inputBindNames("InputNameSerialization", "BindJsonPre
   EXPECT_EQ(keyBind.key, Key::Escape);
   EXPECT_EQ(keyBind.mods, KeyMod::RShift | KeyMod::LCtrl | KeyMod::LGui | KeyMod::RGui | KeyMod::Scroll);
   EXPECT_EQ(keyBind.priority, 5);
-  auto serializedKey = Input::bindToJson(*key);
+  auto serializedKey = Input::bind_to_json(*key);
   ASSERT_TRUE(serializedKey) << serializedKey.error().what();
   EXPECT_EQ(*serializedKey, Json(JsonObject{{"type", "key"}, {"value", "Esc"},
       {"mods", JsonArray{"RShift", "LCtrl", "LGui", "RGui", "Scroll"}}}));
-  auto reparsedKey = Input::bindFromJson(*serializedKey);
+  auto reparsedKey = Input::bind_from_json(*serializedKey);
   ASSERT_TRUE(reparsedKey) << reparsedKey.error().what();
   ASSERT_TRUE(std::holds_alternative<Input::KeyBind>(*reparsedKey));
   auto const& reparsedKeyBind = std::get<Input::KeyBind>(*reparsedKey);
@@ -1072,9 +1233,9 @@ const GameTestRegistration inputBindNames("InputNameSerialization", "BindJsonPre
   for (Json const& json : JsonArray{
       JsonObject{{"type", "mouse"}, {"value", "mOuSeFiFtH"}},
       JsonObject{{"type", "controller"}, {"value", "tOuChPaD"}, {"controller", 7}}}) {
-    auto bind = Input::bindFromJson(json);
+    auto bind = Input::bind_from_json(json);
     ASSERT_TRUE(bind) << bind.error().what();
-    auto serialized = Input::bindToJson(*bind);
+    auto serialized = Input::bind_to_json(*bind);
     ASSERT_TRUE(serialized) << serialized.error().what();
     auto type = json.get_string("type");
     ASSERT_TRUE(type);
@@ -1083,22 +1244,22 @@ const GameTestRegistration inputBindNames("InputNameSerialization", "BindJsonPre
         : Json(JsonObject{{"type", "controller"}, {"value", "Touchpad"}, {"controller", 7}}));
   }
   String malformed(std::string_view("zzzz\xff", 5));
-  auto unknown = Input::bindFromJson(JsonObject{{"type", "key"}, {"value", "not a key"},
+  auto unknown = Input::bind_from_json(JsonObject{{"type", "key"}, {"value", "not a key"},
       {"mods", JsonArray{malformed}}});
   ASSERT_TRUE(unknown) << unknown.error().what();
   EXPECT_TRUE(std::holds_alternative<std::monostate>(*unknown));
-  auto invalidName = Input::bindFromJson(JsonObject{{"type", "key"}, {"value", malformed}});
+  auto invalidName = Input::bind_from_json(JsonObject{{"type", "key"}, {"value", malformed}});
   ASSERT_FALSE(invalidName);
   EXPECT_TRUE(invalidName.error().is<UnicodeException>());
-  auto firstUnknown = Input::bindFromJson(JsonObject{{"type", "key"}, {"value", "A"},
+  auto firstUnknown = Input::bind_from_json(JsonObject{{"type", "key"}, {"value", "A"},
       {"mods", JsonArray{"unknown modifier", malformed}}});
   ASSERT_FALSE(firstUnknown);
   EXPECT_TRUE(firstUnknown.error().is<MapException>());
-  auto firstInvalid = Input::bindFromJson(JsonObject{{"type", "key"}, {"value", "A"},
+  auto firstInvalid = Input::bind_from_json(JsonObject{{"type", "key"}, {"value", "A"},
       {"mods", JsonArray{malformed, "unknown modifier"}}});
   ASSERT_FALSE(firstInvalid);
   EXPECT_TRUE(firstInvalid.error().is<UnicodeException>());
-  auto invalidValue = Input::bindToJson(Input::KeyBind{static_cast<Key>(65535)});
+  auto invalidValue = Input::bind_to_json(Input::KeyBind{static_cast<Key>(65535)});
   ASSERT_FALSE(invalidValue);
   EXPECT_TRUE(invalidValue.error().is<MapException>());
 });
@@ -1109,7 +1270,7 @@ const GameTestRegistration inputModifierPresence("InputNameSerialization",
                                                    auto nullModifiers = plain.set("mods", Json());
                                                    ASSERT_TRUE(nullModifiers);
                                                    for (Json const& config : JsonArray{plain, *nullModifiers}) {
-                                                     auto decoded = Input::bindFromJson(config);
+                                                     auto decoded = Input::bind_from_json(config);
                                                      ASSERT_TRUE(decoded);
                                                      ASSERT_TRUE(std::holds_alternative<Input::KeyBind>(*decoded));
                                                      auto const& binding = std::get<Input::KeyBind>(*decoded);
@@ -1118,7 +1279,7 @@ const GameTestRegistration inputModifierPresence("InputNameSerialization",
                                                    }
                                                    auto badModifiers = plain.set("mods", JsonObject{});
                                                    ASSERT_TRUE(badModifiers);
-                                                   auto invalid = Input::bindFromJson(*badModifiers);
+                                                   auto invalid = Input::bind_from_json(*badModifiers);
                                                    ASSERT_FALSE(invalid);
                                                    EXPECT_TRUE(invalid.error().is<JsonException>());
                                                  });

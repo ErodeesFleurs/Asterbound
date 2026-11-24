@@ -31,6 +31,10 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> set(String const& key, Json const& value);
   [[nodiscard]] std::expected<void, StarException> set_path(String const& path, Json const& value);
+  // Literal object keys, not a query expression. Create object parents for writes;
+  // null erases the leaf. The entire read-modify-write advances one revision.
+  [[nodiscard]] std::expected<void, StarException> set_object_path(
+      std::span<std::reference_wrapper<String const> const> keys, Json value);
 
 private:
   mutable std::mutex m_mutex;

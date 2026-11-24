@@ -11,5 +11,5 @@ class Input;
 export module star.input_lua_bindings;
 
 export namespace Star::LuaBindings {
-  [[nodiscard]] std::expected<LuaCallbacks, StarException> makeInputCallbacks(Input& input);
+  [[nodiscard]] std::expected<LuaCallbacks, StarException> make_input_callbacks(Input& input);
 }

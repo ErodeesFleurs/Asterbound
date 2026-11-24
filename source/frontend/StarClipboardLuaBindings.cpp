@@ -197,7 +197,7 @@ std::optional<Image> decode_thumbnail(std::string_view bytes) {
 std::expected<LuaCallbacks, StarException> LuaBindings::makeClipboardCallbacks(Input& input, RootBase& root, Logger& logger, std::shared_ptr<ApplicationController> appController, bool alwaysAllow) {
   LuaCallbacks callbacks;
   auto available = [appController, alwaysAllow, &input]() {
-    return alwaysAllow || (appController->isFocused() && input.clipboardAllowed());
+    return alwaysAllow || (appController->isFocused() && input.clipboard_allowed());
   };
   if (auto r = callbacks.register_callback("available", [=]() { return available(); }); !r)
     return std::unexpected(std::move(r.error()));

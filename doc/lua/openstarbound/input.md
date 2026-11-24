@@ -14,11 +14,11 @@ If this bind was pressed this frame, returns how many times it has been pressed.
 
 #### `bool` input.bindHeld(`String` categoryId, `String` bindId)
 
-Returns `true` if this bind is currently held.
+An action stays held until the last physical input that activated it is released. Two controllers pressing the same named button are distinct inputs.
 
 ---
 
-#### `Maybe<unsigned>` input.bindDown(`String` categoryId, `String` bindId)
+#### `Maybe<unsigned>` input.bindUp(`String` categoryId, `String` bindId)
 
 If this bind was released this frame, returns how many times it has been released. Returns `nil` otherwise.
 
@@ -26,31 +26,31 @@ If this bind was released this frame, returns how many times it has been release
 
 #### `Maybe<unsigned>` input.keyDown(`String` keyName, [`StringList` modNames])
 
-If this key was pressed this frame, returns how many times it has been pressed. Returns `nil` otherwise or if the specified modifier keys are not held.
+Returns the number of presses this logic tick, including repeats, or `nil` if none match. When `modNames` is supplied, each press is matched against its own modifier snapshot; omit the argument to count all presses.
 
 ---
 
-#### `bool` input.keyHeld(`String` keyName,  [`StringList` modNames])
+#### `bool` input.keyHeld(`String` keyName)
 
-Returns true if the specified key and all specified modifier keys (like Ctrl and Shift) are held.
+Returns whether the key is held.
 
 ---
 
-#### `bool` input.key(`String` keyName,  [`StringList` modNames])
+#### `bool` input.key(`String` keyName)
 
 Same as `input.keyHeld`.
 
 ---
 
-#### `Maybe<unsigned>` input.keyUp(`String` keyName, [`StringList` modNames])
+#### `Maybe<unsigned>` input.keyUp(`String` keyName)
 
-If this key was released this frame, returns how many times it has been released. Returns `nil` otherwise or if the specified modifier keys are not held.
+Returns the number of releases this logic tick, or `nil` if there were none.
 
 ---
 
-#### `Maybe<unsigned>` input.mouseDown(`String` buttonName)
+#### `Maybe<List<Vec2F>>` input.mouseDown(`String` buttonName)
 
-If this mouse button was pressed this frame, returns how many times it has been pressed. Returns `nil` otherwise.
+Returns the positions of presses of this button in the current logic tick, in event order, or `nil`.
 
 ---
 
@@ -66,9 +66,9 @@ Same as `input.mouseHeld`.
 
 ---
 
-#### `Maybe<unsigned>` input.mouseUp(`String` buttonName)
+#### `Maybe<List<Vec2F>>` input.mouseUp(`String` buttonName)
 
-If this mouse button was released this frame, returns how many times it has been released. Returns `nil` otherwise.
+Returns the positions of releases of this button in the current logic tick, in event order, or `nil`.
 
 ---
 

@@ -730,6 +730,15 @@ std::expected<void, StarException> ClientApplication::windowChanged(WindowMode w
   return {};
 }
 
+void ClientApplication::window_focus_lost() {
+  m_heldKeyEvents.clear();
+  m_edgeKeyEvents.clear();
+  m_controllerLeftStick = {};
+  m_controllerRightStick = {};
+  if (m_input)
+    m_input->clear_input_state();
+}
+
 std::expected<void, StarException> ClientApplication::processInput(InputEvent const& event) {
   restorePresentedCamera();
   if (std::holds_alternative<KeyDownEvent>(event)) {
@@ -789,9 +798,7 @@ std::expected<void, StarException> ClientApplication::processInput(InputEvent co
       processed = *interfaceInput;
     }
   }
-  auto input = m_input->handleInput(event, processed);
-  if (!input)
-    return std::unexpected(std::move(input.error()));
+  m_input->handle_input(event, processed);
   return {};
 }
 
@@ -895,7 +902,7 @@ std::expected<void, StarException> ClientApplication::update() {
   if (!cleaned)
     return std::unexpected(std::move(cleaned.error()));
   m_edgeKeyEvents.clear();
-  m_input->update();
+  m_input->finish_tick();
   ++m_framesSkipped;
   return {};
 }
@@ -1465,7 +1472,7 @@ std::expected<void, StarException> ClientApplication::prepareTitleServices() {
         installLuaCallbacks("universe", LuaBindings::makeUniverseClientCallbacks(*m_root, *m_universeClient));
       !installed)
     return installed;
-  if (auto installed = installLuaCallbacks("input", LuaBindings::makeInputCallbacks(*m_input)); !installed)
+  if (auto installed = installLuaCallbacks("input", LuaBindings::make_input_callbacks(*m_input)); !installed)
     return installed;
   if (auto installed = installLuaCallbacks("voice", LuaBindings::makeVoiceCallbacks(*m_voice)); !installed)
     return installed;
@@ -1959,7 +1966,7 @@ std::expected<void, StarException> ClientApplication::updateTitle(float dt) {
   if (!active)
     return std::unexpected(std::move(active.error()));
   bool inputActive = *active;
-  m_input->setTextInputActive(inputActive);
+  m_input->set_text_input_active(inputActive);
   if (inputActive) {
     auto widget = m_titleScreen->paneManager().keyboardCapturedWidget();
     if (!widget)
@@ -2270,8 +2277,8 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
       if (isActionTakenEdge(InterfaceAction::EmoteSleep))
         m_player->addEmote(HumanoidEmote::Sleep);
 
-      if (int newZoomDirection = static_cast<int>(m_input->bindHeld("opensb", "zoomIn"))
-            - static_cast<int>(m_input->bindHeld("opensb", "zoomOut")))
+      if (int newZoomDirection = static_cast<int>(m_input->bind_held("opensb", "zoomIn"))
+            - static_cast<int>(m_input->bind_held("opensb", "zoomOut")))
         m_cameraZoomDirection = newZoomDirection;
     }
     if (m_cameraZoomDirection != 0) {
@@ -2300,7 +2307,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
     else
       m_player->setMoveVector(Vec2F());
 
-    m_voice->setInput(m_input->bindHeld("opensb", "pushToTalk"));
+    m_voice->setInput(m_input->bind_held("opensb", "pushToTalk"));
     DataStreamBuffer voiceData;
     voiceData.set_byte_order(ByteOrder::LittleEndian);
     auto voice = m_voice->send(voiceData, 5000);
@@ -2409,7 +2416,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
     if (!active)
       return std::unexpected(std::move(active.error()));
     bool inputActive = *active;
-    m_input->setTextInputActive(inputActive);
+    m_input->set_text_input_active(inputActive);
     if (inputActive) {
       auto widget = m_mainInterface->paneManager().keyboardCapturedWidget();
       if (!widget)

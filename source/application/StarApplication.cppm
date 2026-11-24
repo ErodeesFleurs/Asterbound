@@ -61,6 +61,7 @@ public:
 
   // Called when the window mode or size is changed.
   [[nodiscard]] virtual std::expected<void, StarException> windowChanged(WindowMode windowMode, Vec2U screenSize);
+  virtual void window_focus_lost() {}
 
   // Called before update, once for every pending event.
   [[nodiscard]] virtual std::expected<void, StarException> processInput(InputEvent const& event);

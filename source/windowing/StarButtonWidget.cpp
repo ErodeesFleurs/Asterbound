@@ -139,7 +139,7 @@ std::expected<void, StarException> ButtonWidget::renderImpl() {
     auto input = context().input();
     if (!input)
       return std::unexpected(std::move(input.error()));
-    auto unlocker = input->get().unlockClipboard();
+    auto unlocker = input->get().unlock_clipboard();
     auto called = m_callback(*this);
     if (!called)
       return std::unexpected(std::move(called.error()));
@@ -355,7 +355,7 @@ std::expected<void, StarException> ButtonWidget::setPressed(bool pressed) {
         auto input = context().input();
         if (!input)
           return std::unexpected(std::move(input.error()));
-        auto unlocker = input->get().unlockClipboard();
+        auto unlocker = input->get().unlock_clipboard();
         auto called = m_callback(*this);
         if (!called)
           return std::unexpected(std::move(called.error()));

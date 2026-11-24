@@ -418,7 +418,7 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
     return std::unexpected(std::move(itemOwner.error()));
   if (auto player = as_ref<Player>(itemOwner->get())) {
     if (auto input = itemOwner->get().isMaster() ? player->get().input() : std::nullopt) {
-      if (auto presses = input->get().bindDown("opensb", "materialCollisionCycle")) {
+      if (auto presses = input->get().bind_down("opensb", "materialCollisionCycle")) {
         auto database = root().materialDatabase();
         if (!database)
           return std::unexpected(std::move(database.error()));
@@ -447,7 +447,7 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
           return std::unexpected(std::move(sound.error()));
       }
 
-      if (auto presses = input->get().bindDown("opensb", "buildingRadiusGrow")) {
+      if (auto presses = input->get().bind_down("opensb", "buildingRadiusGrow")) {
         m_blockRadius = std::min(BlockRadiusLimit, int(m_blockRadius + *presses));
         auto stored = player->get().setSecretProperty(BlockRadiusPropertyKey, m_blockRadius);
         if (!stored)
@@ -457,7 +457,7 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
           return std::unexpected(std::move(sound.error()));
       }
 
-      if (auto presses = input->get().bindDown("opensb", "buildingRadiusShrink")) {
+      if (auto presses = input->get().bind_down("opensb", "buildingRadiusShrink")) {
         m_blockRadius = std::max(1, int(m_blockRadius - *presses));
         auto stored = player->get().setSecretProperty(BlockRadiusPropertyKey, m_blockRadius);
         if (!stored)
@@ -467,7 +467,7 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
           return std::unexpected(std::move(sound.error()));
       }
 
-      if (auto presses = input->get().bindDown("opensb", "blockSwapToggle")) {
+      if (auto presses = input->get().bind_down("opensb", "blockSwapToggle")) {
         if (*presses % 2 != 0)
           m_blockSwap = !m_blockSwap;
         auto stored = player->get().setSecretProperty(BlockSwapPropertyKey, m_blockSwap);

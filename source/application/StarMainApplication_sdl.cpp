@@ -1931,6 +1931,9 @@ private:
               recordNativeError(std::move(result.error()));
           m_SdlControllers.erase(event.gdevice.which);
         }
+      } else if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST && event.window.windowID == SDL_GetWindowID(m_sdlWindow.get())) {
+        std::lock_guard lock(m_eventMutex);
+        m_ownerEvents.emplace_back(OwnerEvent{.focus_lost = true});
       } else if (event.type == SDL_EVENT_QUIT) {
         std::lock_guard lock(m_eventMutex);
         m_ownerEvents.emplace_back(OwnerEvent{.quit = true});
@@ -1966,6 +1969,7 @@ private:
   struct OwnerEvent {
     std::optional<InputEvent> input = std::nullopt;
     std::optional<std::pair<WindowMode, Vec2U>> window = std::nullopt;
+    bool focus_lost = false;
     bool quit = false;
   };
 
@@ -2037,6 +2041,8 @@ private:
         if (auto changed = m_application->windowChanged(mode, size); !changed)
           return std::unexpected(std::move(changed.error()));
       }
+      if (event.focus_lost)
+        m_application->window_focus_lost();
       if (event.input)
         if (auto processed = m_application->processInput(*event.input); !processed)
           return std::unexpected(std::move(processed.error()));

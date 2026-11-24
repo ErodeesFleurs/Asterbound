@@ -22,6 +22,8 @@ import star.root_base;
 import star.configuration;
 import star.root;
 import star.algorithm;
+import star.input;
+import star.input_event;
 import star.file;
 import star.game_test;
 import star.lua;
@@ -110,6 +112,133 @@ import star.versioning_database;
 using namespace Star;
 
 namespace {
+
+const GameTestRegistration input_tick_state("InputBindings", "KeySnapshotsAndMousePositionsBelongToOneLogicTick", [](GameTest& fixture) {
+  auto created = Input::create(fixture.root());
+  ASSERT_TRUE(created) << created.error().what();
+  auto& input = **created;
+
+  input.handle_input(KeyDownEvent{Key::K, KeyMod::Caps});
+  input.handle_input(KeyUpEvent{Key::K}, true);
+  input.handle_input(KeyUpEvent{Key::K});
+  input.handle_input(KeyDownEvent{Key::K, KeyMod::LCtrl});
+  input.handle_input(KeyDownEvent{Key::K, KeyMod::LCtrl | KeyMod::Num});
+  EXPECT_EQ(input.key_down(Key::K, {}), 3u);
+  EXPECT_EQ(input.key_down(Key::K, KeyMod::NoMod), 1u);
+  EXPECT_EQ(input.key_down(Key::K, KeyMod::Caps), 1u);
+  EXPECT_EQ(input.key_down(Key::K, KeyMod::LCtrl), 2u);
+  EXPECT_EQ(input.key_down(Key::K, KeyMod::LCtrl | KeyMod::Num), 1u);
+  EXPECT_FALSE(input.key_down(Key::K, KeyMod::RCtrl));
+  EXPECT_FALSE(input.key_down(Key::K, KeyMod::LCtrl | KeyMod::Scroll));
+  EXPECT_EQ(input.key_up(Key::K), 1u);
+  EXPECT_TRUE(input.key_held(Key::K));
+
+  constexpr auto button = MouseButton::Right;
+  input.handle_input(MouseButtonDownEvent{button, Vec2F(1, 2)});
+  input.handle_input(MouseButtonUpEvent{button, Vec2F(3, 4)}, true);
+  input.handle_input(MouseButtonUpEvent{button, Vec2F(5, 6)});
+  input.handle_input(MouseButtonDownEvent{button, Vec2F(7, 8)});
+  EXPECT_EQ(input.mouse_down(button).size(), 2u);
+  EXPECT_EQ(input.mouse_up(button).size(), 1u);
+  EXPECT_EQ(input.input_events_this_frame().size(), 9u);
+  EXPECT_TRUE(input.input_events_this_frame()[1].second);
+  input.finish_tick();
+  EXPECT_TRUE(input.key_held(Key::K));
+  EXPECT_FALSE(input.key_down(Key::K, {}));
+  EXPECT_FALSE(input.key_up(Key::K));
+  EXPECT_TRUE(input.mouse_held(button));
+  EXPECT_TRUE(input.mouse_down(button).empty());
+  EXPECT_TRUE(input.mouse_up(button).empty());
+  EXPECT_TRUE(input.input_events_this_frame().empty());
+  input.handle_input(MouseButtonUpEvent{button, Vec2F(9, 10)});
+  input.handle_input(MouseButtonDownEvent{button, Vec2F(11, 12)});
+  ASSERT_EQ(input.mouse_up(button).size(), 1u);
+  EXPECT_EQ(input.mouse_up(button).front(), Vec2F(9, 10));
+  ASSERT_EQ(input.mouse_down(button).size(), 1u);
+  EXPECT_EQ(input.mouse_down(button).front(), Vec2F(11, 12));
+  EXPECT_EQ(input.mouse_position(), Vec2F(11, 12));
+
+  input.set_text_input_active(true);
+  input.handle_input(KeyDownEvent{Key::X, KeyMod::NoMod});
+  input.handle_input(KeyUpEvent{Key::K}, true);
+  EXPECT_FALSE(input.key_down(Key::X, {}));
+  EXPECT_FALSE(input.key_held(Key::K));
+  EXPECT_EQ(input.key_up(Key::K), 1u);
+});
+
+const GameTestRegistration input_source_attribution("InputBindings", "PressAttributionSurvivesRepeatsTiesAndOtherDevices", [](GameTest& fixture) {
+  auto config = fixture.root().configuration();
+  ASSERT_TRUE(config);
+  auto previous = (*config)->get("modBindings");
+  ASSERT_TRUE(previous);
+  auto restore = make_scope_exit([&] { EXPECT_TRUE((*config)->set("modBindings", *previous)); });
+  Json chord = JsonObject{{"type", "key"}, {"value", "A"}, {"mods", JsonArray{"LCtrl"}}};
+  Json alternate = JsonObject{{"type", "key"}, {"value", "A"}, {"mods", JsonArray{"LShift"}}};
+  Json mouse = JsonObject{{"type", "mouse"}, {"value", "MouseLeft"}, {"mods", JsonArray{"LCtrl"}}};
+  Json pad = JsonObject{{"type", "controller"}, {"value", "X"}, {"controller", 3}};
+  Json other_pad = JsonObject{{"type", "controller"}, {"value", "X"}, {"controller", 4}};
+  Json plain = JsonObject{{"type", "key"}, {"value", "A"}};
+  // Legacy mod-binding selection ignores lock state even for a named lock.
+  Json other_key = JsonObject{{"type", "key"}, {"value", "B"}, {"mods", JsonArray{"Caps"}}};
+  ASSERT_TRUE((*config)->set("modBindings", JsonObject{{"opensb", JsonObject{
+    {"editingCopyItemJson", JsonArray{chord, chord, alternate, mouse, pad}},
+    {"zoomIn", JsonArray{chord, other_pad}}, {"zoomOut", JsonArray{plain, other_key}}}}}));
+  auto created = Input::create(fixture.root());
+  ASSERT_TRUE(created) << created.error().what();
+  auto& input = **created;
+  String const category = "opensb";
+  String const action = "editingCopyItemJson";
+  input.handle_input(KeyDownEvent{Key::B, KeyMod::NoMod});
+  input.handle_input(KeyDownEvent{Key::A, KeyMod::LCtrl | KeyMod::LShift});
+  input.handle_input(KeyDownEvent{Key::A, KeyMod::NoMod});
+  EXPECT_EQ(input.bind_down(category, action), 2u);
+  EXPECT_EQ(input.bind_down(category, "zoomIn"), 2u);
+  EXPECT_EQ(input.bind_down(category, "zoomOut"), 1u);
+  EXPECT_EQ(input.get_tag("clipboard"), 1u);
+  input.handle_input(ControllerButtonDownEvent{3, ControllerButton::X});
+  input.handle_input(KeyUpEvent{Key::A}, true);
+  input.handle_input(KeyUpEvent{Key::A});
+  EXPECT_TRUE(input.bind_held(category, action));
+  EXPECT_EQ(input.bind_up(category, action), 1u);
+  EXPECT_FALSE(input.bind_held(category, "zoomIn"));
+  EXPECT_TRUE(input.bind_held(category, "zoomOut"));
+  EXPECT_FALSE(input.bind_up(category, "zoomOut"));
+
+  input.finish_tick();
+  input.handle_input(ControllerButtonDownEvent{4, ControllerButton::X});
+  input.handle_input(ControllerButtonUpEvent{4, ControllerButton::X}, true);
+  input.handle_input(ControllerButtonUpEvent{4, ControllerButton::X});
+  EXPECT_TRUE(input.bind_held(category, action));
+  EXPECT_FALSE(input.bind_up(category, action));
+  EXPECT_EQ(input.bind_up(category, "zoomIn"), 1u);
+  input.handle_input(ControllerButtonUpEvent{3, ControllerButton::X});
+  EXPECT_FALSE(input.bind_held(category, action));
+  EXPECT_EQ(input.bind_up(category, action), 1u);
+  EXPECT_TRUE(input.clipboard_allowed());
+  input.finish_tick();
+  EXPECT_FALSE(input.clipboard_allowed());
+
+  input.handle_input(KeyDownEvent{Key::LCtrl, KeyMod::LCtrl}, true);
+  input.handle_input(MouseButtonDownEvent{MouseButton::Left, {}});
+  EXPECT_TRUE(input.clipboard_allowed());
+  ASSERT_TRUE(input.set_binds(category, action, JsonArray{mouse}));
+  EXPECT_FALSE(input.clipboard_allowed());
+  EXPECT_FALSE(input.mouse_held(MouseButton::Left));
+  EXPECT_EQ(input.input_events_this_frame().size(), 2u);
+  input.handle_input(MouseButtonDownEvent{MouseButton::Left, {}});
+  EXPECT_TRUE(input.bind_held(category, action));
+  input.clear_input_state();
+  EXPECT_FALSE(input.clipboard_allowed());
+  {
+    auto unlock = input.unlock_clipboard();
+    input.clear_input_state();
+    EXPECT_TRUE(input.clipboard_allowed());
+  }
+  EXPECT_FALSE(input.clipboard_allowed());
+  EXPECT_TRUE(input.input_events_this_frame().empty());
+  input.handle_input(MouseButtonDownEvent{MouseButton::Left, {}});
+  EXPECT_FALSE(input.bind_down(category, action));
+});
 
 class RootIsolationErrorSink : public LogSink {
 public:
