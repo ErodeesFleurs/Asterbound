@@ -39,7 +39,7 @@ namespace Star {
 class Root;
 class ItemDatabase;
 
-// Required for renderDummy
+// Required for render_dummy
 class ArmorItem;
 class HeadArmor;
 class ChestArmor;
@@ -54,12 +54,12 @@ concept humanoid_pose_animator = std::same_as<T, NetworkedAnimator> || std::same
 
 // Row order is shared by NPC wire ordinals and humanoid.config timing arrays.
 enum class HumanoidEmote {
-  Idle, Blabbering, Shouting, Happy, Sad, NEUTRAL, Laugh, Annoyed, Oh, OOOH, Blink, Wink, Eat, Sleep
+  Idle, Blabbering, Shouting, Happy, Sad, Neutral, Laugh, Annoyed, Oh, Oooh, Blink, Wink, Eat, Sleep
 };
 
 // Keep the distinct native type for modules that overload on HumanoidHand.
 enum class HumanoidHand {
-  Idle, Blabbering, Shouting, Happy, Sad, NEUTRAL, Laugh, Annoyed, Oh, OOOH, Blink, Wink, Eat, Sleep
+  Idle, Blabbering, Shouting, Happy, Sad, Neutral, Laugh, Annoyed, Oh, Oooh, Blink, Wink, Eat, Sleep
 };
 
 struct EmoteDescription {
@@ -74,38 +74,38 @@ inline constexpr std::array emote_descriptions{
   EmoteDescription{HumanoidEmote::Shouting, "Shouting", "shout", true},
   EmoteDescription{HumanoidEmote::Happy, "Happy", "happy", false},
   EmoteDescription{HumanoidEmote::Sad, "Sad", "sad", true},
-  EmoteDescription{HumanoidEmote::NEUTRAL, "NEUTRAL", "neutral", false},
+  EmoteDescription{HumanoidEmote::Neutral, "NEUTRAL", "neutral", false},
   EmoteDescription{HumanoidEmote::Laugh, "Laugh", "laugh", true},
   EmoteDescription{HumanoidEmote::Annoyed, "Annoyed", "annoyed", false},
   EmoteDescription{HumanoidEmote::Oh, "Oh", "oh", false},
-  EmoteDescription{HumanoidEmote::OOOH, "OOOH", "oooh", false},
+  EmoteDescription{HumanoidEmote::Oooh, "OOOH", "oooh", false},
   EmoteDescription{HumanoidEmote::Blink, "Blink", "blink", false},
   EmoteDescription{HumanoidEmote::Wink, "Wink", "wink", false},
   EmoteDescription{HumanoidEmote::Eat, "Eat", "eat", true},
   EmoteDescription{HumanoidEmote::Sleep, "Sleep", "sleep", true}
 };
-inline constexpr std::size_t EmoteSize = emote_descriptions.size();
+inline constexpr std::size_t emote_size = emote_descriptions.size();
 static_assert([] {
-  for (std::size_t i = 0; i < EmoteSize; ++i)
+  for (std::size_t i = 0; i < emote_size; ++i)
     if (static_cast<std::size_t>(emote_descriptions[i].state) != i)
       return false;
-  return EmoteSize == static_cast<std::size_t>(HumanoidEmote::Sleep) + 1;
+  return emote_size == static_cast<std::size_t>(HumanoidEmote::Sleep) + 1;
 }());
-extern std::expected<EnumMap<HumanoidEmote>, StarException> const HumanoidEmoteNames;
+extern std::expected<EnumMap<HumanoidEmote>, StarException> const humanoid_emote_names;
 
 struct Personality {
   String idle = "idle.1";
-  String armIdle = "idle.1";
-  Vec2F headOffset = Vec2F();
-  Vec2F armOffset = Vec2F();
+  String arm_idle = "idle.1";
+  Vec2F head_offset = Vec2F();
+  Vec2F arm_offset = Vec2F();
 };
 
-[[nodiscard]] std::expected<Personality, StarException> parsePersonalityArray(Json const& config);
+[[nodiscard]] std::expected<Personality, StarException> parse_personality_array(Json const& config);
 
-[[nodiscard]] std::expected<std::reference_wrapper<Personality>, StarException> parsePersonality(Personality& personality, Json const& config);
-[[nodiscard]] std::expected<Personality, StarException> parsePersonality(Json const& config);
+[[nodiscard]] std::expected<std::reference_wrapper<Personality>, StarException> parse_personality(Personality& personality, Json const& config);
+[[nodiscard]] std::expected<Personality, StarException> parse_personality(Json const& config);
 
-Json jsonFromPersonality(Personality const& personality);
+Json json_from_personality(Personality const& personality);
 
 struct HumanoidIdentity {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, HumanoidIdentity& identity);
@@ -113,7 +113,7 @@ struct HumanoidIdentity {
   explicit HumanoidIdentity();
   [[nodiscard]] static std::expected<HumanoidIdentity, StarException> create(Json config);
 
-  [[nodiscard]] std::expected<Json, StarException> toJson() const;
+  [[nodiscard]] std::expected<Json, StarException> to_json() const;
 
   String name;
   // Must have :idle[1-5], :sit, :duck, :walk[1-8], :run[1-8], :jump[1-4], and
@@ -121,23 +121,23 @@ struct HumanoidIdentity {
   String species;
   Gender gender;
 
-  String hairGroup;
+  String hair_group;
   // Must have :normal and :climb
-  String hairType;
-  Directives hairDirectives;
-  Directives bodyDirectives;
-  Directives emoteDirectives;
-  String facialHairGroup;
-  String facialHairType;
-  Directives facialHairDirectives;
-  String facialMaskGroup;
-  String facialMaskType;
-  Directives facialMaskDirectives;
+  String hair_type;
+  Directives hair_directives;
+  Directives body_directives;
+  Directives emote_directives;
+  String facial_hair_group;
+  String facial_hair_type;
+  Directives facial_hair_directives;
+  String facial_mask_group;
+  String facial_mask_type;
+  Directives facial_mask_directives;
 
   Personality personality;
   Vec4B color;
 
-  std::optional<String> imagePath;
+  std::optional<String> image_path;
 
 };
 
@@ -157,13 +157,13 @@ public:
     Duck, // 1 ducking frame
     Sit, // 1 sitting frame
     Lay, // 1 laying frame
-    STATESIZE
+    state_size
   };
-  static std::expected<EnumMap<State>, StarException> const StateNames;
+  static std::expected<EnumMap<State>, StarException> const state_names;
 
   [[nodiscard]] static std::expected<std::shared_ptr<Humanoid>, StarException> create(Root& root);
   [[nodiscard]] static std::expected<std::shared_ptr<Humanoid>, StarException> create(Root& root, Json const& config);
-  [[nodiscard]] static std::expected<std::shared_ptr<Humanoid>, StarException> create(Root& root, HumanoidIdentity const& identity, JsonObject parameters = JsonObject(), Json config = Json(), std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog = std::nullopt);
+  [[nodiscard]] static std::expected<std::shared_ptr<Humanoid>, StarException> create(Root& root, HumanoidIdentity const& identity, JsonObject parameters = JsonObject(), Json config = Json(), std::optional<std::reference_wrapper<ItemDatabase const>> item_catalog = std::nullopt);
   [[nodiscard]] static std::expected<std::shared_ptr<Humanoid>, StarException> create(Humanoid const& humanoid);
   Humanoid& operator=(Humanoid const&) = delete;
 
@@ -171,26 +171,26 @@ public:
     HumanoidTiming() = default;
     [[nodiscard]] static std::expected<HumanoidTiming, StarException> create(Root& root, Json config = {});
 
-    static bool cyclicState(State state);
-    static bool cyclicEmoteState(HumanoidEmote state);
+    static bool cyclic_state(State state);
+    static bool cyclic_emote_state(HumanoidEmote state);
 
-    int stateSeq(float timer, State state) const;
-    int emoteStateSeq(float timer, HumanoidEmote state) const;
-    int genericSeq(float timer, float cycle, unsigned frames, bool cyclic) const;
+    int state_seq(float timer, State state) const;
+    int emote_state_seq(float timer, HumanoidEmote state) const;
+    int generic_seq(float timer, float cycle, unsigned frames, bool cyclic) const;
 
-    Array<float, STATESIZE> stateCycle;
-    Array<unsigned, STATESIZE> stateFrames;
+    Array<float, state_size> state_cycle;
+    Array<unsigned, state_size> state_frames;
 
-    Array<float, EmoteSize> emoteCycle;
-    Array<unsigned, EmoteSize> emoteFrames;
+    Array<float, emote_size> emote_cycle;
+    Array<unsigned, emote_size> emote_frames;
   };
 
-  [[nodiscard]] std::expected<void, StarException> setIdentity(HumanoidIdentity const& identity);
+  [[nodiscard]] std::expected<void, StarException> set_identity(HumanoidIdentity const& identity);
   HumanoidIdentity const& identity() const;
 
-  [[nodiscard]] std::expected<bool, StarException> loadConfig(Json merger = JsonObject(), bool forceRefresh = false);
-  [[nodiscard]] std::expected<void, StarException> loadAnimation();
-  [[nodiscard]] std::expected<void, StarException> setHumanoidParameters(JsonObject parameters);
+  [[nodiscard]] std::expected<bool, StarException> load_config(Json merger = JsonObject(), std::optional<bool> unchanged_body_hidden = {});
+  [[nodiscard]] std::expected<void, StarException> load_animation();
+  [[nodiscard]] std::expected<void, StarException> set_humanoid_parameters(JsonObject parameters);
 
   // All of the image identifiers here are meant to be image *base* names, with
   // a collection of frames specific to each piece.  If an image is set to
@@ -198,20 +198,20 @@ public:
   struct WornAny {
     Directives directives;
     String frameset;
-    bool rotateWithHead = false;
-    bool bypassNude = false;
+    bool rotate_with_head = false;
+    bool bypass_nude = false;
     bool fullbright = false;
-    HashMap<String, String> animationTags = {};
+    HashMap<String, String> animation_tags = {};
   };
 
   // Must have :normal, climb
   struct WornHead : WornAny {
-    Directives maskDirectives;
+    Directives mask_directives;
   };
   // Will have :run, :normal, and :duck
   struct WornChest : WornAny {
-    String frontSleeveFrameset;
-    String backSleeveFrameset;
+    String front_sleeve_frameset;
+    String back_sleeve_frameset;
   };
   // Must have :idle, :duck, :walk[1-8], :run[1-8], :jump[1-4], :fall[1-4]
   struct WornLegs : WornAny {};
@@ -224,99 +224,104 @@ public:
     // 8 vanilla + 12 extra slots
     Array<Wearable, 20> wearables;
     // below 3 are recalculated when rendering updated wearables, null-terminated
-    Array<std::uint8_t, 20> wornHeads;
+    Array<std::uint8_t, 20> worn_heads;
     // chests and leg layering is interchangeable
-    Array<std::uint8_t, 20> wornChestsLegs;
-    Array<std::uint8_t, 20> wornBacks;
-    bool wornHeadsChanged = true;
-    bool wornChestsLegsChanged = true;
-    bool wornBacksChanged = true;
-    DirectivesGroup helmetMaskDirectivesGroup;
-    bool helmetMasksChanged = true;
+    Array<std::uint8_t, 20> worn_chests_legs;
+    Array<std::uint8_t, 20> worn_backs;
+    bool worn_heads_changed = true;
+    bool worn_chests_legs_changed = true;
+    bool worn_backs_changed = true;
+    DirectivesGroup helmet_mask_directives_group;
+    bool helmet_masks_changed = true;
   };
 
   template <typename T>
-  inline std::optional<std::reference_wrapper<T const>> getLastWearableOfType() const;
+    requires (std::same_as<T, WornHead> || std::same_as<T, WornChest> || std::same_as<T, WornLegs> || std::same_as<T, WornBack>)
+  std::optional<std::reference_wrapper<T const>> get_last_wearable_of_type() const {
+    for (std::size_t i = m_fashion->wearables.size(); i != 0; --i) {
+      auto const& wearable = m_fashion->wearables[i - 1];
+      if (std::holds_alternative<T>(wearable))
+        return std::cref(std::get<T>(wearable));
+    }
+    return std::nullopt;
+  }
 
-  [[nodiscard]] std::expected<void, StarException> removeWearable(std::uint8_t slot);
-  [[nodiscard]] std::expected<void, StarException> setWearableFromHead(std::uint8_t slot, HeadArmor const& head, Gender gender);
-  [[nodiscard]] std::expected<void, StarException> setWearableFromChest(std::uint8_t slot, ChestArmor const& chest, Gender gender);
-  [[nodiscard]] std::expected<void, StarException> setWearableFromLegs(std::uint8_t slot, LegsArmor const& legs, Gender gender);
-  [[nodiscard]] std::expected<void, StarException> setWearableFromBack(std::uint8_t slot, BackArmor const& back, Gender gender);
-  void refreshWearables(Fashion& fashion);
+  [[nodiscard]] std::expected<void, StarException> remove_wearable(std::uint8_t slot);
+  [[nodiscard]] std::expected<void, StarException> set_wearable_from_head(std::uint8_t slot, HeadArmor const& head, Gender gender);
+  [[nodiscard]] std::expected<void, StarException> set_wearable_from_chest(std::uint8_t slot, ChestArmor const& chest, Gender gender);
+  [[nodiscard]] std::expected<void, StarException> set_wearable_from_legs(std::uint8_t slot, LegsArmor const& legs, Gender gender);
+  [[nodiscard]] std::expected<void, StarException> set_wearable_from_back(std::uint8_t slot, BackArmor const& back, Gender gender);
 
   // Legacy getters for all of the above, returns last found
-  Directives const& headArmorDirectives() const;
-  String const& headArmorFrameset() const;
-  Directives const& chestArmorDirectives() const;
-  String const& chestArmorFrameset() const;
-  String const& backSleeveFrameset() const;
-  String const& frontSleeveFrameset() const;
-  Directives const& legsArmorDirectives() const;
-  String const& legsArmorFrameset() const;
-  Directives const& backArmorDirectives() const;
-  String const& backArmorFrameset() const;
+  Directives const& head_armor_directives() const;
+  String const& head_armor_frameset() const;
+  Directives const& chest_armor_directives() const;
+  String const& chest_armor_frameset() const;
+  String const& back_sleeve_frameset() const;
+  String const& front_sleeve_frameset() const;
+  Directives const& legs_armor_directives() const;
+  String const& legs_armor_frameset() const;
+  Directives const& back_armor_directives() const;
+  String const& back_armor_frameset() const;
 
-  void setBodyHidden(bool hidden);
 
-  [[nodiscard]] std::expected<void, StarException> setState(State state);
-  [[nodiscard]] std::expected<void, StarException> setEmoteState(HumanoidEmote state);
+  [[nodiscard]] std::expected<void, StarException> set_state(State state);
+  [[nodiscard]] std::expected<void, StarException> set_emote_state(HumanoidEmote state);
   [[nodiscard]] std::expected<void, StarException> set_dance(std::optional<String> const& name);
-  void setFacingDirection(Direction facingDirection);
-  [[nodiscard]] std::expected<void, StarException> setMovingBackwards(bool movingBackwards);
-  void setHeadRotation(float headRotation);
-  void setRotation(float rotation);
-  void setScale(Vec2F scale);
+  void set_facing_direction(Direction facing_direction);
+  [[nodiscard]] std::expected<void, StarException> set_moving_backwards(bool backwards);
+  void set_head_rotation(float head_rotation);
+  void set_rotation(float rotation);
+  void set_scale(Vec2F scale);
 
-  void setVaporTrail(bool enabled);
+  void set_vapor_trail(bool enabled);
 
   State state() const;
-  HumanoidEmote emoteState() const;
+  HumanoidEmote emote_state() const;
   std::optional<String> const& dance() const;
   [[nodiscard]] std::expected<bool, StarException> dance_cyclic_or_ended() const;
-  Direction facingDirection() const;
-  bool movingBackwards() const;
+  Direction facing_direction() const;
+  bool moving_backwards() const;
 
   // If not rotating, then the arms follow normal movement animation.  The
   // angle parameter should be in the range [-pi/2, pi/2] (the facing direction
   // should not be included in the angle).
-  void setHandParameters(ToolHand hand, bool holdingItem, float angle, float itemAngle, bool twoHanded,
-      bool recoil, bool outsideOfHand);
-  void setHandFrameOverrides(ToolHand hand, StringView back, StringView front);
-  void setHandDrawables(ToolHand hand, List<Drawable> drawables);
-  void setHandNonRotatedDrawables(ToolHand hand, List<Drawable> drawables);
-  bool handHoldingItem(ToolHand hand) const;
+  void set_hand_parameters(ToolHand hand, bool holding_item, float angle, float item_angle, bool two_handed,
+      bool recoil, bool outside_of_hand);
+  void set_hand_frame_overrides(ToolHand hand, StringView back, StringView front);
+  void set_hand_drawables(ToolHand hand, List<Drawable> drawables);
+  void set_hand_non_rotated_drawables(ToolHand hand, List<Drawable> drawables);
+  bool hand_holding_item(ToolHand hand) const;
 
   // Updates the animation based on whatever the current animation state is,
   // wrapping or clamping animation time as appropriate.
-  [[nodiscard]] std::expected<void, StarException> animate(float dt, std::optional<std::reference_wrapper<NetworkedAnimator::DynamicTarget>> dynamicTarget);
+  [[nodiscard]] std::expected<void, StarException> animate(float dt, std::optional<std::reference_wrapper<NetworkedAnimator::DynamicTarget>> dynamic_target);
 
   // Logical pose is committed by ticks; visual queries use an explicit sampled view.
   [[nodiscard]] std::expected<void, StarException> prepare_animator_pose();
   [[nodiscard]] std::expected<void, StarException> prepare_animator_pose(NetworkedAnimator::Sample& sample, bool with_items = true);
 
   // Reset animation time to 0.0f
-  [[nodiscard]] std::expected<void, StarException> resetAnimation();
+  [[nodiscard]] std::expected<void, StarException> reset_animation();
 
   // Renders to centered drawables (centered on the normal image center for the
   // player graphics), (in world space, not pixels)
-  [[nodiscard]] std::expected<List<Drawable>, StarException> render(bool withItems = true, bool withRotationAndScale = true, float interpolation = 1.f);
-  [[nodiscard]] std::expected<List<Drawable>, StarException> render(NetworkedAnimator::Sample& sample, bool withItems = true, bool withRotationAndScale = true);
+  [[nodiscard]] std::expected<List<Drawable>, StarException> render(bool with_items = true, bool with_rotation_and_scale = true, float interpolation = 1.f);
+  [[nodiscard]] std::expected<List<Drawable>, StarException> render(NetworkedAnimator::Sample& sample, bool with_items = true, bool with_rotation_and_scale = true);
 
   // Renders to centered drawables (centered on the normal image center for the
   // player graphics), (in pixels, not world space)
-  [[nodiscard]] std::expected<List<Drawable>, StarException> renderPortrait(PortraitMode mode) const;
+  [[nodiscard]] std::expected<List<Drawable>, StarException> render_portrait(PortraitMode mode) const;
 
-  [[nodiscard]] std::expected<List<Drawable>, StarException> renderSkull() const;
+  [[nodiscard]] std::expected<List<Drawable>, StarException> render_skull() const;
 
-  [[nodiscard]] static std::expected<std::shared_ptr<Humanoid>, StarException> makeDummy(Root& root, Gender gender);
+  [[nodiscard]] static std::expected<std::shared_ptr<Humanoid>, StarException> make_dummy(Root& root, Gender gender);
   // Renders to centered drawables (centered on the normal image center for the
   // player graphics), (in pixels, not world space)
-  [[nodiscard]] std::expected<List<Drawable>, StarException> renderDummy(Gender gender, std::optional<std::reference_wrapper<HeadArmor const>> head = std::nullopt, std::optional<std::reference_wrapper<ChestArmor const>> chest = std::nullopt,
+  [[nodiscard]] std::expected<List<Drawable>, StarException> render_dummy(Gender gender, std::optional<std::reference_wrapper<HeadArmor const>> head = std::nullopt, std::optional<std::reference_wrapper<ChestArmor const>> chest = std::nullopt,
       std::optional<std::reference_wrapper<LegsArmor const>> legs = std::nullopt, std::optional<std::reference_wrapper<BackArmor const>> back = std::nullopt);
 
-  [[nodiscard]] std::expected<Vec2F, StarException> primaryHandPosition(Vec2F const& offset) const;
-  [[nodiscard]] std::expected<Vec2F, StarException> altHandPosition(Vec2F const& offset) const;
+  [[nodiscard]] std::expected<Vec2F, StarException> hand_position(ToolHand hand, Vec2F const& offset) const;
 
   // Finds the arm position in world space if the humanoid was facing the given
   // direction and applying the given arm angle.  The offset given is from the
@@ -324,84 +329,83 @@ public:
   [[nodiscard]] std::expected<Vec2F, StarException> arm_position(ToolHand hand, Direction facing_direction, float arm_angle, Vec2F const& offset) const;
 
   // Gives the offset of the hand from the arm rotation center
-  [[nodiscard]] std::expected<Vec2F, StarException> primaryHandOffset(Direction facingDirection) const;
-  [[nodiscard]] std::expected<Vec2F, StarException> altHandOffset(Direction facingDirection) const;
+  [[nodiscard]] std::expected<Vec2F, StarException> hand_offset(ToolHand hand, Direction facing_direction) const;
 
-  [[nodiscard]] std::expected<Vec2F, StarException> armAdjustment() const;
+  [[nodiscard]] std::expected<Vec2F, StarException> arm_adjustment() const;
 
-  [[nodiscard]] std::expected<Vec2F, StarException> mouthOffset(bool ignoreAdjustments = false) const;
-  [[nodiscard]] std::expected<float, StarException> getBobYOffset(float interpolation = 1.f) const;
-  [[nodiscard]] std::expected<Vec2F, StarException> feetOffset() const;
+  [[nodiscard]] std::expected<Vec2F, StarException> mouth_offset(bool ignore_adjustments = false) const;
+  [[nodiscard]] std::expected<float, StarException> bob_y_offset(float interpolation = 1.f) const;
+  [[nodiscard]] std::expected<Vec2F, StarException> feet_offset() const;
 
-  [[nodiscard]] std::expected<Vec2F, StarException> headArmorOffset() const;
-  [[nodiscard]] std::expected<Vec2F, StarException> chestArmorOffset() const;
-  [[nodiscard]] std::expected<Vec2F, StarException> legsArmorOffset() const;
-  [[nodiscard]] std::expected<Vec2F, StarException> backArmorOffset() const;
+  [[nodiscard]] std::expected<Vec2F, StarException> head_armor_offset() const;
+  [[nodiscard]] std::expected<Vec2F, StarException> chest_armor_offset() const;
+  [[nodiscard]] std::expected<Vec2F, StarException> legs_armor_offset() const;
+  [[nodiscard]] std::expected<Vec2F, StarException> back_armor_offset() const;
 
-  String defaultDeathParticles() const;
+  String default_death_particles() const;
   [[nodiscard]] std::expected<List<Particle>, StarException> particles(String const& name) const;
 
-  Json const& defaultMovementParameters() const;
-  std::optional<Json> const& playerMovementParameters() const;
+  Json const& default_movement_parameters() const;
+  std::optional<Json> const& player_movement_parameters() const;
 
-  String getHeadFromIdentity() const;
-  String getBodyFromIdentity() const;
-  String getBodyMaskFromIdentity() const;
-  String getBodyHeadMaskFromIdentity() const;
-  String getFacialEmotesFromIdentity() const;
-  String getHairFromIdentity() const;
-  String getFacialHairFromIdentity() const;
-  String getFacialMaskFromIdentity() const;
-  String getBackArmFromIdentity() const;
-  String getFrontArmFromIdentity() const;
-  String getVaporTrailFrameset() const;
+  String get_head_from_identity() const;
+  String get_body_from_identity() const;
+  String get_body_mask_from_identity() const;
+  String get_body_head_mask_from_identity() const;
+  String get_facial_emotes_from_identity() const;
+  String get_hair_from_identity() const;
+  String get_facial_hair_from_identity() const;
+  String get_facial_mask_from_identity() const;
+  String get_back_arm_from_identity() const;
+  String get_front_arm_from_identity() const;
+  String get_vapor_trail_frameset() const;
 
-  std::optional<std::reference_wrapper<NetworkedAnimator>> networkedAnimator();
-  std::optional<std::reference_wrapper<NetworkedAnimator const>> networkedAnimator() const;
-  List<String> animationScripts() const;
+  std::optional<std::reference_wrapper<NetworkedAnimator>> networked_animator();
+  std::optional<std::reference_wrapper<NetworkedAnimator const>> networked_animator() const;
+  List<String> animation_scripts() const;
 
-  [[nodiscard]] std::expected<Json, StarException> humanoidConfig(bool withOverrides = true);
+  [[nodiscard]] std::expected<Json, StarException> humanoid_config(bool with_overrides = true);
 
   // Extracts scalenearest from directives and returns the combined scale and
   // a new Directives without those scalenearest directives.
-  [[nodiscard]] static std::expected<std::pair<Vec2F, Directives>, StarException> extractScaleFromDirectives(Directives const& directives);
+  [[nodiscard]] static std::expected<std::pair<Vec2F, Directives>, StarException> extract_scale_from_directives(Directives const& directives);
 
 private:
   explicit Humanoid(Root& root);
   Humanoid(Humanoid const&) = default;
   Root& m_root;
-  String m_genderName = "male";
+  String m_gender_name = "male";
   struct HandDrawingInfo {
-    List<Drawable> itemDrawables;
-    List<Drawable> nonRotatedDrawables;
-    bool holdingItem = false;
+    List<Drawable> item_drawables;
+    List<Drawable> non_rotated_drawables;
+    bool holding_item = false;
     float angle = 0.0f;
-    float itemAngle = 0.0f;
-    String backFrame;
-    String frontFrame;
-    Directives backDirectives;
-    Directives frontDirectives;
-    float frameAngleAdjust = 0.0f;
+    float item_angle = 0.0f;
+    String back_frame;
+    String front_frame;
+    Directives back_directives;
+    Directives front_directives;
+    float frame_angle_adjust = 0.0f;
     bool recoil = false;
-    bool outsideOfHand = false;
+    bool outside_of_hand = false;
   };
 
-  HandDrawingInfo const& getHand(ToolHand hand) const;
+  HandDrawingInfo const& get_hand(ToolHand hand) const;
 
-  void wearableRemoved(Wearable const& wearable);
+  void wearable_removed(Wearable const& wearable);
 
-  [[nodiscard]] std::expected<String, StarException> frameBase(State state) const;
+  [[nodiscard]] std::expected<std::string_view, StarException> frame_base(State state) const;
 
-  Directives const& getBodyDirectives() const;
-  Directives const& getHairDirectives() const;
-  Directives const& getEmoteDirectives() const;
-  Directives const& getFacialHairDirectives() const;
-  Directives const& getFacialMaskDirectives() const;
-  DirectivesGroup const& getHelmetMaskDirectivesGroup() const;
+  Directives const& get_body_directives() const;
+  Directives const& get_hair_directives() const;
+  Directives const& get_emote_directives() const;
+  Directives const& get_facial_hair_directives() const;
+  Directives const& get_facial_mask_directives() const;
+  DirectivesGroup const& get_helmet_mask_directives_group() const;
 
-  int getEmoteStateSequence(float interpolation = 1.f) const;
-  [[nodiscard]] std::expected<int, StarException> getArmStateSequence(float interpolation = 1.f) const;
-  int getBodyStateSequence(float interpolation = 1.f) const;
+  [[nodiscard]] std::expected<int, StarException> arm_frame_for(int base_frame) const;
+  int body_frame_for(int base_frame) const;
+  [[nodiscard]] std::expected<float, StarException> bob_for_body_frame(int body_frame) const;
 
   struct CachedDance {
     std::shared_ptr<Dance const> definition;
@@ -412,7 +416,8 @@ private:
   [[nodiscard]] std::expected<std::optional<std::reference_wrapper<DanceStep const>>, StarException> sample_dance_step(float interpolation) const;
   [[nodiscard]] std::expected<std::optional<std::reference_wrapper<DanceStep const>>, StarException> dance_step_at(float timer) const;
 
-  [[nodiscard]] std::expected<void, StarException> refreshAnimationState(bool startNew = false);
+  template <humanoid_pose_animator Animator>
+  void refresh_wearables(Fashion& fashion, Animator& animator) const;
   Vec2F base_head_offset() const;
   template <humanoid_pose_animator Animator>
   [[nodiscard]] std::expected<void, StarException> apply_animator_pose(Animator& animator, HandDrawingInfo const& front_hand,
@@ -422,151 +427,154 @@ private:
   template <humanoid_pose_animator Animator>
   [[nodiscard]] std::expected<void, StarException> prepare_animator_pose(Animator& animator, float interpolation, bool with_items);
 
-  Json m_baseConfig;
-  Json m_mergeConfig;
+  struct Config {
+    HumanoidTiming timing;
+    Vec2F global_offset;
+    Vec2F head_run_offset;
+    Vec2F head_swim_offset;
+    Vec2F head_duck_offset;
+    Vec2F head_sit_offset;
+    Vec2F head_lay_offset;
+    float run_fall_offset = 0.0f;
+    float duck_offset = 0.0f;
+    float sit_offset = 0.0f;
+    float lay_offset = 0.0f;
+    Vec2F recoil_offset;
+    Vec2F mouth_offset;
+    Vec2F feet_offset;
 
-  Vec2F m_globalOffset;
-  Vec2F m_headRunOffset;
-  Vec2F m_headSwimOffset;
-  Vec2F m_headDuckOffset;
-  Vec2F m_headSitOffset;
-  Vec2F m_headLayOffset;
-  float m_runFallOffset = 0.0f;
-  float m_duckOffset = 0.0f;
-  float m_sitOffset = 0.0f;
-  float m_layOffset = 0.0f;
-  Vec2F m_recoilOffset;
-  Vec2F m_mouthOffset;
-  Vec2F m_feetOffset;
+    Vec2F head_armor_offset;
+    Vec2F chest_armor_offset;
+    Vec2F legs_armor_offset;
+    Vec2F back_armor_offset;
 
-  Vec2F m_headArmorOffset;
-  Vec2F m_chestArmorOffset;
-  Vec2F m_legsArmorOffset;
-  Vec2F m_backArmorOffset;
+    bool use_body_mask = false;
+    bool use_body_head_mask = false;
 
-  bool m_useBodyMask = false;
-  bool m_useBodyHeadMask = false;
+    bool body_hidden = false;
 
-  bool m_bodyHidden = false;
+    List<int> arm_walk_seq;
+    List<int> arm_run_seq;
+    List<float> walk_bob;
+    List<float> run_bob;
+    List<float> swim_bob;
+    float jump_bob = 0.0f;
+    Vec2F front_arm_rotation_center;
+    Vec2F back_arm_rotation_center;
+    Vec2F front_hand_position;
+    Vec2F back_arm_offset;
 
-  List<int> m_armWalkSeq;
-  List<int> m_armRunSeq;
-  List<float> m_walkBob;
-  List<float> m_runBob;
-  List<float> m_swimBob;
-  float m_jumpBob = 0.0f;
-  Vec2F m_frontArmRotationCenter;
-  Vec2F m_backArmRotationCenter;
-  Vec2F m_frontHandPosition;
-  Vec2F m_backArmOffset;
+    Vec2F head_rotation_center;
+    bool body_fullbright = false;
+    unsigned vapor_trail_frames = 0;
+    float vapor_trail_cycle = 0.0f;
+    Json particle_emitters;
+    String default_death_particles;
+    Json default_movement_parameters;
+    std::optional<Json> player_movement_parameters;
+  };
 
-  Vec2F m_headRotationCenter;
+  [[nodiscard]] std::expected<bool, StarException> apply_config(Json const& config);
+  Config m_config;
+  Json m_base_config;
+  Json m_merge_config;
 
-  String m_headFrameset;
-  String m_bodyFrameset;
-  String m_bodyMaskFrameset;
-  String m_bodyHeadMaskFrameset;
-  String m_backArmFrameset;
-  String m_frontArmFrameset;
-  String m_emoteFrameset;
-  String m_hairFrameset;
-  String m_facialHairFrameset;
-  String m_facialMaskFrameset;
+  String m_head_frameset;
+  String m_body_frameset;
+  String m_body_mask_frameset;
+  String m_body_head_mask_frameset;
+  String m_back_arm_frameset;
+  String m_front_arm_frameset;
+  String m_emote_frameset;
+  String m_hair_frameset;
+  String m_facial_hair_frameset;
+  String m_facial_mask_frameset;
 
-  bool m_bodyFullbright = false;
 
-  String m_vaporTrailFrameset;
-  unsigned m_vaporTrailFrames = 0;
-  float m_vaporTrailCycle = 0.0f;
+  String m_vapor_trail_frameset;
 
   std::shared_ptr<Fashion> m_fashion;
 
   State m_state;
-  HumanoidEmote m_emoteState;
+  HumanoidEmote m_emote_state;
   std::optional<String> m_dance;
   mutable CachedDance m_cached_dance;
-  Direction m_facingDirection;
-  bool m_movingBackwards = false;
-  float m_headRotation = 0.0f;
-  float m_headRotationTarget = 0.0f;
+  Direction m_facing_direction;
+  bool m_moving_backwards = false;
+  float m_head_rotation = 0.0f;
+  float m_head_rotation_target = 0.0f;
   float m_rotation = 0.0f;
   Vec2F m_scale;
-  bool m_drawVaporTrail = false;
+  bool m_draw_vapor_trail = false;
 
-  HandDrawingInfo m_primaryHand;
-  HandDrawingInfo m_altHand;
+  HandDrawingInfo m_primary_hand;
+  HandDrawingInfo m_alt_hand;
 
-  bool m_twoHanded = false;
+  bool m_two_handed = false;
 
   HumanoidIdentity m_identity;
-  HumanoidTiming m_timing;
 
-  float m_animationTimer = 0.0f;
-  float m_emoteAnimationTimer = 0.0f;
+  float m_animation_timer = 0.0f;
+  float m_emote_animation_timer = 0.0f;
   float m_dance_timer = 0;
-  float m_previousAnimationTimer = 0;
-  float m_previousEmoteAnimationTimer = 0;
+  float m_previous_animation_timer = 0;
+  float m_previous_emote_animation_timer = 0;
   float m_previous_dance_timer = 0;
   struct PresentationPose {
-    float headRotation = 0;
+    float head_rotation = 0;
     float rotation = 0;
     Vec2F scale = Vec2F::filled(1.f);
-    float primaryAngle = 0;
-    float primaryItemAngle = 0;
-    float altAngle = 0;
-    float altItemAngle = 0;
-    bool primaryHolding = false;
-    bool altHolding = false;
+    float primary_angle = 0;
+    float primary_item_angle = 0;
+    float alt_angle = 0;
+    float alt_item_angle = 0;
+    bool primary_holding = false;
+    bool alt_holding = false;
     Direction facing = Direction::Left;
-    bool twoHanded = false;
+    bool two_handed = false;
   };
-  PresentationPose m_previousPose;
-  PresentationPose m_currentPose;
-  bool m_presentationHistory = false;
+  PresentationPose m_previous_pose;
+  PresentationPose m_current_pose;
+  bool m_presentation_history = false;
 
-  Json m_particleEmitters;
-  String m_defaultDeathParticles;
+  bool m_use_animation = false;
 
-  Json m_defaultMovementParameters;
-  std::optional<Json> m_playerMovementParameters;
-  bool m_useAnimation = false;
+  std::shared_ptr<NetworkedAnimator> m_networked_animator;
 
-  std::shared_ptr<NetworkedAnimator> m_networkedAnimator;
-
-  List<String> m_animationScripts;
+  List<String> m_animation_scripts;
 
   struct AnimationStateArgs {
     String state;
-    bool startNew;
+    bool start_new;
     bool reverse;
   };
   using AnimationGroup = HashMap<String, AnimationStateArgs>;
   using AnimationGroupRef = std::optional<std::reference_wrapper<AnimationGroup const>>;
-  AnimationGroupRef movement_animation_group() const;
+  AnimationGroupRef movement_animation_group(State state, bool backwards) const;
   template <humanoid_pose_animator Animator>
   [[nodiscard]] static std::expected<void, StarException> apply_animation_group(Animator& animator, AnimationGroupRef group, bool restart);
-  HashMap<Humanoid::State, HashMap<String,AnimationStateArgs>> m_animationStates;
-  HashMap<Humanoid::State, HashMap<String,AnimationStateArgs>> m_animationStatesBackwards;
-  HashMap<HumanoidEmote, HashMap<String,AnimationStateArgs>> m_emoteAnimationStates;
-  HashMap<PortraitMode, HashMap<String,AnimationStateArgs>> m_portraitAnimationStates;
+  HashMap<Humanoid::State, HashMap<String,AnimationStateArgs>> m_animation_states;
+  HashMap<Humanoid::State, HashMap<String,AnimationStateArgs>> m_animation_states_backwards;
+  HashMap<HumanoidEmote, HashMap<String,AnimationStateArgs>> m_emote_animation_states;
+  HashMap<PortraitMode, HashMap<String,AnimationStateArgs>> m_portrait_animation_states;
 
-  HashMap<String, String> m_identityFramesetTags;
+  HashMap<String, String> m_identity_frameset_tags;
 
-  std::pair<String, String> m_headRotationPoint;
-  std::pair<String, String> m_frontArmRotationPoint;
-  std::pair<String, String> m_backArmRotationPoint;
+  std::pair<String, String> m_head_rotation_point;
+  std::pair<String, String> m_front_arm_rotation_point;
+  std::pair<String, String> m_back_arm_rotation_point;
 
-  String m_frontItemPart;
-  String m_backItemPart;
+  String m_front_item_part;
+  String m_back_item_part;
 
-  std::pair<String, String> m_mouthOffsetPoint;
-  std::pair<String, String> m_headArmorOffsetPoint;
-  std::pair<String, String> m_chestArmorOffsetPoint;
-  std::pair<String, String> m_legsArmorOffsetPoint;
-  std::pair<String, String> m_backArmorOffsetPoint;
-  std::pair<String, String> m_feetOffsetPoint;
-  std::pair<String, String> m_throwPoint;
-  std::pair<String, String> m_interactPoint;
+  std::pair<String, String> m_mouth_offset_point;
+  std::pair<String, String> m_head_armor_offset_point;
+  std::pair<String, String> m_chest_armor_offset_point;
+  std::pair<String, String> m_legs_armor_offset_point;
+  std::pair<String, String> m_back_armor_offset_point;
+  std::pair<String, String> m_feet_offset_point;
+  std::pair<String, String> m_throw_point;
+  std::pair<String, String> m_interact_point;
 
 };
 
@@ -585,28 +593,19 @@ public:
   [[nodiscard]] std::expected<void, StarException> net_elements_need_store() override;
 
   std::shared_ptr<Humanoid> humanoid();
-  [[nodiscard]] std::expected<void, StarException> setHumanoidParameters(JsonObject parameters);
-  JsonObject humanoidParameters();
+  [[nodiscard]] std::expected<void, StarException> set_humanoid_parameters(JsonObject parameters);
+  JsonObject humanoid_parameters();
 
 private:
   explicit NetHumanoid(Root& root);
   Root& m_root;
-  [[nodiscard]] std::expected<void, StarException> setupNetElements();
+  [[nodiscard]] std::expected<void, StarException> setup_net_elements();
 
   Json m_config;
-  NetElementHashMap<String,Json> m_humanoidParameters;
+  NetElementHashMap<String,Json> m_humanoid_parameters;
   std::shared_ptr<Humanoid> m_humanoid;
 };
 
-template <typename T>
-inline std::optional<std::reference_wrapper<T const>> Humanoid::getLastWearableOfType() const {
-  for (std::size_t i = m_fashion->wearables.size(); i != 0; --i) {
-    auto const& wearable = m_fashion->wearables[i - 1];
-    if (std::holds_alternative<T>(wearable))
-      return std::cref(std::get<T>(wearable));
-  }
-  return std::nullopt;
-}
 
 }
 
@@ -624,13 +623,13 @@ export namespace Star {
   using ::Star::HumanoidEmote;
   using ::Star::EmoteDescription;
   using ::Star::emote_descriptions;
-  using ::Star::HumanoidEmoteNames;
-  using ::Star::EmoteSize;
+  using ::Star::humanoid_emote_names;
+  using ::Star::emote_size;
   using ::Star::HumanoidHand;
   using ::Star::Personality;
-  using ::Star::parsePersonalityArray;
-  using ::Star::parsePersonality;
-  using ::Star::jsonFromPersonality;
+  using ::Star::parse_personality_array;
+  using ::Star::parse_personality;
+  using ::Star::json_from_personality;
   using ::Star::HumanoidIdentity;
   using ::Star::NetHumanoid;
 }

@@ -352,14 +352,14 @@ std::expected<void, StarException> LargeCharPlateWidget::update(float dt) {
   if (!*animate) return {};
   auto humanoid = m_player->humanoid();
   if (m_delete && m_delete->isHovered()) {
-    result = humanoid->setEmoteState(HumanoidEmote::Sad);
+    result = humanoid->set_emote_state(HumanoidEmote::Sad);
     if (!result) return std::unexpected(std::move(result.error()));
-    result = humanoid->setState(Humanoid::Run);
+    result = humanoid->set_state(Humanoid::Run);
     if (!result) return std::unexpected(std::move(result.error()));
   } else {
-    result = humanoid->setEmoteState(HumanoidEmote::Idle);
+    result = humanoid->set_emote_state(HumanoidEmote::Idle);
     if (!result) return std::unexpected(std::move(result.error()));
-    result = humanoid->setState(isHovered() ? Humanoid::Walk : Humanoid::Idle);
+    result = humanoid->set_state(isHovered() ? Humanoid::Walk : Humanoid::Idle);
     if (!result) return std::unexpected(std::move(result.error()));
   }
   return humanoid->animate(dt, {});

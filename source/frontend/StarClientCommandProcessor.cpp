@@ -834,8 +834,8 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
     outputSheet = true;
     outputName = first;
     if (first == "hat") {
-      assetPath.base_path = humanoid->headArmorFrameset();
-      assetPath.directives += humanoid->headArmorDirectives();
+      assetPath.base_path = humanoid->head_armor_frameset();
+      assetPath.directives += humanoid->head_armor_directives();
     } else if (first == "chest") {
       if (args.size() <= 1) {
         return "Chest armors have multiple spritesheets. Do: "
@@ -847,14 +847,14 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
       String sheet = std::move(*loweredSheet);
       outputName += " " + sheet;
       if (sheet == "torso") {
-        assetPath.base_path = humanoid->chestArmorFrameset();
-        assetPath.directives += humanoid->chestArmorDirectives();
+        assetPath.base_path = humanoid->chest_armor_frameset();
+        assetPath.directives += humanoid->chest_armor_directives();
       } else if (sheet == "front") {
-        assetPath.base_path = humanoid->frontSleeveFrameset();
-        assetPath.directives += humanoid->chestArmorDirectives();
+        assetPath.base_path = humanoid->front_sleeve_frameset();
+        assetPath.directives += humanoid->chest_armor_directives();
       } else if (sheet == "back") {
-        assetPath.base_path = humanoid->backSleeveFrameset();
-        assetPath.directives += humanoid->chestArmorDirectives();
+        assetPath.base_path = humanoid->back_sleeve_frameset();
+        assetPath.directives += humanoid->chest_armor_directives();
       } else {
         return Star::format("^red;Invalid chest sheet type '{}'^reset;", sheet);
       }
@@ -873,43 +873,43 @@ std::expected<String, StarException> ClientCommandProcessor::render(String const
         }
       }
     } else if (first == "legs") {
-      assetPath.base_path = humanoid->legsArmorFrameset();
-      assetPath.directives += humanoid->legsArmorDirectives();
+      assetPath.base_path = humanoid->legs_armor_frameset();
+      assetPath.directives += humanoid->legs_armor_directives();
     } else if (first == "back") {
-      assetPath.base_path = humanoid->backArmorFrameset();
-      assetPath.directives += humanoid->backArmorDirectives();
+      assetPath.base_path = humanoid->back_armor_frameset();
+      assetPath.directives += humanoid->back_armor_directives();
     } else if (first == "body") {
-      assetPath.base_path = humanoid->getBodyFromIdentity();
-      assetPath.directives += identity.bodyDirectives;
+      assetPath.base_path = humanoid->get_body_from_identity();
+      assetPath.directives += identity.body_directives;
     } else if (first == "head") {
       outputSheet = false;
-      assetPath.base_path = humanoid->getHeadFromIdentity();
+      assetPath.base_path = humanoid->get_head_from_identity();
       assetPath.sub_path = String("normal");
-      assetPath.directives += identity.bodyDirectives;
+      assetPath.directives += identity.body_directives;
     } else if (first == "hair") {
       outputSheet = false;
-      assetPath.base_path = humanoid->getHairFromIdentity();
+      assetPath.base_path = humanoid->get_hair_from_identity();
       assetPath.sub_path = String("normal");
-      assetPath.directives += identity.hairDirectives;
+      assetPath.directives += identity.hair_directives;
     } else if (first == "facialhair") {
       outputSheet = false;
-      assetPath.base_path = humanoid->getFacialHairFromIdentity();
+      assetPath.base_path = humanoid->get_facial_hair_from_identity();
       assetPath.sub_path = String("normal");
-      assetPath.directives += identity.facialHairDirectives;
+      assetPath.directives += identity.facial_hair_directives;
     } else if (first == "facialmask") {
       outputSheet = false;
-      assetPath.base_path = humanoid->getFacialMaskFromIdentity();
+      assetPath.base_path = humanoid->get_facial_mask_from_identity();
       assetPath.sub_path = String("normal");
-      assetPath.directives += identity.facialMaskDirectives;
+      assetPath.directives += identity.facial_mask_directives;
     } else if (first == "frontarm") {
-      assetPath.base_path = humanoid->getFrontArmFromIdentity();
-      assetPath.directives += identity.bodyDirectives;
+      assetPath.base_path = humanoid->get_front_arm_from_identity();
+      assetPath.directives += identity.body_directives;
     } else if (first == "backarm") {
-      assetPath.base_path = humanoid->getBackArmFromIdentity();
-      assetPath.directives += identity.bodyDirectives;
+      assetPath.base_path = humanoid->get_back_arm_from_identity();
+      assetPath.directives += identity.body_directives;
     } else if (first == "emote") {
-      assetPath.base_path = humanoid->getFacialEmotesFromIdentity();
-      assetPath.directives += identity.emoteDirectives;
+      assetPath.base_path = humanoid->get_facial_emotes_from_identity();
+      assetPath.directives += identity.emote_directives;
     } else {
       outputSheet = false;
       outputName = "render";

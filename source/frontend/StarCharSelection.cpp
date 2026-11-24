@@ -283,7 +283,7 @@ std::expected<void, StarException> CharSelectionPane::updateCharacterPlates() {
       auto playerUuid = m_filteredList[scrollPosition];
       auto player = m_playerStorage->loadPlayer(playerUuid);
       if (player && *player) {
-        (*player)->humanoid()->setFacingDirection(Direction::Right);
+        (*player)->humanoid()->set_facing_direction(Direction::Right);
         if (auto result = (*selector)->setPlayer(*player); !result) {
           EmergencyLog::warn("Cannot preview character {}: {}", playerUuid.hex(), result.error().what());
           m_filteredList.erase(m_filteredList.begin() + scrollPosition);

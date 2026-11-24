@@ -154,7 +154,7 @@ std::expected<std::shared_ptr<Npc>, StarException> Npc::create(Root& rootContext
   return create(rootContext, *variant);
 }
 
-Npc::Npc(Root& rootContext) : Entity(rootContext), m_netHumanoid([&rootContext] { return NetHumanoid::create(rootContext); }), m_scriptedAnimator(rootContext), m_scriptComponent(rootContext) {}
+Npc::Npc(Root& rootContext) : Entity(rootContext), m_net_humanoid([&rootContext] { return NetHumanoid::create(rootContext); }), m_scriptedAnimator(rootContext), m_scriptComponent(rootContext) {}
 
 std::expected<std::shared_ptr<Npc>, StarException> Npc::create(Root& rootContext, NpcVariant const& npcVariant) {
   auto creature = std::shared_ptr<Npc>(new Npc(rootContext));
@@ -166,9 +166,9 @@ std::expected<std::shared_ptr<Npc>, StarException> Npc::create(Root& rootContext
 
 std::expected<void, StarException> Npc::initialize(NpcVariant const& npcVariant) {
 
-  auto result1 = NetHumanoid::create(this->root(), npcVariant.humanoidIdentity, npcVariant.humanoidParameters, npcVariant.uniqueHumanoidConfig ? npcVariant.humanoidConfig : Json());
+  auto result1 = NetHumanoid::create(this->root(), npcVariant.humanoid_identity, npcVariant.humanoid_parameters, npcVariant.unique_humanoid_config ? npcVariant.humanoid_config : Json());
 if (!result1) return std::unexpected(std::move(result1.error()));
-auto result2 = m_netHumanoid.add_net_element(std::move(*result1));
+auto result2 = m_net_humanoid.add_net_element(std::move(*result1));
 if (!result2) return std::unexpected(std::move(result2.error()));
 
   m_disableWornArmor.set(npcVariant.disableWornArmor);
@@ -226,7 +226,7 @@ if (!result12) return std::unexpected(std::move(result12.error()));
   m_scriptComponent.set_update_delta(m_npcVariant.initialScriptDelta);
   auto result13 = humanoid();
 if (!result13) return std::unexpected(std::move(result13.error()));
-auto result14 = ActorMovementParameters::create(json_merge(std::move(*result13)->defaultMovementParameters(), m_npcVariant.movementParameters));
+auto result14 = ActorMovementParameters::create(json_merge(std::move(*result13)->default_movement_parameters(), m_npcVariant.movementParameters));
 if (!result14) return std::unexpected(std::move(result14.error()));
 auto movementParameters = std::move(*result14);
   if (!movementParameters.physics_effect_categories)
@@ -237,7 +237,7 @@ m_movementController = std::move(*result15);
   m_identityUpdated = false;
   auto result16 = humanoid();
 if (!result16) return std::unexpected(std::move(result16.error()));
-m_deathParticleBurst.set(std::move(*result16)->defaultDeathParticles());
+m_deathParticleBurst.set(std::move(*result16)->default_death_particles());
 
   auto result17 = StatusController::create(this->root(), m_npcVariant.statusControllerSettings);
 if (!result17) return std::unexpected(std::move(result17.error()));
@@ -321,20 +321,20 @@ auto aimPosition = std::move(*result37);
 if (!result38) return std::unexpected(std::move(result38.error()));
 auto result39 = diskStore.get_string("humanoidState");
 if (!result39) return std::unexpected(std::move(result39.error()));
-if (!Humanoid::StateNames) return std::unexpected(Humanoid::StateNames.error());
-auto result40 = Humanoid::StateNames->get_left(std::move(*result39));
+if (!Humanoid::state_names) return std::unexpected(Humanoid::state_names.error());
+auto result40 = Humanoid::state_names->get_left(std::move(*result39));
 if (!result40) return std::unexpected(std::move(result40.error()));
-auto result41 = std::move(*result38)->setState(result40->get());
+auto result41 = std::move(*result38)->set_state(result40->get());
 if (!result41) return std::unexpected(std::move(result41.error()));
 
   auto result42 = humanoid();
 if (!result42) return std::unexpected(std::move(result42.error()));
 auto result43 = diskStore.get_string("humanoidEmoteState");
 if (!result43) return std::unexpected(std::move(result43.error()));
-if (!HumanoidEmoteNames) return std::unexpected(HumanoidEmoteNames.error());
-auto result44 = HumanoidEmoteNames->get_left(std::move(*result43));
+if (!humanoid_emote_names) return std::unexpected(humanoid_emote_names.error());
+auto result44 = humanoid_emote_names->get_left(std::move(*result43));
 if (!result44) return std::unexpected(std::move(result44.error()));
-auto result45 = std::move(*result42)->setEmoteState(result44->get());
+auto result45 = std::move(*result42)->set_emote_state(result44->get());
 if (!result45) return std::unexpected(std::move(result45.error()));
 
   auto result46 = diskStore.get_bool("isInteractive");
@@ -422,13 +422,13 @@ auto result71 = m_tools->diskStore();
 if (!result71) return std::unexpected(std::move(result71.error()));
 auto result72 = humanoid();
 if (!result72) return std::unexpected(std::move(result72.error()));
-if (!Humanoid::StateNames) return std::unexpected(Humanoid::StateNames.error());
-auto result73 = Humanoid::StateNames->get_right(std::move(*result72)->state());
+if (!Humanoid::state_names) return std::unexpected(Humanoid::state_names.error());
+auto result73 = Humanoid::state_names->get_right(std::move(*result72)->state());
 if (!result73) return std::unexpected(std::move(result73.error()));
 auto result74 = humanoid();
 if (!result74) return std::unexpected(std::move(result74.error()));
-if (!HumanoidEmoteNames) return std::unexpected(HumanoidEmoteNames.error());
-auto result75 = HumanoidEmoteNames->get_right(std::move(*result74)->emoteState());
+if (!humanoid_emote_names) return std::unexpected(humanoid_emote_names.error());
+auto result75 = humanoid_emote_names->get_right(std::move(*result74)->emote_state());
 if (!result75) return std::unexpected(std::move(result75.error()));
 auto result76 = m_effectEmitter->toJson();
 if (!result76) return std::unexpected(std::move(result76.error()));
@@ -540,7 +540,7 @@ if (!result99) return std::unexpected(std::move(result99.error()));
 
     auto result100 = humanoid();
 if (!result100) return std::unexpected(std::move(result100.error()));
-auto animator = (*result100)->networkedAnimator();
+auto animator = (*result100)->networked_animator();
 auto result101 = LuaBindings::makeNetworkedAnimatorCallbacks(animator->get());
 if (!result101) return std::unexpected(std::move(result101.error()));
 auto result102 = m_scriptComponent.add_callbacks("animator", std::move(*result101));
@@ -556,12 +556,12 @@ if (!result104) return std::unexpected(std::move(result104.error()));
   if (world.isClient()) {
     auto result105 = humanoid();
 if (!result105) return std::unexpected(std::move(result105.error()));
-auto result106 = m_scriptedAnimator.set_scripts(std::move(*result105)->animationScripts());
+auto result106 = m_scriptedAnimator.set_scripts(std::move(*result105)->animation_scripts());
 if (!result106) return std::unexpected(std::move(result106.error()));
 
     auto result107 = humanoid();
 if (!result107) return std::unexpected(std::move(result107.error()));
-auto animator = (*result107)->networkedAnimator();
+auto animator = (*result107)->networked_animator();
 auto result108 = LuaBindings::makeScriptedAnimatorCallbacks(animator->get(),
       [this](String const& name, Json const& defaultValue) -> Json {
         return m_scriptedAnimationParameters.value(name, defaultValue);
@@ -587,7 +587,7 @@ if (!result114) return std::unexpected(std::move(result114.error()));
 
   }
 
-  if (auto result = updateHumanoidDirectives(); !result)
+  if (auto result = update_humanoid_directives(); !result)
     return std::unexpected(std::move(result.error()));
   auto pose = humanoid();
   if (!pose)
@@ -684,54 +684,54 @@ RectF Npc::metaBoundBox() const {
 std::expected<Vec2F, StarException> Npc::mouthOffset(bool ignoreAdjustments) const {
   auto body = humanoid();
   if (!body) return std::unexpected(std::move(body.error()));
-  auto offset = (*body)->mouthOffset(ignoreAdjustments);
+  auto offset = (*body)->mouth_offset(ignoreAdjustments);
   if (!offset) return std::unexpected(std::move(offset.error()));
-  (*offset)[0] *= numerical_direction((*body)->facingDirection());
+  (*offset)[0] *= numerical_direction((*body)->facing_direction());
   return offset;
 }
 
 std::expected<Vec2F, StarException> Npc::feetOffset() const {
   auto body = humanoid();
   if (!body) return std::unexpected(std::move(body.error()));
-  auto offset = (*body)->feetOffset();
+  auto offset = (*body)->feet_offset();
   if (!offset) return std::unexpected(std::move(offset.error()));
-  (*offset)[0] *= numerical_direction((*body)->facingDirection());
+  (*offset)[0] *= numerical_direction((*body)->facing_direction());
   return offset;
 }
 
 std::expected<Vec2F, StarException> Npc::headArmorOffset() const {
   auto body = humanoid();
   if (!body) return std::unexpected(std::move(body.error()));
-  auto offset = (*body)->headArmorOffset();
+  auto offset = (*body)->head_armor_offset();
   if (!offset) return std::unexpected(std::move(offset.error()));
-  (*offset)[0] *= numerical_direction((*body)->facingDirection());
+  (*offset)[0] *= numerical_direction((*body)->facing_direction());
   return offset;
 }
 
 std::expected<Vec2F, StarException> Npc::chestArmorOffset() const {
   auto body = humanoid();
   if (!body) return std::unexpected(std::move(body.error()));
-  auto offset = (*body)->chestArmorOffset();
+  auto offset = (*body)->chest_armor_offset();
   if (!offset) return std::unexpected(std::move(offset.error()));
-  (*offset)[0] *= numerical_direction((*body)->facingDirection());
+  (*offset)[0] *= numerical_direction((*body)->facing_direction());
   return offset;
 }
 
 std::expected<Vec2F, StarException> Npc::backArmorOffset() const {
   auto body = humanoid();
   if (!body) return std::unexpected(std::move(body.error()));
-  auto offset = (*body)->backArmorOffset();
+  auto offset = (*body)->back_armor_offset();
   if (!offset) return std::unexpected(std::move(offset.error()));
-  (*offset)[0] *= numerical_direction((*body)->facingDirection());
+  (*offset)[0] *= numerical_direction((*body)->facing_direction());
   return offset;
 }
 
 std::expected<Vec2F, StarException> Npc::legsArmorOffset() const {
   auto body = humanoid();
   if (!body) return std::unexpected(std::move(body.error()));
-  auto offset = (*body)->legsArmorOffset();
+  auto offset = (*body)->legs_armor_offset();
   if (!offset) return std::unexpected(std::move(offset.error()));
-  (*offset)[0] *= numerical_direction((*body)->facingDirection());
+  (*offset)[0] *= numerical_direction((*body)->facing_direction());
   return offset;
 }
 
@@ -774,11 +774,11 @@ std::expected<String, StarException> Npc::description() const {
 }
 
 String Npc::species() const {
-  return m_npcVariant.humanoidIdentity.species;
+  return m_npcVariant.humanoid_identity.species;
 }
 
 Gender Npc::gender() const {
-  return m_npcVariant.humanoidIdentity.gender;
+  return m_npcVariant.humanoid_identity.gender;
 }
 
 String Npc::npcType() const {
@@ -959,7 +959,7 @@ if (!result190) return std::unexpected(std::move(result190.error()));
           {
   auto result191 = humanoid();
   if (!result191) return std::unexpected(std::move(result191.error()));
-  auto result192 = std::move(*result191)->setState(Humanoid::Sit);
+  auto result192 = std::move(*result191)->set_state(Humanoid::Sit);
   if (!result192) return std::unexpected(std::move(result192.error()));
 
 }
@@ -968,7 +968,7 @@ if (!result190) return std::unexpected(std::move(result190.error()));
           {
   auto result193 = humanoid();
   if (!result193) return std::unexpected(std::move(result193.error()));
-  auto result194 = std::move(*result193)->setState(Humanoid::Lay);
+  auto result194 = std::move(*result193)->set_state(Humanoid::Lay);
   if (!result194) return std::unexpected(std::move(result194.error()));
 
 }
@@ -977,7 +977,7 @@ if (!result190) return std::unexpected(std::move(result190.error()));
           {
   auto result195 = humanoid();
   if (!result195) return std::unexpected(std::move(result195.error()));
-  auto result196 = std::move(*result195)->setState(Humanoid::Idle);
+  auto result196 = std::move(*result195)->set_state(Humanoid::Idle);
   if (!result196) return std::unexpected(std::move(result196.error()));
 
 } // currently the same as "standard"
@@ -987,7 +987,7 @@ if (!result190) return std::unexpected(std::move(result190.error()));
           {
   auto result197 = humanoid();
   if (!result197) return std::unexpected(std::move(result197.error()));
-  auto result198 = std::move(*result197)->setState(Humanoid::Idle);
+  auto result198 = std::move(*result197)->set_state(Humanoid::Idle);
   if (!result198) return std::unexpected(std::move(result198.error()));
 
 }
@@ -1025,7 +1025,7 @@ if (!result208) return std::unexpected(std::move(result208.error()));
           {
   auto result209 = humanoid();
   if (!result209) return std::unexpected(std::move(result209.error()));
-  auto result210 = std::move(*result209)->setState(Humanoid::Run);
+  auto result210 = std::move(*result209)->set_state(Humanoid::Run);
   if (!result210) return std::unexpected(std::move(result210.error()));
 
 }
@@ -1033,7 +1033,7 @@ if (!result208) return std::unexpected(std::move(result208.error()));
           {
   auto result211 = humanoid();
   if (!result211) return std::unexpected(std::move(result211.error()));
-  auto result212 = std::move(*result211)->setState(Humanoid::Walk);
+  auto result212 = std::move(*result211)->set_state(Humanoid::Walk);
   if (!result212) return std::unexpected(std::move(result212.error()));
 
 }
@@ -1041,7 +1041,7 @@ if (!result208) return std::unexpected(std::move(result208.error()));
           {
   auto result213 = humanoid();
   if (!result213) return std::unexpected(std::move(result213.error()));
-  auto result214 = std::move(*result213)->setState(Humanoid::Duck);
+  auto result214 = std::move(*result213)->set_state(Humanoid::Duck);
   if (!result214) return std::unexpected(std::move(result214.error()));
 
 }
@@ -1049,7 +1049,7 @@ if (!result208) return std::unexpected(std::move(result208.error()));
           {
   auto result215 = humanoid();
   if (!result215) return std::unexpected(std::move(result215.error()));
-  auto result216 = std::move(*result215)->setState(Humanoid::Idle);
+  auto result216 = std::move(*result215)->set_state(Humanoid::Idle);
   if (!result216) return std::unexpected(std::move(result216.error()));
 
 }
@@ -1058,7 +1058,7 @@ if (!result208) return std::unexpected(std::move(result208.error()));
           {
   auto result217 = humanoid();
   if (!result217) return std::unexpected(std::move(result217.error()));
-  auto result218 = std::move(*result217)->setState(Humanoid::Swim);
+  auto result218 = std::move(*result217)->set_state(Humanoid::Swim);
   if (!result218) return std::unexpected(std::move(result218.error()));
 
 }
@@ -1066,7 +1066,7 @@ if (!result208) return std::unexpected(std::move(result208.error()));
           {
   auto result219 = humanoid();
   if (!result219) return std::unexpected(std::move(result219.error()));
-  auto result220 = std::move(*result219)->setState(Humanoid::SwimIdle);
+  auto result220 = std::move(*result219)->set_state(Humanoid::SwimIdle);
   if (!result220) return std::unexpected(std::move(result220.error()));
 
 }
@@ -1075,7 +1075,7 @@ if (!result208) return std::unexpected(std::move(result208.error()));
           {
   auto result221 = humanoid();
   if (!result221) return std::unexpected(std::move(result221.error()));
-  auto result222 = std::move(*result221)->setState(Humanoid::Jump);
+  auto result222 = std::move(*result221)->set_state(Humanoid::Jump);
   if (!result222) return std::unexpected(std::move(result222.error()));
 
 }
@@ -1083,7 +1083,7 @@ if (!result208) return std::unexpected(std::move(result208.error()));
           {
   auto result223 = humanoid();
   if (!result223) return std::unexpected(std::move(result223.error()));
-  auto result224 = std::move(*result223)->setState(Humanoid::Fall);
+  auto result224 = std::move(*result223)->set_state(Humanoid::Fall);
   if (!result224) return std::unexpected(std::move(result224.error()));
 
 }
@@ -1112,7 +1112,7 @@ m_blink_cooldown_timer = GameTimer(std::move(*result227));
 
     auto result228 = humanoid();
 if (!result228) return std::unexpected(std::move(result228.error()));
-auto result229 = std::move(*result228)->setEmoteState(m_emoteState);
+auto result229 = std::move(*result228)->set_emote_state(m_emoteState);
 if (!result229) return std::unexpected(std::move(result229.error()));
 
     auto result230 = humanoid();
@@ -1174,11 +1174,11 @@ if (!result262) return std::unexpected(std::move(result262.error()));
   return m_tools->collectRenderEvents(render_callback);
 }
 
-std::expected<void, StarException> Npc::updateHumanoidDirectives() {
+std::expected<void, StarException> Npc::update_humanoid_directives() {
   DirectivesGroup directives;
   Vec2F scale = Vec2F::filled(1.f);
   for (auto const& entry : m_statusController->parentDirectives().list()) {
-    auto extracted = Humanoid::extractScaleFromDirectives(entry);
+    auto extracted = Humanoid::extract_scale_from_directives(entry);
     if (!extracted)
       return std::unexpected(std::move(extracted.error()));
     scale = scale.piecewise_multiply(extracted->first);
@@ -1187,7 +1187,7 @@ std::expected<void, StarException> Npc::updateHumanoidDirectives() {
   auto pose = humanoid();
   if (!pose)
     return std::unexpected(std::move(pose.error()));
-  (*pose)->setScale(scale);
+  (*pose)->set_scale(scale);
   m_presentationHumanoidDirectives = std::move(directives);
   return {};
 }
@@ -1282,11 +1282,11 @@ DamageBarType Npc::damageBar() const {
 std::expected<List<Drawable>, StarException> Npc::portrait(PortraitMode mode) const {
   auto result265 = humanoid();
 if (!result265) return std::unexpected(std::move(result265.error()));
-return std::move(*result265)->renderPortrait(mode);
+return std::move(*result265)->render_portrait(mode);
 }
 
 std::expected<String, StarException> Npc::name() const {
-  return m_npcVariant.humanoidIdentity.name;
+  return m_npcVariant.humanoid_identity.name;
 }
 
 std::optional<String> Npc::statusText() const {
@@ -1325,7 +1325,7 @@ std::expected<Vec2F, StarException> Npc::getAbsolutePosition(Vec2F relativePosit
   {
   auto result266 = humanoid();
   if (!result266) return std::unexpected(std::move(result266.error()));
-  if (std::move(*result266)->facingDirection() == Direction::Left)
+  if (std::move(*result266)->facing_direction() == Direction::Left)
       relativePosition[0] *= -1;
 }
   return m_movementController->position() + relativePosition;
@@ -1363,22 +1363,22 @@ m_effectEmitter->setSourcePosition("backArmor", std::move(*result274) + position
 
   auto result275 = humanoid();
 if (!result275) return std::unexpected(std::move(result275.error()));
-m_effectEmitter->setDirection(std::move(*result275)->facingDirection());
+m_effectEmitter->setDirection(std::move(*result275)->facing_direction());
   auto result276 = m_effectEmitter->tick(dt, *entityMode());
 if (!result276) return std::unexpected(std::move(result276.error()));
 
 
   auto result277 = humanoid();
 if (!result277) return std::unexpected(std::move(result277.error()));
-auto result278 = std::move(*result277)->setMovingBackwards(m_movementController->moving_direction() != m_movementController->facing_direction());
+auto result278 = std::move(*result277)->set_moving_backwards(m_movementController->moving_direction() != m_movementController->facing_direction());
 if (!result278) return std::unexpected(std::move(result278.error()));
 
   auto result279 = humanoid();
 if (!result279) return std::unexpected(std::move(result279.error()));
-std::move(*result279)->setFacingDirection(m_movementController->facing_direction());
+std::move(*result279)->set_facing_direction(m_movementController->facing_direction());
   auto result280 = humanoid();
 if (!result280) return std::unexpected(std::move(result280.error()));
-std::move(*result280)->setRotation(m_movementController->rotation());
+std::move(*result280)->set_rotation(m_movementController->rotation());
 
   ActorMovementModifiers firingModifiers;
   auto mainItem = handItem(ToolHand::Primary);
@@ -1425,7 +1425,7 @@ if (!result284) return std::unexpected(std::move(result284.error()));
       m_movementController->control_face(*overrideDirection);
 }
 
-  if (auto result = updateHumanoidDirectives(); !result)
+  if (auto result = update_humanoid_directives(); !result)
     return std::unexpected(std::move(result.error()));
   {
   auto result288 = world();
@@ -1473,7 +1473,7 @@ if (!result298) return std::unexpected(std::move(result298.error()));
 
   auto result300 = callbacks.register_callback("humanoidIdentity", [this]() -> std::expected<Json, StarException> { auto result299 = humanoid();
 if (!result299) return std::unexpected(std::move(result299.error()));
-return std::move(*result299)->identity().toJson(); });
+return std::move(*result299)->identity().to_json(); });
 if (!result300) return std::unexpected(std::move(result300.error()));
   auto result303 = callbacks.register_callback("setHumanoidIdentity", [this](Json const& id) -> std::expected<void, StarException> { auto result301 = HumanoidIdentity::create(id);
 if (!result301) return std::unexpected(std::move(result301.error()));
@@ -1484,36 +1484,36 @@ if (!result302) return std::unexpected(std::move(result302.error()));
 if (!result303) return std::unexpected(std::move(result303.error()));
 auto result305 = callbacks.register_callback(
   "setHumanoidParameter", [this](String key, std::optional<Json> value) -> std::expected<void, StarException> {
-    auto result304 = setHumanoidParameter(std::move(key), std::move(value));
+    auto result304 = set_humanoid_parameter(std::move(key), std::move(value));
     if (!result304)
       return std::unexpected(std::move(result304.error()));
     return {};
   });
 if (!result305) return std::unexpected(std::move(result305.error()));
 auto result306 = callbacks.register_callback(
-  "getHumanoidParameter", [this](String key) -> std::optional<Json> { return getHumanoidParameter(std::move(key)); });
+  "getHumanoidParameter", [this](String key) -> std::optional<Json> { return get_humanoid_parameter(std::move(key)); });
 if (!result306) return std::unexpected(std::move(result306.error()));
 auto result308 = callbacks.register_callback("setHumanoidParameters",
                                             [this](JsonObject parameters) -> std::expected<void, StarException> {
-                                              auto result307 = setHumanoidParameters(std::move(parameters));
+                                              auto result307 = set_humanoid_parameters(std::move(parameters));
                                               if (!result307)
                                                 return std::unexpected(std::move(result307.error()));
                                               return {};
                                             });
 if (!result308) return std::unexpected(std::move(result308.error()));
-  auto result309 = callbacks.register_callback("getHumanoidParameters", [this]() -> JsonObject { return getHumanoidParameters(); });
+  auto result309 = callbacks.register_callback("getHumanoidParameters", [this]() -> JsonObject { return get_humanoid_parameters(); });
 if (!result309) return std::unexpected(std::move(result309.error()));
-  auto result311 = callbacks.register_callback("refreshHumanoidParameters", [this]() -> std::expected<void, StarException> { auto result310 = refreshHumanoidParameters();
+  auto result311 = callbacks.register_callback("refreshHumanoidParameters", [this]() -> std::expected<void, StarException> { auto result310 = refresh_humanoid_parameters();
 if (!result310) return std::unexpected(std::move(result310.error()));
    return {};
 });
 if (!result311) return std::unexpected(std::move(result311.error()));
-  auto result313 = callbacks.register_callback("humanoidConfig", [this](bool withOverrides) -> std::expected<Json, StarException> { auto result312 = humanoid();
+  auto result313 = callbacks.register_callback("humanoidConfig", [this](bool with_overrides) -> std::expected<Json, StarException> { auto result312 = humanoid();
 if (!result312) return std::unexpected(std::move(result312.error()));
-return std::move(*result312)->humanoidConfig(withOverrides); });
+return std::move(*result312)->humanoid_config(with_overrides); });
 if (!result313) return std::unexpected(std::move(result313.error()));
 
-  auto result314 = callbacks.register_callback(   "bodyDirectives", [this]()   { return identity().bodyDirectives;      });
+  auto result314 = callbacks.register_callback(   "bodyDirectives", [this]()   { return identity().body_directives;      });
 if (!result314) return std::unexpected(std::move(result314.error()));
   auto result316 = callbacks.register_callback("setBodyDirectives", [this](String const& str) -> std::expected<void, StarException> { auto result315 = setBodyDirectives(str);
 if (!result315) return std::unexpected(std::move(result315.error()));
@@ -1521,7 +1521,7 @@ if (!result315) return std::unexpected(std::move(result315.error()));
 });
 if (!result316) return std::unexpected(std::move(result316.error()));
 
-  auto result317 = callbacks.register_callback(   "emoteDirectives", [this]()   { return identity().emoteDirectives;      });
+  auto result317 = callbacks.register_callback(   "emoteDirectives", [this]()   { return identity().emote_directives;      });
 if (!result317) return std::unexpected(std::move(result317.error()));
   auto result319 = callbacks.register_callback("setEmoteDirectives", [this](String const& str) -> std::expected<void, StarException> { auto result318 = setEmoteDirectives(str);
 if (!result318) return std::unexpected(std::move(result318.error()));
@@ -1529,21 +1529,21 @@ if (!result318) return std::unexpected(std::move(result318.error()));
 });
 if (!result319) return std::unexpected(std::move(result319.error()));
 
-  auto result320 = callbacks.register_callback(   "hairGroup",      [this]()   { return identity().hairGroup;      });
+  auto result320 = callbacks.register_callback(   "hairGroup",      [this]()   { return identity().hair_group;      });
 if (!result320) return std::unexpected(std::move(result320.error()));
   auto result322 = callbacks.register_callback("setHairGroup",      [this](String const& str) -> std::expected<void, StarException> { auto result321 = setHairGroup(str);
 if (!result321) return std::unexpected(std::move(result321.error()));
    return {};
 });
 if (!result322) return std::unexpected(std::move(result322.error()));
-  auto result323 = callbacks.register_callback(   "hairType",       [this]()   { return identity().hairType;      });
+  auto result323 = callbacks.register_callback(   "hairType",       [this]()   { return identity().hair_type;      });
 if (!result323) return std::unexpected(std::move(result323.error()));
   auto result325 = callbacks.register_callback("setHairType",       [this](String const& str) -> std::expected<void, StarException> { auto result324 = setHairType(str);
 if (!result324) return std::unexpected(std::move(result324.error()));
    return {};
 });
 if (!result325) return std::unexpected(std::move(result325.error()));
-  auto result326 = callbacks.register_callback(   "hairDirectives", [this]()   { return identity().hairDirectives;     });
+  auto result326 = callbacks.register_callback(   "hairDirectives", [this]()   { return identity().hair_directives;     });
 if (!result326) return std::unexpected(std::move(result326.error()));
   auto result328 = callbacks.register_callback("setHairDirectives", [this](String const& str) -> std::expected<void, StarException> { auto result327 = setHairDirectives(str);
 if (!result327) return std::unexpected(std::move(result327.error()));
@@ -1551,21 +1551,21 @@ if (!result327) return std::unexpected(std::move(result327.error()));
 });
 if (!result328) return std::unexpected(std::move(result328.error()));
 
-  auto result329 = callbacks.register_callback(   "facialHairGroup",      [this]()   { return identity().facialHairGroup;      });
+  auto result329 = callbacks.register_callback(   "facialHairGroup",      [this]()   { return identity().facial_hair_group;      });
 if (!result329) return std::unexpected(std::move(result329.error()));
   auto result331 = callbacks.register_callback("setFacialHairGroup",      [this](String const& str) -> std::expected<void, StarException> { auto result330 = setFacialHairGroup(str);
 if (!result330) return std::unexpected(std::move(result330.error()));
    return {};
 });
 if (!result331) return std::unexpected(std::move(result331.error()));
-  auto result332 = callbacks.register_callback(   "facialHairType",       [this]()   { return identity().facialHairType;      });
+  auto result332 = callbacks.register_callback(   "facialHairType",       [this]()   { return identity().facial_hair_type;      });
 if (!result332) return std::unexpected(std::move(result332.error()));
   auto result334 = callbacks.register_callback("setFacialHairType",       [this](String const& str) -> std::expected<void, StarException> { auto result333 = setFacialHairType(str);
 if (!result333) return std::unexpected(std::move(result333.error()));
    return {};
 });
 if (!result334) return std::unexpected(std::move(result334.error()));
-  auto result335 = callbacks.register_callback(   "facialHairDirectives", [this]()   { return identity().facialHairDirectives;      });
+  auto result335 = callbacks.register_callback(   "facialHairDirectives", [this]()   { return identity().facial_hair_directives;      });
 if (!result335) return std::unexpected(std::move(result335.error()));
   auto result337 = callbacks.register_callback("setFacialHairDirectives", [this](String const& str) -> std::expected<void, StarException> { auto result336 = setFacialHairDirectives(str);
 if (!result336) return std::unexpected(std::move(result336.error()));
@@ -1574,20 +1574,20 @@ if (!result336) return std::unexpected(std::move(result336.error()));
 if (!result337) return std::unexpected(std::move(result337.error()));
 
   auto result338 = callbacks.register_callback("hair", [this]() {
-    HumanoidIdentity const& humanoidIdentity = identity();
-    return lua_tuple_return(humanoidIdentity.hairGroup, humanoidIdentity.hairType, humanoidIdentity.hairDirectives);
+    HumanoidIdentity const& humanoid_identity = identity();
+    return lua_tuple_return(humanoid_identity.hair_group, humanoid_identity.hair_type, humanoid_identity.hair_directives);
   });
 if (!result338) return std::unexpected(std::move(result338.error()));
 
   auto result339 = callbacks.register_callback("facialHair", [this]() {
-    HumanoidIdentity const& humanoidIdentity = identity();
-    return lua_tuple_return(humanoidIdentity.facialHairGroup, humanoidIdentity.facialHairType, humanoidIdentity.facialHairDirectives);
+    HumanoidIdentity const& humanoid_identity = identity();
+    return lua_tuple_return(humanoid_identity.facial_hair_group, humanoid_identity.facial_hair_type, humanoid_identity.facial_hair_directives);
   });
 if (!result339) return std::unexpected(std::move(result339.error()));
 
   auto result340 = callbacks.register_callback("facialMask", [this]() {
-    HumanoidIdentity const& humanoidIdentity = identity();
-    return lua_tuple_return(humanoidIdentity.facialMaskGroup, humanoidIdentity.facialMaskType, humanoidIdentity.facialMaskDirectives);
+    HumanoidIdentity const& humanoid_identity = identity();
+    return lua_tuple_return(humanoid_identity.facial_mask_group, humanoid_identity.facial_mask_type, humanoid_identity.facial_mask_directives);
   });
 if (!result340) return std::unexpected(std::move(result340.error()));
 
@@ -1694,7 +1694,7 @@ if (!result361) return std::unexpected(std::move(result361.error()));
 });
 if (!result362) return std::unexpected(std::move(result362.error()));
 
-  auto result363 = callbacks.register_callback(   "imagePath", [this]()                        { return identity().imagePath;    });
+  auto result363 = callbacks.register_callback(   "imagePath", [this]()                        { return identity().image_path;    });
 if (!result363) return std::unexpected(std::move(result363.error()));
   auto result365 = callbacks.register_callback("setImagePath", [this](std::optional<String> const& imagePath) -> std::expected<void, StarException> { auto result364 = setImagePath(imagePath);
 if (!result364) return std::unexpected(std::move(result364.error()));
@@ -1714,12 +1714,12 @@ auto result368 =
   });
 if (!result368) return std::unexpected(std::move(result368.error()));
 
-  auto result369 = callbacks.register_callback(   "personality", [this]() { return jsonFromPersonality(identity().personality); });
+  auto result369 = callbacks.register_callback(   "personality", [this]() { return json_from_personality(identity().personality); });
 if (!result369) return std::unexpected(std::move(result369.error()));
   auto result372 = callbacks.register_callback("setPersonality", [this](Json const& personalityConfig) -> std::expected<void, StarException> {
     Personality const& oldPersonality = identity().personality;
     Personality newPersonality = oldPersonality;
-    auto result370 = parsePersonality(newPersonality, personalityConfig);
+    auto result370 = parse_personality(newPersonality, personalityConfig);
 if (!result370) return std::unexpected(std::move(result370.error()));
 
     auto result371 = setPersonality(newPersonality);
@@ -1789,8 +1789,8 @@ if (!result385) return std::unexpected(std::move(result385.error()));
     });
 if (!result386) return std::unexpected(std::move(result386.error()));
 
-  auto result388 = callbacks.register_callback("emote", [this](String const& arg1) -> std::expected<void, StarException> { if (!HumanoidEmoteNames) return std::unexpected(HumanoidEmoteNames.error());
-    auto result387 = HumanoidEmoteNames->get_left(arg1);
+  auto result388 = callbacks.register_callback("emote", [this](String const& arg1) -> std::expected<void, StarException> { if (!humanoid_emote_names) return std::unexpected(humanoid_emote_names.error());
+    auto result387 = humanoid_emote_names->get_left(arg1);
     if (!result387)
       return std::unexpected(std::move(result387.error()));
     addEmote(result387->get());
@@ -2080,13 +2080,13 @@ if (!result461) return std::unexpected(std::move(result461.error()));
   auto result462 = m_netGroup.add_net_element(m_identityNetState);
 if (!result462) return std::unexpected(std::move(result462.error()));
 
-  m_refreshedHumanoidParameters.set_compatibility_version(10);
-  auto result463 = m_netGroup.add_net_element(m_refreshedHumanoidParameters);
+  m_refreshed_humanoid_parameters.set_compatibility_version(10);
+  auto result463 = m_netGroup.add_net_element(m_refreshed_humanoid_parameters);
 if (!result463) return std::unexpected(std::move(result463.error()));
 
 
-  m_netHumanoid.set_compatibility_version(10);
-  auto result464 = m_netGroup.add_net_element(m_netHumanoid);
+  m_net_humanoid.set_compatibility_version(10);
+  auto result464 = m_netGroup.add_net_element(m_net_humanoid);
 if (!result464) return std::unexpected(std::move(result464.error()));
 
 
@@ -2108,13 +2108,13 @@ if (!result466) return std::unexpected(std::move(result466.error()));
 m_humanoidStateNetState.set(std::move(*result466)->state());
   auto result467 = humanoid();
 if (!result467) return std::unexpected(std::move(result467.error()));
-m_humanoidEmoteStateNetState.set(std::move(*result467)->emoteState());
+m_humanoidEmoteStateNetState.set(std::move(*result467)->emote_state());
   auto result468 = humanoid();
 if (!result468) return std::unexpected(std::move(result468.error()));
 m_humanoid_dance_net_state.set(std::move(*result468)->dance());
 
   if (m_identityUpdated) {
-    m_identityNetState.push(m_npcVariant.humanoidIdentity);
+    m_identityNetState.push(m_npcVariant.humanoid_identity);
     m_identityUpdated = false;
   }
   return {};
@@ -2125,12 +2125,12 @@ std::expected<void, StarException> Npc::getNetStates(bool initial) {
   setTeam(m_teamNetState.get());
   auto result469 = humanoid();
 if (!result469) return std::unexpected(std::move(result469.error()));
-auto result470 = std::move(*result469)->setState(m_humanoidStateNetState.get());
+auto result470 = std::move(*result469)->set_state(m_humanoidStateNetState.get());
 if (!result470) return std::unexpected(std::move(result470.error()));
 
   auto result471 = humanoid();
 if (!result471) return std::unexpected(std::move(result471.error()));
-auto result472 = std::move(*result471)->setEmoteState(m_humanoidEmoteStateNetState.get());
+auto result472 = std::move(*result471)->set_emote_state(m_humanoidEmoteStateNetState.get());
 if (!result472) return std::unexpected(std::move(result472.error()));
 
   auto result473 = humanoid();
@@ -2141,17 +2141,17 @@ if (!result474) return std::unexpected(std::move(result474.error()));
 
   if ((m_identityNetState.pull_updated()) && !initial) {
     auto newIdentity = m_identityNetState.get();
-    if ((m_npcVariant.humanoidIdentity.species == newIdentity.species) && (m_npcVariant.humanoidIdentity.imagePath == newIdentity.imagePath)) {
+    if ((m_npcVariant.humanoid_identity.species == newIdentity.species) && (m_npcVariant.humanoid_identity.image_path == newIdentity.image_path)) {
       auto result475 = humanoid();
 if (!result475) return std::unexpected(std::move(result475.error()));
-auto result476 = std::move(*result475)->setIdentity(newIdentity);
+auto result476 = std::move(*result475)->set_identity(newIdentity);
 if (!result476) return std::unexpected(std::move(result476.error()));
 
     }
-    m_npcVariant.humanoidIdentity = newIdentity;
+    m_npcVariant.humanoid_identity = newIdentity;
   }
-  if (m_refreshedHumanoidParameters.pull_occurred() && !initial) {
-    auto result477 = refreshHumanoidParameters();
+  if (m_refreshed_humanoid_parameters.pull_occurred() && !initial) {
+    auto result477 = refresh_humanoid_parameters();
 if (!result477) return std::unexpected(std::move(result477.error()));
 
   }
@@ -2347,7 +2347,7 @@ if (!result499) return std::unexpected(std::move(result499.error()));
 lights.append_range(std::move(*result499));
 auto result500 = humanoid();
 if (!result500) return std::unexpected(std::move(result500.error()));
-auto animator = (*result500)->networkedAnimator();
+auto animator = (*result500)->networked_animator();
 auto humanoidSample = animator->get().sample(interpolation);
 auto prepared = (*result500)->prepare_animator_pose(humanoidSample);
 if (!prepared) return std::unexpected(std::move(prepared.error()));
@@ -2374,22 +2374,22 @@ std::optional<ChainableJsonMessageResponse> result = std::move(*result503);
   return result;
 }
 
-std::expected<Vec2F, StarException> Npc::armPosition(ToolHand hand, Direction facingDirection, float armAngle, Vec2F offset) const {
-  auto result506 = humanoid();
-if (!result506) return std::unexpected(std::move(result506.error()));
-return m_tools->armPosition(*std::move(*result506), hand, facingDirection, armAngle, offset);
+std::expected<Vec2F, StarException> Npc::arm_position(ToolHand hand, Direction facing_direction, float arm_angle, Vec2F offset) const {
+  auto body = humanoid();
+  if (!body) return std::unexpected(std::move(body.error()));
+  return (*body)->arm_position(hand, facing_direction, arm_angle, offset);
 }
 
-std::expected<Vec2F, StarException> Npc::handOffset(ToolHand hand, Direction facingDirection) const {
-  auto result507 = humanoid();
-if (!result507) return std::unexpected(std::move(result507.error()));
-return m_tools->handOffset(*std::move(*result507), hand, facingDirection);
+std::expected<Vec2F, StarException> Npc::hand_offset(ToolHand hand, Direction facing_direction) const {
+  auto body = humanoid();
+  if (!body) return std::unexpected(std::move(body.error()));
+  return (*body)->hand_offset(hand, facing_direction);
 }
 
-std::expected<Vec2F, StarException> Npc::handPosition(ToolHand hand, Vec2F const& handOffset) const {
-  auto result508 = humanoid();
-if (!result508) return std::unexpected(std::move(result508.error()));
-return m_tools->handPosition(hand, *std::move(*result508), handOffset);
+std::expected<Vec2F, StarException> Npc::hand_position(ToolHand hand, Vec2F const& hand_offset) const {
+  auto body = humanoid();
+  if (!body) return std::unexpected(std::move(body.error()));
+  return (*body)->hand_position(hand, hand_offset);
 }
 
 std::shared_ptr<Item> Npc::handItem(ToolHand hand) const {
@@ -2401,7 +2401,7 @@ std::shared_ptr<Item> Npc::handItem(ToolHand hand) const {
 std::expected<Vec2F, StarException> Npc::armAdjustment() const {
   auto result509 = humanoid();
 if (!result509) return std::unexpected(std::move(result509.error()));
-return std::move(*result509)->armAdjustment();
+return std::move(*result509)->arm_adjustment();
 }
 
 Vec2F Npc::velocity() const {
@@ -2517,8 +2517,8 @@ std::expected<void, StarException> Npc::addEffectEmitters(StringSet const& emitt
 
 std::expected<void, StarException> Npc::requestEmote(String const& emote) {
   if (!emote.empty()) {
-    if (!HumanoidEmoteNames) return std::unexpected(HumanoidEmoteNames.error());
-    auto result514 = HumanoidEmoteNames->get_left(emote);
+    if (!humanoid_emote_names) return std::unexpected(humanoid_emote_names.error());
+    auto result514 = humanoid_emote_names->get_left(emote);
     if (!result514)
       return std::unexpected(std::move(result514.error()));
     auto state = result514->get();
@@ -2594,7 +2594,7 @@ std::expected<List<PhysicsForceRegion>, StarException> Npc::force_regions() cons
 
 
 HumanoidIdentity const& Npc::identity() const {
-  return m_npcVariant.humanoidIdentity;
+  return m_npcVariant.humanoid_identity;
 }
 
 std::expected<void, StarException> Npc::updateIdentity() {
@@ -2602,14 +2602,14 @@ std::expected<void, StarException> Npc::updateIdentity() {
   auto result521 = humanoid();
 if (!result521) return std::unexpected(std::move(result521.error()));
 auto oldIdentity = std::move(*result521)->identity();
-  if ((m_npcVariant.humanoidIdentity.species != oldIdentity.species) || (m_npcVariant.humanoidIdentity.imagePath != oldIdentity.imagePath)) {
-    auto result522 = refreshHumanoidParameters();
+  if ((m_npcVariant.humanoid_identity.species != oldIdentity.species) || (m_npcVariant.humanoid_identity.image_path != oldIdentity.image_path)) {
+    auto result522 = refresh_humanoid_parameters();
 if (!result522) return std::unexpected(std::move(result522.error()));
 
   } else {
     auto result523 = humanoid();
 if (!result523) return std::unexpected(std::move(result523.error()));
-auto result524 = std::move(*result523)->setIdentity(m_npcVariant.humanoidIdentity);
+auto result524 = std::move(*result523)->set_identity(m_npcVariant.humanoid_identity);
 if (!result524) return std::unexpected(std::move(result524.error()));
 
   }
@@ -2617,119 +2617,113 @@ if (!result524) return std::unexpected(std::move(result524.error()));
 }
 
 std::expected<void, StarException> Npc::setIdentity(HumanoidIdentity identity) {
-  m_npcVariant.humanoidIdentity = std::move(identity);
+  m_npcVariant.humanoid_identity = std::move(identity);
   auto result525 = updateIdentity();
 if (!result525) return std::unexpected(std::move(result525.error()));
 
   return {};
 }
 
-std::expected<void, StarException> Npc::setHumanoidParameter(String key, std::optional<Json> value) {
-  if (value.has_value())
-    m_npcVariant.humanoidParameters.set(key, value.value_or(Json{}));
+std::expected<void, StarException> Npc::set_humanoid_parameter(String key, std::optional<Json> value) {
+  auto parameters = m_npcVariant.humanoid_parameters;
+  if (value)
+    parameters.set(std::move(key), std::move(*value));
   else
-    m_npcVariant.humanoidParameters.erase(key);
-
-  auto elements = m_netHumanoid.net_elements();
-  auto result526 = elements.last();
-if (!result526) return std::unexpected(std::move(result526.error()));
-auto result527 = result526->get()->setHumanoidParameters(m_npcVariant.humanoidParameters);
-if (!result527) return std::unexpected(std::move(result527.error()));
-
-  return {};
+    parameters.erase(key);
+  return set_humanoid_parameters(std::move(parameters));
 }
 
-std::optional<Json> Npc::getHumanoidParameter(String key) {
-  return m_npcVariant.humanoidParameters.maybe(key);
+std::optional<Json> Npc::get_humanoid_parameter(String key) {
+  return m_npcVariant.humanoid_parameters.maybe(key);
 }
 
-std::expected<void, StarException> Npc::setHumanoidParameters(JsonObject parameters) {
-  m_npcVariant.humanoidParameters = std::move(parameters);
-
-  auto elements = m_netHumanoid.net_elements();
-  auto result528 = elements.last();
-if (!result528) return std::unexpected(std::move(result528.error()));
-auto result529 = result528->get()->setHumanoidParameters(m_npcVariant.humanoidParameters);
-if (!result529) return std::unexpected(std::move(result529.error()));
-
+std::expected<void, StarException> Npc::set_humanoid_parameters(JsonObject parameters) {
+  auto elements = m_net_humanoid.net_elements();
+  auto element = elements.last();
+  if (!element)
+    return std::unexpected(std::move(element.error()));
+  auto applied = element->get()->set_humanoid_parameters(parameters);
+  if (!applied)
+    return std::unexpected(std::move(applied.error()));
+  m_npcVariant.humanoid_parameters = std::move(parameters);
   return {};
 }
 
 
-JsonObject Npc::getHumanoidParameters() {
-  return m_npcVariant.humanoidParameters;
+JsonObject Npc::get_humanoid_parameters() {
+  return m_npcVariant.humanoid_parameters;
 }
 
 std::expected<void, StarException> Npc::setBodyDirectives(String const& directives)
-{ m_npcVariant.humanoidIdentity.bodyDirectives = directives; auto result530 = updateIdentity();
+{ m_npcVariant.humanoid_identity.body_directives = directives; auto result530 = updateIdentity();
 if (!result530) return std::unexpected(std::move(result530.error()));
    return {};
 }
 
 std::expected<void, StarException> Npc::setEmoteDirectives(String const& directives)
-{ m_npcVariant.humanoidIdentity.emoteDirectives = directives; auto result531 = updateIdentity();
+{ m_npcVariant.humanoid_identity.emote_directives = directives; auto result531 = updateIdentity();
 if (!result531) return std::unexpected(std::move(result531.error()));
    return {};
 }
 
 std::expected<void, StarException> Npc::setHairGroup(String const& group)
-{ m_npcVariant.humanoidIdentity.hairGroup = group; auto result532 = updateIdentity();
+{ m_npcVariant.humanoid_identity.hair_group = group; auto result532 = updateIdentity();
 if (!result532) return std::unexpected(std::move(result532.error()));
    return {};
 }
 
 std::expected<void, StarException> Npc::setHairType(String const& type)
-{ m_npcVariant.humanoidIdentity.hairType = type; auto result533 = updateIdentity();
+{ m_npcVariant.humanoid_identity.hair_type = type; auto result533 = updateIdentity();
 if (!result533) return std::unexpected(std::move(result533.error()));
    return {};
 }
 
 std::expected<void, StarException> Npc::setHairDirectives(String const& directives)
-{ m_npcVariant.humanoidIdentity.hairDirectives = directives; auto result534 = updateIdentity();
+{ m_npcVariant.humanoid_identity.hair_directives = directives; auto result534 = updateIdentity();
 if (!result534) return std::unexpected(std::move(result534.error()));
    return {};
 }
 
 std::expected<void, StarException> Npc::setFacialHairGroup(String const& group)
-{ m_npcVariant.humanoidIdentity.facialHairGroup = group; auto result535 = updateIdentity();
+{ m_npcVariant.humanoid_identity.facial_hair_group = group; auto result535 = updateIdentity();
 if (!result535) return std::unexpected(std::move(result535.error()));
    return {};
 }
 
 std::expected<void, StarException> Npc::setFacialHairType(String const& type)
-{ m_npcVariant.humanoidIdentity.facialHairType = type; auto result536 = updateIdentity();
+{ m_npcVariant.humanoid_identity.facial_hair_type = type; auto result536 = updateIdentity();
 if (!result536) return std::unexpected(std::move(result536.error()));
    return {};
 }
 
 std::expected<void, StarException> Npc::setFacialHairDirectives(String const& directives)
-{ m_npcVariant.humanoidIdentity.facialHairDirectives = directives; auto result537 = updateIdentity();
+{ m_npcVariant.humanoid_identity.facial_hair_directives = directives; auto result537 = updateIdentity();
 if (!result537) return std::unexpected(std::move(result537.error()));
    return {};
 }
 
 std::expected<void, StarException> Npc::setFacialMaskGroup(String const& group)
-{ m_npcVariant.humanoidIdentity.facialMaskGroup = group; auto result538 = updateIdentity();
+{ m_npcVariant.humanoid_identity.facial_mask_group = group; auto result538 = updateIdentity();
 if (!result538) return std::unexpected(std::move(result538.error()));
    return {};
 }
 
 std::expected<void, StarException> Npc::setFacialMaskType(String const& type)
-{ m_npcVariant.humanoidIdentity.facialMaskType = type; auto result539 = updateIdentity();
+{ m_npcVariant.humanoid_identity.facial_mask_type = type; auto result539 = updateIdentity();
 if (!result539) return std::unexpected(std::move(result539.error()));
    return {};
 }
 
 std::expected<void, StarException> Npc::setFacialMaskDirectives(String const& directives)
-{ m_npcVariant.humanoidIdentity.facialMaskDirectives = directives; auto result540 = updateIdentity();
+{ m_npcVariant.humanoid_identity.facial_mask_directives = directives; auto result540 = updateIdentity();
 if (!result540) return std::unexpected(std::move(result540.error()));
    return {};
 }
 
 std::expected<void, StarException> Npc::setHair(String const& group, String const& type, String const& directives) {
-  m_npcVariant.humanoidIdentity.hairGroup = group;
-  m_npcVariant.humanoidIdentity.hairType = type;
-  m_npcVariant.humanoidIdentity.hairDirectives = directives;
+  m_npcVariant.humanoid_identity.hair_group = group;
+  m_npcVariant.humanoid_identity.hair_type = type;
+  m_npcVariant.humanoid_identity.hair_directives = directives;
   auto result541 = updateIdentity();
 if (!result541) return std::unexpected(std::move(result541.error()));
 
@@ -2737,9 +2731,9 @@ if (!result541) return std::unexpected(std::move(result541.error()));
 }
 
 std::expected<void, StarException> Npc::setFacialHair(String const& group, String const& type, String const& directives) {
-  m_npcVariant.humanoidIdentity.facialHairGroup = group;
-  m_npcVariant.humanoidIdentity.facialHairType = type;
-  m_npcVariant.humanoidIdentity.facialHairDirectives = directives;
+  m_npcVariant.humanoid_identity.facial_hair_group = group;
+  m_npcVariant.humanoid_identity.facial_hair_type = type;
+  m_npcVariant.humanoid_identity.facial_hair_directives = directives;
   auto result542 = updateIdentity();
 if (!result542) return std::unexpected(std::move(result542.error()));
 
@@ -2747,9 +2741,9 @@ if (!result542) return std::unexpected(std::move(result542.error()));
 }
 
 std::expected<void, StarException> Npc::setFacialMask(String const& group, String const& type, String const& directives) {
-  m_npcVariant.humanoidIdentity.facialMaskGroup = group;
-  m_npcVariant.humanoidIdentity.facialMaskType = type;
-  m_npcVariant.humanoidIdentity.facialMaskDirectives = directives;
+  m_npcVariant.humanoid_identity.facial_mask_group = group;
+  m_npcVariant.humanoid_identity.facial_mask_type = type;
+  m_npcVariant.humanoid_identity.facial_mask_directives = directives;
   auto result543 = updateIdentity();
 if (!result543) return std::unexpected(std::move(result543.error()));
 
@@ -2757,7 +2751,7 @@ if (!result543) return std::unexpected(std::move(result543.error()));
 }
 
 std::expected<void, StarException> Npc::setSpecies(String const& species) {
-  m_npcVariant.humanoidIdentity.species = species;
+  m_npcVariant.humanoid_identity.species = species;
   auto result544 = updateIdentity();
 if (!result544) return std::unexpected(std::move(result544.error()));
 
@@ -2765,7 +2759,7 @@ if (!result544) return std::unexpected(std::move(result544.error()));
 }
 
 std::expected<void, StarException> Npc::setGender(Gender const& gender) {
-  m_npcVariant.humanoidIdentity.gender = gender;
+  m_npcVariant.humanoid_identity.gender = gender;
   auto result545 = updateIdentity();
 if (!result545) return std::unexpected(std::move(result545.error()));
 
@@ -2773,7 +2767,7 @@ if (!result545) return std::unexpected(std::move(result545.error()));
 }
 
 std::expected<void, StarException> Npc::setPersonality(Personality const& personality) {
-  m_npcVariant.humanoidIdentity.personality = personality;
+  m_npcVariant.humanoid_identity.personality = personality;
   auto result546 = updateIdentity();
 if (!result546) return std::unexpected(std::move(result546.error()));
 
@@ -2781,7 +2775,7 @@ if (!result546) return std::unexpected(std::move(result546.error()));
 }
 
 std::expected<void, StarException> Npc::setImagePath(std::optional<String> const& imagePath) {
-  m_npcVariant.humanoidIdentity.imagePath = imagePath;
+  m_npcVariant.humanoid_identity.image_path = imagePath;
   auto result547 = updateIdentity();
 if (!result547) return std::unexpected(std::move(result547.error()));
 
@@ -2789,7 +2783,7 @@ if (!result547) return std::unexpected(std::move(result547.error()));
 }
 
 std::expected<void, StarException> Npc::setFavoriteColor(Color color) {
-  m_npcVariant.humanoidIdentity.color = color.to_rgba();
+  m_npcVariant.humanoid_identity.color = color.to_rgba();
   auto result548 = updateIdentity();
 if (!result548) return std::unexpected(std::move(result548.error()));
 
@@ -2797,7 +2791,7 @@ if (!result548) return std::unexpected(std::move(result548.error()));
 }
 
 std::expected<void, StarException> Npc::setName(String const& name) {
-  m_npcVariant.humanoidIdentity.name = name;
+  m_npcVariant.humanoid_identity.name = name;
   auto result549 = updateIdentity();
 if (!result549) return std::unexpected(std::move(result549.error()));
 
@@ -2809,43 +2803,43 @@ void Npc::setDescription(String const& description) {
 }
 
 std::expected<std::shared_ptr<Humanoid>, StarException> Npc::humanoid() {
-  auto elements = m_netHumanoid.net_elements();
+  auto elements = m_net_humanoid.net_elements();
   auto last = elements.last();
   if (!last) return std::unexpected(std::move(last.error()));
   return last->get()->humanoid();
 }
 std::expected<std::shared_ptr<Humanoid>, StarException> Npc::humanoid() const {
-  auto elements = m_netHumanoid.net_elements();
+  auto elements = m_net_humanoid.net_elements();
   auto last = elements.last();
   if (!last) return std::unexpected(std::move(last.error()));
   return last->get()->humanoid();
 }
 
-std::expected<void, StarException> Npc::refreshHumanoidParameters() {
+std::expected<void, StarException> Npc::refresh_humanoid_parameters() {
   auto result550 = this->root().speciesDatabase();
 if (!result550) return std::unexpected(std::move(result550.error()));
-auto speciesDatabase = std::move(*result550);
-  auto result551 = speciesDatabase->species(m_npcVariant.humanoidIdentity.species);
+auto species_database = std::move(*result550);
+  auto result551 = species_database->species(m_npcVariant.humanoid_identity.species);
 if (!result551) return std::unexpected(std::move(result551.error()));
-auto speciesDef = std::move(*result551);
+auto species_def = std::move(*result551);
 
   if (isMaster()) {
-    m_refreshedHumanoidParameters.trigger();
+    m_refreshed_humanoid_parameters.trigger();
     m_scriptedAnimationParameters.clear();
-    m_netHumanoid.clear_net_elements();
-    auto result552 = NetHumanoid::create(this->root(), m_npcVariant.humanoidIdentity, m_npcVariant.humanoidParameters, m_npcVariant.uniqueHumanoidConfig ? m_npcVariant.humanoidConfig : Json());
+    m_net_humanoid.clear_net_elements();
+    auto result552 = NetHumanoid::create(this->root(), m_npcVariant.humanoid_identity, m_npcVariant.humanoid_parameters, m_npcVariant.unique_humanoid_config ? m_npcVariant.humanoid_config : Json());
 if (!result552) return std::unexpected(std::move(result552.error()));
-auto result553 = m_netHumanoid.add_net_element(std::move(*result552));
+auto result553 = m_net_humanoid.add_net_element(std::move(*result552));
 if (!result553) return std::unexpected(std::move(result553.error()));
 
     auto result554 = humanoid();
 if (!result554) return std::unexpected(std::move(result554.error()));
-m_deathParticleBurst.set(std::move(*result554)->defaultDeathParticles());
+m_deathParticleBurst.set(std::move(*result554)->default_death_particles());
   }else {
-    auto elements = m_netHumanoid.net_elements();
+    auto elements = m_net_humanoid.net_elements();
     auto result555 = elements.last();
 if (!result555) return std::unexpected(std::move(result555.error()));
-m_npcVariant.humanoidParameters = result555->get()->humanoidParameters();
+m_npcVariant.humanoid_parameters = result555->get()->humanoid_parameters();
   }
 
   auto result556 = m_armor->disk_store();
@@ -2862,7 +2856,7 @@ if (!result559) return std::unexpected(std::move(result559.error()));
 
   auto result560 = humanoid();
 if (!result560) return std::unexpected(std::move(result560.error()));
-auto result561 = ActorMovementParameters::create(json_merge(std::move(*result560)->defaultMovementParameters(), m_npcVariant.movementParameters));
+auto result561 = ActorMovementParameters::create(json_merge(std::move(*result560)->default_movement_parameters(), m_npcVariant.movementParameters));
 if (!result561) return std::unexpected(std::move(result561.error()));
 auto result562 = m_movementController->reset_base_parameters(std::move(*result561));
 if (!result562) return std::unexpected(std::move(result562.error()));
@@ -2876,7 +2870,7 @@ if (!result563) return std::unexpected(std::move(result563.error()));
 
         auto result564 = humanoid();
 if (!result564) return std::unexpected(std::move(result564.error()));
-auto animator = (*result564)->networkedAnimator();
+auto animator = (*result564)->networked_animator();
 auto result565 = LuaBindings::makeNetworkedAnimatorCallbacks(animator->get());
 if (!result565) return std::unexpected(std::move(result565.error()));
 auto result566 = m_scriptComponent.add_callbacks("animator", std::move(*result565));
@@ -2906,15 +2900,15 @@ if (!result567) return std::unexpected(std::move(result567.error()));
 
         auto result573 = humanoid();
   if (!result573) return std::unexpected(std::move(result573.error()));
-  auto result574 = m_scriptedAnimator.set_scripts(std::move(*result573)->animationScripts());
+  auto result574 = m_scriptedAnimator.set_scripts(std::move(*result573)->animation_scripts());
   if (!result574) return std::unexpected(std::move(result574.error()));
 
         auto result575 = humanoid();
   if (!result575) return std::unexpected(std::move(result575.error()));
-  auto animator = (*result575)->networkedAnimator();
+  auto animator = (*result575)->networked_animator();
   auto result576 = LuaBindings::makeScriptedAnimatorCallbacks(animator->get(),
-          [this](String const& name, Json const& defaultValue) -> Json {
-            return m_scriptedAnimationParameters.value(name, defaultValue);
+          [this](String const& name, Json const& default_value) -> Json {
+            return m_scriptedAnimationParameters.value(name, default_value);
           });
   if (!result576) return std::unexpected(std::move(result576.error()));
   auto result577 = m_scriptedAnimator.add_callbacks("animationConfig", std::move(*result576));

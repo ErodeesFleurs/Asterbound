@@ -433,10 +433,10 @@ Directives const& HeadArmor::maskDirectives() const {
 
 std::expected<List<Drawable>, StarException> HeadArmor::preview(std::optional<std::reference_wrapper<TileDrawer>>, std::shared_ptr<Player> const& viewer) const {
   Gender gender = viewer ? viewer->gender() : Gender::Male;
-  auto humanoid = viewer ? std::expected<std::shared_ptr<Humanoid>, StarException>(viewer->humanoid()) : Humanoid::makeDummy(root(), gender);
+  auto humanoid = viewer ? std::expected<std::shared_ptr<Humanoid>, StarException>(viewer->humanoid()) : Humanoid::make_dummy(root(), gender);
   if (!humanoid)
     return std::unexpected(std::move(humanoid.error()));
-  return (*humanoid)->renderDummy(gender, std::cref(*this), std::nullopt, std::nullopt, std::nullopt);
+  return (*humanoid)->render_dummy(gender, std::cref(*this), std::nullopt, std::nullopt, std::nullopt);
 }
 
 std::expected<std::shared_ptr<ChestArmor>, StarException> ChestArmor::create(Root& root, Json const& config, String const& directory, Json const& data) {
@@ -502,10 +502,10 @@ String const& ChestArmor::backSleeveFrameset(Gender gender) const {
 
 std::expected<List<Drawable>, StarException> ChestArmor::preview(std::optional<std::reference_wrapper<TileDrawer>>, std::shared_ptr<Player> const& viewer) const {
   Gender gender = viewer ? viewer->gender() : Gender::Male;
-  auto humanoid = viewer ? std::expected<std::shared_ptr<Humanoid>, StarException>(viewer->humanoid()) : Humanoid::makeDummy(root(), gender);
+  auto humanoid = viewer ? std::expected<std::shared_ptr<Humanoid>, StarException>(viewer->humanoid()) : Humanoid::make_dummy(root(), gender);
   if (!humanoid)
     return std::unexpected(std::move(humanoid.error()));
-  return (*humanoid)->renderDummy(gender, std::nullopt, std::cref(*this), std::nullopt, std::nullopt);
+  return (*humanoid)->render_dummy(gender, std::nullopt, std::cref(*this), std::nullopt, std::nullopt);
 }
 
 std::expected<std::shared_ptr<LegsArmor>, StarException> LegsArmor::create(Root& root, Json const& config, String const& directory, Json const& data) {
@@ -541,10 +541,10 @@ String const& LegsArmor::frameset(Gender gender) const {
 
 std::expected<List<Drawable>, StarException> LegsArmor::preview(std::optional<std::reference_wrapper<TileDrawer>>, std::shared_ptr<Player> const& viewer) const {
   Gender gender = viewer ? viewer->gender() : Gender::Male;
-  auto humanoid = viewer ? std::expected<std::shared_ptr<Humanoid>, StarException>(viewer->humanoid()) : Humanoid::makeDummy(root(), gender);
+  auto humanoid = viewer ? std::expected<std::shared_ptr<Humanoid>, StarException>(viewer->humanoid()) : Humanoid::make_dummy(root(), gender);
   if (!humanoid)
     return std::unexpected(std::move(humanoid.error()));
-  return (*humanoid)->renderDummy(gender, std::nullopt, std::nullopt, std::cref(*this), std::nullopt);
+  return (*humanoid)->render_dummy(gender, std::nullopt, std::nullopt, std::cref(*this), std::nullopt);
 }
 
 std::expected<std::shared_ptr<BackArmor>, StarException> BackArmor::create(Root& root, Json const& config, String const& directory, Json const& data) {
@@ -580,10 +580,10 @@ String const& BackArmor::frameset(Gender gender) const {
 
 std::expected<List<Drawable>, StarException> BackArmor::preview(std::optional<std::reference_wrapper<TileDrawer>>, std::shared_ptr<Player> const& viewer) const {
   Gender gender = viewer ? viewer->gender() : Gender::Male;
-  auto humanoid = viewer ? std::expected<std::shared_ptr<Humanoid>, StarException>(viewer->humanoid()) : Humanoid::makeDummy(root(), gender);
+  auto humanoid = viewer ? std::expected<std::shared_ptr<Humanoid>, StarException>(viewer->humanoid()) : Humanoid::make_dummy(root(), gender);
   if (!humanoid)
     return std::unexpected(std::move(humanoid.error()));
-  return (*humanoid)->renderDummy(gender, std::nullopt, std::nullopt, std::nullopt, std::cref(*this));
+  return (*humanoid)->render_dummy(gender, std::nullopt, std::nullopt, std::nullopt, std::cref(*this));
 }
 
 }

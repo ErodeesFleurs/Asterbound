@@ -84,7 +84,6 @@ private:
   std::uint32_t m_pending_wearables = all_slots;
   bool m_appearance_dirty = true;
   bool m_config_dirty = true;
-  bool m_config_failed = false;
   Gender m_last_gender{};
   Direction m_last_direction{};
   bool m_last_nude = false;

@@ -838,11 +838,11 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
       if (!parsed) return std::unexpected(std::move(parsed.error()));
       parsedGender = *parsed;
     }
-    auto result = (*database)->generateHumanoid(species, seed.value_or(root.random().next_u64()), parsedGender, itemCatalog);
+    auto result = (*database)->generate_humanoid(species, seed.value_or(root.random().next_u64()), parsedGender, itemCatalog);
     if (!result) return std::unexpected(std::move(result.error()));
-    auto identity = result->identity.toJson();
+    auto identity = result->identity.to_json();
     if (!identity) return std::unexpected(std::move(identity.error()));
-    return LuaTupleReturn<Json, JsonObject, JsonObject>{std::move(*identity), std::move(result->humanoidParameters), std::move(result->armor)};
+    return LuaTupleReturn<Json, JsonObject, JsonObject>{std::move(*identity), std::move(result->humanoid_parameters), std::move(result->armor)};
   }); !r) return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.copy_callback("generateHumanoidIdentity", "generateHumanoid"); !r) return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.register_callback("createHumanoid", [&root, itemCatalog](
@@ -862,13 +862,13 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
   ) -> std::expected<LuaTupleReturn<Json, JsonObject, JsonObject>, StarException> {
     auto database = root.speciesDatabase();
     if (!database) return std::unexpected(std::move(database.error()));
-    auto result = (*database)->createHumanoid(std::move(name), std::move(speciesChoice), genderChoice, bodyColorChoice,
+    auto result = (*database)->create_humanoid(std::move(name), std::move(speciesChoice), genderChoice, bodyColorChoice,
                                               alty, hairChoice, heady, shirtChoice, shirtColor, pantsChoice, pantsColor,
                                               personality, std::move(ext), itemCatalog);
     if (!result) return std::unexpected(std::move(result.error()));
-    auto identity = result->identity.toJson();
+    auto identity = result->identity.to_json();
     if (!identity) return std::unexpected(std::move(identity.error()));
-    return LuaTupleReturn<Json, JsonObject, JsonObject>{std::move(*identity), std::move(result->humanoidParameters), std::move(result->armor)};
+    return LuaTupleReturn<Json, JsonObject, JsonObject>{std::move(*identity), std::move(result->humanoid_parameters), std::move(result->armor)};
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.register_callback("effectConfig", [&root](String const& effect) -> std::expected<Json, StarException> {

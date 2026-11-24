@@ -94,7 +94,7 @@ std::expected<bool, StarException> ArmorWearer::setup_humanoid(Humanoid& humanoi
     m_pending_wearables |= m_visible_slots;
     m_last_gender = gender;
   }
-  auto direction = humanoid.facingDirection();
+  auto direction = humanoid.facing_direction();
   if (direction != m_last_direction) {
     m_pending_wearables |= m_flipping_slots;
     m_last_direction = direction;
@@ -106,15 +106,15 @@ std::expected<bool, StarException> ArmorWearer::setup_humanoid(Humanoid& humanoi
     if (m_visible_slots & (std::uint32_t{1} << slot)) {
       auto const& item = *m_armors[slot].item;
       if (auto head = as_ref<HeadArmor>(item))
-        applied = humanoid.setWearableFromHead(slot, head->get(), gender);
+        applied = humanoid.set_wearable_from_head(slot, head->get(), gender);
       else if (auto chest = as_ref<ChestArmor>(item))
-        applied = humanoid.setWearableFromChest(slot, chest->get(), gender);
+        applied = humanoid.set_wearable_from_chest(slot, chest->get(), gender);
       else if (auto legs = as_ref<LegsArmor>(item))
-        applied = humanoid.setWearableFromLegs(slot, legs->get(), gender);
+        applied = humanoid.set_wearable_from_legs(slot, legs->get(), gender);
       else if (auto back = as_ref<BackArmor>(item))
-        applied = humanoid.setWearableFromBack(slot, back->get(), gender);
+        applied = humanoid.set_wearable_from_back(slot, back->get(), gender);
     } else {
-      applied = humanoid.removeWearable(slot);
+      applied = humanoid.remove_wearable(slot);
     }
     if (!applied)
       return std::unexpected(std::move(applied.error()));
@@ -134,10 +134,7 @@ std::expected<bool, StarException> ArmorWearer::setup_humanoid(Humanoid& humanoi
     if (config->is_type(Json::Type::Object))
       merged_config = merged_config ? json_merge(merged_config, *config) : std::move(*config);
   }
-  humanoid.setBodyHidden(body_hidden);
-  // A failed load may have mutated the target, even if we return to its old config.
-  auto loaded = humanoid.loadConfig(std::move(merged_config), m_config_failed);
-  m_config_failed = !loaded;
+  auto loaded = humanoid.load_config(std::move(merged_config), body_hidden);
   if (!loaded)
     return std::unexpected(std::move(loaded.error()));
   m_config_dirty = false;

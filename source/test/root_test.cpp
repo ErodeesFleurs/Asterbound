@@ -730,10 +730,10 @@ const GameTestRegistration missing_death_burst("WorldClientTest", "MissingPlayer
   ASSERT_TRUE(item && *item);
   ASSERT_TRUE(player->inventory()->setSwapSlotItem(*item));
   String const burst = "unconfigured-test-death-burst";
-  ASSERT_TRUE(player->setHumanoidParameter("deathParticles", Json(burst)));
-  ASSERT_TRUE(player->refreshHumanoidParameters());
+  ASSERT_TRUE(player->set_humanoid_parameter("deathParticles", Json(burst)));
+  ASSERT_TRUE(player->refresh_humanoid_parameters());
   ASSERT_TRUE(world->addEntity(player));
-  ASSERT_EQ(player->humanoid()->defaultDeathParticles(), burst);
+  ASSERT_EQ(player->humanoid()->default_death_particles(), burst);
   ASSERT_FALSE(player->humanoid()->particles(burst));
 
   auto const deaths = player->log()->deathCount();

@@ -2252,7 +2252,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
       if (isActionTakenEdge(InterfaceAction::EmoteSad))
         m_player->addEmote(HumanoidEmote::Sad);
       if (isActionTakenEdge(InterfaceAction::EmoteNeutral))
-        m_player->addEmote(HumanoidEmote::NEUTRAL);
+        m_player->addEmote(HumanoidEmote::Neutral);
       if (isActionTakenEdge(InterfaceAction::EmoteLaugh))
         m_player->addEmote(HumanoidEmote::Laugh);
       if (isActionTakenEdge(InterfaceAction::EmoteAnnoyed))
@@ -2260,7 +2260,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
       if (isActionTakenEdge(InterfaceAction::EmoteOh))
         m_player->addEmote(HumanoidEmote::Oh);
       if (isActionTakenEdge(InterfaceAction::EmoteOooh))
-        m_player->addEmote(HumanoidEmote::OOOH);
+        m_player->addEmote(HumanoidEmote::Oooh);
       if (isActionTakenEdge(InterfaceAction::EmoteBlink))
         m_player->addEmote(HumanoidEmote::Blink);
       if (isActionTakenEdge(InterfaceAction::EmoteWink))

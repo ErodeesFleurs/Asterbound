@@ -268,7 +268,7 @@ std::expected<void, StarException> InspectionTool::update(float, FireMode fireMo
   if (!aimPosition)
     return std::unexpected(std::move(aimPosition.error()));
   m_currentAngle = itemWorld->get().geometry().diff(*aimPosition, itemOwner->get().position()).angle();
-  auto position = itemOwner->get().handPosition(*itemHand, m_lightPosition - m_handPosition);
+  auto position = itemOwner->get().hand_position(*itemHand, m_lightPosition - m_handPosition);
   if (!position)
     return std::unexpected(std::move(position.error()));
   m_currentPosition = itemOwner->get().position() + *position;
@@ -312,7 +312,7 @@ std::expected<List<LightSource>, StarException> InspectionTool::lightSources() c
   if (!aimPosition)
     return std::unexpected(std::move(aimPosition.error()));
   float angle = itemWorld->get().geometry().diff(*aimPosition, itemOwner->get().position()).angle();
-  auto position = itemOwner->get().handPosition(*itemHand, m_lightPosition - m_handPosition);
+  auto position = itemOwner->get().hand_position(*itemHand, m_lightPosition - m_handPosition);
   if (!position)
     return std::unexpected(std::move(position.error()));
   LightSource lightSource;

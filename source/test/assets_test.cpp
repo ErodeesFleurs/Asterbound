@@ -2980,7 +2980,7 @@ const GameTestRegistration emote_matcher_differential(
             ASSERT_TRUE(length);
             float score = *position + static_cast<float>(*length) * 0.01f;
             if (score > best) {
-              auto emote = HumanoidEmoteNames->get_left(name);
+              auto emote = humanoid_emote_names->get_left(name);
               ASSERT_TRUE(emote);
               expected = emote->get();
               best = score;

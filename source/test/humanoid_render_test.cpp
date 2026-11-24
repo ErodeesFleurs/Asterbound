@@ -141,7 +141,7 @@ struct PlayerWorldContext {
     if (auto entered = player->init(*world, 100, EntityMode::Master); !entered)
       return std::unexpected(std::move(entered.error()));
     initialized = true;
-    return player->refreshHumanoid();
+    return player->refresh_humanoid();
   }
 
   std::shared_ptr<File> storage;
@@ -244,7 +244,7 @@ const GameTestRegistration armor_visibility_transitions(
     ASSERT_TRUE(config);
     auto humanoid = Humanoid::create(root, *config);
     ASSERT_TRUE(humanoid);
-    ASSERT_TRUE((*humanoid)->setIdentity(HumanoidIdentity{}));
+    ASSERT_TRUE((*humanoid)->set_identity(HumanoidIdentity{}));
     auto owner = ArmorWearer::create(root);
     ASSERT_TRUE(owner);
     auto& wearer = **owner;
@@ -267,9 +267,10 @@ const GameTestRegistration armor_visibility_transitions(
       auto item = (*database)->item(*descriptor);
       return item ? as<ArmorItem>(std::move(*item)) : std::shared_ptr<ArmorItem>{};
     };
-    auto base = (*humanoid)->defaultMovementParameters();
+    auto base = (*humanoid)->default_movement_parameters();
     auto functional = make_armor({{"hideInVanillaSlots", false}, {"bypassNude", false},
-        {"humanoidConfig", JsonObject{{"movementParameters", JsonObject{{"armorProbe", 1}}}}}});
+        {"humanoidConfig", JsonObject{{"movementParameters", JsonObject{{"armorProbe", 1}}},
+                                       {"mouthOffset", JsonArray{8, 16}}, {"deathParticles", "equipped-a"}}}});
     auto cosmetic = make_armor({{"armorTypesToHide", JsonArray{"Head"}}, {"humanoidConfig", JsonObject{}}});
     ASSERT_TRUE(functional);
     ASSERT_TRUE(cosmetic);
@@ -279,30 +280,74 @@ const GameTestRegistration armor_visibility_transitions(
     EXPECT_EQ(wearer.item_descriptor(0), functional->descriptor());
     auto refresh = [&](bool nude = false) { return wearer.setup_humanoid(**humanoid, nude); };
     ASSERT_EQ(refresh(), true);
-    auto equipped = (*humanoid)->defaultMovementParameters();
+    auto equipped = (*humanoid)->default_movement_parameters();
     ASSERT_NE(equipped, base);
     EXPECT_EQ(refresh(), false);
     for (unsigned relative : {0u, 11u}) {
       ASSERT_TRUE(wearer.set_cosmetic_item(relative, cosmetic));
       EXPECT_EQ(wearer.item_descriptor(8 + relative), cosmetic->descriptor());
       ASSERT_EQ(refresh(), true);
-      EXPECT_EQ((*humanoid)->defaultMovementParameters(), base);
+      EXPECT_EQ((*humanoid)->default_movement_parameters(), base);
       ASSERT_TRUE(wearer.set_cosmetic_item(relative, {}));
       ASSERT_EQ(refresh(), true);
-      EXPECT_EQ((*humanoid)->defaultMovementParameters(), equipped);
+      EXPECT_EQ((*humanoid)->default_movement_parameters(), equipped);
     }
     ASSERT_EQ(refresh(true), true);
-    EXPECT_EQ((*humanoid)->defaultMovementParameters(), base);
+    EXPECT_EQ((*humanoid)->default_movement_parameters(), base);
     ASSERT_EQ(refresh(), true);
-    auto broken = make_armor({{"humanoidConfig", JsonObject{{"headRotationCenter", JsonArray{1}}}},
-                               {"hideInVanillaSlots", false}});
+    auto equipped_config = (*humanoid)->humanoid_config(true);
+    ASSERT_TRUE(equipped_config);
+    auto broken = make_armor({{"hideInVanillaSlots", false},
+        {"humanoidConfig", JsonObject{{"mouthOffset", JsonArray{32, 48}}, {"deathParticles", "rejected-b"},
+                                       {"movementParameters", JsonObject{{"armorProbe", 2}}}, {"headRotationCenter", JsonArray{1}}}}});
     ASSERT_TRUE(broken);
     ASSERT_TRUE(wearer.set_item(0, broken));
-    EXPECT_FALSE(refresh().has_value());
-    EXPECT_FALSE(refresh().has_value());
+    for (unsigned attempt = 0; attempt != 2; ++attempt) {
+      EXPECT_FALSE(refresh().has_value());
+      EXPECT_EQ((*humanoid)->mouth_offset(true), Vec2F(1, 2));
+      EXPECT_EQ((*humanoid)->default_death_particles(), "equipped-a");
+      EXPECT_EQ((*humanoid)->humanoid_config(true), *equipped_config);
+      EXPECT_EQ((*humanoid)->default_movement_parameters(), equipped);
+    }
+    ASSERT_TRUE(wearer.set_item(0, functional));
+    EXPECT_EQ(refresh(), false);
     ASSERT_TRUE(wearer.set_item(0, {}));
     EXPECT_EQ(refresh(), true);
-    EXPECT_EQ((*humanoid)->defaultMovementParameters(), base);
+    EXPECT_EQ((*humanoid)->default_movement_parameters(), base);
+
+    // A parameter failure must not publish either its base config or its network map,
+    // and a later successful base edit must still merge the previously accepted overlay.
+    auto net = NetHumanoid::create(root);
+    ASSERT_TRUE(net) << net.error().what();
+    auto& wrapper = **net;
+    auto& model = *wrapper.humanoid();
+    JsonObject accepted{{"deathParticles", "base-a"}, {"playerMovementParameters", JsonObject{{"probe", 1}}}};
+    ASSERT_TRUE(wrapper.set_humanoid_parameters(accepted));
+    Json overlay = JsonObject{{"mouthOffset", JsonArray{16, -8}}, {"movementParameters", JsonObject{{"armorProbe", 7}}}};
+    ASSERT_EQ(model.load_config(overlay), true);
+    auto accepted_base = model.humanoid_config(false);
+    auto accepted_config = model.humanoid_config(true);
+    ASSERT_TRUE(accepted_base);
+    ASSERT_TRUE(accepted_config);
+    auto accepted_movement = model.default_movement_parameters();
+    auto accepted_player_movement = model.player_movement_parameters();
+    JsonObject invalid{{"deathParticles", "base-b"}, {"playerMovementParameters", JsonObject{{"probe", 2}}},
+                       {"headRotationCenter", JsonArray{1}}};
+    for (unsigned attempt = 0; attempt != 2; ++attempt) {
+      EXPECT_FALSE(wrapper.set_humanoid_parameters(invalid).has_value());
+      EXPECT_EQ(wrapper.humanoid_parameters(), accepted);
+      EXPECT_EQ(model.humanoid_config(false), *accepted_base);
+      EXPECT_EQ(model.humanoid_config(true), *accepted_config);
+      EXPECT_EQ(model.default_death_particles(), "base-a");
+      EXPECT_EQ(model.mouth_offset(true), Vec2F(2, -1));
+      EXPECT_EQ(model.default_movement_parameters(), accepted_movement);
+      EXPECT_EQ(model.player_movement_parameters(), accepted_player_movement);
+    }
+    ASSERT_TRUE(wrapper.set_humanoid_parameters({{"deathParticles", "base-c"}}));
+    EXPECT_EQ(model.default_death_particles(), "base-c");
+    EXPECT_EQ(model.mouth_offset(true), Vec2F(2, -1));
+    EXPECT_EQ(model.default_movement_parameters(), accepted_movement);
+    EXPECT_EQ(model.load_config(overlay), false);
   });
 
 const GameTestRegistration
@@ -317,7 +362,7 @@ const GameTestRegistration
     auto humanoid = Humanoid::create(fixture.root(), *legacy);
     ASSERT_TRUE(humanoid) << humanoid.error().what();
     HumanoidIdentity identity;
-    ASSERT_TRUE((*humanoid)->setIdentity(identity));
+    ASSERT_TRUE((*humanoid)->set_identity(identity));
     auto database = fixture.root().itemDatabase();
     ASSERT_TRUE(database) << database.error().what();
     auto names = (*database)->allItems();
@@ -348,13 +393,13 @@ const GameTestRegistration
       auto chest = as_ref<ChestArmor>(**item);
       ASSERT_TRUE(chest);
       ASSERT_EQ(chest->get().fullbright(), fullbright);
-      ASSERT_TRUE((*humanoid)->setWearableFromChest(0, chest->get(), identity.gender));
+      ASSERT_TRUE((*humanoid)->set_wearable_from_chest(0, chest->get(), identity.gender));
       auto sleeve = AssetPath::split(chest->get().backSleeveFrameset(identity.gender)).base_path;
       for (auto direction : {Direction::Left, Direction::Right}) {
-        (*humanoid)->setFacingDirection(direction);
+        (*humanoid)->set_facing_direction(direction);
         for (bool holding : {false, true}) {
-          (*humanoid)->setHandParameters(ToolHand::Primary, holding, 0, 0, false, false, false);
-          (*humanoid)->setHandParameters(ToolHand::Alt, holding, 0, 0, false, false, false);
+          (*humanoid)->set_hand_parameters(ToolHand::Primary, holding, 0, 0, false, false, false);
+          (*humanoid)->set_hand_parameters(ToolHand::Alt, holding, 0, 0, false, false, false);
           auto drawables = (*humanoid)->render();
           ASSERT_TRUE(drawables) << drawables.error().what();
           unsigned sleeves = 0;
@@ -467,8 +512,8 @@ const GameTestRegistration transientMovementAnimation(
         ASSERT_TRUE(remotes[i]->read_net_state(packet->first, 0.f, rules[i]));
         ASSERT_TRUE(remotes[i]->update(dt, step));
         EXPECT_EQ(remotes[i]->humanoid()->state(), state);
-        EXPECT_EQ(remotes[i]->humanoid()->facingDirection(), player.humanoid()->facingDirection());
-        EXPECT_EQ(remotes[i]->humanoid()->movingBackwards(), player.humanoid()->movingBackwards());
+        EXPECT_EQ(remotes[i]->humanoid()->facing_direction(), player.humanoid()->facing_direction());
+        EXPECT_EQ(remotes[i]->humanoid()->moving_backwards(), player.humanoid()->moving_backwards());
         EXPECT_EQ(remotes[i]->movementController().moving_direction(), networkDirection);
         EXPECT_NEAR(remotes[i]->movementController().rotation(), movement.rotation(), .011f);
         EXPECT_FALSE(remotes[i]->movementController().onGround());
@@ -493,8 +538,8 @@ const GameTestRegistration transientMovementAnimation(
             movement.setVelocity(tangent * (direction == Direction::Left ? -14.f : 14.f));
             ASSERT_TRUE(tick());
             EXPECT_EQ(player.humanoid()->state(), states[i]);
-            EXPECT_EQ(player.humanoid()->facingDirection(), facing);
-            EXPECT_EQ(player.humanoid()->movingBackwards(), facing != direction);
+            EXPECT_EQ(player.humanoid()->facing_direction(), facing);
+            EXPECT_EQ(player.humanoid()->moving_backwards(), facing != direction);
             EXPECT_EQ(movement.moving_direction(), nativeDirection);
             EXPECT_FALSE(movement.onGround());
             EXPECT_TRUE(movement.zeroG());
@@ -525,11 +570,11 @@ const GameTestRegistration transientMovementAnimation(
     nativeDirection = movement.moving_direction();
     movement.setVelocity(Vec2F());
     ASSERT_TRUE(tick());
-    EXPECT_FALSE(player.humanoid()->movingBackwards());
-    sync(Humanoid::Run, player.humanoid()->facingDirection());
+    EXPECT_FALSE(player.humanoid()->moving_backwards());
+    sync(Humanoid::Run, player.humanoid()->facing_direction());
     player.setGenericProperty("poseFixture", "duck");
     ASSERT_TRUE(tick());
-    sync(Humanoid::Duck, player.humanoid()->facingDirection());
+    sync(Humanoid::Duck, player.humanoid()->facing_direction());
 
     player.setGenericProperty("poseFixture", Json());
     ASSERT_TRUE(tick());
@@ -554,7 +599,7 @@ const GameTestRegistration transientMovementAnimation(
     player.setGenericProperty("poseFixture", Json());
     ASSERT_TRUE(player.uninit());
     ASSERT_TRUE(player.init(*setup.world, 100, EntityMode::Master));
-    ASSERT_TRUE(player.refreshHumanoid());
+    ASSERT_TRUE(player.refresh_humanoid());
     ASSERT_TRUE(movement.update_base_parameters(parameters));
     ASSERT_TRUE(tick());
     EXPECT_EQ(player.humanoid()->state(), Humanoid::SwimIdle);
@@ -617,15 +662,15 @@ const GameTestRegistration refreshedMovementCycles(
       auto made = Humanoid::create(fixture.root(), mode);
       ASSERT_TRUE(made) << made.error().what();
       auto humanoid = *made;
-      ASSERT_TRUE(humanoid->setIdentity(HumanoidIdentity{}));
+      ASSERT_TRUE(humanoid->set_identity(HumanoidIdentity{}));
       for (auto state : {Humanoid::Walk, Humanoid::Run}) {
         for (float rotation : {std::numbers::pi_v<float> / 2, std::numbers::pi_v<float>}) {
-          humanoid->setRotation(rotation);
+          humanoid->set_rotation(rotation);
           for (bool backwards : {false, true}) {
-            ASSERT_TRUE(humanoid->setMovingBackwards(backwards));
+            ASSERT_TRUE(humanoid->set_moving_backwards(backwards));
             std::set<String> frames;
             for (int frame = 0; frame != 60; ++frame) {
-              ASSERT_TRUE(humanoid->setState(state));
+              ASSERT_TRUE(humanoid->set_state(state));
               ASSERT_TRUE(humanoid->animate(1.f / 60, {}));
               auto drawables = humanoid->render();
               ASSERT_TRUE(drawables) << drawables.error().what();
@@ -975,9 +1020,9 @@ const GameTestRegistration humanoidSemanticSampling(
       auto made = Humanoid::create(fixture.root(), mode);
       ASSERT_TRUE(made);
       auto& humanoid = **made;
-      ASSERT_TRUE(humanoid.setIdentity(HumanoidIdentity{}));
+      ASSERT_TRUE(humanoid.set_identity(HumanoidIdentity{}));
       ASSERT_TRUE(humanoid.animate(1.f / 60, {}));
-      humanoid.setRotation(1.f);
+      humanoid.set_rotation(1.f);
       ASSERT_TRUE(humanoid.animate(1.f / 60, {}));
       auto previous = humanoid.render(false, true, 0);
       auto middle = humanoid.render(false, true, .5f);
@@ -1002,7 +1047,7 @@ const GameTestRegistration humanoidSemanticSampling(
         }
       }
       EXPECT_EQ(humanoid.state(), Humanoid::Idle);
-      EXPECT_EQ(humanoid.emoteState(), HumanoidEmote::Idle);
+      EXPECT_EQ(humanoid.emote_state(), HumanoidEmote::Idle);
     }
   });
 
@@ -1158,6 +1203,9 @@ const GameTestRegistration arm_rotation_group_order(
         },
         "parts":{
           "anchor":{"properties":{"offset":[5,7]}},
+          "frontHandItem":{"properties":{"offset":[5,9]},
+            "partStates":{"frontArm":{"plain":{"properties":{"offset":[8,9]}}}}},
+          "backHandItem":{"properties":{"offset":[-4,6]}},
           "frontArm":{"properties":{"anchorPart":"anchor","rotationCenter":[1,2]},
             "partStates":{"frontArm":{
               "rotation":{"properties":{"transformationGroups":["before","frontArmRotation","after"]}},
@@ -1177,7 +1225,7 @@ const GameTestRegistration arm_rotation_group_order(
     auto made = Humanoid::create(fixture.root(), *config);
     ASSERT_TRUE(made) << made.error().what();
     auto& humanoid = **made;
-    auto animator = humanoid.networkedAnimator();
+    auto animator = humanoid.networked_animator();
     ASSERT_TRUE(animator);
     ASSERT_TRUE(animator->get().translateTransformationGroup("before", {2, 3}));
     ASSERT_TRUE(animator->get().scaleTransformationGroup("after", Vec2F(2, 3)));
@@ -1199,10 +1247,21 @@ const GameTestRegistration arm_rotation_group_order(
     expect_position(ToolHand::Primary, Direction::Right, {-11, 25});
     expect_position(ToolHand::Alt, Direction::Left, {11, 25});
 
-    humanoid.setHandFrameOverrides(ToolHand::Primary, "rotation", "plain");
+    humanoid.set_hand_frame_overrides(ToolHand::Primary, "rotation", "plain");
     expect_position(ToolHand::Alt, Direction::Right, {17, 34}); // No rotation marker.
-    humanoid.setHandFrameOverrides(ToolHand::Primary, "rotation", "broken");
+    humanoid.set_hand_frame_overrides(ToolHand::Primary, "rotation", "broken");
     EXPECT_FALSE(humanoid.arm_position(ToolHand::Alt, Direction::Right, angle, {3, 4}));
+
+    auto expect_offset = [&](ToolHand hand, Direction facing, Vec2F expected) {
+      EXPECT_EQ(humanoid.hand_offset(hand, facing), expected);
+    };
+    expect_offset(ToolHand::Primary, Direction::Right, {-3, 5});
+    expect_offset(ToolHand::Alt, Direction::Right, {4, 7});
+    ASSERT_TRUE(animator->get().setLocalState("frontArm", "plain"));
+    expect_offset(ToolHand::Alt, Direction::Right, {7, 7});
+    humanoid.set_hand_parameters(ToolHand::Primary, true, 0, 0, true, false, false);
+    expect_offset(ToolHand::Primary, Direction::Right, {7, 7});
+    expect_offset(ToolHand::Alt, Direction::Right, {-3, 5});
   });
 
 const GameTestRegistration authoredAnimationGroupSampling(
@@ -1253,6 +1312,166 @@ const GameTestRegistration authoredAnimationGroupSampling(
     EXPECT_NEAR(*timer, .6f, 1e-5f);
   });
 
+static void exercise_movement_transitions(Root& root, Json const& config) {
+  auto bob_config = config.set_path("runBob", JsonArray{0, 1, 2, 3, 4, 5, 6, 7});
+  ASSERT_TRUE(bob_config);
+  for (bool break_body : {true, false}) {
+    JsonObject broken{{"body", JsonArray{break_body ? Json("missing") : Json("walk"), true, true}},
+                      {"bodyHighPriority", JsonArray{break_body ? Json("walk") : Json("missing"), true, true}}};
+    auto forward = bob_config->set_path("stateAnimations.jump", broken);
+    ASSERT_TRUE(forward);
+    auto both = forward->set_path("stateAnimationsBackwards.run", broken);
+    ASSERT_TRUE(both);
+    auto made = Humanoid::create(root, *both);
+    ASSERT_TRUE(made) << made.error().what();
+    auto& model = **made;
+    ASSERT_TRUE(model.set_state(Humanoid::Run));
+    {
+      auto& animator = model.networked_animator().value().get();
+      auto cycle = animator.stateCycle("body", {}).value();
+      ASSERT_TRUE(model.animate(cycle * .26f, {}));
+      ASSERT_TRUE(model.animate(cycle * .28f, {}));
+      auto previous = animator.sample(0.f).stateTimer("body").value();
+      auto current = animator.stateTimer("body").value();
+      auto previous_bob = model.bob_y_offset(0.f).value();
+      auto current_bob = model.bob_y_offset(1.f).value();
+      ASSERT_NE(previous, current);
+      ASSERT_NE(previous_bob, current_bob);
+      for (int attempt = 0; attempt < 2; ++attempt) {
+        for (bool backwards : {false, true}) {
+          EXPECT_FALSE(backwards ? model.set_moving_backwards(true) : model.set_state(Humanoid::Jump));
+          EXPECT_EQ(model.state(), Humanoid::Run);
+          EXPECT_FALSE(model.moving_backwards());
+          EXPECT_EQ(model.bob_y_offset(0.f).value(), previous_bob);
+          EXPECT_EQ(model.bob_y_offset(1.f).value(), current_bob);
+          for (auto const& type : {String("body"), String("bodyHighPriority")}) {
+            EXPECT_EQ(animator.state(type).value(), "run");
+            EXPECT_FALSE(animator.stateReverse(type).value());
+            EXPECT_EQ(animator.sample(0.f).stateTimer(type).value(), previous);
+            EXPECT_EQ(animator.stateTimer(type).value(), current);
+          }
+        }
+      }
+      EXPECT_FALSE(model.set_state(Humanoid::state_size));
+    }
+    JsonObject repaired{{"body", JsonArray{"run", false, false}},
+                        {"bodyHighPriority", JsonArray{"run", true, false}}};
+    ASSERT_TRUE(model.set_humanoid_parameters(JsonObject{{"stateAnimations", JsonObject{{"jump", repaired}}},
+                                                       {"stateAnimationsBackwards", JsonObject{{"run", repaired}}}}));
+    ASSERT_TRUE(model.load_animation());
+    auto& animator = model.networked_animator().value().get();
+    ASSERT_TRUE(animator.setLocalState("body", "run"));
+    ASSERT_TRUE(animator.setLocalState("bodyHighPriority", "run"));
+    ASSERT_TRUE(model.animate(.05f, {}));
+    auto timer = animator.stateTimer("body").value();
+    ASSERT_GT(timer, 0.f);
+    ASSERT_TRUE(model.set_moving_backwards(true));
+    EXPECT_EQ(animator.stateTimer("body").value(), timer);
+    EXPECT_EQ(animator.stateTimer("bodyHighPriority").value(), 0.f);
+    ASSERT_TRUE(model.animate(.04f, {}));
+    timer = animator.stateTimer("body").value();
+    auto high_timer = animator.stateTimer("bodyHighPriority").value();
+    ASSERT_GT(high_timer, 0.f);
+    ASSERT_TRUE(model.set_moving_backwards(true)); // Same direction never restarts.
+    EXPECT_EQ(animator.stateTimer("bodyHighPriority").value(), high_timer);
+    ASSERT_TRUE(model.set_state(Humanoid::Jump)); // No backwards group: use forward.
+    EXPECT_EQ(animator.stateTimer("body").value(), timer);
+    EXPECT_EQ(animator.stateTimer("bodyHighPriority").value(), 0.f);
+  }
+}
+
+static void exercise_dummy_preview(Root& root, Json const& config) {
+  auto database = root.itemDatabase();
+  ASSERT_TRUE(database);
+  String head_name, back_name;
+  for (auto const& name : (*database)->allItems()) {
+    auto type = (*database)->itemType(name);
+    ASSERT_TRUE(type);
+    if (*type == ItemType::HeadArmor && head_name.empty())
+      head_name = name;
+    if (*type == ItemType::BackArmor && back_name.empty())
+      back_name = name;
+    if (!head_name.empty() && !back_name.empty()) break;
+  }
+  ASSERT_FALSE(head_name.empty() || back_name.empty());
+  auto item = [&](String const& name, JsonObject parameters) {
+    auto descriptor = ItemDescriptor::create(name, 1, std::move(parameters));
+    return (*database)->item(descriptor.value()).value();
+  };
+  auto back = as<BackArmor>(item(back_name, {}));
+  ASSERT_TRUE(back);
+  auto gender = Gender::Male;
+  auto back_image = AssetPath::split(back->frameset(gender)).base_path;
+  auto shows_back = [&](List<Drawable> const& drawables) {
+    return std::ranges::any_of(drawables, [&](Drawable const& d) {
+      return d.is_image() && d.image_part().image.base_path == back_image;
+    });
+  };
+  auto legacy = config.erase("animation");
+  ASSERT_TRUE(legacy);
+  for (bool animated : {true, false}) {
+    auto made = Humanoid::create(root, animated ? config : *legacy);
+    ASSERT_TRUE(made) << made.error().what();
+    auto& model = **made;
+    ASSERT_TRUE(model.set_identity(HumanoidIdentity{}));
+    auto animator = model.networked_animator();
+    ASSERT_TRUE(animator);
+    // Legacy humanoids own an empty animator for the shared network path.
+    ASSERT_EQ(animator->get().parts().contains("frontArm"), animated);
+    auto head_a = as<HeadArmor>(item(head_name, {{"mask", "?multiply=ffbbbb"}}));
+    JsonObject tags;
+    if (animated)
+      tags = JsonObject{{"previewProbe", "preview"}};
+    auto head_b = as<HeadArmor>(item(head_name, {{"mask", "?multiply=bbbbff"}, {"humanoidAnimationTags", tags}}));
+    auto bad = as<HeadArmor>(item(head_name, {{"mask", ""}, {"humanoidAnimationTags", false}}));
+    ASSERT_TRUE(head_a && head_b && bad);
+    ASSERT_TRUE(model.set_wearable_from_head(3, *head_a, gender));
+    ASSERT_TRUE(model.set_wearable_from_back(0, *back, gender));
+    ASSERT_TRUE(model.set_state(Humanoid::Walk));
+    model.set_head_rotation(.21f);
+    ASSERT_TRUE(model.animate(.08f, {}));
+    auto real = model.render();
+    ASSERT_TRUE(real) << real.error().what();
+    ASSERT_TRUE(shows_back(*real));
+    String real_tags;
+    String tags_query = "<backCosmetic1Frameset>|<headCosmetic4Frameset>|<helmetMaskDirectives>|<hairFrameset>|<previewProbe>";
+    if (animated) {
+      animator->get().setLocalTag("previewProbe", String("real"));
+      real_tags = animator->get().applyPartTags("body", tags_query).value();
+    }
+    auto check_restored = [&] {
+      EXPECT_EQ(model.state(), Humanoid::Walk);
+      EXPECT_EQ(model.back_armor_frameset(), back->frameset(gender));
+      if (animated) // Observe logical tags before a render could repair them.
+        EXPECT_EQ(animator->get().applyPartTags("body", tags_query).value(), real_tags);
+      EXPECT_EQ(model.render().value(), *real);
+    };
+    auto preview_a = [&] { return model.render_dummy(gender, std::cref(*head_a), {}, {}, std::cref(*back)); };
+    auto a = preview_a();
+    ASSERT_TRUE(a) << a.error().what();
+    EXPECT_TRUE(shows_back(*a));
+    check_restored();
+    auto b = model.render_dummy(gender, std::cref(*head_b));
+    ASSERT_TRUE(b) << b.error().what();
+    EXPECT_FALSE(shows_back(*b));
+    check_restored();
+    EXPECT_EQ(preview_a().value(), *a);
+    check_restored();
+    EXPECT_FALSE(model.render_dummy(gender, std::cref(*bad)));
+    check_restored();
+    if (animated) {
+      // Fail after the sample received B's tags, not during armor parsing.
+      auto& props = animator->get().parts().get("frontArm").value().get().part_properties;
+      auto center = props.get("rotationCenter").value().get();
+      props.set("rotationCenter", false);
+      EXPECT_FALSE(model.render_dummy(gender, std::cref(*head_b)));
+      props.set("rotationCenter", center);
+      check_restored();
+      EXPECT_EQ(preview_a().value(), *a);
+    }
+  }
+}
+
 const GameTestRegistration emote_transaction(
   "HumanoidRenderTest", "EmoteTransitionsAndForcedResetAreRetryable", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
@@ -1262,8 +1481,10 @@ const GameTestRegistration emote_transaction(
     ASSERT_TRUE(root) << root.error().what();
     auto built = Humanoid::create(**root, HumanoidIdentity{}, JsonObject{{"useAnimation", true}});
     ASSERT_TRUE(built) << built.error().what();
-    auto config = (*built)->humanoidConfig(false);
+    auto config = (*built)->humanoid_config(false);
     ASSERT_TRUE(config);
+    exercise_movement_transitions(**root, *config);
+    exercise_dummy_preview(**root, *config);
     // Try both targets as the broken one: iteration order is not a contract.
     for (bool break_body : {false, true}) {
       JsonObject group{{"body", JsonArray{break_body ? Json("missing") : Json("walk"), true, true}},
@@ -1273,12 +1494,12 @@ const GameTestRegistration emote_transaction(
       auto made = Humanoid::create(**root, *broken);
       ASSERT_TRUE(made) << made.error().what();
       auto& model = **made;
-      ASSERT_TRUE(model.setIdentity(HumanoidIdentity{}));
-      ASSERT_TRUE(model.setState(Humanoid::Run));
-      ASSERT_TRUE(model.setEmoteState(HumanoidEmote::Laugh));
+      ASSERT_TRUE(model.set_identity(HumanoidIdentity{}));
+      ASSERT_TRUE(model.set_state(Humanoid::Run));
+      ASSERT_TRUE(model.set_emote_state(HumanoidEmote::Laugh));
       ASSERT_TRUE(model.animate(.05f, {}));
       ASSERT_TRUE(model.animate(.06f, {}));
-      auto handle = model.networkedAnimator();
+      auto handle = model.networked_animator();
       ASSERT_TRUE(handle);
       {
         auto& animator = handle->get();
@@ -1289,27 +1510,27 @@ const GameTestRegistration emote_transaction(
         EXPECT_GT(*before, 0.f);
         EXPECT_GT(*after, *before);
         for (int attempt = 0; attempt < 2; ++attempt) {
-          EXPECT_FALSE(model.setEmoteState(HumanoidEmote::Happy));
-          EXPECT_EQ(model.emoteState(), HumanoidEmote::Laugh);
+          EXPECT_FALSE(model.set_emote_state(HumanoidEmote::Happy));
+          EXPECT_EQ(model.emote_state(), HumanoidEmote::Laugh);
           EXPECT_EQ(animator.state("emote").value(), "laugh");
           EXPECT_EQ(animator.state("body").value(), "run");
           EXPECT_EQ(animator.sample(0.f).stateTimer("emote").value(), *before);
           EXPECT_EQ(animator.stateTimer("emote").value(), *after);
           EXPECT_EQ(animator.stateTimer("body").value(), *body);
         }
-        EXPECT_FALSE(model.setEmoteState(static_cast<HumanoidEmote>(-1)));
+        EXPECT_FALSE(model.set_emote_state(static_cast<HumanoidEmote>(-1)));
       }
 
       JsonObject repaired{{"body", JsonArray{"run", false, false}}, {"emote", JsonArray{"laugh", false, false}}};
-      ASSERT_TRUE(model.setHumanoidParameters(JsonObject{{"emoteAnimations", JsonObject{{"happy", repaired}}}}));
-      ASSERT_TRUE(model.loadAnimation());
-      auto& animator = model.networkedAnimator().value().get();
+      ASSERT_TRUE(model.set_humanoid_parameters(JsonObject{{"emoteAnimations", JsonObject{{"happy", repaired}}}}));
+      ASSERT_TRUE(model.load_animation());
+      auto& animator = model.networked_animator().value().get();
       ASSERT_TRUE(animator.setLocalState("emote", "laugh"));
       ASSERT_TRUE(model.animate(.05f, {}));
       auto timer = animator.stateTimer("emote").value();
       ASSERT_GT(timer, 0.f);
-      ASSERT_TRUE(model.setEmoteState(HumanoidEmote::Happy));
-      EXPECT_EQ(model.emoteState(), HumanoidEmote::Happy);
+      ASSERT_TRUE(model.set_emote_state(HumanoidEmote::Happy));
+      EXPECT_EQ(model.emote_state(), HumanoidEmote::Happy);
       EXPECT_EQ(animator.stateTimer("emote").value(), timer); // Authored startNew=false.
 
       // A late pose error follows both state groups and local transform writes.
@@ -1321,11 +1542,11 @@ const GameTestRegistration emote_transaction(
       auto& properties = arm->get().part_properties;
       auto center = properties.get("rotationCenter").value().get();
       properties.set("rotationCenter", false);
-      EXPECT_FALSE(model.resetAnimation());
+      EXPECT_FALSE(model.reset_animation());
       EXPECT_EQ(animator.stateTimer("emote").value(), timer);
       EXPECT_EQ(animator.getLocalTransformationGroup("headRotation").value(), transform);
       properties.set("rotationCenter", center);
-      ASSERT_TRUE(model.resetAnimation());
+      ASSERT_TRUE(model.reset_animation());
       EXPECT_EQ(animator.sample(0.f).stateTimer("emote").value(), 0.f);
       EXPECT_EQ(animator.stateTimer("emote").value(), 0.f); // Forced restart even for the same state.
     }
@@ -1341,7 +1562,7 @@ const GameTestRegistration humanoidTickOwnedPose(
     auto& root = **createdRoot;
     auto baseHumanoid = Humanoid::create(root, HumanoidIdentity{}, JsonObject{{"useAnimation", true}});
     ASSERT_TRUE(baseHumanoid) << baseHumanoid.error().what();
-    auto config = (*baseHumanoid)->humanoidConfig(false);
+    auto config = (*baseHumanoid)->humanoid_config(false);
     ASSERT_TRUE(config) << config.error().what();
     auto animation = config->get("animation");
     ASSERT_TRUE(animation) << animation.error().what();
@@ -1357,27 +1578,27 @@ const GameTestRegistration humanoidTickOwnedPose(
     auto made = Humanoid::create(root, *augmentedConfig);
     ASSERT_TRUE(made) << made.error().what();
     auto& humanoid = **made;
-    ASSERT_TRUE(humanoid.setIdentity(HumanoidIdentity{}));
-    humanoid.setFacingDirection(Direction::Right);
-    humanoid.setHandFrameOverrides(ToolHand::Primary, "rotation", "rotation");
-    humanoid.setHandParameters(ToolHand::Primary, true, 0, 0, true, false, false);
+    ASSERT_TRUE(humanoid.set_identity(HumanoidIdentity{}));
+    humanoid.set_facing_direction(Direction::Right);
+    humanoid.set_hand_frame_overrides(ToolHand::Primary, "rotation", "rotation");
+    humanoid.set_hand_parameters(ToolHand::Primary, true, 0, 0, true, false, false);
     auto firstTick = humanoid.animate(1.f / 60, {});
     ASSERT_TRUE(firstTick) << firstTick.error().what();
-    auto beforeMouth = humanoid.mouthOffset();
-    auto beforeArmor = humanoid.headArmorOffset();
+    auto beforeMouth = humanoid.mouth_offset();
+    auto beforeArmor = humanoid.head_armor_offset();
     ASSERT_TRUE(beforeMouth);
     ASSERT_TRUE(beforeArmor);
-    humanoid.setHeadRotation(1.f);
-    humanoid.setHandParameters(ToolHand::Primary, true, 1.f, 1.f, true, false, false);
+    humanoid.set_head_rotation(1.f);
+    humanoid.set_hand_parameters(ToolHand::Primary, true, 1.f, 1.f, true, false, false);
     auto secondTick = humanoid.animate(1.f / 60, {});
     ASSERT_TRUE(secondTick) << secondTick.error().what();
-    auto mouth = humanoid.mouthOffset();
-    auto armor = humanoid.headArmorOffset();
+    auto mouth = humanoid.mouth_offset();
+    auto armor = humanoid.head_armor_offset();
     ASSERT_TRUE(mouth);
     ASSERT_TRUE(armor);
     EXPECT_NE(*mouth, *beforeMouth);
     EXPECT_NE(*armor, *beforeArmor);
-    auto animatorRef = humanoid.networkedAnimator();
+    auto animatorRef = humanoid.networked_animator();
     ASSERT_TRUE(animatorRef);
     auto& animator = animatorRef->get();
     auto logicalHead = animator.getLocalTransformationGroup("headRotation");
@@ -1406,8 +1627,8 @@ const GameTestRegistration humanoidTickOwnedPose(
           EXPECT_NEAR((*afterGeometry)[i].position[1], sampledLights[i].position[1], 1e-5f);
         }
       }
-      auto preservedMouth = humanoid.mouthOffset();
-      auto preservedArmor = humanoid.headArmorOffset();
+      auto preservedMouth = humanoid.mouth_offset();
+      auto preservedArmor = humanoid.head_armor_offset();
       auto preservedHead = animator.getLocalTransformationGroup("headRotation");
       auto preservedArm = animator.getLocalTransformationGroup("frontArmRotation");
       ASSERT_TRUE(preservedMouth);
@@ -1447,7 +1668,7 @@ const GameTestRegistration humanoid_dance_playback(
     auto metadata = (*root)->imageMetadataDatabase();
     ASSERT_TRUE(metadata);
     HumanoidIdentity identity;
-    identity.personality.headOffset = {1, 2};
+    identity.personality.head_offset = {1, 2};
     std::array<std::shared_ptr<Humanoid>, 2> models;
     auto find_sprite = [](List<Drawable> const& drawables, String const& path)
         -> std::optional<std::reference_wrapper<Drawable::ImagePart const>> {
@@ -1473,14 +1694,72 @@ const GameTestRegistration humanoid_dance_playback(
       ASSERT_TRUE(made) << made.error().what();
       models[i] = std::move(*made);
       auto& model = *models[i];
-      auto config = model.humanoidConfig(false);
+      auto config = model.humanoid_config(false);
       ASSERT_TRUE(config);
       EXPECT_EQ(config->contains("animation"), animated);
-      model.setFacingDirection(Direction::Right);
+      ASSERT_TRUE(model.set_state(Humanoid::Walk));
+      for (String key : {String("armWalkSeq"), String("walkBob")}) {
+        ASSERT_TRUE(model.load_config(JsonObject{{key, JsonArray{}}}));
+        auto drawn = model.render(false);
+        if (animated) {
+          ASSERT_TRUE(drawn) << drawn.error().what();
+          EXPECT_TRUE(find_sprite(*drawn, "/humanoid/human/malebody.png"));
+        } else {
+          EXPECT_FALSE(drawn) << key.utf8();
+        }
+      }
+      if (!animated) {
+        // Reverse arms use the arm sequence's length, but body and bob use stateFrames.
+        ASSERT_TRUE(model.load_config(JsonObject{{"armWalkSeq", JsonArray{1,1,1,1,1,1,1,2,3}},
+                                                 {"walkBob", JsonArray{0,0,0,0,0,0,0,5}}}));
+        ASSERT_TRUE(model.set_moving_backwards(true));
+        auto backwards = model.render(false);
+        ASSERT_TRUE(backwards) << backwards.error().what();
+        auto arm = find_sprite(*backwards, "/humanoid/human/frontarm.png");
+        auto body = find_sprite(*backwards, "/humanoid/human/malebody.png");
+        ASSERT_TRUE(arm);
+        ASSERT_TRUE(body);
+        EXPECT_EQ(arm->get().image.sub_path, "walk.3");
+        EXPECT_EQ(body->get().image.sub_path, "walk.8");
+        EXPECT_EQ(model.bob_y_offset(), 5.f / tile_pixels);
+        ASSERT_TRUE(model.set_moving_backwards(false));
+      }
+      ASSERT_TRUE(model.set_state(Humanoid::Idle));
+      ASSERT_TRUE(model.load_config(JsonObject{{"globalOffset", JsonArray{2, -3}}}));
+      model.set_facing_direction(Direction::Left);
+      model.set_scale({2, 3});
+      model.set_rotation(.4f);
+      auto unprefixed = model.render(true);
+      ASSERT_TRUE(unprefixed) << unprefixed.error().what();
+      auto alt = Drawable::make_line(Line2F({0, 0}, {1, 0}), 2, Color::palette_white, {1, 2});
+      auto primary = Drawable::make_line(Line2F({0, 0}, {0, 1}), 3, Color::palette_white, {3, 4});
+      model.set_hand_non_rotated_drawables(ToolHand::Alt, {alt});
+      model.set_hand_non_rotated_drawables(ToolHand::Primary, {primary});
+      auto prefixed = model.render(true);
+      ASSERT_TRUE(prefixed) << prefixed.error().what();
+      ASSERT_EQ(prefixed->size(), unprefixed->size() + 2);
+      EXPECT_TRUE(std::equal(prefixed->begin() + 2, prefixed->end(), unprefixed->begin()));
+      for (auto& expected : {std::ref(alt), std::ref(primary)}) {
+        auto& layer = expected.get();
+        if (!animated) {
+          layer.translate(Vec2F(2, -3) / tile_pixels);
+          layer.scale(Vec2F(2, 3));
+          layer.rotate(.4f);
+        }
+        layer.rebase();
+      }
+      EXPECT_EQ((*prefixed)[0], alt);
+      EXPECT_EQ((*prefixed)[1], primary);
+      model.set_hand_non_rotated_drawables(ToolHand::Alt, {});
+      model.set_hand_non_rotated_drawables(ToolHand::Primary, {});
+      model.set_rotation(0);
+      model.set_scale({1, 1});
+      ASSERT_TRUE(model.load_config(JsonObject{}));
+      model.set_facing_direction(Direction::Right);
       for (auto hand : {ToolHand::Primary, ToolHand::Alt}) {
-        model.setHandFrameOverrides(hand, "rotation", "rotation");
-        model.setHandParameters(hand, true, 0, 0, false, false, false);
-        model.setHandDrawables(hand, {Drawable::make_line(Line2F({0, 0}, {1, 0}), 1, Color::palette_white)});
+        model.set_hand_frame_overrides(hand, "rotation", "rotation");
+        model.set_hand_parameters(hand, true, 0, 0, false, false, false);
+        model.set_hand_drawables(hand, {Drawable::make_line(Line2F({0, 0}, {1, 0}), 1, Color::palette_white)});
       }
       auto idle = model.render();
       ASSERT_TRUE(idle) << idle.error().what();
@@ -1490,7 +1769,7 @@ const GameTestRegistration humanoid_dance_playback(
 
       ASSERT_TRUE(model.set_dance("renderprobe"));
       ASSERT_TRUE(model.animate(.25f, {}));
-      auto animator = model.networkedAnimator();
+      auto animator = model.networked_animator();
       if (animated) {
         ASSERT_TRUE(animator);
         EXPECT_EQ(animator->get().state("bodyDance"), "idle.2"); // exact authored state
@@ -1505,7 +1784,7 @@ const GameTestRegistration humanoid_dance_playback(
         auto head = find_sprite(*shown, "/humanoid/human/malehead.png");
         ASSERT_TRUE(head);
         auto delta = head->get().transformation.transform_point(Vec2F{}) - idle_head->get().transformation.transform_point(Vec2F{});
-        near(delta, ((first ? Vec2F(5, -3) : Vec2F{}) - identity.personality.headOffset) / tile_pixels);
+        near(delta, ((first ? Vec2F(5, -3) : Vec2F{}) - identity.personality.head_offset) / tile_pixels);
         if (first) {
           auto body = find_sprite(*shown, "/humanoid/human/malebody.png");
           ASSERT_TRUE(body);
@@ -1545,12 +1824,12 @@ const GameTestRegistration humanoid_dance_playback(
       auto final_pose = model.render();
       ASSERT_TRUE(final_pose);
       check_pose(*final_pose, "idle.1", false); // last step, not wrapped
-      ASSERT_TRUE(model.setState(Humanoid::Duck));
+      ASSERT_TRUE(model.set_state(Humanoid::Duck));
       ASSERT_TRUE(model.animate(0.f, {}));
       auto filtered = model.render();
       ASSERT_TRUE(filtered);
       check_pose(*filtered, "duck.1", true);
-      ASSERT_TRUE(model.setState(Humanoid::Idle));
+      ASSERT_TRUE(model.set_state(Humanoid::Idle));
       ASSERT_TRUE(model.set_dance("emptyprobe"));
       ASSERT_TRUE(model.animate(0.f, {}));
       auto empty = model.render();

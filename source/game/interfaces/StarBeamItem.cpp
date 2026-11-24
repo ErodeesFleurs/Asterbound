@@ -167,7 +167,7 @@ std::expected<void, StarException> BeamItem::update(float, FireMode, bool, HashS
   if (!item_world)
     return std::unexpected(std::move(item_world.error()));
   auto& user = item_owner->get();
-  auto origin = user.handPosition(*item_hand, (m_firePosition - m_handPosition) / tile_pixels);
+  auto origin = user.hand_position(*item_hand, (m_firePosition - m_handPosition) / tile_pixels);
   if (!origin)
     return std::unexpected(std::move(origin.error()));
   auto aim = user.aimPosition();

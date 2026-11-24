@@ -212,16 +212,16 @@ auto speciesDatabase = std::move(*result15);
   auto result16 = speciesDatabase->species(species);
 if (!result16) return std::unexpected(std::move(result16.error()));
 auto speciesDefinition = std::move(*result16);
-  auto result17 = speciesDatabase->generateHumanoid(species, seed, {}, itemCatalog);
+  auto result17 = speciesDatabase->generate_humanoid(species, seed, {}, itemCatalog);
 if (!result17) return std::unexpected(std::move(result17.error()));
 auto result = std::move(*result17);
   HumanoidIdentity identity = result.identity;
 
   auto result18 = config.get_object("humanoidParameters", JsonObject());
 if (!result18) return std::unexpected(std::move(result18.error()));
-auto result19 = json_merge(result.humanoidParameters, std::move(*result18)).to_object();
+auto result19 = json_merge(result.humanoid_parameters, std::move(*result18)).to_object();
 if (!result19) return std::unexpected(std::move(result19.error()));
-variant.humanoidParameters = std::move(*result19);
+variant.humanoid_parameters = std::move(*result19);
 
   {
   auto result20 = config.contains("npcname");
@@ -258,7 +258,7 @@ variant.humanoidParameters = std::move(*result19);
   if (!result27) return std::unexpected(std::move(result27.error()));
   if (std::move(*result27))
       {
-    auto result28 = identity.toJson();
+    auto result28 = identity.to_json();
     if (!result28) return std::unexpected(std::move(result28.error()));
     auto result29 = config.get("identity");
     if (!result29) return std::unexpected(std::move(result29.error()));
@@ -270,8 +270,8 @@ variant.humanoidParameters = std::move(*result19);
 
   auto result31 = config.contains("humanoidConfig");
 if (!result31) return std::unexpected(std::move(result31.error()));
-variant.uniqueHumanoidConfig = std::move(*result31);
-  if (variant.uniqueHumanoidConfig){
+variant.unique_humanoid_config = std::move(*result31);
+  if (variant.unique_humanoid_config){
     auto result32 = m_root.assets();
 if (!result32) return std::unexpected(std::move(result32.error()));
 auto result33 = config.get_string("humanoidConfig");
@@ -279,8 +279,8 @@ if (!result33) return std::unexpected(std::move(result33.error()));
     auto humanoidLoaded = [&]() -> std::expected<void, StarException> {
 auto result34 = (*result32)->json(*result33);
 if (!result34) return std::unexpected(std::move(result34.error()));
-variant.humanoidConfig = std::move(*result34);
-    auto result35 = speciesDatabase->humanoidConfig(identity, variant.humanoidParameters, variant.humanoidConfig, itemCatalog);
+variant.humanoid_config = std::move(*result34);
+    auto result35 = speciesDatabase->humanoid_config(identity, variant.humanoid_parameters, variant.humanoid_config, itemCatalog);
 if (!result35) return std::unexpected(std::move(result35.error()));
 auto usedHumanoidConfig = std::move(*result35);
     // this only needs to be done if the npc has a unique humanoid config, otherwise the output from generateHumanoid should be fine
@@ -288,7 +288,7 @@ auto usedHumanoidConfig = std::move(*result35);
 if (!result36) return std::unexpected(std::move(result36.error()));
 auto result37 = randSource.sample_ref(*result36);
 if (!result37) return std::unexpected(std::move(result37.error()));
-auto result38 = parsePersonalityArray(result37->get());
+auto result38 = parse_personality_array(result37->get());
 if (!result38) return std::unexpected(std::move(result38.error()));
 identity.personality = std::move(*result38);
     return {};
@@ -296,9 +296,9 @@ identity.personality = std::move(*result38);
     if (!humanoidLoaded)
       return std::unexpected((*result32)->with_asset_context(std::move(humanoidLoaded.error()), *result33, "Loading NPC humanoid configuration"));
   } else {
-    auto result39 = speciesDefinition->humanoidConfig();
+    auto result39 = speciesDefinition->humanoid_config();
 if (!result39) return std::unexpected(std::move(result39.error()));
-variant.humanoidConfig = std::move(*result39);
+variant.humanoid_config = std::move(*result39);
   }
 
   // and where it ususally merges the identity
@@ -307,7 +307,7 @@ variant.humanoidConfig = std::move(*result39);
   if (!result40) return std::unexpected(std::move(result40.error()));
   if (std::move(*result40))
       {
-    auto result41 = identity.toJson();
+    auto result41 = identity.to_json();
     if (!result41) return std::unexpected(std::move(result41.error()));
     auto result42 = config.get("identity");
     if (!result42) return std::unexpected(std::move(result42.error()));
@@ -317,7 +317,7 @@ variant.humanoidConfig = std::move(*result39);
   }
 }
 
-  variant.humanoidIdentity = identity;
+  variant.humanoid_identity = identity;
 
   auto result44 = config.get("movementParameters", {});
 if (!result44) return std::unexpected(std::move(result44.error()));
@@ -533,11 +533,11 @@ if (!result94) return std::unexpected(std::move(result94.error()));
   auto result95 = ds.write(variant.initialScriptDelta);
 if (!result95) return std::unexpected(std::move(result95.error()));
 
-  auto result96 = ds.write(variant.humanoidIdentity);
+  auto result96 = ds.write(variant.humanoid_identity);
 if (!result96) return std::unexpected(std::move(result96.error()));
 
   if (rules.version() >= 11 ) {
-    auto result97 = ds.write(variant.humanoidParameters);
+    auto result97 = ds.write(variant.humanoid_parameters);
 if (!result97) return std::unexpected(std::move(result97.error()));
 
     auto result98 = ds.write(variant.description);
@@ -603,11 +603,11 @@ variant.scriptConfig = std::move(*result112);
   auto result113 = ds.read(variant.initialScriptDelta);
 if (!result113) return std::unexpected(std::move(result113.error()));
 
-  auto result114 = ds.read(variant.humanoidIdentity);
+  auto result114 = ds.read(variant.humanoid_identity);
 if (!result114) return std::unexpected(std::move(result114.error()));
 
   if (rules.version() >= 11){
-    auto result115 = ds.read(variant.humanoidParameters);
+    auto result115 = ds.read(variant.humanoid_parameters);
 if (!result115) return std::unexpected(std::move(result115.error()));
 
     auto result116 = ds.read(variant.description);
@@ -616,7 +616,7 @@ if (!result116) return std::unexpected(std::move(result116.error()));
   } else {
     auto result117 = config.get_object("humanoidParameters", JsonObject());
 if (!result117) return std::unexpected(std::move(result117.error()));
-variant.humanoidParameters = std::move(*result117);
+variant.humanoid_parameters = std::move(*result117);
     auto result118 = config.opt_string("description");
 if (!result118) return std::unexpected(std::move(result118.error()));
 variant.description = std::move(*result118);
@@ -630,8 +630,8 @@ if (!result120) return std::unexpected(std::move(result120.error()));
 auto speciesDefinition = std::move(*result120);
   auto result121 = config.contains("humanoidConfig");
 if (!result121) return std::unexpected(std::move(result121.error()));
-variant.uniqueHumanoidConfig = std::move(*result121);
-  if (variant.uniqueHumanoidConfig)
+variant.unique_humanoid_config = std::move(*result121);
+  if (variant.unique_humanoid_config)
     {
   auto result122 = m_root.assets();
   if (!result122) return std::unexpected(std::move(result122.error()));
@@ -639,13 +639,13 @@ variant.uniqueHumanoidConfig = std::move(*result121);
   if (!result123) return std::unexpected(std::move(result123.error()));
   auto result124 = (*result122)->json(*result123);
   if (!result124) return std::unexpected((*result122)->with_asset_context(std::move(result124.error()), *result123, "Loading NPC humanoid configuration"));
-  variant.humanoidConfig = std::move(*result124);
+  variant.humanoid_config = std::move(*result124);
 }
   else
     {
-  auto result125 = speciesDefinition->humanoidConfig();
+  auto result125 = speciesDefinition->humanoid_config();
   if (!result125) return std::unexpected(std::move(result125.error()));
-  variant.humanoidConfig = std::move(*result125);
+  variant.humanoid_config = std::move(*result125);
 }
 
   auto result126 = config.get("movementParameters", {});
@@ -740,7 +740,7 @@ std::expected<Json, StarException> NpcDatabase::writeNpcVariantToJson(NpcVariant
   auto result152 = m_root.versioningDatabase();
 if (!result152) return std::unexpected(std::move(result152.error()));
 auto versioningDatabase = std::move(*result152);
-  auto result153 = variant.humanoidIdentity.toJson();
+  auto result153 = variant.humanoid_identity.to_json();
 if (!result153) return std::unexpected(std::move(result153.error()));
 auto result154 = json_from_map_v<StringMap<ItemDescriptor>>(variant.items, [&versioningDatabase](ItemDescriptor const& descriptor) {
       return descriptor.diskStore(*versioningDatabase);
@@ -761,7 +761,7 @@ JsonObject store{{"species", variant.species},
                  {"keepAlive", variant.keepAlive},
                  {"damageTeam", variant.damageTeam},
                  {"damageTeamType", String(*damageTeamName)},
-                 {"humanoidParameters", variant.humanoidParameters}};
+                 {"humanoidParameters", variant.humanoid_parameters}};
 if (variant.description.has_value())
   store.set("description", variant.description.value_or(String{}));
 return store;
@@ -810,10 +810,10 @@ variant.initialScriptDelta = std::move(*result166);
 if (!result167) return std::unexpected(std::move(result167.error()));
 auto result168 = HumanoidIdentity::create(std::move(*result167));
 if (!result168) return std::unexpected(std::move(result168.error()));
-variant.humanoidIdentity = std::move(*result168);
+variant.humanoid_identity = std::move(*result168);
   auto result169 = data.get_object("humanoidParameters", JsonObject());
 if (!result169) return std::unexpected(std::move(result169.error()));
-variant.humanoidParameters = std::move(*result169);
+variant.humanoid_parameters = std::move(*result169);
 
   auto result170 = m_root.speciesDatabase();
 if (!result170) return std::unexpected(std::move(result170.error()));
@@ -823,8 +823,8 @@ if (!result171) return std::unexpected(std::move(result171.error()));
 auto speciesDefinition = std::move(*result171);
   auto result172 = config.contains("humanoidConfig");
 if (!result172) return std::unexpected(std::move(result172.error()));
-variant.uniqueHumanoidConfig = std::move(*result172);
-  if (variant.uniqueHumanoidConfig)
+variant.unique_humanoid_config = std::move(*result172);
+  if (variant.unique_humanoid_config)
     {
   auto result173 = m_root.assets();
   if (!result173) return std::unexpected(std::move(result173.error()));
@@ -832,13 +832,13 @@ variant.uniqueHumanoidConfig = std::move(*result172);
   if (!result174) return std::unexpected(std::move(result174.error()));
   auto result175 = (*result173)->json(*result174);
   if (!result175) return std::unexpected((*result173)->with_asset_context(std::move(result175.error()), *result174, "Loading NPC humanoid configuration"));
-  variant.humanoidConfig = std::move(*result175);
+  variant.humanoid_config = std::move(*result175);
 }
   else
     {
-  auto result176 = speciesDefinition->humanoidConfig();
+  auto result176 = speciesDefinition->humanoid_config();
   if (!result176) return std::unexpected(std::move(result176.error()));
-  variant.humanoidConfig = std::move(*result176);
+  variant.humanoid_config = std::move(*result176);
 }
 
 
@@ -979,7 +979,7 @@ return Npc::create(m_root, std::move(*result206));
 }
 
 std::expected<List<Drawable>, StarException> NpcDatabase::npcPortrait(NpcVariant const& npcVariant, PortraitMode mode, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog) const {
-  auto result207 = Humanoid::create(m_root, npcVariant.humanoidIdentity, npcVariant.humanoidParameters, npcVariant.uniqueHumanoidConfig ? npcVariant.humanoidConfig : Json(), itemCatalog);
+  auto result207 = Humanoid::create(m_root, npcVariant.humanoid_identity, npcVariant.humanoid_parameters, npcVariant.unique_humanoid_config ? npcVariant.humanoid_config : Json(), itemCatalog);
 if (!result207) return std::unexpected(std::move(result207.error()));
 auto humanoid = std::move(*result207);
 
@@ -1019,7 +1019,7 @@ for (auto const& item : npcVariant.items) {
 if (!result212) return std::unexpected(std::move(result212.error()));
 
 
-  return humanoid->renderPortrait(mode);
+  return humanoid->render_portrait(mode);
 }
 
 std::expected<Json, StarException> NpcDatabase::buildConfig(String const& typeName, Json const& overrides) const {

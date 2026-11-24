@@ -81,9 +81,6 @@ public:
   [[nodiscard]] std::expected<std::optional<Direction>, StarException> setupHumanoidHandItems(Humanoid& humanoid, Vec2F position, Vec2F aimPosition) const;
   [[nodiscard]] std::expected<void, StarException> setupHumanoidHandItemDrawables(Humanoid& humanoid, float interpolation = 1.0f) const;
 
-  [[nodiscard]] std::expected<Vec2F, StarException> armPosition(Humanoid const& humanoid, ToolHand hand, Direction facingDirection, float armAngle, Vec2F offset) const;
-  [[nodiscard]] std::expected<Vec2F, StarException> handOffset(Humanoid const& humanoid, ToolHand hand, Direction facingDirection) const;
-  [[nodiscard]] std::expected<Vec2F, StarException> handPosition(ToolHand hand, Humanoid const& humanoid, Vec2F const& handOffset) const;
   [[nodiscard]] std::expected<bool, StarException> queryShieldHit(DamageSource const& source) const;
 
   [[nodiscard]] std::expected<void, StarException> tick(float dt, bool shifting, HashSet<MoveControlType> const& moves);

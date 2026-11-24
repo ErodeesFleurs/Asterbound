@@ -47,9 +47,9 @@ public:
   // Translates the given arm position into it's final entity space position
   // based on the given facing direction, and arm angle, and an offset from the
   // rotation center of the arm.
-  [[nodiscard]] virtual std::expected<Vec2F, StarException> armPosition(ToolHand hand, Direction facingDirection, float armAngle, Vec2F offset = {}) const = 0;
+  [[nodiscard]] virtual std::expected<Vec2F, StarException> arm_position(ToolHand hand, Direction facing_direction, float arm_angle, Vec2F offset = {}) const = 0;
   // The offset to give to armPosition to get the position of the hand.
-  [[nodiscard]] virtual std::expected<Vec2F, StarException> handOffset(ToolHand hand, Direction facingDirection) const = 0;
+  [[nodiscard]] virtual std::expected<Vec2F, StarException> hand_offset(ToolHand hand, Direction facing_direction) const = 0;
 
   // Gets the world position of the current aim point.
   [[nodiscard]] virtual std::expected<Vec2F, StarException> aimPosition() const = 0;
@@ -63,7 +63,7 @@ public:
   // FIXME: This is effectively unusable, because since tool user items control
   // the angle and facing direction of the owner, and this uses the facing
   // direction and angle as input, the result will always be behind.
-  [[nodiscard]] virtual std::expected<Vec2F, StarException> handPosition(ToolHand hand, Vec2F const& handOffset = Vec2F()) const = 0;
+  [[nodiscard]] virtual std::expected<Vec2F, StarException> hand_position(ToolHand hand, Vec2F const& hand_offset = Vec2F()) const = 0;
 
   // FIXME: This was used for an Item to get a shared pointer to itself, which was
   // super bad and weird, but it COULD be used to get the item in the owner's

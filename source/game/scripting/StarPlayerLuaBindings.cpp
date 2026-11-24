@@ -226,7 +226,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback(   "humanoidIdentity", [&player]() -> std::expected<Json, StarException> {
-    return player.humanoid()->identity().toJson();
+    return player.humanoid()->identity().to_json();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("setHumanoidIdentity", [&player](Json const& id) -> std::expected<void, StarException> {
@@ -238,34 +238,34 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   if (auto registered = callbacks.register_callback(
         "setHumanoidParameter",
         [&player](String key, std::optional<Json> value) -> std::expected<void, StarException> {
-          return player.setHumanoidParameter(std::move(key), std::move(value));
+          return player.set_humanoid_parameter(std::move(key), std::move(value));
         });
       !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered =
         callbacks.register_callback("getHumanoidParameter",
                                    [&player](String key) -> std::expected<std::optional<Json>, StarException> {
-                                     return player.getHumanoidParameter(std::move(key));
+                                     return player.get_humanoid_parameter(std::move(key));
                                    });
       !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered =
         callbacks.register_callback("setHumanoidParameters",
                                    [&player](JsonObject parameters) -> std::expected<void, StarException> {
-                                     return player.setHumanoidParameters(std::move(parameters));
+                                     return player.set_humanoid_parameters(std::move(parameters));
                                    });
       !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("getHumanoidParameters", [&player]() -> std::expected<JsonObject, StarException> {
-    return player.getHumanoidParameters();
+    return player.get_humanoid_parameters();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("refreshHumanoidParameters", [&player]() -> std::expected<void, StarException> {
-    return player.refreshHumanoidParameters();
+    return player.refresh_humanoid_parameters();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
-  if (auto registered = callbacks.register_callback("humanoidConfig", [&player](bool withOverrides) -> std::expected<Json, StarException> {
-    return player.humanoid()->humanoidConfig(withOverrides);
+  if (auto registered = callbacks.register_callback("humanoidConfig", [&player](bool with_overrides) -> std::expected<Json, StarException> {
+    return player.humanoid()->humanoid_config(with_overrides);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("controlMovementState", [&player](std::optional<String> const& state) -> std::expected<void, StarException> {
@@ -274,7 +274,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback(   "bodyDirectives", [&player]() -> std::expected<String, StarException> {
-    return player.identity().bodyDirectives.string();
+    return player.identity().body_directives.string();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("setBodyDirectives", [&player](String const& str) -> std::expected<void, StarException> {
@@ -283,7 +283,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback(   "emoteDirectives", [&player]() -> std::expected<String, StarException> {
-    return player.identity().emoteDirectives.string();
+    return player.identity().emote_directives.string();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("setEmoteDirectives", [&player](String const& str) -> std::expected<void, StarException> {
@@ -292,7 +292,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback(   "hairGroup",      [&player]() -> std::expected<String, StarException> {
-    return player.identity().hairGroup;
+    return player.identity().hair_group;
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("setHairGroup",      [&player](String const& str) -> std::expected<void, StarException> {
@@ -300,7 +300,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback(   "hairType",       [&player]() -> std::expected<String, StarException> {
-    return player.identity().hairType;
+    return player.identity().hair_type;
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("setHairType",       [&player](String const& str) -> std::expected<void, StarException> {
@@ -308,7 +308,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback(   "hairDirectives", [&player]() -> std::expected<String, StarException> {
-    return player.identity().hairDirectives.string();
+    return player.identity().hair_directives.string();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("setHairDirectives", [&player](String const& str) -> std::expected<void, StarException> {
@@ -317,7 +317,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback(   "facialHairGroup",      [&player]() -> std::expected<String, StarException> {
-    return player.identity().facialHairGroup;
+    return player.identity().facial_hair_group;
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("setFacialHairGroup",      [&player](String const& str) -> std::expected<void, StarException> {
@@ -325,7 +325,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback(   "facialHairType",       [&player]() -> std::expected<String, StarException> {
-    return player.identity().facialHairType;
+    return player.identity().facial_hair_type;
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("setFacialHairType",       [&player](String const& str) -> std::expected<void, StarException> {
@@ -333,7 +333,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback(   "facialHairDirectives", [&player]() -> std::expected<String, StarException> {
-    return player.identity().facialHairDirectives.string();
+    return player.identity().facial_hair_directives.string();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("setFacialHairDirectives", [&player](String const& str) -> std::expected<void, StarException> {
@@ -342,7 +342,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback(   "facialMaskGroup",      [&player]() -> std::expected<String, StarException> {
-    return player.identity().facialMaskGroup;
+    return player.identity().facial_mask_group;
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("setFacialMaskGroup",      [&player](String const& str) -> std::expected<void, StarException> {
@@ -350,7 +350,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback(   "facialMaskType",       [&player]() -> std::expected<String, StarException> {
-    return player.identity().facialMaskType;
+    return player.identity().facial_mask_type;
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("setFacialMaskType",       [&player](String const& str) -> std::expected<void, StarException> {
@@ -358,7 +358,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback(   "facialMaskDirectives", [&player]() -> std::expected<String, StarException> {
-    return player.identity().facialMaskDirectives.string();
+    return player.identity().facial_mask_directives.string();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("setFacialMaskDirectives", [&player](String const& str) -> std::expected<void, StarException> {
@@ -368,19 +368,19 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
 
   if (auto registered = callbacks.register_callback("hair", [&player]() -> std::expected<decltype(lua_tuple_return(String(), String(), String())), StarException> {
     HumanoidIdentity const& identity = player.identity();
-    return lua_tuple_return(identity.hairGroup, identity.hairType, identity.hairDirectives.string());
+    return lua_tuple_return(identity.hair_group, identity.hair_type, identity.hair_directives.string());
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("facialHair", [&player]() -> std::expected<decltype(lua_tuple_return(String(), String(), String())), StarException> {
     HumanoidIdentity const& identity = player.identity();
-    return lua_tuple_return(identity.facialHairGroup, identity.facialHairType, identity.facialHairDirectives.string());
+    return lua_tuple_return(identity.facial_hair_group, identity.facial_hair_type, identity.facial_hair_directives.string());
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("facialMask", [&player]() -> std::expected<decltype(lua_tuple_return(String(), String(), String())), StarException> {
     HumanoidIdentity const& identity = player.identity();
-    return lua_tuple_return(identity.facialMaskGroup, identity.facialMaskType, identity.facialMaskDirectives.string());
+    return lua_tuple_return(identity.facial_mask_group, identity.facial_mask_type, identity.facial_mask_directives.string());
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
@@ -470,7 +470,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback(   "imagePath", [&player]() -> std::expected<std::optional<String>, StarException> {
-    return player.identity().imagePath;
+    return player.identity().image_path;
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("setImagePath", [&player](std::optional<String> const& imagePath) -> std::expected<void, StarException> {
@@ -499,12 +499,12 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback(   "personality", [&player]() -> std::expected<Json, StarException> {
-    return jsonFromPersonality(player.identity().personality);
+    return json_from_personality(player.identity().personality);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("setPersonality", [&player](Json const& personalityConfig) -> std::expected<void, StarException> {
     Personality personality = player.identity().personality;
-    auto parsed = parsePersonality(personality, personalityConfig);
+    auto parsed = parse_personality(personality, personalityConfig);
     if (!parsed) return std::unexpected(std::move(parsed.error()));
     return player.setPersonality(personality);
   }); !registered)
@@ -803,8 +803,8 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("emote", [&player](String const& emote, std::optional<float> cooldown) -> std::expected<void, StarException> {
-    if (!HumanoidEmoteNames) return std::unexpected(HumanoidEmoteNames.error());
-    auto value = HumanoidEmoteNames->get_left(emote);
+    if (!humanoid_emote_names) return std::unexpected(humanoid_emote_names.error());
+    auto value = humanoid_emote_names->get_left(emote);
     if (!value) return std::unexpected(std::move(value.error()));
     player.addEmote(value->get(), cooldown);
     return {};
@@ -813,8 +813,8 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
 
   if (auto registered = callbacks.register_callback("currentEmote", [&player]() -> std::expected<decltype(lua_tuple_return(String(), float())), StarException> {
     auto emote = player.currentEmote();
-    if (!HumanoidEmoteNames) return std::unexpected(HumanoidEmoteNames.error());
-    auto name = HumanoidEmoteNames->get_right(emote.first);
+    if (!humanoid_emote_names) return std::unexpected(humanoid_emote_names.error());
+    auto name = humanoid_emote_names->get_right(emote.first);
     if (!name) return std::unexpected(std::move(name.error()));
     return lua_tuple_return(name->get(), emote.second);
   }); !registered)
@@ -1892,7 +1892,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
   // more accurate than mcontroller.facingDirection
   if (auto registered = callbacks.register_callback("facingDirection", [&player]() -> std::expected<int, StarException> {
-    return numerical_direction(player.humanoid()->facingDirection());
+    return numerical_direction(player.humanoid()->facing_direction());
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 

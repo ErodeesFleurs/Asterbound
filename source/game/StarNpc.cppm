@@ -220,9 +220,9 @@ public:
 
   [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) override;
 
-  [[nodiscard]] std::expected<Vec2F, StarException> armPosition(ToolHand hand, Direction facingDirection, float armAngle, Vec2F offset = {}) const override;
-  [[nodiscard]] std::expected<Vec2F, StarException> handOffset(ToolHand hand, Direction facingDirection) const override;
-  [[nodiscard]] std::expected<Vec2F, StarException> handPosition(ToolHand hand, Vec2F const& handOffset = {}) const override;
+  [[nodiscard]] std::expected<Vec2F, StarException> arm_position(ToolHand hand, Direction facing_direction, float arm_angle, Vec2F offset = {}) const override;
+  [[nodiscard]] std::expected<Vec2F, StarException> hand_offset(ToolHand hand, Direction facing_direction) const override;
+  [[nodiscard]] std::expected<Vec2F, StarException> hand_position(ToolHand hand, Vec2F const& hand_offset = {}) const override;
   std::shared_ptr<Item> handItem(ToolHand hand) const override;
   [[nodiscard]] std::expected<Vec2F, StarException> armAdjustment() const override;
   Vec2F velocity() const override;
@@ -267,10 +267,10 @@ public:
   [[nodiscard]] std::expected<void, StarException> updateIdentity();
   [[nodiscard]] std::expected<void, StarException> setIdentity(HumanoidIdentity identity);
 
-  [[nodiscard]] std::expected<void, StarException> setHumanoidParameter(String key, std::optional<Json> value);
-  std::optional<Json> getHumanoidParameter(String key);
-  [[nodiscard]] std::expected<void, StarException> setHumanoidParameters(JsonObject parameters);
-  JsonObject getHumanoidParameters();
+  [[nodiscard]] std::expected<void, StarException> set_humanoid_parameter(String key, std::optional<Json> value);
+  std::optional<Json> get_humanoid_parameter(String key);
+  [[nodiscard]] std::expected<void, StarException> set_humanoid_parameters(JsonObject parameters);
+  JsonObject get_humanoid_parameters();
 
   [[nodiscard]] std::expected<void, StarException> setBodyDirectives(String const& directives);
   [[nodiscard]] std::expected<void, StarException> setEmoteDirectives(String const& directives);
@@ -308,7 +308,7 @@ public:
 private:
   explicit Npc(Root& rootContext);
   [[nodiscard]] std::expected<List<LightSource>, StarException> presentationLightSources(float interpolation) const;
-  [[nodiscard]] std::expected<void, StarException> updateHumanoidDirectives();
+  [[nodiscard]] std::expected<void, StarException> update_humanoid_directives();
   DirectivesGroup m_presentationHumanoidDirectives;
   [[nodiscard]] std::expected<void, StarException> initialize(NpcVariant const& npcVariant);
   [[nodiscard]] std::expected<void, StarException> loadState(Json const& diskStore);
@@ -332,9 +332,9 @@ private:
 
   void disableWornArmor(bool disable);
 
-  [[nodiscard]] std::expected<void, StarException> refreshHumanoidParameters();
+  [[nodiscard]] std::expected<void, StarException> refresh_humanoid_parameters();
 
-  NetElementDynamicGroup<NetHumanoid> m_netHumanoid;
+  NetElementDynamicGroup<NetHumanoid> m_net_humanoid;
   LuaAnimationScript m_scriptedAnimator;
   NetElementHashMap<String, Json> m_scriptedAnimationParameters;
   NetworkedAnimator::DynamicTarget m_humanoidDynamicTarget;
@@ -353,7 +353,7 @@ private:
   NetElementData<std::optional<String>> m_humanoid_dance_net_state;
 
   NetElementData<HumanoidIdentity> m_identityNetState;
-  NetElementEvent m_refreshedHumanoidParameters;
+  NetElementEvent m_refreshed_humanoid_parameters;
   bool m_identityUpdated;
 
   NetElementData<std::optional<String>> m_deathParticleBurst;

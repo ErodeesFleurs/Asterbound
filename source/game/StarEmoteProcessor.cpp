@@ -50,12 +50,12 @@ std::expected<std::shared_ptr<EmoteProcessor>, StarException> EmoteProcessor::cr
   if (!cfg) return std::unexpected(std::move(cfg.error()));
   auto bindings = cfg->get_object("emoteBindings");
   if (!bindings) return std::unexpected(std::move(bindings.error()));
-  if (!HumanoidEmoteNames) return std::unexpected(HumanoidEmoteNames.error());
+  if (!humanoid_emote_names) return std::unexpected(humanoid_emote_names.error());
   for (auto const& binding : *bindings) {
     auto array = binding.second.array_ptr();
     if (!array) return std::unexpected(std::move(array.error()));
     if ((*array)->empty()) continue;
-    auto emote = HumanoidEmoteNames->get_left(binding.first);
+    auto emote = humanoid_emote_names->get_left(binding.first);
     if (!emote) return std::unexpected(std::move(emote.error()));
     for (auto const& text : **array) {
       auto string = text.to_string();

@@ -157,30 +157,30 @@ std::expected<List<Drawable>, StarException> Flashlight::drawables() const {
 std::expected<List<LightSource>, StarException> Flashlight::lightSources() const {
   if (!initialized())
     return List<LightSource>{};
-  auto ownerResult = owner();
-  if (!ownerResult)
-    return std::unexpected(std::move(ownerResult.error()));
-  auto worldResult = world();
-  if (!worldResult)
-    return std::unexpected(std::move(worldResult.error()));
-  auto handResult = hand();
-  if (!handResult)
-    return std::unexpected(std::move(handResult.error()));
-  auto ownerHandPosition = ownerResult->get().handPosition(*handResult, (m_lightPosition - m_handPosition) / tile_pixels);
-  if (!ownerHandPosition)
-    return std::unexpected(std::move(ownerHandPosition.error()));
-  auto aimPosition = ownerResult->get().aimPosition();
-  if (!aimPosition)
-    return std::unexpected(std::move(aimPosition.error()));
-  float angle = worldResult->get().geometry().diff(*aimPosition, ownerResult->get().position()).angle();
-  LightSource lightSource;
-  lightSource.type = LightType::Point;
-  lightSource.position = ownerResult->get().position() + *ownerHandPosition;
-  lightSource.color = m_lightColor.to_rgb_f();
-  lightSource.pointBeam = m_beamWidth;
-  lightSource.beamAngle = angle;
-  lightSource.beamAmbience = m_ambientFactor;
-  return List<LightSource>{std::move(lightSource)};
+  auto owner_result = owner();
+  if (!owner_result)
+    return std::unexpected(std::move(owner_result.error()));
+  auto world_result = world();
+  if (!world_result)
+    return std::unexpected(std::move(world_result.error()));
+  auto hand_result = hand();
+  if (!hand_result)
+    return std::unexpected(std::move(hand_result.error()));
+  auto owner_hand_position = owner_result->get().hand_position(*hand_result, (m_lightPosition - m_handPosition) / tile_pixels);
+  if (!owner_hand_position)
+    return std::unexpected(std::move(owner_hand_position.error()));
+  auto aim_position = owner_result->get().aimPosition();
+  if (!aim_position)
+    return std::unexpected(std::move(aim_position.error()));
+  float angle = world_result->get().geometry().diff(*aim_position, owner_result->get().position()).angle();
+  LightSource light_source;
+  light_source.type = LightType::Point;
+  light_source.position = owner_result->get().position() + *owner_hand_position;
+  light_source.color = m_lightColor.to_rgb_f();
+  light_source.pointBeam = m_beamWidth;
+  light_source.beamAngle = angle;
+  light_source.beamAmbience = m_ambientFactor;
+  return List<LightSource>{std::move(light_source)};
 }
 
 }

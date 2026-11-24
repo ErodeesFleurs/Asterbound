@@ -115,10 +115,10 @@ namespace Star {
 namespace {
 std::expected<Vec2F, StarException> active_hand_position(ToolUserEntity const& owner, ToolHand hand, Direction facing,
                                                    float angle, Vec2F const& offset) {
-  auto hand_offset = owner.handOffset(hand, facing);
+  auto hand_offset = owner.hand_offset(hand, facing);
   if (!hand_offset)
     return std::unexpected(std::move(hand_offset.error()));
-  return owner.armPosition(hand, facing, angle, offset + *hand_offset);
+  return owner.arm_position(hand, facing, angle, offset + *hand_offset);
 }
 }
 
@@ -683,7 +683,7 @@ std::expected<Vec2F, StarException> ActiveItem::armPosition(Vec2F const& offset)
   auto itemHand = hand();
   if (!itemHand)
     return std::unexpected(std::move(itemHand.error()));
-  return itemOwner->get().armPosition(*itemHand, itemOwner->get().facingDirection(), m_armAngle.get(), offset);
+  return itemOwner->get().arm_position(*itemHand, itemOwner->get().facingDirection(), m_armAngle.get(), offset);
 }
 
 std::expected<Vec2F, StarException> ActiveItem::handPosition(Vec2F const& offset) const {
@@ -736,55 +736,55 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
     return std::unexpected(std::move(added.error()));
 
   // Aim a barrel with a vertical offset from the hand at the given target.
-  if (auto added = callbacks.register_callback("aimAngleAndDirection", [this](float aimVerticalOffset, Vec2F targetPosition) -> std::expected<LuaTupleReturn<float, int>, StarException> {
-      auto itemOwner = owner();
-      if (!itemOwner)
-        return std::unexpected(std::move(itemOwner.error()));
-      auto itemHand = hand();
-      if (!itemHand)
-        return std::unexpected(std::move(itemHand.error()));
-      auto rotationCenter = itemOwner->get().armPosition(*itemHand, itemOwner->get().facingDirection(), 0.0f, Vec2F());
-      if (!rotationCenter)
-        return std::unexpected(std::move(rotationCenter.error()));
-      Vec2F handRotationCenter = *rotationCenter;
-      Vec2F ownerPosition = itemOwner->get().position();
-      auto itemWorld = itemOwner->get().world();
-      if (!itemWorld)
-        return std::unexpected(std::move(itemWorld.error()));
-      Vec2F toTarget = itemWorld->get().geometry().diff(targetPosition, ownerPosition);
+  if (auto added = callbacks.register_callback("aimAngleAndDirection", [this](float aim_vertical_offset, Vec2F target_position) -> std::expected<LuaTupleReturn<float, int>, StarException> {
+      auto item_owner = owner();
+      if (!item_owner)
+        return std::unexpected(std::move(item_owner.error()));
+      auto item_hand = hand();
+      if (!item_hand)
+        return std::unexpected(std::move(item_hand.error()));
+      auto rotation_center = item_owner->get().arm_position(*item_hand, item_owner->get().facingDirection(), 0.0f, Vec2F());
+      if (!rotation_center)
+        return std::unexpected(std::move(rotation_center.error()));
+      Vec2F hand_rotation_center = *rotation_center;
+      Vec2F owner_position = item_owner->get().position();
+      auto item_world = item_owner->get().world();
+      if (!item_world)
+        return std::unexpected(std::move(item_world.error()));
+      Vec2F to_target = item_world->get().geometry().diff(target_position, owner_position);
       // Keep the target beyond the hand's rotation center to avoid rapid flips.
-      auto dir = numerical_direction(itemOwner->get().facingDirection());
-      auto targetX = toTarget[0] * dir;
-      auto centerX = handRotationCenter[0] * dir;
-      if (centerX >= 0 && targetX >= 0 && targetX < centerX)
-        toTarget[0] = handRotationCenter[0] + (0.125 * dir);
-      toTarget -= handRotationCenter;
-      float toTargetDist = toTarget.magnitude();
+      auto dir = numerical_direction(item_owner->get().facingDirection());
+      auto target_x = to_target[0] * dir;
+      auto center_x = hand_rotation_center[0] * dir;
+      if (center_x >= 0 && target_x >= 0 && target_x < center_x)
+        to_target[0] = hand_rotation_center[0] + (0.125 * dir);
+      to_target -= hand_rotation_center;
+      float to_target_dist = to_target.magnitude();
       // Clamp targets inside the barrel-offset circle to retain continuity.
-      float angleAdjust = -std::asin(std::clamp(aimVerticalOffset / toTargetDist, -1.0f, 1.0f));
-      auto angleSide = get_angle_side(toTarget.angle());
-      return lua_tuple_return(angleSide.first + angleAdjust, numerical_direction(angleSide.second));
+      float angle_adjust = -std::asin(std::clamp(aim_vertical_offset / to_target_dist, -1.0f, 1.0f));
+      auto angle_side = get_angle_side(to_target.angle());
+      return lua_tuple_return(angle_side.first + angle_adjust, numerical_direction(angle_side.second));
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.register_callback("aimAngle", [this](float aimVerticalOffset, Vec2F targetPosition) -> std::expected<float, StarException> {
-      auto itemOwner = owner();
-      if (!itemOwner)
-        return std::unexpected(std::move(itemOwner.error()));
-      auto itemHand = hand();
-      if (!itemHand)
-        return std::unexpected(std::move(itemHand.error()));
-      auto rotationCenter = itemOwner->get().armPosition(*itemHand, itemOwner->get().facingDirection(), 0.0f, Vec2F());
-      if (!rotationCenter)
-        return std::unexpected(std::move(rotationCenter.error()));
-      Vec2F handRotationCenter = *rotationCenter;
-      Vec2F ownerPosition = itemOwner->get().position();
-      auto itemWorld = itemOwner->get().world();
-      if (!itemWorld)
-        return std::unexpected(std::move(itemWorld.error()));
-      Vec2F toTarget = itemWorld->get().geometry().diff(targetPosition, ownerPosition + handRotationCenter);
-      float toTargetDist = toTarget.magnitude();
-      float angleAdjust = -std::asin(std::clamp(aimVerticalOffset / toTargetDist, -1.0f, 1.0f));
-      return toTarget.angle() + angleAdjust;
+  if (auto added = callbacks.register_callback("aimAngle", [this](float aim_vertical_offset, Vec2F target_position) -> std::expected<float, StarException> {
+      auto item_owner = owner();
+      if (!item_owner)
+        return std::unexpected(std::move(item_owner.error()));
+      auto item_hand = hand();
+      if (!item_hand)
+        return std::unexpected(std::move(item_hand.error()));
+      auto rotation_center = item_owner->get().arm_position(*item_hand, item_owner->get().facingDirection(), 0.0f, Vec2F());
+      if (!rotation_center)
+        return std::unexpected(std::move(rotation_center.error()));
+      Vec2F hand_rotation_center = *rotation_center;
+      Vec2F owner_position = item_owner->get().position();
+      auto item_world = item_owner->get().world();
+      if (!item_world)
+        return std::unexpected(std::move(item_world.error()));
+      Vec2F to_target = item_world->get().geometry().diff(target_position, owner_position + hand_rotation_center);
+      float to_target_dist = to_target.magnitude();
+      float angle_adjust = -std::asin(std::clamp(aim_vertical_offset / to_target_dist, -1.0f, 1.0f));
+      return to_target.angle() + angle_adjust;
     }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("setHoldingItem", [this](bool value) { m_holdingItem.set(value); }); !added)
@@ -953,9 +953,9 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
     }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("emote", [this](String const& name) -> std::expected<void, StarException> {
-      if (!HumanoidEmoteNames)
-        return std::unexpected(HumanoidEmoteNames.error());
-      auto emote = HumanoidEmoteNames->get_left(name);
+      if (!humanoid_emote_names)
+        return std::unexpected(humanoid_emote_names.error());
+      auto emote = humanoid_emote_names->get_left(name);
       if (!emote)
         return std::unexpected(std::move(emote.error()));
       auto itemOwner = owner();

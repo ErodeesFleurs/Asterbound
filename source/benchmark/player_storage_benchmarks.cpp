@@ -165,7 +165,7 @@ void register_player_storage_benchmarks(Star::Root& root, bool& failed) {
             return;
           }
           for (auto _ : state) {
-            auto refreshed = appearance ? (*player)->refreshHumanoid() : (*player)->refreshArmor();
+            auto refreshed = appearance ? (*player)->refresh_humanoid() : (*player)->refreshArmor();
             if (!refreshed) {
               failed = true;
               state.SkipWithError(refreshed.error().what());

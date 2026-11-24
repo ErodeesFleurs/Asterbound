@@ -84,7 +84,7 @@ struct SpeciesOption {
 
 struct CharacterCreationResult {
   HumanoidIdentity identity;
-  JsonObject humanoidParameters;
+  JsonObject humanoid_parameters;
   JsonObject armor;
 };
 
@@ -96,7 +96,7 @@ public:
   String kind() const;
   bool playerSelectable() const;
   SpeciesOption const& options() const;
-  [[nodiscard]] std::expected<Json, StarException> humanoidConfig() const;
+  [[nodiscard]] std::expected<Json, StarException> humanoid_config() const;
   List<Personality> const& personalities() const;
   String nameGen(Gender gender) const;
   String ouchNoise(Gender gender) const;
@@ -117,8 +117,8 @@ private:
   SpeciesCharCreationTooltip m_tooltip;
   bool m_playerSelectable;
   Json m_config;
-  String m_humanoidConfig;
-  Json m_humanoidOverrides;
+  String m_humanoid_config;
+  Json m_humanoid_overrides;
   List<Personality> m_personalities;
   List<String> m_nameGen;
   List<String> m_ouchNoises;
@@ -143,10 +143,10 @@ public:
   [[nodiscard]] std::expected<std::shared_ptr<SpeciesDefinition>, StarException> species(String const& kind) const;
   StringMap<std::shared_ptr<SpeciesDefinition>> allSpecies() const;
 
-  [[nodiscard]] std::expected<Json, StarException> humanoidConfig(HumanoidIdentity identity, JsonObject parameters = JsonObject(), Json config = Json(), std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog = std::nullopt) const;
-  [[nodiscard]] std::expected<CharacterCreationResult, StarException> createHumanoid(String name, String speciesChoice, std::size_t genderChoice, std::size_t bodyColor, std::size_t alty, std::size_t hairChoice, std::size_t heady, std::size_t shirtChoice, std::size_t shirtColor, std::size_t pantsChoice, std::size_t pantsColor, std::size_t personality, LuaVariadic<LuaValue> ext = {}, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog = std::nullopt) const;
+  [[nodiscard]] std::expected<Json, StarException> humanoid_config(HumanoidIdentity identity, JsonObject parameters = JsonObject(), Json config = Json(), std::optional<std::reference_wrapper<ItemDatabase const>> item_catalog = std::nullopt) const;
+  [[nodiscard]] std::expected<CharacterCreationResult, StarException> create_humanoid(String name, String species_choice, std::size_t gender_choice, std::size_t body_color, std::size_t alty, std::size_t hair_choice, std::size_t heady, std::size_t shirt_choice, std::size_t shirt_color, std::size_t pants_choice, std::size_t pants_color, std::size_t personality, LuaVariadic<LuaValue> ext = {}, std::optional<std::reference_wrapper<ItemDatabase const>> item_catalog = std::nullopt) const;
 
-  [[nodiscard]] std::expected<CharacterCreationResult, StarException> generateHumanoid(String species, std::int64_t seed, std::optional<Gender> = {}, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog = std::nullopt) const;
+  [[nodiscard]] std::expected<CharacterCreationResult, StarException> generate_humanoid(String species, std::int64_t seed, std::optional<Gender> = {}, std::optional<std::reference_wrapper<ItemDatabase const>> item_catalog = std::nullopt) const;
 
 private:
   explicit SpeciesDatabase(Root& root) : m_root(root) {}

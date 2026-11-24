@@ -373,7 +373,7 @@ std::expected<bool, StarException> CharCreationPane::sendEvent(InputEvent const&
       if (actions.contains(InterfaceAction::EmoteSad))
         m_previewPlayer->addEmote(HumanoidEmote::Sad);
       if (actions.contains(InterfaceAction::EmoteNeutral))
-        m_previewPlayer->addEmote(HumanoidEmote::NEUTRAL);
+        m_previewPlayer->addEmote(HumanoidEmote::Neutral);
       if (actions.contains(InterfaceAction::EmoteLaugh))
         m_previewPlayer->addEmote(HumanoidEmote::Laugh);
       if (actions.contains(InterfaceAction::EmoteAnnoyed))
@@ -381,7 +381,7 @@ std::expected<bool, StarException> CharCreationPane::sendEvent(InputEvent const&
       if (actions.contains(InterfaceAction::EmoteOh))
         m_previewPlayer->addEmote(HumanoidEmote::Oh);
       if (actions.contains(InterfaceAction::EmoteOooh))
-        m_previewPlayer->addEmote(HumanoidEmote::OOOH);
+        m_previewPlayer->addEmote(HumanoidEmote::Oooh);
       if (actions.contains(InterfaceAction::EmoteBlink))
         m_previewPlayer->addEmote(HumanoidEmote::Blink);
       if (actions.contains(InterfaceAction::EmoteWink))
@@ -526,17 +526,17 @@ std::expected<void, StarException> CharCreationPane::changed() {
     return std::unexpected(std::move(clothing.error()));
   if (auto result = (*portrait)->setMode((*clothing)->isChecked() ? PortraitMode::Full : PortraitMode::FullNude); !result)
     return std::unexpected(std::move(result.error()));
-  auto results = (*database)->createHumanoid((*textBox)->getText(), species.species, m_genderChoice, m_bodyColor,
+  auto results = (*database)->create_humanoid((*textBox)->getText(), species.species, m_genderChoice, m_bodyColor,
       m_alty, m_hairChoice, m_heady, m_shirtChoice, m_shirtColor, m_pantsChoice, m_pantsColor, m_personality);
   if (!results)
     return std::unexpected(std::move(results.error()));
   if (auto result = m_previewPlayer->setModeType(static_cast<PlayerMode>(m_modeChoice)); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = m_previewPlayer->setHumanoidParameters(std::move(results->humanoidParameters)); !result)
+  if (auto result = m_previewPlayer->set_humanoid_parameters(std::move(results->humanoid_parameters)); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = m_previewPlayer->setIdentity(std::move(results->identity)); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = m_previewPlayer->refreshHumanoidParameters(); !result)
+  if (auto result = m_previewPlayer->refresh_humanoid_parameters(); !result)
     return std::unexpected(std::move(result.error()));
   if (!EquipmentSlotNames)
     return std::unexpected(EquipmentSlotNames.error());

@@ -1432,7 +1432,7 @@ const GameTestRegistration
     Entity& entity = player;
     ASSERT_TRUE(entity.init(**world, 100, EntityMode::Master));
     auto uninitPlayer = make_scope_exit([&] { EXPECT_TRUE(entity.uninit()); });
-    ASSERT_TRUE(player.refreshHumanoid());
+    ASSERT_TRUE(player.refresh_humanoid());
     Vec2F const origin(1024, 1024);
     ASSERT_TRUE(player.moveTo(origin));
     auto tools = ToolUser::create(root);
@@ -1526,7 +1526,7 @@ const GameTestRegistration
       player.aim(origin + Vec2F(20, 0));
       auto const far_end = center_of_tile(origin + Vec2F(20, 0)) - player.position();
       ASSERT_LT(far_end.magnitude(), range);
-      auto hand = player.handPosition(ToolHand::Primary, (beam.firePosition() - beam.handPosition()) / tile_pixels);
+      auto hand = player.hand_position(ToolHand::Primary, (beam.firePosition() - beam.handPosition()) / tile_pixels);
       ASSERT_TRUE(hand);
       ASSERT_LT((far_end - *hand).magnitude(), range); // the chord alone would stay in range
       for (unsigned i = 0; i != displayCalls; ++i) {
@@ -1629,7 +1629,7 @@ void with_scripted_item_owner(GameTest& fixture, String const& script, std::invo
   Entity& entity = player;
   ASSERT_TRUE(entity.init(**world, 100, EntityMode::Master));
   auto uninit_player = make_scope_exit([&] { EXPECT_TRUE(entity.uninit()); });
-  ASSERT_TRUE(player.refreshHumanoid());
+  ASSERT_TRUE(player.refresh_humanoid());
   ASSERT_TRUE(player.moveTo(Vec2F(1024, 1024)));
   test(root, player);
 }
@@ -1671,9 +1671,9 @@ end
       ASSERT_TRUE(directed);
       ASSERT_TRUE(movement.load_state(*directed));
       ASSERT_EQ(player.facingDirection(), facing);
-      auto offset = player.handOffset(ToolHand::Primary, facing);
+      auto offset = player.hand_offset(ToolHand::Primary, facing);
       ASSERT_TRUE(offset);
-      auto arm = player.armPosition(ToolHand::Primary, facing, 0.7f, *offset);
+      auto arm = player.arm_position(ToolHand::Primary, facing, 0.7f, *offset);
       ASSERT_TRUE(arm);
       Vec2F origin = player.position() + *arm;
       auto expected_point = [&](Vec2F point) {

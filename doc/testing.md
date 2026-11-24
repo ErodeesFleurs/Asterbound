@@ -619,6 +619,20 @@ with a conservative earliest-timestamp bound; negative smear, TTL changes and
 failed-insertion timestamps must remain covered. Filtered cleanup still visits
 every entry. Revisiting evicted cells re-executes their deterministic callbacks.
 
+### Humanoid appearance and pose
+
+Use `game_tests --gtest_filter='HumanoidRenderTest.*:ArmorWearerTest.*'` with
+real assets. A rejected configuration or movement state must leave the current
+pose usable and the same request retryable. Compare the original appearance
+before and after a dummy preview, including back armor and helmet masks.
+Native names are independent of resource and script keys: for example,
+`HumanoidTiming::state_cycle` still reads `"stateCycle"`. Keep saved identity
+fields, animation tags, Lua callback names and binary field order unchanged.
+
+For paired timings, exercise the legacy and animator paths separately. Compare
+ordered drawable output for empty hands, two held items with non-rotated
+prefixes, a dance, and a masked portrait before interpreting CPU times.
+
 ### Game timers
 
 `GameTimers.GlobalBreakRequestsFollowElapsedSteps` counts actual tile-entity

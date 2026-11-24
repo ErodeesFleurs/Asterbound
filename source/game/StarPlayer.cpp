@@ -278,7 +278,7 @@ std::expected<std::shared_ptr<Player>, StarException> Player::create(Root& root,
   return create(root, std::move(config), Uuid(root.random()));
 }
 
-Player::Player(Root& rootOwner) : Entity(rootOwner), m_netHumanoid([&rootOwner] { return NetHumanoid::create(rootOwner); }), m_scriptedAnimator(rootOwner) {}
+Player::Player(Root& rootOwner) : Entity(rootOwner), m_net_humanoid([&rootOwner] { return NetHumanoid::create(rootOwner); }), m_scriptedAnimator(rootOwner) {}
 
 Player::~Player() {
   if (m_inventory)
@@ -344,9 +344,9 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   }
 
   // all of these are defaults and won't include the correct humanoid config for the species
-  if (auto result = installHumanoid(); !result)
+  if (auto result = install_humanoid(); !result)
     return std::unexpected(std::move(result.error()));
-  auto movementParametersResult = ActorMovementParameters::create(json_merge(humanoid()->defaultMovementParameters(), humanoid()->playerMovementParameters().value_or(m_config->movementParameters)));
+  auto movementParametersResult = ActorMovementParameters::create(json_merge(humanoid()->default_movement_parameters(), humanoid()->player_movement_parameters().value_or(m_config->movementParameters)));
   if (!movementParametersResult)
     return std::unexpected(std::move(movementParametersResult.error()));
   auto movementParameters = std::move(*movementParametersResult);
@@ -651,14 +651,14 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
       return std::unexpected(std::move(result.error()));
   }
 
-  m_netHumanoid.set_compatibility_version(10);
+  m_net_humanoid.set_compatibility_version(10);
   {
-    if (auto result = m_netGroup.add_net_element(m_netHumanoid); !result)
+    if (auto result = m_netGroup.add_net_element(m_net_humanoid); !result)
       return std::unexpected(std::move(result.error()));
   }
-  m_refreshedHumanoidParameters.set_compatibility_version(10);
+  m_refreshed_humanoid_parameters.set_compatibility_version(10);
   {
-    if (auto result = m_netGroup.add_net_element(m_refreshedHumanoidParameters); !result)
+    if (auto result = m_netGroup.add_net_element(m_refreshed_humanoid_parameters); !result)
       return std::unexpected(std::move(result.error()));
   }
 
@@ -710,30 +710,30 @@ std::expected<void, StarException> Player::net_load(ByteArray const& net_store, 
   if (auto result = ds.read(m_identity); !result)
     return std::unexpected(std::move(result.error()));
   if (rules.version() >= 10) {
-    if (auto result = ds.read(m_humanoidParameters); !result)
+    if (auto result = ds.read(m_humanoid_parameters); !result)
       return std::unexpected(std::move(result.error()));
   }
-  if (auto result = installHumanoid(); !result)
+  if (auto result = install_humanoid(); !result)
     return std::unexpected(std::move(result.error()));
-  auto movementParametersResult = ActorMovementParameters::create(json_merge(humanoid()->defaultMovementParameters(), humanoid()->playerMovementParameters().value_or(m_config->movementParameters)));
+  auto movementParametersResult = ActorMovementParameters::create(json_merge(humanoid()->default_movement_parameters(), humanoid()->player_movement_parameters().value_or(m_config->movementParameters)));
   if (!movementParametersResult)
     return std::unexpected(std::move(movementParametersResult.error()));
   auto movementParameters = std::move(*movementParametersResult);
   if (auto result = m_movementController->reset_base_parameters(movementParameters); !result)
     return std::unexpected(std::move(result.error()));
-  m_deathParticleBurst.set(humanoid()->defaultDeathParticles());
+  m_deathParticleBurst.set(humanoid()->default_death_particles());
   return {};
 }
 
-std::expected<void, StarException> Player::installHumanoid() {
-  auto currentResult = NetHumanoid::create(root(), m_identity, m_humanoidParameters, Json());
-  if (!currentResult)
-    return std::unexpected(std::move(currentResult.error()));
-  auto current = std::move(*currentResult);
-  m_netHumanoid.clear_net_elements();
-  if (auto result = m_netHumanoid.add_net_element(current); !result)
+std::expected<void, StarException> Player::install_humanoid() {
+  auto current_result = NetHumanoid::create(root(), m_identity, m_humanoid_parameters, Json());
+  if (!current_result)
+    return std::unexpected(std::move(current_result.error()));
+  auto current = std::move(*current_result);
+  m_net_humanoid.clear_net_elements();
+  if (auto result = m_net_humanoid.add_net_element(current); !result)
     return std::unexpected(std::move(result.error()));
-  m_currentNetHumanoid = std::move(current);
+  m_current_net_humanoid = std::move(current);
   return {};
 }
 
@@ -904,17 +904,17 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
   if (!parametersResult)
     return std::unexpected(std::move(parametersResult.error()));
   auto parameters = std::move(*parametersResult);
-  m_humanoidParameters = std::move(parameters);
-  if (auto result = installHumanoid(); !result)
+  m_humanoid_parameters = std::move(parameters);
+  if (auto result = install_humanoid(); !result)
     return std::unexpected(std::move(result.error()));
-  auto movementParametersResult = ActorMovementParameters::create(json_merge(humanoid()->defaultMovementParameters(), humanoid()->playerMovementParameters().value_or(m_config->movementParameters)));
+  auto movementParametersResult = ActorMovementParameters::create(json_merge(humanoid()->default_movement_parameters(), humanoid()->player_movement_parameters().value_or(m_config->movementParameters)));
   if (!movementParametersResult)
     return std::unexpected(std::move(movementParametersResult.error()));
   auto movementParameters = std::move(*movementParametersResult);
   if (auto result = m_movementController->reset_base_parameters(movementParameters); !result)
     return std::unexpected(std::move(result.error()));
   m_effectsAnimator->setGlobalTag("effectDirectives", speciesDef->effectDirectives());
-  m_deathParticleBurst.set(humanoid()->defaultDeathParticles());
+  m_deathParticleBurst.set(humanoid()->default_death_particles());
   auto propertiesResult = diskStore.get_object("genericProperties");
   if (!propertiesResult)
     return std::unexpected(std::move(propertiesResult.error()));
@@ -1069,7 +1069,7 @@ std::expected<void, StarException> Player::init(World& world, EntityId entityId,
       auto songbookCallbacks = std::move(*songbookCallbacksResult);
       if (auto result = p.second->add_callbacks("songbook", std::move(songbookCallbacks)); !result)
         return std::unexpected(std::move(result.error()));
-      auto animatorCallbacksResult = LuaBindings::makeNetworkedAnimatorCallbacks(humanoid()->networkedAnimator()->get());
+      auto animatorCallbacksResult = LuaBindings::makeNetworkedAnimatorCallbacks(humanoid()->networked_animator()->get());
       if (!animatorCallbacksResult)
         return std::unexpected(std::move(animatorCallbacksResult.error()));
       auto animatorCallbacks = std::move(*animatorCallbacksResult);
@@ -1098,9 +1098,9 @@ std::expected<void, StarException> Player::init(World& world, EntityId entityId,
       return std::unexpected(std::move(result.error()));
   }
   if (world.isClient()) {
-    if (auto result = m_scriptedAnimator.set_scripts(humanoid()->animationScripts()); !result)
+    if (auto result = m_scriptedAnimator.set_scripts(humanoid()->animation_scripts()); !result)
       return std::unexpected(std::move(result.error()));
-    auto animationCallbacksResult = LuaBindings::makeScriptedAnimatorCallbacks(humanoid()->networkedAnimator()->get(),
+    auto animationCallbacksResult = LuaBindings::makeScriptedAnimatorCallbacks(humanoid()->networked_animator()->get(),
       [&parameters = m_scriptedAnimationParameters](String const& name, Json const& defaultValue) -> std::expected<Json, StarException> {
         return parameters.value(name, defaultValue);
       });
@@ -1121,7 +1121,7 @@ std::expected<void, StarException> Player::init(World& world, EntityId entityId,
   m_xAimPositionNetState.set_interpolator(world.geometry().x_lerp_function());
   if (auto result = refreshEquipment(); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = updateHumanoidDirectives(); !result)
+  if (auto result = update_humanoid_directives(); !result)
     return std::unexpected(std::move(result.error()));
   return humanoid()->prepare_animator_pose();
 }
@@ -1172,19 +1172,19 @@ std::expected<void, StarException> Player::uninit() {
   return {};
 }
 
-std::expected<void, StarException> Player::updateHumanoidDirectives() {
+std::expected<void, StarException> Player::update_humanoid_directives() {
   DirectivesGroup directives;
   Vec2F scale = Vec2F::filled(1.f);
   for (auto const& group : {std::cref(m_techController->parentDirectives()), std::cref(m_statusController->parentDirectives())}) {
     for (auto const& entry : group.get().list()) {
-      auto extracted = Humanoid::extractScaleFromDirectives(entry);
+      auto extracted = Humanoid::extract_scale_from_directives(entry);
       if (!extracted)
         return std::unexpected(std::move(extracted.error()));
       scale = scale.piecewise_multiply(extracted->first);
       directives.append(extracted->second);
     }
   }
-  humanoid()->setScale(scale);
+  humanoid()->set_scale(scale);
   m_presentationHumanoidDirectives = std::move(directives);
   return {};
 }
@@ -1310,14 +1310,14 @@ void Player::setWireConnector(std::optional<std::reference_wrapper<WireConnector
 
 std::expected<List<Drawable>, StarException> Player::portrait(PortraitMode mode) const {
   if (isPermaDead())
-    return humanoid()->renderSkull();
+    return humanoid()->render_skull();
   if (invisible())
     return List<Drawable>{};
   if (!inWorld()) {
-    if (auto result = refreshHumanoid(); !result)
+    if (auto result = refresh_humanoid(); !result)
       return std::unexpected(std::move(result.error()));
   }
-  return humanoid()->renderPortrait(mode);
+  return humanoid()->render_portrait(mode);
 }
 
 bool Player::underwater() const {
@@ -1347,7 +1347,7 @@ std::expected<List<LightSource>, StarException> Player::presentationLightSources
     return std::unexpected(std::move(techResult.error()));
   auto tech = std::move(*techResult);
   lights.append_range(std::move(tech));
-  auto humanoidSample = humanoid()->networkedAnimator()->get().sample(interpolation);
+  auto humanoidSample = humanoid()->networked_animator()->get().sample(interpolation);
   if (auto prepared = humanoid()->prepare_animator_pose(humanoidSample); !prepared)
     return std::unexpected(std::move(prepared.error()));
   auto humanoidLightsResult = humanoidSample.lightSources();
@@ -1543,7 +1543,7 @@ Vec2F Player::velocity() const {
 }
 
 std::expected<Vec2F, StarException> Player::mouthOffset(bool ignoreAdjustments) const {
-  auto offsetResult = humanoid()->mouthOffset(ignoreAdjustments);
+  auto offsetResult = humanoid()->mouth_offset(ignoreAdjustments);
   if (!offsetResult)
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
@@ -1551,7 +1551,7 @@ std::expected<Vec2F, StarException> Player::mouthOffset(bool ignoreAdjustments) 
 }
 
 std::expected<Vec2F, StarException> Player::feetOffset() const {
-  auto offsetResult = humanoid()->feetOffset();
+  auto offsetResult = humanoid()->feet_offset();
   if (!offsetResult)
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
@@ -1559,7 +1559,7 @@ std::expected<Vec2F, StarException> Player::feetOffset() const {
 }
 
 std::expected<Vec2F, StarException> Player::headArmorOffset() const {
-  auto offsetResult = humanoid()->headArmorOffset();
+  auto offsetResult = humanoid()->head_armor_offset();
   if (!offsetResult)
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
@@ -1567,7 +1567,7 @@ std::expected<Vec2F, StarException> Player::headArmorOffset() const {
 }
 
 std::expected<Vec2F, StarException> Player::chestArmorOffset() const {
-  auto offsetResult = humanoid()->chestArmorOffset();
+  auto offsetResult = humanoid()->chest_armor_offset();
   if (!offsetResult)
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
@@ -1575,7 +1575,7 @@ std::expected<Vec2F, StarException> Player::chestArmorOffset() const {
 }
 
 std::expected<Vec2F, StarException> Player::backArmorOffset() const {
-  auto offsetResult = humanoid()->backArmorOffset();
+  auto offsetResult = humanoid()->back_armor_offset();
   if (!offsetResult)
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
@@ -1583,7 +1583,7 @@ std::expected<Vec2F, StarException> Player::backArmorOffset() const {
 }
 
 std::expected<Vec2F, StarException> Player::legsArmorOffset() const {
-  auto offsetResult = humanoid()->legsArmorOffset();
+  auto offsetResult = humanoid()->legs_armor_offset();
   if (!offsetResult)
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
@@ -2296,7 +2296,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
 
   updateMovementAnimationState();
 
-  humanoid()->setRotation(m_movementController->rotation());
+  humanoid()->set_rotation(m_movementController->rotation());
 
   bool suppressedItems = !canUseTool();
 
@@ -2337,7 +2337,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
   if (!loungingIn() && overrideFacingDirection)
     m_movementController->control_face(facingDirection = *overrideFacingDirection);
 
-  humanoid()->setFacingDirection(facingDirection);
+  humanoid()->set_facing_direction(facingDirection);
   Direction movingDirection = m_movementController->moving_direction();
   if (m_movementAnimationState) {
     auto tangent = Vec2F::with_angle(m_movementController->rotation());
@@ -2347,11 +2347,11 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
   }
   if (isMaster())
     m_movementController->set_network_moving_direction(m_movementAnimationState ? std::optional(movingDirection) : std::nullopt);
-  if (auto result = humanoid()->setMovingBackwards(facingDirection != movingDirection); !result)
+  if (auto result = humanoid()->set_moving_backwards(facingDirection != movingDirection); !result)
     return std::unexpected(std::move(result.error()));
 
   {
-    if (auto result = refreshHumanoid(); !result)
+    if (auto result = refresh_humanoid(); !result)
       return std::unexpected(std::move(result.error()));
   }
 
@@ -2434,16 +2434,16 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
   auto backArmorOffset = std::move(*backArmorOffsetResult);
   m_effectEmitter->setSourcePosition("backArmor", backArmorOffset + position());
 
-  auto primaryOffsetResult = handPosition(ToolHand::Primary);
-  if (!primaryOffsetResult)
-    return std::unexpected(std::move(primaryOffsetResult.error()));
-  auto primaryOffset = std::move(*primaryOffsetResult);
-  m_effectEmitter->setSourcePosition("primary", primaryOffset + position());
-  auto altOffsetResult = handPosition(ToolHand::Alt);
-  if (!altOffsetResult)
-    return std::unexpected(std::move(altOffsetResult.error()));
-  auto altOffset = std::move(*altOffsetResult);
-  m_effectEmitter->setSourcePosition("alt", altOffset + position());
+  auto primary_offset_result = hand_position(ToolHand::Primary);
+  if (!primary_offset_result)
+    return std::unexpected(std::move(primary_offset_result.error()));
+  auto primary_offset = std::move(*primary_offset_result);
+  m_effectEmitter->setSourcePosition("primary", primary_offset + position());
+  auto alt_offset_result = hand_position(ToolHand::Alt);
+  if (!alt_offset_result)
+    return std::unexpected(std::move(alt_offset_result.error()));
+  auto alt_offset = std::move(*alt_offset_result);
+  m_effectEmitter->setSourcePosition("alt", alt_offset + position());
 
   m_effectEmitter->setDirection(facingDirection);
 
@@ -2464,7 +2464,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
         if (!rotationResult)
           return std::unexpected(std::move(rotationResult.error()));
         auto rotation = std::move(*rotationResult);
-        humanoid()->setHeadRotation(rotation);
+        humanoid()->set_head_rotation(rotation);
       } else
         calculateHeadRotation = true;
     }
@@ -2473,7 +2473,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
       auto headRotationEnabled = root().humanoidHeadRotation();
       if (!headRotationEnabled)
         return std::unexpected(std::move(headRotationEnabled.error()));
-      if (headRotationEnabled->get() && (humanoid()->handHoldingItem(ToolHand::Primary) || humanoid()->handHoldingItem(ToolHand::Alt) || humanoid()->dance())) {
+      if (headRotationEnabled->get() && (humanoid()->hand_holding_item(ToolHand::Primary) || humanoid()->hand_holding_item(ToolHand::Alt) || humanoid()->dance())) {
         auto primary = m_tools->primaryHandItem();
         auto alt = m_tools->altHandItem();
         String const disableFlag = "disableHeadRotation";
@@ -2507,10 +2507,10 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
           auto mouth = std::move(*mouthResult);
           auto diff = currentWorld.geometry().diff(m_aimPosition, mouth);
           diff.set_x(std::fabsf(diff.x()));
-          headRotation = diff.angle() * .25f * numerical_direction(humanoid()->facingDirection());
+          headRotation = diff.angle() * .25f * numerical_direction(humanoid()->facing_direction());
         }
       }
-      humanoid()->setHeadRotation(headRotation);
+      humanoid()->set_head_rotation(headRotation);
       if (isMaster())
         {
           if (auto result = setSecretProperty("humanoid.headRotation", headRotation); !result)
@@ -2967,17 +2967,17 @@ std::expected<void, StarException> Player::refreshArmor() {
   return {};
 }
 
-std::expected<void, StarException> Player::refreshHumanoid() const {
+std::expected<void, StarException> Player::refresh_humanoid() const {
   auto refreshed = [&]() -> std::expected<void, StarException> {
-    auto changedResult = m_armor->setup_humanoid(*humanoid(), forceNude());
-    if (!changedResult)
-      return std::unexpected(std::move(changedResult.error()));
-    auto changed = std::move(*changedResult);
+    auto changed_result = m_armor->setup_humanoid(*humanoid(), forceNude());
+    if (!changed_result)
+      return std::unexpected(std::move(changed_result.error()));
+    auto changed = std::move(*changed_result);
     if (changed) {
-      auto parametersResult = ActorMovementParameters::create(json_merge(humanoid()->defaultMovementParameters(), humanoid()->playerMovementParameters().value_or(m_config->movementParameters)));
-      if (!parametersResult)
-        return std::unexpected(std::move(parametersResult.error()));
-      auto parameters = std::move(*parametersResult);
+      auto parameters_result = ActorMovementParameters::create(json_merge(humanoid()->default_movement_parameters(), humanoid()->player_movement_parameters().value_or(m_config->movementParameters)));
+      if (!parameters_result)
+        return std::unexpected(std::move(parameters_result.error()));
+      auto parameters = std::move(*parameters_result);
       return m_movementController->reset_base_parameters(parameters);
     }
     return {};
@@ -3231,16 +3231,16 @@ std::expected<Vec2F, StarException> Player::aimPosition() const {
   return m_aimPosition;
 }
 
-std::expected<Vec2F, StarException> Player::armPosition(ToolHand hand, Direction facingDirection, float armAngle, Vec2F offset) const {
-  return m_tools->armPosition(*humanoid(), hand, facingDirection, armAngle, offset);
+std::expected<Vec2F, StarException> Player::arm_position(ToolHand hand, Direction facing_direction, float arm_angle, Vec2F offset) const {
+  return humanoid()->arm_position(hand, facing_direction, arm_angle, offset);
 }
 
-std::expected<Vec2F, StarException> Player::handOffset(ToolHand hand, Direction facingDirection) const {
-  return m_tools->handOffset(*humanoid(), hand, facingDirection);
+std::expected<Vec2F, StarException> Player::hand_offset(ToolHand hand, Direction facing_direction) const {
+  return humanoid()->hand_offset(hand, facing_direction);
 }
 
-std::expected<Vec2F, StarException> Player::handPosition(ToolHand hand, Vec2F const& handOffset) const {
-  return m_tools->handPosition(hand, *humanoid(), handOffset);
+std::expected<Vec2F, StarException> Player::hand_position(ToolHand hand, Vec2F const& hand_offset) const {
+  return humanoid()->hand_position(hand, hand_offset);
 }
 
 std::shared_ptr<Item> Player::handItem(ToolHand hand) const {
@@ -3251,7 +3251,7 @@ std::shared_ptr<Item> Player::handItem(ToolHand hand) const {
 }
 
 std::expected<Vec2F, StarException> Player::armAdjustment() const {
-  return humanoid()->armAdjustment();
+  return humanoid()->arm_adjustment();
 }
 
 void Player::setCameraFocusEntity(std::optional<EntityId> const& cameraFocusEntity) {
@@ -3725,7 +3725,7 @@ std::expected<void, StarException> Player::processStateChanges(float dt) {
       }
     }
   }
-  if (auto result = updateHumanoidDirectives(); !result)
+  if (auto result = update_humanoid_directives(); !result)
     return std::unexpected(std::move(result.error()));
   if (currentWorld.isClient()) {
     {
@@ -3745,113 +3745,113 @@ std::expected<void, StarException> Player::processStateChanges(float dt) {
   if (auto techState = m_techController->parentState()) {
     if (techState == TechController::ParentState::Stand) {
       {
-        if (auto result = humanoid()->setState(Humanoid::Idle); !result)
+        if (auto result = humanoid()->set_state(Humanoid::Idle); !result)
           return std::unexpected(std::move(result.error()));
       }
     } else if (techState == TechController::ParentState::Fly) {
       {
-        if (auto result = humanoid()->setState(Humanoid::Jump); !result)
+        if (auto result = humanoid()->set_state(Humanoid::Jump); !result)
           return std::unexpected(std::move(result.error()));
       }
     } else if (techState == TechController::ParentState::Fall) {
       {
-        if (auto result = humanoid()->setState(Humanoid::Fall); !result)
+        if (auto result = humanoid()->set_state(Humanoid::Fall); !result)
           return std::unexpected(std::move(result.error()));
       }
     } else if (techState == TechController::ParentState::Sit) {
       {
-        if (auto result = humanoid()->setState(Humanoid::Sit); !result)
+        if (auto result = humanoid()->set_state(Humanoid::Sit); !result)
           return std::unexpected(std::move(result.error()));
       }
     } else if (techState == TechController::ParentState::Lay) {
       {
-        if (auto result = humanoid()->setState(Humanoid::Lay); !result)
+        if (auto result = humanoid()->set_state(Humanoid::Lay); !result)
           return std::unexpected(std::move(result.error()));
       }
     } else if (techState == TechController::ParentState::Duck) {
       {
-        if (auto result = humanoid()->setState(Humanoid::Duck); !result)
+        if (auto result = humanoid()->set_state(Humanoid::Duck); !result)
           return std::unexpected(std::move(result.error()));
       }
     } else if (techState == TechController::ParentState::Walk) {
       {
-        if (auto result = humanoid()->setState(Humanoid::Walk); !result)
+        if (auto result = humanoid()->set_state(Humanoid::Walk); !result)
           return std::unexpected(std::move(result.error()));
       }
     } else if (techState == TechController::ParentState::Run) {
       {
-        if (auto result = humanoid()->setState(Humanoid::Run); !result)
+        if (auto result = humanoid()->set_state(Humanoid::Run); !result)
           return std::unexpected(std::move(result.error()));
       }
     } else if (techState == TechController::ParentState::Swim) {
       {
-        if (auto result = humanoid()->setState(Humanoid::Swim); !result)
+        if (auto result = humanoid()->set_state(Humanoid::Swim); !result)
           return std::unexpected(std::move(result.error()));
       }
     } else if (techState == TechController::ParentState::SwimIdle) {
       {
-        if (auto result = humanoid()->setState(Humanoid::SwimIdle); !result)
+        if (auto result = humanoid()->set_state(Humanoid::SwimIdle); !result)
           return std::unexpected(std::move(result.error()));
       }
     }
   } else if (m_movementAnimationState) {
-    if (auto result = humanoid()->setState(*m_movementAnimationState); !result)
+    if (auto result = humanoid()->set_state(*m_movementAnimationState); !result)
       return std::unexpected(std::move(result.error()));
   } else {
     auto loungeAnchor = as<LoungeAnchor>(m_movementController->entity_anchor());
     if (m_state == State::Idle) {
       {
-        if (auto result = humanoid()->setState(Humanoid::Idle); !result)
+        if (auto result = humanoid()->set_state(Humanoid::Idle); !result)
           return std::unexpected(std::move(result.error()));
       }
     } else if (m_state == State::Walk) {
       {
-        if (auto result = humanoid()->setState(Humanoid::Walk); !result)
+        if (auto result = humanoid()->set_state(Humanoid::Walk); !result)
           return std::unexpected(std::move(result.error()));
       }
     } else if (m_state == State::Run) {
       {
-        if (auto result = humanoid()->setState(Humanoid::Run); !result)
+        if (auto result = humanoid()->set_state(Humanoid::Run); !result)
           return std::unexpected(std::move(result.error()));
       }
     } else if (m_state == State::Jump) {
       {
-        if (auto result = humanoid()->setState(Humanoid::Jump); !result)
+        if (auto result = humanoid()->set_state(Humanoid::Jump); !result)
           return std::unexpected(std::move(result.error()));
       }
     } else if (m_state == State::Fall) {
       {
-        if (auto result = humanoid()->setState(Humanoid::Fall); !result)
+        if (auto result = humanoid()->set_state(Humanoid::Fall); !result)
           return std::unexpected(std::move(result.error()));
       }
     } else if (m_state == State::Swim) {
       {
-        if (auto result = humanoid()->setState(Humanoid::Swim); !result)
+        if (auto result = humanoid()->set_state(Humanoid::Swim); !result)
           return std::unexpected(std::move(result.error()));
       }
     } else if (m_state == State::SwimIdle) {
       {
-        if (auto result = humanoid()->setState(Humanoid::SwimIdle); !result)
+        if (auto result = humanoid()->set_state(Humanoid::SwimIdle); !result)
           return std::unexpected(std::move(result.error()));
       }
     } else if (m_state == State::Crouch) {
       {
-        if (auto result = humanoid()->setState(Humanoid::Duck); !result)
+        if (auto result = humanoid()->set_state(Humanoid::Duck); !result)
           return std::unexpected(std::move(result.error()));
       }
     } else if (m_state == State::Lounge && loungeAnchor && loungeAnchor->orientation == LoungeOrientation::Sit) {
       {
-        if (auto result = humanoid()->setState(Humanoid::Sit); !result)
+        if (auto result = humanoid()->set_state(Humanoid::Sit); !result)
           return std::unexpected(std::move(result.error()));
       }
     } else if (m_state == State::Lounge && loungeAnchor && loungeAnchor->orientation == LoungeOrientation::Lay) {
       {
-        if (auto result = humanoid()->setState(Humanoid::Lay); !result)
+        if (auto result = humanoid()->set_state(Humanoid::Lay); !result)
           return std::unexpected(std::move(result.error()));
       }
     } else if (m_state == State::Lounge && loungeAnchor && loungeAnchor->orientation == LoungeOrientation::Stand) {
       {
-        if (auto result = humanoid()->setState(Humanoid::Idle); !result)
+        if (auto result = humanoid()->set_state(Humanoid::Idle); !result)
           return std::unexpected(std::move(result.error()));
       }
     }
@@ -3859,7 +3859,7 @@ std::expected<void, StarException> Player::processStateChanges(float dt) {
 
   {
 
-    if (auto result = humanoid()->setEmoteState(m_emoteState); !result)
+    if (auto result = humanoid()->set_emote_state(m_emoteState); !result)
 
       return std::unexpected(std::move(result.error()));
 
@@ -3922,26 +3922,26 @@ std::expected<bool, StarException> Player::inToolRange(Vec2F const& aimPos) cons
 }
 
 std::expected<void, StarException> Player::getNetStates(bool initial) {
-  auto elements = m_netHumanoid.net_elements();
+  auto elements = m_net_humanoid.net_elements();
   auto elementsLastResult = elements.last();
   if (!elementsLastResult)
     return std::unexpected(std::move(elementsLastResult.error()));
   auto elementsLast = std::move(elementsLastResult->get());
-  m_currentNetHumanoid = std::move(elementsLast);
+  m_current_net_humanoid = std::move(elementsLast);
   m_state = static_cast<State>(m_stateNetState.get());
   m_shifting = m_shiftingNetState.get();
   m_aimPosition[0] = m_xAimPositionNetState.get();
   m_aimPosition[1] = m_yAimPositionNetState.get();
   if (m_identityNetState.pull_updated() && !initial) {
     auto newIdentity = m_identityNetState.get();
-    if (m_identity.species == newIdentity.species && m_identity.imagePath == newIdentity.imagePath) {
-      if (auto result = humanoid()->setIdentity(newIdentity); !result)
+    if (m_identity.species == newIdentity.species && m_identity.image_path == newIdentity.image_path) {
+      if (auto result = humanoid()->set_identity(newIdentity); !result)
         return std::unexpected(std::move(result.error()));
     }
     m_identity = std::move(newIdentity);
   }
-  if (m_refreshedHumanoidParameters.pull_occurred() && !initial) {
-    if (auto result = refreshHumanoidParameters(); !result)
+  if (m_refreshed_humanoid_parameters.pull_occurred() && !initial) {
+    if (auto result = refresh_humanoid_parameters(); !result)
       return std::unexpected(std::move(result.error()));
   }
   setTeam(m_teamNetState.get());
@@ -3952,9 +3952,9 @@ std::expected<void, StarException> Player::getNetStates(bool initial) {
     m_chat_message_updated = true;
     m_pending_chat_actions.push_back(SayChatAction{entityId(), m_chat_message, m_movementController->position()});
   }
-  if (!HumanoidEmoteNames)
-    return std::unexpected(HumanoidEmoteNames.error());
-  auto emoteResult = HumanoidEmoteNames->get_left(m_emoteNetState.get());
+  if (!humanoid_emote_names)
+    return std::unexpected(humanoid_emote_names.error());
+  auto emoteResult = humanoid_emote_names->get_left(m_emoteNetState.get());
   if (!emoteResult)
     return std::unexpected(std::move(emoteResult.error()));
   auto const& emote = emoteResult->get();
@@ -3999,9 +3999,9 @@ std::expected<void, StarException> Player::setNetStates() {
     m_chat_message_net_state.push(m_chat_message);
     m_new_chat_message_net_state.trigger();
   }
-  if (!HumanoidEmoteNames)
-    return std::unexpected(HumanoidEmoteNames.error());
-  auto emoteResult = HumanoidEmoteNames->get_right(m_emoteState);
+  if (!humanoid_emote_names)
+    return std::unexpected(humanoid_emote_names.error());
+  auto emoteResult = humanoid_emote_names->get_right(m_emoteState);
   if (!emoteResult)
     return std::unexpected(std::move(emoteResult.error()));
   auto const& emote = emoteResult->get();
@@ -4354,83 +4354,87 @@ std::expected<void, StarException> Player::setNametag(std::optional<String> name
 std::expected<void, StarException> Player::updateIdentity() {
   m_identityUpdated = true;
   auto const& oldIdentity = humanoid()->identity();
-  if (m_identity.species != oldIdentity.species || m_identity.imagePath != oldIdentity.imagePath)
-    return refreshHumanoidParameters();
-  return humanoid()->setIdentity(m_identity);
+  if (m_identity.species != oldIdentity.species || m_identity.image_path != oldIdentity.image_path)
+    return refresh_humanoid_parameters();
+  return humanoid()->set_identity(m_identity);
 }
 
-std::expected<void, StarException> Player::setHumanoidParameter(String key, std::optional<Json> value) {
+std::expected<void, StarException> Player::set_humanoid_parameter(String key, std::optional<Json> value) {
+  auto parameters = m_humanoid_parameters;
   if (value)
-    m_humanoidParameters.set(key, *value);
+    parameters.set(std::move(key), std::move(*value));
   else
-    m_humanoidParameters.erase(key);
-  return m_currentNetHumanoid->setHumanoidParameters(m_humanoidParameters);
+    parameters.erase(key);
+  return set_humanoid_parameters(std::move(parameters));
 }
 
-std::optional<Json> Player::getHumanoidParameter(String key) {
-  return m_humanoidParameters.maybe(key);
+std::optional<Json> Player::get_humanoid_parameter(String key) {
+  return m_humanoid_parameters.maybe(key);
 }
 
-std::expected<void, StarException> Player::setHumanoidParameters(JsonObject parameters) {
-  m_humanoidParameters = std::move(parameters);
-  return m_currentNetHumanoid->setHumanoidParameters(m_humanoidParameters);
+std::expected<void, StarException> Player::set_humanoid_parameters(JsonObject parameters) {
+  auto applied = m_current_net_humanoid->set_humanoid_parameters(parameters);
+  if (!applied)
+    return std::unexpected(std::move(applied.error()));
+  m_humanoid_parameters = std::move(parameters);
+  return {};
 }
 
-JsonObject Player::getHumanoidParameters() {
-  return m_humanoidParameters;
+JsonObject Player::get_humanoid_parameters() {
+  return m_humanoid_parameters;
 }
 
 std::expected<void, StarException> Player::setBodyDirectives(String const& directives)
-{ m_identity.bodyDirectives = directives; return updateIdentity(); }
+{ m_identity.body_directives = directives; return updateIdentity(); }
 
 std::expected<void, StarException> Player::setEmoteDirectives(String const& directives)
-{ m_identity.emoteDirectives = directives; return updateIdentity(); }
+{ m_identity.emote_directives = directives; return updateIdentity(); }
 
 std::expected<void, StarException> Player::setHairGroup(String const& group)
-{ m_identity.hairGroup = group; return updateIdentity(); }
+{ m_identity.hair_group = group; return updateIdentity(); }
 
 std::expected<void, StarException> Player::setHairType(String const& type)
-{ m_identity.hairType = type; return updateIdentity(); }
+{ m_identity.hair_type = type; return updateIdentity(); }
 
 std::expected<void, StarException> Player::setHairDirectives(String const& directives)
-{ m_identity.hairDirectives = directives; return updateIdentity(); }
+{ m_identity.hair_directives = directives; return updateIdentity(); }
 
 std::expected<void, StarException> Player::setFacialHairGroup(String const& group)
-{ m_identity.facialHairGroup = group; return updateIdentity(); }
+{ m_identity.facial_hair_group = group; return updateIdentity(); }
 
 std::expected<void, StarException> Player::setFacialHairType(String const& type)
-{ m_identity.facialHairType = type; return updateIdentity(); }
+{ m_identity.facial_hair_type = type; return updateIdentity(); }
 
 std::expected<void, StarException> Player::setFacialHairDirectives(String const& directives)
-{ m_identity.facialHairDirectives = directives; return updateIdentity(); }
+{ m_identity.facial_hair_directives = directives; return updateIdentity(); }
 
 std::expected<void, StarException> Player::setFacialMaskGroup(String const& group)
-{ m_identity.facialMaskGroup = group; return updateIdentity(); }
+{ m_identity.facial_mask_group = group; return updateIdentity(); }
 
 std::expected<void, StarException> Player::setFacialMaskType(String const& type)
-{ m_identity.facialMaskType = type; return updateIdentity(); }
+{ m_identity.facial_mask_type = type; return updateIdentity(); }
 
 std::expected<void, StarException> Player::setFacialMaskDirectives(String const& directives)
-{ m_identity.facialMaskDirectives = directives; return updateIdentity(); }
+{ m_identity.facial_mask_directives = directives; return updateIdentity(); }
 
 std::expected<void, StarException> Player::setHair(String const& group, String const& type, String const& directives) {
-  m_identity.hairGroup = group;
-  m_identity.hairType = type;
-  m_identity.hairDirectives = directives;
+  m_identity.hair_group = group;
+  m_identity.hair_type = type;
+  m_identity.hair_directives = directives;
   return updateIdentity();
 }
 
 std::expected<void, StarException> Player::setFacialHair(String const& group, String const& type, String const& directives) {
-  m_identity.facialHairGroup = group;
-  m_identity.facialHairType = type;
-  m_identity.facialHairDirectives = directives;
+  m_identity.facial_hair_group = group;
+  m_identity.facial_hair_type = type;
+  m_identity.facial_hair_directives = directives;
   return updateIdentity();
 }
 
 std::expected<void, StarException> Player::setFacialMask(String const& group, String const& type, String const& directives) {
-  m_identity.facialMaskGroup = group;
-  m_identity.facialMaskType = type;
-  m_identity.facialMaskDirectives = directives;
+  m_identity.facial_mask_group = group;
+  m_identity.facial_mask_type = type;
+  m_identity.facial_mask_directives = directives;
   return updateIdentity();
 }
 
@@ -4464,15 +4468,15 @@ std::expected<void, StarException> Player::setPersonality(Personality const& per
 }
 
 std::expected<void, StarException> Player::setImagePath(std::optional<String> const& imagePath) {
-  m_identity.imagePath = imagePath;
+  m_identity.image_path = imagePath;
   return updateIdentity();
 }
 
 std::shared_ptr<Humanoid> Player::humanoid() {
-  return m_currentNetHumanoid->humanoid();
+  return m_current_net_humanoid->humanoid();
 }
 std::shared_ptr<Humanoid> Player::humanoid() const {
-  return m_currentNetHumanoid->humanoid();
+  return m_current_net_humanoid->humanoid();
 }
 
 HumanoidIdentity const& Player::identity() const {
@@ -4588,9 +4592,9 @@ std::expected<void, StarException> Player::addEffectEmitters(StringSet const& em
 }
 
 std::expected<void, StarException> Player::requestEmote(String const& emote) {
-  if (!HumanoidEmoteNames)
-    return std::unexpected(HumanoidEmoteNames.error());
-  auto stateResult = HumanoidEmoteNames->get_left(emote);
+  if (!humanoid_emote_names)
+    return std::unexpected(humanoid_emote_names.error());
+  auto stateResult = humanoid_emote_names->get_left(emote);
   if (!stateResult)
     return std::unexpected(std::move(stateResult.error()));
   auto const& state = stateResult->get();
@@ -4659,7 +4663,7 @@ std::expected<Json, StarException> Player::diskStore() {
   if (!techsResult)
     return std::unexpected(std::move(techsResult.error()));
   auto techs = std::move(*techsResult);
-  auto identityResult = m_identity.toJson();
+  auto identityResult = m_identity.to_json();
   if (!identityResult)
     return std::unexpected(std::move(identityResult.error()));
   auto identity = std::move(*identityResult);
@@ -4704,7 +4708,7 @@ std::expected<Json, StarException> Player::diskStore() {
     {"techController", std::move(techController)}, {"statusController", std::move(statusController)},
     {"log", m_log->toJson()}, {"aiState", m_ai_state.to_json()}, {"quests", std::move(quests)},
     {"companions", std::move(companions)}, {"deployment", std::move(deployment)},
-    {"genericProperties", m_genericProperties}, {"genericScriptStorage", std::move(storage)}, {"humanoidParameters", m_humanoidParameters}
+    {"genericProperties", m_genericProperties}, {"genericScriptStorage", std::move(storage)}, {"humanoidParameters", m_humanoid_parameters}
   };
 }
 
@@ -4723,7 +4727,7 @@ std::expected<ByteArray, StarException> Player::net_store(NetCompatibilityRules 
   if (auto result = ds.write(m_identity); !result)
     return std::unexpected(std::move(result.error()));
   if (rules.version() >= 10) {
-    if (auto result = ds.write(m_humanoidParameters); !result)
+    if (auto result = ds.write(m_humanoid_parameters); !result)
       return std::unexpected(std::move(result.error()));
   }
   return ds.take_data();
@@ -4786,7 +4790,7 @@ std::expected<void, StarException> Player::animatePortrait(float dt) {
     return std::unexpected(std::move(result.error()));
   if (m_emote_cooldown_timer.tick(dt))
     m_emoteState = HumanoidEmote::Idle;
-  return humanoid()->setEmoteState(m_emoteState);
+  return humanoid()->set_emote_state(m_emoteState);
 }
 
 std::expected<bool, StarException> Player::isOutside() {
@@ -5131,39 +5135,39 @@ std::expected<void, StarException> Player::setSecretProperty(String const& name,
   return {};
 }
 
-std::expected<void, StarException> Player::refreshHumanoidParameters() {
-  auto databaseResult = root().speciesDatabase();
-  if (!databaseResult)
-    return std::unexpected(std::move(databaseResult.error()));
-  auto database = std::move(*databaseResult);
-  auto definitionResult = database->species(m_identity.species);
-  if (!definitionResult)
-    return std::unexpected(std::move(definitionResult.error()));
-  auto definition = std::move(*definitionResult);
+std::expected<void, StarException> Player::refresh_humanoid_parameters() {
+  auto database_result = root().speciesDatabase();
+  if (!database_result)
+    return std::unexpected(std::move(database_result.error()));
+  auto database = std::move(*database_result);
+  auto definition_result = database->species(m_identity.species);
+  if (!definition_result)
+    return std::unexpected(std::move(definition_result.error()));
+  auto definition = std::move(*definition_result);
   if (isMaster() || !inWorld()) {
-    m_refreshedHumanoidParameters.trigger();
-    if (auto result = installHumanoid(); !result)
+    m_refreshed_humanoid_parameters.trigger();
+    if (auto result = install_humanoid(); !result)
       return std::unexpected(std::move(result.error()));
     m_effectsAnimator->setGlobalTag("effectDirectives", definition->effectDirectives());
-    m_deathParticleBurst.set(humanoid()->defaultDeathParticles());
+    m_deathParticleBurst.set(humanoid()->default_death_particles());
     m_statusController->setStatusProperty("ouchNoise", definition->ouchNoise(m_identity.gender));
     m_scriptedAnimationParameters.clear();
   } else {
-    m_humanoidParameters = m_currentNetHumanoid->humanoidParameters();
+    m_humanoid_parameters = m_current_net_humanoid->humanoid_parameters();
   }
-  auto armorResult = m_armor->disk_store();
-  if (!armorResult)
-    return std::unexpected(std::move(armorResult.error()));
-  auto armor = std::move(*armorResult);
+  auto armor_result = m_armor->disk_store();
+  if (!armor_result)
+    return std::unexpected(std::move(armor_result.error()));
+  auto armor = std::move(*armor_result);
   m_armor->reset();
   if (auto result = m_armor->disk_load(armor); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = m_armor->setup_humanoid(*humanoid(), forceNude()); !result)
     return std::unexpected(std::move(result.error()));
-  auto parametersResult = ActorMovementParameters::create(json_merge(humanoid()->defaultMovementParameters(), humanoid()->playerMovementParameters().value_or(m_config->movementParameters)));
-  if (!parametersResult)
-    return std::unexpected(std::move(parametersResult.error()));
-  auto parameters = std::move(*parametersResult);
+  auto parameters_result = ActorMovementParameters::create(json_merge(humanoid()->default_movement_parameters(), humanoid()->player_movement_parameters().value_or(m_config->movementParameters)));
+  if (!parameters_result)
+    return std::unexpected(std::move(parameters_result.error()));
+  auto parameters = std::move(*parameters_result);
   if (auto result = m_movementController->reset_base_parameters(parameters); !result)
     return std::unexpected(std::move(result.error()));
   if (inWorld()) {
@@ -5172,10 +5176,10 @@ std::expected<void, StarException> Player::refreshHumanoidParameters() {
         if (script.second->initialized()) {
           if (auto result = script.second->remove_callbacks("animator"); !result)
             return std::unexpected(std::move(result.error()));
-          auto callbacksResult = LuaBindings::makeNetworkedAnimatorCallbacks(humanoid()->networkedAnimator()->get());
-          if (!callbacksResult)
-            return std::unexpected(std::move(callbacksResult.error()));
-          auto callbacks = std::move(*callbacksResult);
+          auto callbacks_result = LuaBindings::makeNetworkedAnimatorCallbacks(humanoid()->networked_animator()->get());
+          if (!callbacks_result)
+            return std::unexpected(std::move(callbacks_result.error()));
+          auto callbacks = std::move(*callbacks_result);
           if (auto result = script.second->add_callbacks("animator", std::move(callbacks)); !result)
             return std::unexpected(std::move(result.error()));
           if (auto result = script.second->invoke("refreshHumanoidParameters"); !result)
@@ -5183,39 +5187,39 @@ std::expected<void, StarException> Player::refreshHumanoidParameters() {
         }
       }
     }
-    auto currentWorldResult = world();
-    if (!currentWorldResult)
-      return std::unexpected(std::move(currentWorldResult.error()));
-    auto& currentWorld = currentWorldResult->get();
-    if (currentWorld.isClient() && m_scriptedAnimator.initialized()) {
+    auto current_world_result = world();
+    if (!current_world_result)
+      return std::unexpected(std::move(current_world_result.error()));
+    auto& current_world = current_world_result->get();
+    if (current_world.isClient() && m_scriptedAnimator.initialized()) {
       if (auto result = recover_lua_script_error(m_scriptedAnimator.uninit()); !result)
         return std::unexpected(std::move(result.error()));
       if (auto result = m_scriptedAnimator.remove_callbacks("animationConfig"); !result)
         return std::unexpected(std::move(result.error()));
       if (auto result = m_scriptedAnimator.remove_callbacks("entity"); !result)
         return std::unexpected(std::move(result.error()));
-      if (auto result = m_scriptedAnimator.set_scripts(humanoid()->animationScripts()); !result)
+      if (auto result = m_scriptedAnimator.set_scripts(humanoid()->animation_scripts()); !result)
         return std::unexpected(std::move(result.error()));
-      auto animationCallbacksResult = LuaBindings::makeScriptedAnimatorCallbacks(humanoid()->networkedAnimator()->get(),
-        [&parameters = m_scriptedAnimationParameters](String const& name, Json const& defaultValue) -> std::expected<Json, StarException> {
-          return parameters.value(name, defaultValue);
+      auto animation_callbacks_result = LuaBindings::makeScriptedAnimatorCallbacks(humanoid()->networked_animator()->get(),
+        [&parameters = m_scriptedAnimationParameters](String const& name, Json const& default_value) -> std::expected<Json, StarException> {
+          return parameters.value(name, default_value);
         });
-      if (!animationCallbacksResult)
-        return std::unexpected(std::move(animationCallbacksResult.error()));
-      auto animationCallbacks = std::move(*animationCallbacksResult);
-      if (auto result = m_scriptedAnimator.add_callbacks("animationConfig", std::move(animationCallbacks)); !result)
+      if (!animation_callbacks_result)
+        return std::unexpected(std::move(animation_callbacks_result.error()));
+      auto animation_callbacks = std::move(*animation_callbacks_result);
+      if (auto result = m_scriptedAnimator.add_callbacks("animationConfig", std::move(animation_callbacks)); !result)
         return std::unexpected(std::move(result.error()));
-      auto entityCallbacksResult = LuaBindings::makeEntityCallbacks(*this);
-      if (!entityCallbacksResult)
-        return std::unexpected(std::move(entityCallbacksResult.error()));
-      auto entityCallbacks = std::move(*entityCallbacksResult);
-      if (auto result = m_scriptedAnimator.add_callbacks("entity", std::move(entityCallbacks)); !result)
+      auto entity_callbacks_result = LuaBindings::makeEntityCallbacks(*this);
+      if (!entity_callbacks_result)
+        return std::unexpected(std::move(entity_callbacks_result.error()));
+      auto entity_callbacks = std::move(*entity_callbacks_result);
+      if (auto result = m_scriptedAnimator.add_callbacks("entity", std::move(entity_callbacks)); !result)
         return std::unexpected(std::move(result.error()));
-      if (auto result = recover_lua_script_error(m_scriptedAnimator.init(currentWorld)); !result)
+      if (auto result = recover_lua_script_error(m_scriptedAnimator.init(current_world)); !result)
         return std::unexpected(std::move(result.error()));
     }
   }
-  if (auto result = updateHumanoidDirectives(); !result)
+  if (auto result = update_humanoid_directives(); !result)
     return std::unexpected(std::move(result.error()));
   return humanoid()->prepare_animator_pose();
 }

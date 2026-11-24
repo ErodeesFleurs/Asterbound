@@ -66,8 +66,8 @@ const GameTestRegistration speciesGenderCoverage("SpeciesTest", "NameGenAndOuchN
 });
 
 const GameTestRegistration emote_timing_contract("HumanoidTimingTest", "EmoteDomainAndFrameBoundaries", [](GameTest& fixture) {
-  JsonArray cycles(EmoteSize, Json(2.0));
-  JsonArray frames(EmoteSize, Json(4));
+  JsonArray cycles(emote_size, Json(2.0));
+  JsonArray frames(emote_size, Json(4));
   frames[static_cast<std::size_t>(HumanoidEmote::Idle)] = 1;
   frames[static_cast<std::size_t>(HumanoidEmote::Blink)] = std::numeric_limits<int>::max();
   auto load = [&] {
@@ -76,13 +76,13 @@ const GameTestRegistration emote_timing_contract("HumanoidTimingTest", "EmoteDom
   auto timing = load();
   ASSERT_TRUE(timing) << timing.error().what();
   auto const longest = std::numeric_limits<float>::max();
-  EXPECT_EQ(timing->emoteStateSeq(longest, HumanoidEmote::Idle), 1);
-  EXPECT_EQ(timing->emoteStateSeq(longest, HumanoidEmote::Blink), std::numeric_limits<int>::max());
-  EXPECT_EQ(timing->emoteStateSeq(1.999f, HumanoidEmote::Blabbering), 4);
-  EXPECT_EQ(timing->emoteStateSeq(2.0f, HumanoidEmote::Blabbering), 1);
-  EXPECT_EQ(timing->emoteStateSeq(2.5f, HumanoidEmote::Blabbering), 2);
-  EXPECT_EQ(timing->emoteStateSeq(2.0f, HumanoidEmote::Happy), 4);
-  EXPECT_EQ(timing->emoteStateSeq(-2.0f, HumanoidEmote::Happy), 1);
+  EXPECT_EQ(timing->emote_state_seq(longest, HumanoidEmote::Idle), 1);
+  EXPECT_EQ(timing->emote_state_seq(longest, HumanoidEmote::Blink), std::numeric_limits<int>::max());
+  EXPECT_EQ(timing->emote_state_seq(1.999f, HumanoidEmote::Blabbering), 4);
+  EXPECT_EQ(timing->emote_state_seq(2.0f, HumanoidEmote::Blabbering), 1);
+  EXPECT_EQ(timing->emote_state_seq(2.5f, HumanoidEmote::Blabbering), 2);
+  EXPECT_EQ(timing->emote_state_seq(2.0f, HumanoidEmote::Happy), 4);
+  EXPECT_EQ(timing->emote_state_seq(-2.0f, HumanoidEmote::Happy), 1);
 
   constexpr double nan = std::numeric_limits<double>::quiet_NaN();
   constexpr double infinity = std::numeric_limits<double>::infinity();
@@ -115,14 +115,14 @@ TEST(HumanoidEmoteTest, WireAndAssetLayout) {
     {"OOOH", "oooh", false}, {"Blink", "blink", false}, {"Wink", "wink", false},
     {"Eat", "eat", true}, {"Sleep", "sleep", true}
   };
-  static_assert(std::size(expected) == EmoteSize);
-  ASSERT_TRUE(HumanoidEmoteNames);
-  for (std::size_t i = 0; i < EmoteSize; ++i) {
+  static_assert(std::size(expected) == emote_size);
+  ASSERT_TRUE(humanoid_emote_names);
+  for (std::size_t i = 0; i < emote_size; ++i) {
     auto emote = static_cast<HumanoidEmote>(i);
-    auto name = HumanoidEmoteNames->get_right(emote);
+    auto name = humanoid_emote_names->get_right(emote);
     ASSERT_TRUE(name);
     EXPECT_EQ(name->get().utf8(), expected[i].name);
     EXPECT_EQ(emote_descriptions[i].frame, expected[i].frame);
-    EXPECT_EQ(Humanoid::HumanoidTiming::cyclicEmoteState(emote), expected[i].cyclic);
+    EXPECT_EQ(Humanoid::HumanoidTiming::cyclic_emote_state(emote), expected[i].cyclic);
   }
 }

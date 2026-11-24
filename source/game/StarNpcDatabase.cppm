@@ -68,10 +68,10 @@ struct NpcVariant {
 
   std::optional<String> description;
 
-  HumanoidIdentity humanoidIdentity;
-  Json humanoidConfig;
-  bool uniqueHumanoidConfig;
-  JsonObject humanoidParameters;
+  HumanoidIdentity humanoid_identity;
+  Json humanoid_config;
+  bool unique_humanoid_config;
+  JsonObject humanoid_parameters;
 
   Json movementParameters;
   Json statusControllerSettings;

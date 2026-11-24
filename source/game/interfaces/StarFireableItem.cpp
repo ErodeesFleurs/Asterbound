@@ -461,7 +461,7 @@ std::expected<Vec2F, StarException> FireableItem::ownerFirePosition() const {
   auto handResult = hand();
   if (!handResult)
     return std::unexpected(std::move(handResult.error()));
-  return ownerResult->get().handPosition(*handResult, (this->firePosition() - handPosition()) / tile_pixels);
+  return ownerResult->get().hand_position(*handResult, (this->firePosition() - handPosition()) / tile_pixels);
 }
 
 float FireableItem::windupTime() const {
