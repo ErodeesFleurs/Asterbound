@@ -54,14 +54,24 @@ std::expected<Json, StarException> ItemRecipe::toJson() const {
     });
 }
 
+void RecipeStock::add(ItemDescriptor const& item) {
+  if (!item.count())
+    return;
+  auto add_count = [&](std::uint64_t& total) {
+    total += std::min(item.count(), std::numeric_limits<std::uint64_t>::max() - total);
+  };
+  add_count(by_name[item.name()]);
+  add_count(by_parameters[item.singular()]);
+}
+
 bool ItemRecipe::isNull() const { return currencyInputs.empty() && inputs.empty() && output.isNull(); }
 
 bool ItemRecipe::operator==(ItemRecipe const& rhs) const {
-  return std::tie(currencyInputs, inputs, output) == std::tie(rhs.currencyInputs, rhs.inputs, rhs.output);
+  return matchInputParameters == rhs.matchInputParameters && std::tie(currencyInputs, inputs, output) == std::tie(rhs.currencyInputs, rhs.inputs, rhs.output);
 }
 
 bool ItemRecipe::operator!=(ItemRecipe const& rhs) const {
-  return std::tie(currencyInputs, inputs, output) != std::tie(rhs.currencyInputs, rhs.inputs, rhs.output);
+  return !(*this == rhs);
 }
 
 std::expected<void, StarException> write_text(TextBuffer& output, ItemRecipe const& recipe) {

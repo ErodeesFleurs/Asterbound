@@ -442,6 +442,7 @@ std::expected<void, StarException> CelestialMasterDatabase::init(std::optional<S
   if (!named)
     return std::unexpected(assets->with_asset_context(std::move(named.error()), "/celestial/names.config", "Loading celestial names"));
   if (database_file) {
+    auto const block_size = m_database.block_size();
     auto identified = m_database.set_content_identifier("Celestial2");
     if (!identified)
       return std::unexpected(std::move(identified.error()));
@@ -454,13 +455,23 @@ std::expected<void, StarException> CelestialMasterDatabase::init(std::optional<S
     auto opened = m_database.open();
     if (!opened)
       return std::unexpected(std::move(opened.error()));
-    if (m_database.content_identifier() != "Celestial2") {
-      auto logged = m_root.logger().error("CelestialMasterDatabase database content identifier is not 'Celestial2', moving out of the way and recreating");
+    if (m_database.content_identifier() != "Celestial2" || m_database.key_size() != 32) {
+      auto logged = m_root.logger().warn("Backing up incompatible celestial database '{}' (identifier '{}', key size {})",
+          *database_file, m_database.content_identifier(), m_database.key_size());
       if (!logged)
         return std::unexpected(std::move(logged.error()));
-      auto closed = m_database.close();
+      auto closed = m_database.close(true);
       if (!closed)
         return std::unexpected(std::move(closed.error()));
+      auto restored_identifier = m_database.set_content_identifier("Celestial2");
+      if (!restored_identifier)
+        return std::unexpected(std::move(restored_identifier.error()));
+      auto restored_keys = m_database.reset_key_size();
+      if (!restored_keys)
+        return std::unexpected(std::move(restored_keys.error()));
+      auto restored_blocks = m_database.set_block_size(block_size);
+      if (!restored_blocks)
+        return std::unexpected(std::move(restored_blocks.error()));
       auto renamed = File::rename(*database_file, Star::format("{}.{}.fail", *database_file, Time::milliseconds_since_epoch()));
       if (!renamed)
         return std::unexpected(std::move(renamed.error()));

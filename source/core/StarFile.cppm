@@ -128,6 +128,9 @@ public:
 
   [[nodiscard]] static std::expected<std::shared_ptr<File>, StarException> open(String const& filename, IOMode mode);
 
+  // Creates a new, named read/write file. Never opens or truncates an existing path.
+  [[nodiscard]] static std::expected<std::shared_ptr<File>, StarException> create_new_read_write(String filename);
+
   File();
   File(String filename);
   ~File() noexcept override;

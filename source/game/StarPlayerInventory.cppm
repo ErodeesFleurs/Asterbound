@@ -12,6 +12,7 @@ import star.inventory_types;
 import star.multi_array;
 import star.data_stream;
 import star.item_descriptor;
+import star.item_recipe;
 
 import star.net_element;
 import star.net_element_basic_fields;
@@ -101,10 +102,11 @@ public:
   std::uint64_t hasCountOfItem(ItemDescriptor const& descriptor, bool exactMatch = false) const;
 
   // Consume items based on ItemDescriptor. Can take from any manageable item slot.
+  [[nodiscard]] std::expected<bool, StarException> consume_recipe(ItemRecipe const& recipe, std::uint64_t batches);
   bool consumeItems(ItemDescriptor const& descriptor, bool exactMatch = false);
   [[nodiscard]] std::expected<ItemDescriptor, StarException> takeItems(ItemDescriptor const& descriptor, bool takePartial = false, bool exactMatch = false);
   // Return a summary of every item that can be consumed by ItemDescriptor.
-  [[nodiscard]] std::expected<HashMap<ItemDescriptor, std::uint64_t>, StarException> availableItems() const;
+  [[nodiscard]] std::expected<RecipeStock, StarException> availableItems() const;
 
   std::shared_ptr<HeadArmor> headArmor() const;
   std::shared_ptr<ChestArmor> chestArmor() const;

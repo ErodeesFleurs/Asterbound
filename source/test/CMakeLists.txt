@@ -100,6 +100,8 @@ set_property(SOURCE font_bitmap_test.cpp APPEND PROPERTY COMPILE_DEFINITIONS
   "STAR_BUNDLED_FONTS=\"${PROJECT_SOURCE_DIR}/../assets/asterbound\"")
 target_include_directories(core_tests SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  add_dependencies(core_tests btree_repacker)
+  target_sources(core_tests PRIVATE btree_repacker_test.cpp)
   target_compile_definitions (core_tests PRIVATE STAR_TEST_WRAP_WRITE=1 STAR_TEST_WRAP_READ=1)
   target_link_options (core_tests PRIVATE "LINKER:--wrap=write" "LINKER:--wrap=read")
 endif ()

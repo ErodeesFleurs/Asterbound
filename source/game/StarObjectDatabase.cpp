@@ -212,36 +212,20 @@ std::expected<bool, StarException> ObjectOrientation::anchorsValid(World const& 
   return anyValid;
 }
 
-std::expected<std::size_t, StarException> ObjectConfig::findValidOrientation(World const& world, Vec2I const& position, std::optional<Direction> directionAffinity) const {
-  auto valid = [&orientations = orientations, &world, &position](std::size_t index) -> std::expected<bool, StarException> {
-    auto placementResult = orientations[index]->placementValid(world, position);
-    if (!placementResult)
-      return std::unexpected(std::move(placementResult.error()));
-    auto placement = std::move(*placementResult);
-    if (!placement)
-      return false;
-    return orientations[index]->anchorsValid(world, position);
-  };
-  // Try the requested affinity first, preserving orientation ordering.
-  if (directionAffinity) {
+std::expected<std::size_t, StarException> ObjectConfig::find_valid_orientation(World const& world, Vec2I const& position, std::optional<Direction> direction_affinity) const {
+  // Each candidate belongs to exactly one pass. Within a pass keep asset order.
+  for (int pass = 0; pass < (direction_affinity ? 2 : 1); ++pass) {
     for (std::size_t i = 0; i < orientations.size(); ++i) {
-      if (!orientations[i]->directionAffinity || *directionAffinity != *orientations[i]->directionAffinity)
+      auto const& orientation = *orientations[i];
+      if (direction_affinity && (orientation.direction_affinity == direction_affinity) != (pass == 0))
         continue;
-      auto matchesResult = valid(i);
-      if (!matchesResult)
-        return std::unexpected(std::move(matchesResult.error()));
-      auto matches = std::move(*matchesResult);
-      if (matches)
-        return i;
+      auto placement = orientation.placementValid(world, position);
+      if (!placement) return std::unexpected(std::move(placement.error()));
+      if (!*placement) continue;
+      auto anchored = orientation.anchorsValid(world, position);
+      if (!anchored) return std::unexpected(std::move(anchored.error()));
+      if (*anchored) return i;
     }
-  }
-  for (std::size_t i = 0; i < orientations.size(); ++i) {
-    auto matchesResult = valid(i);
-    if (!matchesResult)
-      return std::unexpected(std::move(matchesResult.error()));
-    auto matches = std::move(*matchesResult);
-    if (matches)
-      return i;
   }
   return npos;
 }
@@ -579,7 +563,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
       auto affinityResult = enum_value<direction_names>(direction);
       if (!affinityResult)
         return std::unexpected(std::move(affinityResult.error()));
-      orientation->directionAffinity = *affinityResult;
+      orientation->direction_affinity = *affinityResult;
     }
     auto collisionTypeResult = orientationSettings.get_string("collision", "none");
     if (!collisionTypeResult)
@@ -909,7 +893,7 @@ std::expected<bool, StarException> ObjectDatabase::canPlaceObject(World const& w
   auto config = getConfig(objectName);
   if (!config)
     return std::unexpected(std::move(config.error()));
-  auto orientation = (*config)->findValidOrientation(world, position, {});
+  auto orientation = (*config)->find_valid_orientation(world, position, {});
   if (!orientation)
     return std::unexpected(std::move(orientation.error()));
   return *orientation != npos;
@@ -1426,14 +1410,14 @@ std::expected<List<Drawable>, StarException> ObjectDatabase::cursorHintDrawables
     auto drawable = std::move(*drawableResult);
     drawables.push_back(std::move(drawable));
   } else {
-    auto orientationIndexResult = config->findValidOrientation(world, position, direction);
+    auto orientationIndexResult = config->find_valid_orientation(world, position, direction);
     if (!orientationIndexResult)
       return std::unexpected(std::move(orientationIndexResult.error()));
     auto orientationIndex = std::move(*orientationIndexResult);
     if (orientationIndex == npos) {
       // Retain the existing affinity fallback order for invalid placements.
       for (std::size_t i = 0; i < config->orientations.size(); ++i) {
-        if (config->orientations[i]->directionAffinity == direction)
+        if (config->orientations[i]->direction_affinity == direction)
           orientationIndex = i;
       }
       if (orientationIndex == npos)

@@ -35,6 +35,7 @@ import star.item;
 namespace Star {
 
 class Root;
+class Player;
 class RecipeDatabase;
 class AugmentItem;
 
@@ -121,12 +122,13 @@ public:
     Json parameters;
   };
 
-  static std::uint64_t getCountOfItem(List<std::shared_ptr<Item>> const& bag, ItemDescriptor const& item, bool exactMatch = false);
-  static std::uint64_t getCountOfItem(HashMap<ItemDescriptor, std::uint64_t> const& bag, ItemDescriptor const& item, bool exactMatch = false);
-  static HashMap<ItemDescriptor, std::uint64_t> normalizeBag(List<std::shared_ptr<Item>> const& bag);
-  static bool canMakeRecipe(ItemRecipe const& recipe, HashMap<ItemDescriptor, std::uint64_t> const& availableIngredients, StringMap<std::uint64_t> const& availableCurrencies);
-  static HashSet<ItemRecipe> recipesFromSubset(HashMap<ItemDescriptor, std::uint64_t> const& normalizedBag, StringMap<std::uint64_t> const& availableCurrencies, HashSet<ItemRecipe> const& subset);
-  static HashSet<ItemRecipe> recipesFromSubset(HashMap<ItemDescriptor, std::uint64_t> const& normalizedBag, StringMap<std::uint64_t> const& availableCurrencies, HashSet<ItemRecipe> const& subset, StringSet const& allowedTypes);
+  static std::uint64_t get_count_of_item(List<std::shared_ptr<Item>> const& bag, ItemDescriptor const& item, bool exactMatch = false);
+  static std::uint64_t get_count_of_item(RecipeStock const& bag, ItemDescriptor const& item, bool exactMatch = false);
+  static RecipeStock normalize_bag(List<std::shared_ptr<Item>> const& bag);
+  [[nodiscard]] std::expected<bool, StarException> craft_recipe(Player& player, ItemRecipe const& recipe, std::uint64_t batches) const;
+  static bool can_make_recipe(ItemRecipe const& recipe, RecipeStock const& availableIngredients, StringMap<std::uint64_t> const& availableCurrencies);
+  static HashSet<ItemRecipe> recipesFromSubset(RecipeStock const& normalizedBag, StringMap<std::uint64_t> const& availableCurrencies, HashSet<ItemRecipe> const& subset);
+  static HashSet<ItemRecipe> recipesFromSubset(RecipeStock const& normalizedBag, StringMap<std::uint64_t> const& availableCurrencies, HashSet<ItemRecipe> const& subset, StringSet const& allowedTypes);
   [[nodiscard]]
   static std::expected<String, StarException> guiFilterString(std::shared_ptr<Item> const& item);
 
@@ -198,13 +200,13 @@ public:
   HashSet<ItemRecipe> recipesForOutputItem(String itemName) const;
 
   HashSet<ItemRecipe> recipesFromBagContents(List<std::shared_ptr<Item>> const& bag, StringMap<std::uint64_t> const& availableCurrencies) const;
-  HashSet<ItemRecipe> recipesFromBagContents(HashMap<ItemDescriptor, std::uint64_t> const& bag, StringMap<std::uint64_t> const& availableCurrencies) const;
+  HashSet<ItemRecipe> recipesFromBagContents(RecipeStock const& bag, StringMap<std::uint64_t> const& availableCurrencies) const;
 
   HashSet<ItemRecipe> recipesFromBagContents(List<std::shared_ptr<Item>> const& bag, StringMap<std::uint64_t> const& availableCurrencies, StringSet const& allowedTypes) const;
-  HashSet<ItemRecipe> recipesFromBagContents(HashMap<ItemDescriptor, std::uint64_t> const& bag, StringMap<std::uint64_t> const& availableCurrencies, StringSet const& allowedTypes) const;
+  HashSet<ItemRecipe> recipesFromBagContents(RecipeStock const& bag, StringMap<std::uint64_t> const& availableCurrencies, StringSet const& allowedTypes) const;
 
-  std::uint64_t maxCraftableInBag(List<std::shared_ptr<Item>> const& bag, StringMap<std::uint64_t> const& availableCurrencies, ItemRecipe const& recipe) const;
-  std::uint64_t maxCraftableInBag(HashMap<ItemDescriptor, std::uint64_t> const& bag, StringMap<std::uint64_t> const& availableCurrencies, ItemRecipe const& recipe) const;
+  std::uint64_t max_craftable_in_bag(List<std::shared_ptr<Item>> const& bag, StringMap<std::uint64_t> const& availableCurrencies, ItemRecipe const& recipe) const;
+  static std::uint64_t max_craftable_in_bag(RecipeStock const& bag, StringMap<std::uint64_t> const& availableCurrencies, ItemRecipe const& recipe);
 
   ItemRecipe getPreciseRecipeForMaterials(String const& group, List<std::shared_ptr<Item>> const& bag, StringMap<std::uint64_t> const& availableCurrencies) const;
 

@@ -68,12 +68,12 @@ public:
   // config file.
   [[nodiscard]] std::expected<VersionedJson, StarException> makeCurrentVersionedJson(String const& identifier, Json const& content) const;
 
-  // Returns true if the version in this VersionedJson matches the configured
-  // current version and does not need updating.
+  // Only the configured main version and installed sub-identifiers matter.
+  // Unknown mod metadata is preserved, not treated as a reason to migrate.
   [[nodiscard]] std::expected<bool, StarException> versionedJsonCurrent(VersionedJson const& versionedJson) const;
 
-  // Brings versioned JSON up to the configured latest version using scripts.
-  // Script and upgrade failures are returned as VersioningDatabaseException.
+  // Run sub-version scripts at every reached main version, including the last.
+  // Script failures and incomplete migration chains return VersioningDatabaseException.
   [[nodiscard]] std::expected<VersionedJson, StarException> updateVersionedJson(VersionedJson const& versionedJson) const;
   [[nodiscard]] std::expected<VersionedJson, StarException> updateVersionedJson(VersionedJson const& versionedJson, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog) const;
 

@@ -193,7 +193,7 @@ std::expected<void, StarException> Statistics::setStat(String const& name, Strin
   }
   auto database = m_root.statisticsDatabase();
   if (!database) return std::unexpected(std::move(database.error()));
-  m_pendingAchievementChecks.insert_range((*database)->achievementsForStat(name));
+  m_pendingAchievementChecks.insert_range((*database)->achievements_for_stat(name));
   return {};
 }
 

@@ -296,7 +296,7 @@ std::uint64_t ItemBag::available(ItemDescriptor const& descriptor, bool exactMat
   std::uint64_t count = 0;
   for (auto const& items : m_items) {
     if (items && items->matches(descriptor, exactMatch))
-      count += items->count();
+      count += std::min(items->count(), std::numeric_limits<std::uint64_t>::max() - count);
   }
 
   return count / descriptor.count();

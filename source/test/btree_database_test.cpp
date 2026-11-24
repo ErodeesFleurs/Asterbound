@@ -571,6 +571,90 @@ TEST(BTreeDatabaseTest, FreeIndexStagingPreservesPayloadAndRollback) {
   EXPECT_TRUE(db.close());
 }
 
+TEST(BTreeDatabaseTest, FreeIndexPaddingReadFailureKeepsEveryBlockForRetryOrRollback) {
+  auto random = RandomService::create();
+  ASSERT_TRUE(random);
+  for (unsigned successful_reads : {0u, 1u, 2u}) {
+    for (bool retry : {false, true}) {
+      SCOPED_TRACE(::testing::Message() << "prior FF blocks=" << successful_reads << " retry=" << retry);
+      auto file = File::temporary_file(**random);
+      ASSERT_TRUE(file);
+      auto cleanup = make_scope_exit([&] { EXPECT_TRUE((*file)->remove()); });
+      auto device = std::make_shared<ReadBudgetFile>((*file)->file_name());
+      device->block_size = 64;
+      Logger logger;
+      BTreeDatabase db(logger, "TestDB", 4);
+      ASSERT_TRUE(db.set_auto_commit(false));
+      ASSERT_TRUE(db.set_block_size(device->block_size));
+      ASSERT_TRUE(db.set_io_device(device));
+      ASSERT_TRUE(db.open());
+
+      auto key = key_bytes(1);
+      ByteArray large(20 * device->block_size, 'x');
+      ByteArray small(8, 's');
+      ASSERT_TRUE(db.insert(key, large));
+      ASSERT_TRUE(db.commit());
+      auto total = db.total_block_count();
+      ASSERT_TRUE(total);
+      auto old_free = db.free_block_count();
+      ASSERT_TRUE(old_free);
+      ASSERT_EQ(*old_free, 0u);
+
+      // The root is a single leaf both before and after shrinking. Its
+      // released tails require several new FF heads; no existing head is read.
+      ASSERT_TRUE(db.insert(key, small));
+      auto pending_free = db.free_block_count();
+      ASSERT_TRUE(pending_free);
+      ASSERT_EQ(*pending_free, *total - 1);
+      device->full_block_reads = 0;
+      device->remaining_full_reads = successful_reads;
+      auto failed = db.commit();
+      ASSERT_FALSE(failed);
+      EXPECT_TRUE(failed.error().is<IOException>());
+      EXPECT_EQ(device->full_block_reads, successful_reads + 1);
+      device->remaining_full_reads.reset();
+      auto after_failure = db.free_block_count();
+      ASSERT_TRUE(after_failure) << after_failure.error().what();
+      EXPECT_EQ(*after_failure, *pending_free);
+      auto pending = db.find(key);
+      ASSERT_TRUE(pending && *pending);
+      EXPECT_EQ(**pending, small);
+
+      ASSERT_TRUE(retry ? db.commit() : db.rollback());
+      ASSERT_TRUE(db.close(true));
+      ASSERT_TRUE(db.open());
+      auto recovered = db.find(key);
+      ASSERT_TRUE(recovered && *recovered);
+      EXPECT_EQ(**recovered, retry ? small : large);
+      auto recovered_free = db.free_block_count();
+      ASSERT_TRUE(recovered_free) << recovered_free.error().what();
+      EXPECT_EQ(*recovered_free, retry ? *pending_free : *old_free);
+      check_block_counts(db);
+
+      // Consume the entire chain. Missing or repeated entries must not grow
+      // the file, overwrite live data, or leave a dangling free list.
+      if (!retry) {
+        ASSERT_TRUE(db.insert(key, small));
+        ASSERT_TRUE(db.commit());
+      }
+      ASSERT_TRUE(db.insert(key, large));
+      ASSERT_TRUE(db.commit());
+      ASSERT_TRUE(db.close(true));
+      ASSERT_TRUE(db.open());
+      auto reused = db.find(key);
+      ASSERT_TRUE(reused && *reused);
+      EXPECT_EQ(**reused, large);
+      auto final_total = db.total_block_count();
+      ASSERT_TRUE(final_total);
+      EXPECT_EQ(*final_total, *total);
+      auto final_free = db.free_block_count();
+      ASSERT_TRUE(final_free);
+      EXPECT_EQ(*final_free, 0u);
+      ASSERT_TRUE(db.close(true));
+    }
+  }
+}
+
 TEST(BTreeDatabaseTest, CommitPhaseFailuresPreservePendingDataAndRecover) {
   struct Fault {
     unsigned phase;

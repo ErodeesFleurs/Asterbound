@@ -480,133 +480,68 @@ bool PlayerInventory::hasItem(ItemDescriptor const& descriptor, bool exactMatch)
 }
 
 std::uint64_t PlayerInventory::hasCountOfItem(ItemDescriptor const& descriptor, bool exactMatch) const {
-  auto one = descriptor.singular();
-
-  std::uint64_t count = 0;
-  auto countItem = [&](std::shared_ptr<Item> const& ptr) {
-    if (ptr)
-      count += ptr->matches(one, exactMatch) ? ptr->count() : 0;
+  std::uint64_t total = 0;
+  auto add = [&](std::uint64_t count) {
+    total += std::min(count, std::numeric_limits<std::uint64_t>::max() - total);
   };
-
-  countItem(m_swapSlot);
-  countItem(m_trashSlot);
-  for (auto const& p : m_equipment)
-    countItem(p.second);
-
-  for (auto const& pair : m_bags)
-    count += pair.second->available(one, exactMatch);
-
-  return count;
+  auto count_slot = [&](std::shared_ptr<Item> const& item) {
+    if (item && item->matches(descriptor, exactMatch))
+      add(item->count());
+  };
+  count_slot(m_swapSlot);
+  count_slot(m_trashSlot);
+  for (auto const& slot : m_equipment)
+    count_slot(slot.second);
+  for (auto const& bag : m_bags)
+    add(bag.second->available(descriptor, exactMatch));
+  return total;
 }
 
 bool PlayerInventory::consumeItems(ItemDescriptor const& descriptor, bool exactMatch) {
-  if (descriptor.count() == 0)
+  auto remaining = descriptor.count();
+  if (!remaining)
     return true;
-
-  auto one = descriptor.singular();
-
-  Map<String, std::uint64_t> consumeFromItemBags;
-  for (auto const& pair : m_bags)
-    consumeFromItemBags[pair.first] = pair.second->available(one);
-
-  std::uint64_t consumeFromEquipment = 0;
-  for (auto const& p : m_equipment) {
-    if (p.second)
-      consumeFromEquipment += p.second->matches(one, exactMatch) ? p.second->count() : 0;
-  }
-
-  std::uint64_t consumeFromSwap = 0;
-  if (m_swapSlot)
-    consumeFromSwap += m_swapSlot->matches(one, exactMatch) ? m_swapSlot->count() : 0;
-
-  std::uint64_t consumeFromTrash = 0;
-  if (m_trashSlot)
-    consumeFromTrash += m_trashSlot->matches(one, exactMatch) ? m_trashSlot->count() : 0;
-
-  auto totalAvailable = consumeFromEquipment + consumeFromSwap + consumeFromTrash;
-  for (auto const& pair : consumeFromItemBags)
-    totalAvailable += pair.second;
-
-  if (totalAvailable < descriptor.count())
+  if (hasCountOfItem(descriptor, exactMatch) < remaining)
     return false;
-
-  std::uint64_t leftoverCount = descriptor.count();
-  std::uint64_t quantity;
-  for (auto pair : m_bags) {
-    quantity = std::min(leftoverCount, consumeFromItemBags[pair.first]);
-    if (quantity > 0) {
-      auto res = pair.second->consumeItems(one.multiply(quantity), exactMatch);
-      ((void)(res));
-      if constexpr (Star::debug_enabled) {
-        Star::star_assert_failed((res));
-      }
-      leftoverCount -= quantity;
-    }
+  for (auto const& bag : m_bags) {
+    auto take = std::min(remaining, bag.second->available(descriptor, exactMatch));
+    if (take && !bag.second->consumeItems(descriptor.withCount(take), exactMatch))
+      return false;
+    remaining -= take;
+    if (!remaining)
+      return true;
   }
-
-  quantity = std::min(leftoverCount, consumeFromEquipment);
-  if (quantity > 0) {
-    auto leftoverQuantity = quantity;
-    ((void)(leftoverQuantity));
-    for (auto& p : m_equipment) {
-      if (p.second && p.second->matches(one, exactMatch)) {
-        auto toConsume = std::min(p.second->count(), quantity);
-        auto res = p.second->consume(toConsume);
-        normalizeItem(p.second);
-        ((void)(res));
-        if constexpr (Star::debug_enabled) {
-          Star::star_assert_failed((res));
-        }
-
-        leftoverQuantity -= toConsume;
-      }
+  auto consume_slot = [&](std::shared_ptr<Item>& item) {
+    if (remaining && item && item->matches(descriptor, exactMatch)) {
+      auto take = std::min(remaining, item->count());
+      if (item->consume(take))
+        remaining -= take;
+      normalizeItem(item);
     }
-    if constexpr (Star::debug_enabled) {
-      Star::star_assert_failed((leftoverQuantity == 0));
-    }
-    leftoverCount -= quantity;
+  };
+  for (auto& slot : m_equipment)
+    consume_slot(slot.second);
+  consume_slot(m_swapSlot);
+  consume_slot(m_trashSlot);
+  return remaining == 0;
+}
+
+std::expected<bool, StarException> PlayerInventory::consume_recipe(ItemRecipe const& recipe, std::uint64_t batches) {
+  if (!batches)
+    return false;
+  auto stock = availableItems();
+  if (!stock)
+    return std::unexpected(std::move(stock.error()));
+  if (batches > ItemDatabase::max_craftable_in_bag(*stock, m_currencies, recipe))
+    return false;
+  // Each product is bounded by the division in max_craftable_in_bag.
+  for (auto const& input : recipe.inputs) {
+    if (!consumeItems(input.withCount(input.count() * batches), recipe.matchInputParameters))
+      return std::unexpected(InventoryException("Recipe inventory changed during consumption"));
   }
-
-  quantity = std::min(leftoverCount, consumeFromSwap);
-  if (quantity > 0) {
-    if (m_swapSlot && m_swapSlot->matches(one, exactMatch)) {
-      auto toConsume = std::min(m_swapSlot->count(), quantity);
-      auto res = m_swapSlot->consume(toConsume);
-      normalizeItem(m_swapSlot);
-      ((void)(res));
-      if constexpr (Star::debug_enabled) {
-        Star::star_assert_failed((res));
-      }
-
-      quantity -= toConsume;
-      if constexpr (Star::debug_enabled) {
-        Star::star_assert_failed((quantity == 0));
-      }
-    }
-    leftoverCount -= std::min(leftoverCount, consumeFromSwap);
-  }
-
-  quantity = std::min(leftoverCount, consumeFromTrash);
-  if (quantity > 0) {
-    if (m_trashSlot && m_trashSlot->matches(one, exactMatch)) {
-      auto toConsume = std::min(m_trashSlot->count(), quantity);
-      auto res = m_trashSlot->consume(toConsume);
-      normalizeItem(m_trashSlot);
-      ((void)(res));
-      if constexpr (Star::debug_enabled) {
-        Star::star_assert_failed((res));
-      }
-
-      quantity -= toConsume;
-      if constexpr (Star::debug_enabled) {
-        Star::star_assert_failed((quantity == 0));
-      }
-    }
-    leftoverCount -= std::min(leftoverCount, consumeFromTrash);
-  }
-
-  if constexpr (Star::debug_enabled) {
-    Star::star_assert_failed((leftoverCount == 0));
+  for (auto const& [name, amount] : recipe.currencyInputs) {
+    if (amount && !consumeCurrency(name, amount * batches))
+      return std::unexpected(InventoryException("Recipe currency changed during consumption"));
   }
   return true;
 }
@@ -623,10 +558,15 @@ bool PlayerInventory::consumeItems(ItemDescriptor const& descriptor, bool exactM
   return {};
 }
 
-[[nodiscard]] std::expected<HashMap<ItemDescriptor, std::uint64_t>, StarException> PlayerInventory::availableItems() const {
-  auto items = allItems();
-  if (!items) return std::unexpected(std::move(items.error()));
-  return ItemDatabase::normalizeBag(*items);
+[[nodiscard]] std::expected<RecipeStock, StarException> PlayerInventory::availableItems() const {
+  RecipeStock stock;
+  auto visited = forEveryItem([&](InventorySlot const&, std::shared_ptr<Item> const& item) -> std::expected<void, StarException> {
+    stock.add(item->descriptor());
+    return {};
+  });
+  if (!visited)
+    return std::unexpected(std::move(visited.error()));
+  return stock;
 }
 
 std::shared_ptr<HeadArmor> PlayerInventory::headArmor() const {

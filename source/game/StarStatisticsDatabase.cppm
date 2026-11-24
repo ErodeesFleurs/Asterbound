@@ -14,7 +14,7 @@ class Assets;
 class Root;
 
 struct StatEvent {
-  String eventName;
+  String event_name;
   StringList scripts;
   Json config;
 };
@@ -27,28 +27,31 @@ struct Achievement {
 };
 
 class StatisticsDatabase {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
+
 public:
   [[nodiscard]] static std::expected<std::shared_ptr<StatisticsDatabase>, StarException> create(Root& root);
+  StatisticsDatabase(ConstructionKey, Root& root) : m_root(root) {}
 
-  [[nodiscard]] std::expected<std::shared_ptr<StatEvent>, StarException> event(String const& eventName) const;
+  [[nodiscard]] std::expected<std::shared_ptr<StatEvent>, StarException> event(String const& name) const;
 
   [[nodiscard]] std::expected<std::shared_ptr<Achievement>, StarException> achievement(String const& name) const;
-  StringList allAchievements() const;
-  StringList achievementsForStat(String const& statName) const;
+  StringList all_achievements() const;
+  // The index is immutable after creation; the view is valid while this database lives.
+  std::span<String const> achievements_for_stat(String const& stat_name) const;
 
 private:
-  explicit StatisticsDatabase(Root& root);
   [[nodiscard]] std::expected<void, StarException> load();
-  [[nodiscard]] static std::expected<std::shared_ptr<StatEvent>, StarException> readEvent(Assets const& assets, String const& path);
-  [[nodiscard]] static std::expected<std::shared_ptr<Achievement>, StarException> readAchievement(Assets const& assets, String const& path);
+  [[nodiscard]] static std::expected<std::shared_ptr<StatEvent>, StarException> read_event(Assets const& assets, String const& path);
+  [[nodiscard]] static std::expected<std::shared_ptr<Achievement>, StarException> read_achievement(Assets const& assets, String const& path);
 
   Root& m_root;
-  StringMap<String> m_eventPaths;
-  StringMap<String> m_achievementPaths;
-  StringMap<StringList> m_statAchievements;
-  mutable std::mutex m_cacheMutex;
-  mutable HashLruCache<String, std::shared_ptr<StatEvent>> m_eventCache;
-  mutable HashLruCache<String, std::shared_ptr<Achievement>> m_achievementCache;
+  StringMap<String> m_event_paths;
+  StringMap<String> m_achievement_paths;
+  StringMap<StringList> m_stat_achievements;
+  mutable std::mutex m_cache_mutex;
+  mutable HashLruCache<String, std::shared_ptr<StatEvent>> m_event_cache;
+  mutable HashLruCache<String, std::shared_ptr<Achievement>> m_achievement_cache;
 };
 
 }

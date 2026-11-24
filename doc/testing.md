@@ -515,6 +515,9 @@ VLQ-size transitions, empty values, record ownership, free-index padding and
 range erasure with per-key commit failures. Keep the commit fault matrix,
 explicit rollback/retry and reopen checks: failed sync does not prove rollback.
 Preserve the disk layout and all three durability barriers.
+On Linux, `BTreeRepackerTest.*` runs the actual repacker against private files.
+Keep recoverable source corruption separate from fatal destination failures:
+the latter must not replace an existing output, including when paths alias.
 
 Reuse `File/BTree/StageRollback` and `File/BTree/Commit` for matched timings;
 `CommitPhaseDiagnostic` is instrumented evidence, not throughput. Report cache

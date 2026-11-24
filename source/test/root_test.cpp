@@ -31,6 +31,7 @@ import star.random;
 import star.root_lua_bindings;
 import star.string;
 import star.tech_database;
+import star.statistics_database;
 import star.collision_block;
 import star.game_types;
 import star.map;
@@ -87,6 +88,7 @@ import star.data_stream_extra;
 import star.encode;
 
 import star.dance_database;
+import star.versioning_database;
 
 #include "gtest/gtest.h"
 
@@ -389,6 +391,65 @@ const GameTestRegistration codex_catalog("CodexCatalog", "EmptyDefaultsRelativeI
   if (!json) return std::unexpected(std::move(json.error()));
   return json->get_string("rootIsolationOwner");
 }
+
+const GameTestRegistration statistics_achievement_index(
+  "StatisticsDatabaseTest", "AtomicIndexFirstDefinitionAndOptionalTriggers", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto settings = isolationSettings(fixture.rootSettings(), *directory, "statistics");
+    ASSERT_TRUE(settings) << settings.error().what();
+    auto overlay = File::relative_to(*directory, "assets");
+    settings->assetSources = {overlay};
+    auto write_asset = [&](String const& filename, String const& content) {
+      return File::write_file(content, File::relative_to(overlay, filename));
+    };
+    ASSERT_TRUE(write_asset("preload.config", "[]"));
+    ASSERT_TRUE(write_asset("alpha.achievement", R"({"name":"shared","triggers":["alpha","both"],"scripts":[]})"));
+    ASSERT_TRUE(write_asset("beta.achievement", R"({"name":"shared","triggers":["beta","both"],"scripts":[]})"));
+    ASSERT_TRUE(write_asset("invalid.achievement", R"({"name":"invalid","triggers":["leaked",3],"scripts":[]})"));
+    ASSERT_TRUE(write_asset("missing.achievement", R"({"name":"missing","scripts":[]})"));
+    ASSERT_TRUE(write_asset("null.achievement", R"({"name":"null","triggers":null,"scripts":[]})"));
+    auto root = Root::create(std::move(*settings));
+    ASSERT_TRUE(root) << root.error().what();
+    auto assets = (*root)->assets();
+    ASSERT_TRUE(assets) << assets.error().what();
+    auto paths = (*assets)->scan_extension("achievement");
+    ASSERT_TRUE(paths);
+    // Index iteration order, not lexical filename order, determines which definition wins.
+    auto first = std::find_if(paths->get().begin(), paths->get().end(), [](CaseInsensitiveString const& path) {
+      return path.string() == "/alpha.achievement" || path.string() == "/beta.achievement";
+    });
+    ASSERT_NE(first, paths->get().end());
+    bool alpha_first = first->string() == "/alpha.achievement";
+    String winner = alpha_first ? String("alpha") : String("beta");
+    String loser = alpha_first ? String("beta") : String("alpha");
+
+    auto loaded = (*root)->statisticsDatabase();
+    ASSERT_TRUE(loaded) << loaded.error().what();
+    auto const& database = **loaded;
+    EXPECT_EQ(database.all_achievements().size(), 3u);
+    auto invalid = database.achievement("invalid");
+    ASSERT_TRUE(invalid) << invalid.error().what();
+    EXPECT_FALSE(*invalid);
+    EXPECT_TRUE(database.achievements_for_stat("leaked").empty());
+    auto shared = database.achievement("shared");
+    ASSERT_TRUE(shared) << shared.error().what();
+    ASSERT_TRUE(*shared);
+    EXPECT_EQ((*shared)->triggers, (StringList{winner, "both"}));
+    auto names = database.achievements_for_stat(winner);
+    ASSERT_EQ(names.size(), 1u);
+    EXPECT_EQ(names.front(), "shared");
+    EXPECT_EQ(names.data(), database.achievements_for_stat(winner).data());
+    EXPECT_TRUE(database.achievements_for_stat(loser).empty());
+    EXPECT_EQ(database.achievements_for_stat("both").size(), 1u);
+    for (auto const& name : StringList{"missing", "null"}) {
+      auto achievement = database.achievement(name);
+      ASSERT_TRUE(achievement) << achievement.error().what();
+      ASSERT_TRUE(*achievement);
+      EXPECT_TRUE((*achievement)->triggers.empty());
+    }
+  });
 
 const GameTestRegistration timed_dance("DanceTest", "RefreshAndFailedReplacement", [](GameTest& fixture) {
   auto directory = File::temporary_directory(fixture.root().random());
@@ -1033,6 +1094,77 @@ writeIsolationModules(String const& overlay, std::initializer_list<std::pair<Str
   }
   return {};
 }
+
+const GameTestRegistration versioning_migrations("VersioningDatabase", "RunsLuaAtEachReachedVersion",
+    [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto settings = isolationSettings(fixture.rootSettings(), *directory, "versioning");
+  ASSERT_TRUE(settings) << settings.error().what();
+  auto overlay = File::relative_to(*directory, "assets");
+  settings->assetSources = {overlay};
+  ASSERT_TRUE(File::create_directory(File::relative_to(overlay, "versioning")));
+  auto written = writeIsolationModules(overlay, {
+    {"preload.config", "[]"},
+    // No migration may require a usable celestial catalog until the Lua call.
+    {"celestial.config", "{}"},
+    {"versioning.config", R"({"Chain":2,"OnlySub":4,"Gap":2,"MainGap":2,"Celestial":1})"},
+    {"versioning/subVersioning.config", R"({"Chain":{"steps":3},"OnlySub":{"steps":1},"Gap":{"steps":3}})"},
+    {"versioning/Chain_0_steps_0_1.lua", "function update(s) return s .. 'a' end"},
+    {"versioning/Chain_0_1.lua", "function update(s) return s .. 'b' end"},
+    {"versioning/Chain_0_2.lua", "function update(s) error('skipped ordered main edge') end"},
+    {"versioning/Chain_1_steps_1_2.lua", "function update(s) return s .. 'c' end"},
+    {"versioning/Chain_1_2.lua", "function update(s) return s .. 'd' end"},
+    {"versioning/Chain_2_steps_2_3.lua", "function update(s) return s .. 'e' end"},
+    {"versioning/OnlySub_4_steps_0_1.lua", "function update(s) return s .. 'only' end"},
+    {"versioning/OnlySub_4_steps_0_2.lua", "function update(s) error('skipped ordered sub edge') end"},
+    {"versioning/Gap_2_steps_0_1.lua", "function update(s) return s .. 'partial' end"},
+    {"versioning/Gap_2_steps_2_3.lua", "function update(s) error('unreachable') end"},
+    {"versioning/MainGap_0_1.lua", "function update(s) return s .. 'partial' end"},
+    {"versioning/Celestial_0_1.lua", R"(
+      function update(s)
+        assert(type(celestial.parameters) == 'function')
+        local ok, err = pcall(celestial.parameters, '1:2:3')
+        assert(not ok, 'invalid celestial catalog unexpectedly accepted')
+        return tostring(err)
+      end
+    )"}
+  });
+  ASSERT_TRUE(written) << written.error().what();
+  auto root = Root::create(std::move(*settings));
+  ASSERT_TRUE(root) << root.error().what();
+  auto database = (*root)->versioningDatabase();
+  ASSERT_TRUE(database) << database.error().what();
+  auto const& versions = **database;
+  VersionedJson old{"Chain", 0, "", {{"removed-mod", 17}}};
+  auto updated = versions.updateVersionedJson(old);
+  ASSERT_TRUE(updated) << updated.error().what();
+  EXPECT_EQ(updated->content, Json("abcde"));
+  EXPECT_EQ(updated->version, 2u);
+  EXPECT_EQ(updated->subVersions.value("steps"), 3u);
+  EXPECT_EQ(updated->subVersions.value("removed-mod"), 17u);
+  EXPECT_EQ(versions.versionedJsonCurrent(*updated), true);
+
+  VersionedJson only_sub{"OnlySub", 4, "", {}};
+  EXPECT_EQ(versions.versionedJsonCurrent(only_sub), false);
+  EXPECT_EQ(versions.loadVersionedJson(only_sub, "OnlySub"), Json("only"));
+  only_sub.subVersions["steps"] = 5;
+  EXPECT_FALSE(versions.updateVersionedJson(only_sub)); // Do not silently downgrade a known sub-version.
+  VersionedJson gap{"Gap", 2, "", {}};
+  auto broken = versions.updateVersionedJson(gap);
+  ASSERT_FALSE(broken);
+  EXPECT_NE(std::string_view(broken.error().what()).find("requires sub identifier 'steps' version 3, reached 1"),
+            std::string_view::npos);
+  EXPECT_FALSE(versions.loadVersionedJson(gap, "Gap"));
+  EXPECT_FALSE(versions.updateVersionedJson({"MainGap", 0, "", {}}));
+  auto celestial = versions.loadVersionedJson({"Celestial", 0, "", {}}, "Celestial");
+  ASSERT_TRUE(celestial) << celestial.error().what();
+  auto message = celestial->to_string();
+  ASSERT_TRUE(message) << message.error().what();
+  EXPECT_EQ(message->contains("celestial.config"), true) << message->utf8();
+});
+
 const GameTestRegistration questTemplateItemBoundaries("RootTest", "QuestTemplateItemBoundaries", [](GameTest&) {
   for (auto const& config :
        {Json(JsonObject{{"id", "borrowed-quest"}}),

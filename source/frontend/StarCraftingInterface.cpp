@@ -622,21 +622,12 @@ std::expected<void, StarException> CraftingPane::upgradeTable() {
   if (m_sourceEntityId == null_entity_id || !m_upgradeRecipe)
     return {};
 
-  bool canUpgrade = m_player->isAdmin();
-  if (!canUpgrade) {
-    auto availableItems = m_player->inventory()->availableItems();
-    if (!availableItems)
-      return std::unexpected(std::move(availableItems.error()));
-    canUpgrade = ItemDatabase::canMakeRecipe(*m_upgradeRecipe, std::move(*availableItems),
-                                             m_player->inventory()->availableCurrencies());
-  }
-  if (!canUpgrade)
-    return {};
-
   if (!m_player->isAdmin()) {
-    auto result = consumeIngredients(*m_upgradeRecipe, 1);
-    if (!result)
-      return std::unexpected(std::move(result.error()));
+    auto consumed = m_player->inventory()->consume_recipe(*m_upgradeRecipe, 1);
+    if (!consumed)
+      return std::unexpected(std::move(consumed.error()));
+    if (!*consumed)
+      return updateAvailableRecipes();
   }
 
   auto requestUpgrade = m_worldClient->sendEntityMessage(m_sourceEntityId, "requestUpgrade");
@@ -654,7 +645,7 @@ std::expected<std::size_t, StarException> CraftingPane::itemCount(List<std::shar
   if (!itemDatabaseResult408)
     return std::unexpected(std::move(itemDatabaseResult408.error()));
   auto itemDb = std::move(*itemDatabaseResult408);
-  return itemDb->getCountOfItem(store, item);
+  return itemDb->get_count_of_item(store, item);
 }
 
 std::expected<void, StarException> CraftingPane::update(float dt) {
@@ -792,7 +783,7 @@ std::expected<void, StarException> CraftingPane::updateCraftButtons() {
   if (!recipeFromSelectedWidgetResult427)
     return std::unexpected(std::move(recipeFromSelectedWidgetResult427.error()));
   auto recipe = std::move(*recipeFromSelectedWidgetResult427);
-  bool recipeAvailable = !recipe.isNull() && (m_player->isAdmin() || ItemDatabase::canMakeRecipe(recipe, normalizedBag, availableCurrencies));
+  bool recipeAvailable = !recipe.isNull() && (m_player->isAdmin() || ItemDatabase::can_make_recipe(recipe, normalizedBag, availableCurrencies));
 
   auto fetchChildResult428 = fetchChild<ButtonWidget>("btnCraft");
   if (!fetchChildResult428)
@@ -835,7 +826,7 @@ std::expected<void, StarException> CraftingPane::updateCraftButtons() {
     if (!fetchChildResult435)
       return std::unexpected(std::move(fetchChildResult435.error()));
     if (auto upgradeButton = std::move(*fetchChildResult435)) {
-      bool canUpgrade = (m_upgradeRecipe && (m_player->isAdmin() || ItemDatabase::canMakeRecipe(*m_upgradeRecipe, normalizedBag, availableCurrencies)));
+      bool canUpgrade = (m_upgradeRecipe && (m_player->isAdmin() || ItemDatabase::can_make_recipe(*m_upgradeRecipe, normalizedBag, availableCurrencies)));
       upgradeButton->setEnabled(canUpgrade);
     }
   }
@@ -920,7 +911,8 @@ std::expected<void, StarException> CraftingPane::updateAvailableRecipes() {
   auto availableItemsResult447 = m_player->inventory()->availableItems();
   if (!availableItemsResult447)
     return std::unexpected(std::move(availableItemsResult447.error()));
-  HashMap<ItemDescriptor, std::uint64_t> normalizedBag = std::move(*availableItemsResult447);
+  auto const& normalizedBag = *availableItemsResult447;
+  auto currencies = m_player->inventory()->availableCurrencies();
 
   auto clearResult448 = m_guiList->clear();
   if (!clearResult448)
@@ -942,7 +934,7 @@ std::expected<void, StarException> CraftingPane::updateAvailableRecipes() {
         return std::unexpected(std::move(addResult451.error()));
     }
 
-    auto setupWidgetResult452 = setupWidget(widget, recipe, normalizedBag);
+    auto setupWidgetResult452 = setupWidget(widget, recipe, normalizedBag, currencies);
     if (!setupWidgetResult452)
       return std::unexpected(std::move(setupWidgetResult452.error()));
 
@@ -957,7 +949,7 @@ std::expected<void, StarException> CraftingPane::updateAvailableRecipes() {
   return {};
 }
 
-std::expected<void, StarException> CraftingPane::setupWidget(std::shared_ptr<Widget> const& widget, ItemRecipe const& recipe, HashMap<ItemDescriptor, std::uint64_t> const& normalizedBag) {
+std::expected<void, StarException> CraftingPane::setupWidget(std::shared_ptr<Widget> const& widget, ItemRecipe const& recipe, RecipeStock const& normalizedBag, StringMap<std::uint64_t> const& currencies) {
   auto& root = context().root();
 
   auto single = recipe.output.singular();
@@ -973,24 +965,8 @@ std::expected<void, StarException> CraftingPane::setupWidget(std::shared_ptr<Wid
     m_itemCache[single] = item;
   }
 
-  bool unavailable = false;
-  std::size_t price = recipe.currencyInputs.value("money", 0);
-
-  if (!m_player->isAdmin()) {
-    for (auto const& p : recipe.currencyInputs) {
-      if (m_player->currency(p.first) < p.second)
-        unavailable = true;
-    }
-
-    auto itemDatabaseResult456 = context().root().itemDatabase();
-    if (!itemDatabaseResult456)
-      return std::unexpected(std::move(itemDatabaseResult456.error()));
-    auto itemDb = std::move(*itemDatabaseResult456);
-    for (auto const& input : recipe.inputs) {
-      if (itemDb->getCountOfItem(normalizedBag, input, recipe.matchInputParameters) < input.count())
-        unavailable = true;
-    }
-  }
+  bool unavailable = !m_player->isAdmin() && !ItemDatabase::can_make_recipe(recipe, normalizedBag, currencies);
+  auto price = recipe.currencyInputs.value("money", 0);
 
   String name = item->friendlyName();
   if (recipe.output.count() > 1)
@@ -1204,7 +1180,7 @@ std::expected<std::shared_ptr<Pane>, StarException> CraftingPane::setupTooltip(I
     if (!itemSharedResult499)
       return std::unexpected(std::move(itemSharedResult499.error()));
     auto item = std::move(*itemSharedResult499);
-    std::size_t itemCount = itemDb->getCountOfItem(normalizedBag, input, recipe.matchInputParameters);
+    std::size_t itemCount = itemDb->get_count_of_item(normalizedBag, input, recipe.matchInputParameters);
     addIngredient(item, itemCount, input.count());
   }
 
@@ -1223,55 +1199,6 @@ std::expected<std::shared_ptr<Pane>, StarException> CraftingPane::setupTooltip(I
   tooltip->setSize(background->size());
 
   return tooltip;
-}
-
-std::expected<bool, StarException> CraftingPane::consumeIngredients(ItemRecipe& recipe, int count) {
-  auto itemDatabaseResult502 = context().root().itemDatabase();
-  if (!itemDatabaseResult502)
-    return std::unexpected(std::move(itemDatabaseResult502.error()));
-  auto itemDb = std::move(*itemDatabaseResult502);
-
-  auto availableItemsResult503 = m_player->inventory()->availableItems();
-  if (!availableItemsResult503)
-    return std::unexpected(std::move(availableItemsResult503.error()));
-  auto normalizedBag = std::move(*availableItemsResult503);
-  auto availableCurrencies = m_player->inventory()->availableCurrencies();
-
-  // make sure we still have the currencies and items avaialable
-  for (auto const& p : recipe.currencyInputs) {
-    std::uint64_t countRequired = p.second * count;
-    if (availableCurrencies.value(p.first) < countRequired) {
-      auto updateAvailableRecipesResult504 = updateAvailableRecipes();
-      if (!updateAvailableRecipesResult504)
-        return std::unexpected(std::move(updateAvailableRecipesResult504.error()));
-      return false;
-    }
-  }
-  for (auto input : recipe.inputs) {
-    std::size_t countRequired = input.count() * count;
-    if (itemDb->getCountOfItem(normalizedBag, input, recipe.matchInputParameters) < countRequired) {
-      auto updateAvailableRecipesResult505 = updateAvailableRecipes();
-      if (!updateAvailableRecipesResult505)
-        return std::unexpected(std::move(updateAvailableRecipesResult505.error()));
-      return false;
-    }
-  }
-
-  // actually consume the currencies and items
-  for (auto const& p : recipe.currencyInputs) {
-    if (p.second > 0)
-      m_player->inventory()->consumeCurrency(p.first, p.second * count);
-  }
-  for (auto input : recipe.inputs) {
-    if (count > 0)
-      {
-        auto createResult506 = ItemDescriptor::create(input.name(), input.count() * count, input.parameters());
-        if (!createResult506)
-          return std::unexpected(std::move(createResult506.error()));
-        m_player->inventory()->consumeItems(std::move(*createResult506), recipe.matchInputParameters);
-      }
-  }
-  return true;
 }
 
 void CraftingPane::stopCrafting() {
@@ -1341,40 +1268,19 @@ std::expected<void, StarException> CraftingPane::craft(int count) {
       return std::unexpected(std::move(recipeFromSelectedWidgetResult515.error()));
     auto recipe = std::move(*recipeFromSelectedWidgetResult515);
 
-    {
-      bool condition517 = static_cast<bool>(!m_player->isAdmin());
-      if (condition517) {
-        auto consumeIngredientsResult516 = consumeIngredients(recipe, count);
-        if (!consumeIngredientsResult516)
-          return std::unexpected(std::move(consumeIngredientsResult516.error()));
-        condition517 = static_cast<bool>(!std::move(*consumeIngredientsResult516));
-      }
-      if (condition517) {
-        stopCrafting();
-        return {};
-      }
+    auto database = root.itemDatabase();
+    if (!database)
+      return std::unexpected(std::move(database.error()));
+    if (count <= 0) {
+      stopCrafting();
+      return {};
     }
-
-    ItemDescriptor itemDescriptor = recipe.output;
-    int remainingItemCount = itemDescriptor.count() * count;
-    while (remainingItemCount > 0) {
-      auto itemDatabaseResult518 = root.itemDatabase();
-      if (!itemDatabaseResult518)
-        return std::unexpected(std::move(itemDatabaseResult518.error()));
-      auto itemResult519 = std::move(*itemDatabaseResult518)->item(itemDescriptor.singular().multiply(remainingItemCount));
-      if (!itemResult519)
-        return std::unexpected(std::move(itemResult519.error()));
-      auto craftedItem = std::move(*itemResult519);
-      remainingItemCount -= craftedItem->count();
-      auto giveItemResult520 = m_player->giveItem(craftedItem);
-      if (!giveItemResult520)
-        return std::unexpected(std::move(giveItemResult520.error()));
-
-      for (auto&& collectable : recipe.collectables) {
-        auto collectable_added = m_player->add_collectable(collectable.first, collectable.second);
-        if (!collectable_added)
-          return std::unexpected(std::move(collectable_added.error()));
-      }
+    auto crafted = (*database)->craft_recipe(*m_player, recipe, static_cast<std::uint64_t>(count));
+    if (!crafted)
+      return std::unexpected(std::move(crafted.error()));
+    if (!*crafted) {
+      stopCrafting();
+      return updateAvailableRecipes();
     }
 
     m_blueprints->markAsRead(recipe.output.singular());
@@ -1560,8 +1466,10 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
         if (!itemSharedResult545)
           return std::unexpected(std::move(itemSharedResult545.error()));
         auto recipeItem = std::move(*itemSharedResult545);
-        int itemPrice = static_cast<int>(recipeItem->price() * printFactor);
-        recipe.currencyInputs["money"] = itemPrice;
+        auto price = static_cast<double>(recipeItem->price()) * printFactor;
+        if (!(price >= 0 && price < 0x1p64))
+          return std::unexpected(RecipeException("Printer currency requirement exceeds supported range"));
+        recipe.currencyInputs["money"] = static_cast<std::uint64_t>(price);
         recipe.outputRarity = recipeItem->rarity();
         recipe.duration = printTime;
         auto guiFilterStringResult546 = ItemDatabase::guiFilterString(recipeItem);
@@ -1710,26 +1618,23 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
 }
 
 std::expected<int, StarException> CraftingPane::maxCraft() {
-  if (m_player->isAdmin())
-    return m_maxSpinCount;
-  auto itemDatabaseResult564 = context().root().itemDatabase();
-  if (!itemDatabaseResult564)
-    return std::unexpected(std::move(itemDatabaseResult564.error()));
-  auto itemDb = std::move(*itemDatabaseResult564);
-  int res = 0;
-  if (m_guiList->selectedItem() != npos && m_guiList->selectedItem() < m_recipes.size()) {
-    auto availableItemsResult565 = m_player->inventory()->availableItems();
-    if (!availableItemsResult565)
-      return std::unexpected(std::move(availableItemsResult565.error()));
-    HashMap<ItemDescriptor, std::uint64_t> normalizedBag = std::move(*availableItemsResult565);
-    auto recipeFromSelectedWidgetResult566 = recipeFromSelectedWidget();
-    if (!recipeFromSelectedWidgetResult566)
-      return std::unexpected(std::move(recipeFromSelectedWidgetResult566.error()));
-    auto selectedRecipe = std::move(*recipeFromSelectedWidgetResult566);
-    res = itemDb->maxCraftableInBag(normalizedBag, m_player->inventory()->availableCurrencies(), selectedRecipe);
-    res = std::min(res, m_maxSpinCount);
+  bool admin = m_player->isAdmin();
+  if (m_guiList->selectedItem() >= m_recipes.size())
+    return admin ? m_maxSpinCount : 0;
+  auto recipe = recipeFromSelectedWidget();
+  if (!recipe)
+    return std::unexpected(std::move(recipe.error()));
+  std::uint64_t limit = std::numeric_limits<std::uint64_t>::max();
+  if (admin) {
+    if (recipe->output.count())
+      limit /= recipe->output.count();
+  } else {
+    auto stock = m_player->inventory()->availableItems();
+    if (!stock)
+      return std::unexpected(std::move(stock.error()));
+    limit = ItemDatabase::max_craftable_in_bag(*stock, m_player->inventory()->availableCurrencies(), *recipe);
   }
-  return res;
+  return static_cast<int>(std::min<std::uint64_t>(limit, std::max(0, m_maxSpinCount)));
 }
 
 std::expected<ItemRecipe, StarException> CraftingPane::recipeFromSelectedWidget() const {

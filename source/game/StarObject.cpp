@@ -445,8 +445,8 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
       if (!operation2)
         return std::unexpected(std::move(operation2.error()));
     } else if (auto orientation = currentOrientation()) {
-      if (orientation->directionAffinity)
-        m_direction.set(*orientation->directionAffinity);
+      if (orientation->direction_affinity)
+        m_direction.set(*orientation->direction_affinity);
       m_materialSpaces.set(orientation->materialSpaces);
     }
     m_orientationDrawablesCache.reset();
@@ -792,7 +792,7 @@ std::expected<void, StarException> Object::updateOrientation() {
   if (!currentWorldResult)
     return std::unexpected(std::move(currentWorldResult.error()));
   auto& currentWorld = currentWorldResult->get();
-  auto indexResult = m_config->findValidOrientation(currentWorld, tilePosition(), m_direction.get());
+  auto indexResult = m_config->find_valid_orientation(currentWorld, tilePosition(), m_direction.get());
   if (!indexResult)
     return std::unexpected(std::move(indexResult.error()));
   auto index = std::move(*indexResult);
@@ -800,8 +800,8 @@ std::expected<void, StarException> Object::updateOrientation() {
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
   if (auto orientation = currentOrientation()) {
-    if (orientation->directionAffinity)
-      m_direction.set(*orientation->directionAffinity);
+    if (orientation->direction_affinity)
+      m_direction.set(*orientation->direction_affinity);
     m_materialSpaces.set(orientation->materialSpaces);
   }
   resetEmissionTimers();
@@ -1331,7 +1331,7 @@ std::expected<List<Drawable>, StarException> Object::cursorHintDrawables() const
   List<Drawable> result;
   auto const& orientations = getOrientations();
   for (std::size_t i = 0; i < orientations.size(); ++i) {
-    if (orientations[i]->directionAffinity && *orientations[i]->directionAffinity == m_direction.get()) {
+    if (orientations[i]->direction_affinity && *orientations[i]->direction_affinity == m_direction.get()) {
       auto drawablesResult = orientationDrawables(i);
       if (!drawablesResult)
         return std::unexpected(std::move(drawablesResult.error()));

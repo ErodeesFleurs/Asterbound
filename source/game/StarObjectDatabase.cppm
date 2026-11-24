@@ -122,7 +122,7 @@ struct ObjectOrientation {
   // otherwise all anchors must be valid
   bool anchorAny;
 
-  std::optional<Direction> directionAffinity;
+  std::optional<Direction> direction_affinity;
 
   // Optional list of material spaces
   List<MaterialSpace> materialSpaces;
@@ -151,7 +151,7 @@ struct ObjectOrientation {
 struct ObjectConfig {
   // Returns the index of the best valid orientation.  If no orientations are
   // valid, returns npos
-  [[nodiscard]] std::expected<std::size_t, StarException> findValidOrientation(World const& world, Vec2I const& position, std::optional<Direction> directionAffinity = std::optional<Direction>()) const;
+  [[nodiscard]] std::expected<std::size_t, StarException> find_valid_orientation(World const& world, Vec2I const& position, std::optional<Direction> direction_affinity = std::optional<Direction>()) const;
 
   String path;
   // The JSON values that were used to configure this Object

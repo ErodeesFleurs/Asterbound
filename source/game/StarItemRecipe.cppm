@@ -2,6 +2,7 @@ module;
 import std;
 import star.string;
 import star.list;
+import star.map;
 import star.format;
 import star.text_formatter;
 import star.hash;
@@ -18,6 +19,12 @@ struct RecipeExceptionTag {
   static constexpr std::string_view name() { return "RecipeException"; }
 };
 using RecipeException = StarError<RecipeExceptionTag, StarException>;
+
+struct RecipeStock {
+  void add(ItemDescriptor const& item);
+  StringMap<std::uint64_t> by_name;
+  HashMap<ItemDescriptor, std::uint64_t> by_parameters;
+};
 
 struct ItemRecipe {
   friend std::expected<void, StarException> write_text(TextBuffer& output, ItemRecipe const& recipe);
@@ -37,7 +44,7 @@ struct ItemRecipe {
   Rarity outputRarity;
   String guiFilterString;
   StringMap<String> collectables;
-  bool matchInputParameters;
+  bool matchInputParameters = false;
 };
 
 template <>
@@ -61,6 +68,7 @@ export namespace Star {
 export namespace Star {
   using ::Star::RecipeExceptionTag;
   using ::Star::RecipeException;
+  using ::Star::RecipeStock;
   using ::Star::ItemRecipe;
   using ::Star::ValueHash;
   using ::Star::write_text;

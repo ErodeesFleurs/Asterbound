@@ -1127,7 +1127,7 @@ namespace Star {
     if (auto tail_terminated = leaf_buffer.write<BlockIndex>(invalid_block_index); !tail_terminated)
       return std::unexpected(std::move(tail_terminated.error()));
 
-    if (auto staged = parent.update_block(current_leaf_block, leaf_buffer.data()); !staged)
+    if (auto staged = parent.update_block(current_leaf_block, leaf_buffer.take_data()); !staged)
       return std::unexpected(std::move(staged.error()));
 
     return leaf->self;
@@ -1316,7 +1316,7 @@ namespace Star {
     return free_index_block;
   }
 
-  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::write_free_index_block(BlockIndex block_index, FreeIndexBlock index_block) {
+  [[nodiscard]] std::expected<void, StarException> BTreeDatabase::write_free_index_block(BlockIndex block_index, FreeIndexBlock const& index_block) {
     // Preserve old padding and acquire the complete old payload before staging
     // any fields, exactly as the first partial write previously did.
     auto block = read_block(block_index);
@@ -1522,62 +1522,32 @@ namespace Star {
     }
 
     if (!m_available_blocks.empty()) {
-
-      // First, read the existing head FreeIndexBlock, if it exists
-      FreeIndexBlock index_block = FreeIndexBlock{.next_free_block = invalid_block_index, .free_blocks = {}};
-
-      auto new_block = [&]() -> std::expected<BlockIndex, StarException> {
-        if (!m_available_blocks.empty())
-          return m_available_blocks.take_first();
-        return make_end_block();
-      };
-
-      if (m_head_free_index_block != invalid_block_index) {
-        auto free_index = read_free_index_block(m_head_free_index_block);
-        if (!free_index) return std::unexpected(std::move(free_index.error()));
-        index_block = (*free_index);
-      } else {
-        auto head_reserved = new_block();
-        if (!head_reserved) return std::unexpected(std::move(head_reserved.error()));
-        m_head_free_index_block = (*head_reserved);
+      auto head = m_head_free_index_block;
+      FreeIndexBlock index_block{.next_free_block = invalid_block_index, .free_blocks = {}};
+      if (head != invalid_block_index) {
+        auto existing = read_free_index_block(head);
+        if (!existing) return std::unexpected(std::move(existing.error()));
+        index_block = std::move(*existing);
       }
 
-      // Then, we need to write all the available blocks to the FreeIndexBlock chain.
-      while (true) {
-
-        // If we have room on our current FreeIndexBlock, just add a block to it.
-        if (!m_available_blocks.empty() && index_block.free_blocks.size() < max_free_index_length()) {
-
-          auto available = m_available_blocks.take_first();
-          if (!available) return std::unexpected(std::move(available.error()));
-          BlockIndex to_add = (*available);
-          index_block.free_blocks.push_back(to_add);
-        } else {
-
-          // Update the current head free index block.
-          if (auto free_index_written = write_free_index_block(m_head_free_index_block, index_block); !free_index_written)
-            return std::unexpected(std::move(free_index_written.error()));
-
-          // If we're out of blocks to free, then we're done
-          if (m_available_blocks.empty()) {
-            break;
-          }
-
-          // If our head free index block is full, then
-          // need to write a new head free index block.
-          if (index_block.free_blocks.size() >= max_free_index_length()) {
-
-            index_block.next_free_block = m_head_free_index_block;
-            index_block.free_blocks.clear();
-
-            auto head_reserved = new_block();
-            if (!head_reserved) return std::unexpected(std::move(head_reserved.error()));
-            m_head_free_index_block = (*head_reserved);
-            if (auto free_index_written = write_free_index_block(m_head_free_index_block, index_block); !free_index_written)
-              return std::unexpected(std::move(free_index_written.error()));
-
-          }
+      auto capacity = max_free_index_length();
+      while (!m_available_blocks.empty()) {
+        auto first = m_available_blocks.begin();
+        auto next = first;
+        if (head == invalid_block_index || index_block.free_blocks.size() >= capacity) {
+          index_block.next_free_block = head;
+          head = *next++;
+          index_block.free_blocks.clear();
         }
+        while (next != m_available_blocks.end() && index_block.free_blocks.size() < capacity)
+          index_block.free_blocks.push_back(*next++);
+
+        // Until the padding read and serialization succeed, these blocks
+        // remain available and the previous (possibly staged) head is valid.
+        if (auto staged = write_free_index_block(head, index_block); !staged)
+          return std::unexpected(std::move(staged.error()));
+        m_head_free_index_block = head;
+        m_available_blocks.erase(first, next);
       }
     }
 

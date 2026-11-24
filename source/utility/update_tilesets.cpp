@@ -299,8 +299,8 @@ std::expected<void, StarException> defineObjectOrientation(Root& root, TilesetUp
       {"imagePositionX", Star::to_string(imagePosition.x())},
       {"imagePositionY", Star::to_string(imagePosition.y())},
       {"//shortdescription", *shortDescription}, {"//description", *description}};
-  if (orientation->directionAffinity.has_value()) {
-    Direction direction = *orientation->directionAffinity;
+  if (orientation->direction_affinity.has_value()) {
+    Direction direction = *orientation->direction_affinity;
     if (orientation->flipImages)
       direction = -direction;
     auto directionName = enum_name<direction_names>(direction);

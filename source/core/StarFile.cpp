@@ -242,6 +242,16 @@ std::expected<std::shared_ptr<File>, StarException> File::open(String const& fil
   return file;
 }
 
+std::expected<std::shared_ptr<File>, StarException> File::create_new_read_write(String filename) {
+  auto file = std::make_shared<File>(std::move(filename));
+  auto handle = NativeFileHandle::open(file->m_filename, IOMode::ReadWrite, true, true);
+  if (!handle)
+    return std::unexpected(std::move(handle.error()));
+  file->m_file.reset(handle->release());
+  file->set_mode(IOMode::ReadWrite);
+  return file;
+}
+
 std::expected<ByteArray, StarException> File::read_file(String const& filename) {
   return read_file_contents<ByteArray>(filename);
 }

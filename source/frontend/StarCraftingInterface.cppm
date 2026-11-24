@@ -81,7 +81,6 @@ private:
   [[nodiscard]] std::expected<void, StarException> update(float dt) override;
   [[nodiscard]] std::expected<void, StarException> updateCraftButtons();
   [[nodiscard]] std::expected<void, StarException> updateAvailableRecipes();
-  [[nodiscard]] std::expected<bool, StarException> consumeIngredients(ItemRecipe& recipe, int count);
   void stopCrafting();
   [[nodiscard]] std::expected<void, StarException> toggleCraft();
   [[nodiscard]] std::expected<void, StarException> craft(int count);
@@ -89,7 +88,7 @@ private:
   [[nodiscard]] std::expected<void, StarException> countTextChanged();
   [[nodiscard]] std::expected<int, StarException> maxCraft();
   [[nodiscard]] std::expected<ItemRecipe, StarException> recipeFromSelectedWidget() const;
-  [[nodiscard]] std::expected<void, StarException> setupWidget(std::shared_ptr<Widget> const& widget, ItemRecipe const& recipe, HashMap<ItemDescriptor, std::uint64_t> const& normalizedBag);
+  [[nodiscard]] std::expected<void, StarException> setupWidget(std::shared_ptr<Widget> const& widget, ItemRecipe const& recipe, RecipeStock const& normalizedBag, StringMap<std::uint64_t> const& currencies);
 
   [[nodiscard]] std::expected<std::shared_ptr<Pane>, StarException> setupTooltip(ItemRecipe const& recipe);
 

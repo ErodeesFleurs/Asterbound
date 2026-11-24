@@ -6,6 +6,8 @@
 
 import std;
 import star.algorithm;
+import star.btree_database;
+import star.byte_array;
 import star.celestial_coordinate;
 import star.celestial_database;
 import star.celestial_parameters;
@@ -14,6 +16,7 @@ import star.either;
 import star.file;
 import star.format;
 import star.game_test;
+import star.io_device;
 import star.json;
 import star.list;
 import star.map;
@@ -58,6 +61,73 @@ const GameTestRegistration persistence("CelestialDatabase", "PublishesPersistenc
   ASSERT_TRUE(reopened) << reopened.error().what();
   auto close = make_scope_exit([&] { EXPECT_TRUE((*reopened)->close()); });
   check(**reopened, true);
+});
+
+const GameTestRegistration replace_incompatible("CelestialDatabase", "ReplacesIncompatibleStorageOnlyOnce", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  for (auto const& identifier : std::array{String("Celestial1"), String("Celestial2")}) {
+    SCOPED_TRACE(identifier.utf8());
+    auto directory = File::temporary_directory(root.random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto path = File::relative_to(*directory, "universe.chunks");
+    ByteArray const key(4, 'k'), value(8, 'v');
+    {
+      BTreeDatabase old(root.logger(), identifier, 4);
+      auto file = File::open(path, IOMode::ReadWrite);
+      ASSERT_TRUE(file);
+      ASSERT_TRUE(old.set_io_device(std::move(*file)));
+      ASSERT_TRUE(old.open());
+      ASSERT_TRUE(old.insert(key, value));
+      ASSERT_TRUE(old.close(true));
+    }
+    {
+      auto database = CelestialMasterDatabase::create(root, path);
+      ASSERT_TRUE(database) << database.error().what();
+      auto close = make_scope_exit([&] { EXPECT_TRUE((*database)->close()); });
+      ASSERT_TRUE((*database)->mark_persistent(CelestialCoordinate(Vec3I(1, 1, 1))));
+    }
+    auto entries = File::directory_entries(*directory);
+    ASSERT_TRUE(entries);
+    ASSERT_EQ(entries->size(), 2u);
+    auto const& backup_name = (*entries)[(*entries)[0].first == "universe.chunks" ? 1 : 0].first;
+    ASSERT_TRUE(backup_name.utf8().ends_with(".fail"));
+    {
+      BTreeDatabase backup(root.logger());
+      auto file = File::open(File::relative_to(*directory, backup_name), IOMode::Read);
+      ASSERT_TRUE(file);
+      ASSERT_TRUE(backup.set_io_device(std::move(*file)));
+      ASSERT_TRUE(backup.open());
+      EXPECT_EQ(backup.content_identifier(), identifier);
+      EXPECT_EQ(backup.key_size(), 4u);
+      auto saved = backup.find(key);
+      ASSERT_TRUE(saved && *saved);
+      EXPECT_EQ(**saved, value);
+      ASSERT_TRUE(backup.close(true));
+    }
+    {
+      BTreeDatabase replacement(root.logger());
+      auto file = File::open(path, IOMode::Read);
+      ASSERT_TRUE(file);
+      ASSERT_TRUE(replacement.set_io_device(std::move(*file)));
+      ASSERT_TRUE(replacement.open());
+      EXPECT_EQ(replacement.content_identifier(), "Celestial2");
+      EXPECT_EQ(replacement.key_size(), 32u);
+      ASSERT_TRUE(replacement.close(true));
+    }
+    auto reopened = CelestialMasterDatabase::create(root, path);
+    ASSERT_TRUE(reopened) << reopened.error().what();
+    auto close = make_scope_exit([&] { EXPECT_TRUE((*reopened)->close()); });
+    auto response = (*reopened)->respond_to_request(make_left(Vec2I(0, 0)));
+    ASSERT_TRUE(response && response->is_left());
+    EXPECT_TRUE(response->left_ref().persistent);
+    auto final_entries = File::directory_entries(*directory);
+    ASSERT_TRUE(final_entries);
+    EXPECT_EQ(final_entries->size(), 2u);
+    auto backup_exists = File::exists(File::relative_to(*directory, backup_name));
+    ASSERT_TRUE(backup_exists);
+    EXPECT_TRUE(*backup_exists);
+  }
 });
 
 #if defined(STAR_SYSTEM_LINUX) && GTEST_HAS_DEATH_TEST

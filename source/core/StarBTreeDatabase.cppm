@@ -256,7 +256,7 @@ private:
   [[nodiscard]] std::expected<void, StarException> raw_write_block(BlockIndex block_index, std::size_t block_offset, std::span<char const> block);
 
   [[nodiscard]] std::expected<FreeIndexBlock, StarException> read_free_index_block(BlockIndex block_index);
-  [[nodiscard]] std::expected<void, StarException> write_free_index_block(BlockIndex block_index, FreeIndexBlock index_block);
+  [[nodiscard]] std::expected<void, StarException> write_free_index_block(BlockIndex block_index, FreeIndexBlock const& index_block);
 
   std::uint32_t leaf_size(std::shared_ptr<LeafNode> const& leaf) const;
   std::uint32_t max_index_pointers() const;
@@ -342,6 +342,8 @@ public:
   using BTreeDatabase::content_identifier_string_size;
   using BTreeDatabase::block_size;
   using BTreeDatabase::set_block_size;
+  using BTreeDatabase::key_size;
+  [[nodiscard]] std::expected<void, StarException> reset_key_size() { return set_key_size(32); }
   using BTreeDatabase::content_identifier;
   using BTreeDatabase::set_content_identifier;
   using BTreeDatabase::index_cache_size;

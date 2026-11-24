@@ -295,49 +295,75 @@ std::expected<VersionedJson, StarException> VersioningDatabase::makeCurrentVersi
   if (!version) return std::unexpected(std::move(version.error()));
   return VersionedJson{identifier, version->get(), content, m_currentSubVersions.value(identifier)};
 }
+// A removed mod's versions are opaque metadata. Only installed identifiers
+// participate in migration; an absent version starts at zero.
+static auto first_sub_version_mismatch(StringMap<VersionNumber> const& saved,
+                                       StringMap<VersionNumber> const& required) {
+  auto entry = required.begin();
+  while (entry != required.end() && saved.value(entry->first) == entry->second)
+    ++entry;
+  return entry;
+}
 std::expected<bool, StarException> VersioningDatabase::versionedJsonCurrent(VersionedJson const& json) const {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lock_with_diagnostics(locker);
   auto version = m_currentVersions.get(json.identifier);
   if (!version) return std::unexpected(std::move(version.error()));
-  return json.version == version->get() && json.subVersions == m_currentSubVersions.value(json.identifier);
+  if (json.version != version->get()) return false;
+  auto required = m_currentSubVersions.find_ref(json.identifier);
+  return !required || first_sub_version_mismatch(json.subVersions, required->get()) == required->get().end();
 }
 std::expected<VersionedJson, StarException> VersioningDatabase::updateVersionedJson(VersionedJson const& json) const {
   return updateVersionedJson(json, std::nullopt);
 }
-std::expected<VersionedJson, StarException> VersioningDatabase::updateVersionedJson(VersionedJson const& versionedJson, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog) const {
+std::expected<VersionedJson, StarException> VersioningDatabase::updateVersionedJson(VersionedJson const& input, std::optional<std::reference_wrapper<ItemDatabase const>> item_catalog) const {
   std::unique_lock locker(m_mutex, std::defer_lock);
   lock_with_diagnostics(locker);
-  auto celestial_database = CelestialMasterDatabase::create(m_root);
-  if (!celestial_database) return std::unexpected(std::move(celestial_database.error()));
-  VersionedJson result = versionedJson;
-  auto targetVersion = m_currentVersions.maybe(versionedJson.identifier);
-  if (!targetVersion)
-    return std::unexpected(VersioningDatabaseException::format("Versioned JSON has an unregistered identifier '{}'", versionedJson.identifier));
-  LuaCallbacks celestialCallbacks;
-  auto registered = celestialCallbacks.register_callback("parameters", [&celestial_database](Json const& coordinate) -> std::expected<Json, StarException> {
-    auto coord = CelestialCoordinate::create(coordinate);
-    if (!coord) return std::unexpected(std::move(coord.error()));
-    auto parameters = (*celestial_database)->parameters(*coord);
-    if (!parameters) return std::unexpected(std::move(parameters.error()));
-    if (!*parameters)
-      return std::unexpected(VersioningDatabaseException("Missing celestial parameters in versioning script"));
-    return (*parameters)->disk_store();
-  });
-  if (!registered) return std::unexpected(std::move(registered.error()));
-  auto invokeUpdate = [&](String const& script, Json const& content) -> std::expected<Json, StarException> {
+  auto target = m_currentVersions.maybe(input.identifier);
+  if (!target)
+    return std::unexpected(VersioningDatabaseException::format("Versioned JSON has an unregistered identifier '{}'", input.identifier));
+  if (input.version > *target)
+    return std::unexpected(VersioningDatabaseException::format("VersionedJson with identifier '{}' and version {} is newer than current version of {}, cannot load", input.identifier, input.version, *target));
+  VersionedJson result = input;
+  std::shared_ptr<CelestialMasterDatabase> celestial_database;
+  std::optional<std::stop_source> lifetime;
+  auto retire = make_scope_exit([&] { if (lifetime) lifetime->request_stop(); });
+  LuaCallbacks celestial_callbacks;
+  auto install_celestial = [&](LuaContext& context) -> std::expected<void, StarException> {
+    if (!lifetime) {
+      LuaCallbacks callbacks;
+      auto registered = callbacks.register_callback("parameters", [&](Json const& coordinate) -> std::expected<Json, StarException> {
+        auto coord = CelestialCoordinate::create(coordinate);
+        if (!coord) return std::unexpected(std::move(coord.error()));
+        if (!celestial_database) {
+          auto created = CelestialMasterDatabase::create(m_root);
+          if (!created) return std::unexpected(std::move(created.error()));
+          celestial_database = std::move(*created);
+        }
+        auto parameters = celestial_database->parameters(*coord);
+        if (!parameters) return std::unexpected(std::move(parameters.error()));
+        if (!*parameters)
+          return std::unexpected(VersioningDatabaseException("Missing celestial parameters in versioning script"));
+        return (*parameters)->disk_store();
+      });
+      if (!registered) return registered;
+      celestial_callbacks = callbacks.with_lifetime(lifetime.emplace().get_token());
+    }
+    return context.set_callbacks("celestial", celestial_callbacks);
+  };
+  auto invoke_update = [&](String const& script, Json const& content) -> std::expected<Json, StarException> {
     auto context = m_luaRoot->create_context();
     if (!context) return std::unexpected(std::move(context.error()));
-    auto previousRoot = context->get("root");
-    if (!previousRoot) return std::unexpected(std::move(previousRoot.error()));
-    auto previousVersioning = context->get("versioning");
-    if (!previousVersioning) return std::unexpected(std::move(previousVersioning.error()));
+    auto previous_root = context->get("root");
+    if (!previous_root) return std::unexpected(std::move(previous_root.error()));
+    auto previous_versioning = context->get("versioning");
+    if (!previous_versioning) return std::unexpected(std::move(previous_versioning.error()));
     auto invoked = [&]() -> std::expected<Json, StarException> {
       auto removed = context->remove("root");
       if (!removed) return std::unexpected(std::move(removed.error()));
       removed = context->remove("versioning");
       if (!removed) return std::unexpected(std::move(removed.error()));
-      auto callbacks = LuaBindings::makeRootCallbacks(m_root, itemCatalog);
+      auto callbacks = LuaBindings::makeRootCallbacks(m_root, item_catalog);
       if (!callbacks) return std::unexpected(std::move(callbacks.error()));
       auto installed = context->set_callbacks("root", *callbacks);
       if (!installed) return std::unexpected(std::move(installed.error()));
@@ -345,9 +371,9 @@ std::expected<VersionedJson, StarException> VersioningDatabase::updateVersionedJ
       if (!utility) return std::unexpected(std::move(utility.error()));
       installed = context->set_callbacks("sb", *utility);
       if (!installed) return std::unexpected(std::move(installed.error()));
-      installed = context->set_callbacks("celestial", celestialCallbacks);
+      installed = install_celestial(*context);
       if (!installed) return std::unexpected(std::move(installed.error()));
-      auto versioning = makeVersioningCallbacks(itemCatalog);
+      auto versioning = makeVersioningCallbacks(item_catalog);
       if (!versioning) return std::unexpected(std::move(versioning.error()));
       installed = context->set_callbacks("versioning", *versioning);
       if (!installed) return std::unexpected(std::move(installed.error()));
@@ -360,52 +386,64 @@ std::expected<VersionedJson, StarException> VersioningDatabase::updateVersionedJ
       return context->invoke_path<Json>("update", content);
     }();
     // Both restorations run even if script execution or one restoration fails.
-    auto restoredRoot = context->set("root", *previousRoot);
-    auto restoredVersioning = context->set("versioning", *previousVersioning);
-    if (!restoredRoot) return std::unexpected(std::move(restoredRoot.error()));
-    if (!restoredVersioning) return std::unexpected(std::move(restoredVersioning.error()));
+    auto restored_root = context->set("root", *previous_root);
+    auto restored_versioning = context->set("versioning", *previous_versioning);
+    if (!restored_root) return std::unexpected(std::move(restored_root.error()));
+    if (!restored_versioning) return std::unexpected(std::move(restored_versioning.error()));
     return invoked;
   };
-  auto updated = [&]() -> std::expected<void, StarException> {
-    auto identifier = versionedJson.identifier.to_lower();
-    if (!identifier) return std::unexpected(std::move(identifier.error()));
-    for (auto const& script : m_versionUpdateScripts.value(*identifier)) {
-      for (auto const& subScripts : m_subVersionUpdateScripts.value(*identifier).value(result.version)) {
-        auto targetSubVersion = m_currentSubVersions.value(result.identifier).value(subScripts.first);
-        for (auto const& subScript : subScripts.second) {
-          if (result.subVersions.value(subScripts.first) >= targetSubVersion) break;
-          if (subScript.fromVersion == result.subVersions.value(subScripts.first)) {
-            auto content = invokeUpdate(subScript.script, result.content);
-            if (!content) return std::unexpected(std::move(content.error()));
-            result.content = std::move(*content);
-            if (!result.content)
-              return std::unexpected(VersioningDatabaseException::format("Could not bring versionedJson with identifier '{}' and version {} forward to current version of {}, conversion script of sub identifier '{}' from {} to {} returned null (un-upgradeable)", versionedJson.identifier, result.version, Star::output_optional(targetVersion), subScripts.first, subScript.fromVersion, subScript.toVersion));
-            auto logged = m_root.logger().debug("Brought versionedJson '{}' sub identifier '{}' from version {} to {}", versionedJson.identifier, subScripts.first, result.subVersions.value(subScripts.first), subScript.toVersion);
-            if (!logged) return std::unexpected(std::move(logged.error()));
-            result.subVersions[subScripts.first] = subScript.toVersion;
-          }
-        }
-      }
-      if (result.version >= *targetVersion) break;
-      if (script.fromVersion == result.version) {
-        auto content = invokeUpdate(script.script, result.content);
-        if (!content) return std::unexpected(std::move(content.error()));
-        result.content = std::move(*content);
-        if (!result.content)
-          return std::unexpected(VersioningDatabaseException::format("Could not bring versionedJson with identifier '{}' and version {} forward to current version of {}, conversion script from {} to {} returned null (un-upgradeable)", versionedJson.identifier, result.version, Star::output_optional(targetVersion), script.fromVersion, script.toVersion));
-        auto logged = m_root.logger().debug("Brought versionedJson '{}' from version {} to {}", versionedJson.identifier, result.version, script.toVersion);
-        if (!logged) return std::unexpected(std::move(logged.error()));
-        result.version = script.toVersion;
+  auto identifier = input.identifier.to_lower();
+  if (!identifier) return std::unexpected(std::move(identifier.error()));
+  auto required = m_currentSubVersions.find_ref(input.identifier);
+  auto sub_scripts = m_subVersionUpdateScripts.find_ref(*identifier);
+  auto apply_script = [&](VersionUpdateScript const& script) -> std::expected<void, StarException> {
+    auto content = invoke_update(script.script, result.content);
+    if (!content)
+      return std::unexpected(VersioningDatabaseException(Star::format("Error upgrading '{}' at version {} using '{}'", input.identifier, result.version, script.script), std::move(content.error())));
+    if (!*content)
+      return std::unexpected(VersioningDatabaseException::format("Conversion script '{}' for '{}' returned null (un-upgradeable)", script.script, input.identifier));
+    result.content = std::move(*content);
+    return m_root.logger().debug("Brought versionedJson '{}' forward using '{}'", input.identifier, script.script);
+  };
+  auto apply_sub_versions = [&]() -> std::expected<void, StarException> {
+    if (!required || !sub_scripts) return {};
+    auto groups = sub_scripts->get().find_ref(result.version);
+    if (!groups) return {};
+    for (auto const& [name, scripts] : groups->get()) {
+      auto wanted = required->get().maybe(name);
+      if (!wanted) continue;
+      auto current = result.subVersions.value(name);
+      for (auto const& script : scripts) {
+        if (current >= *wanted) break;
+        if (script.fromVersion != current || script.toVersion > *wanted) continue;
+        auto applied = apply_script(script);
+        if (!applied) return applied;
+        current = result.subVersions[name] = script.toVersion;
       }
     }
     return {};
-  }();
-  if (!updated)
-    return std::unexpected(VersioningDatabaseException(Star::format("Could not bring versionedJson with identifier '{}' and version {} forward to current version of {}", versionedJson.identifier, result.version, Star::output_optional(targetVersion)), std::move(updated.error())));
-  if (result.version > *targetVersion)
-    return std::unexpected(VersioningDatabaseException::format("VersionedJson with identifier '{}' and version {} is newer than current version of {}, cannot load", versionedJson.identifier, result.version, Star::output_optional(targetVersion)));
-  if (result.version != *targetVersion)
-    return std::unexpected(VersioningDatabaseException::format("Could not bring VersionedJson with identifier '{}' and version {} forward to current version of {}, best version was {}", versionedJson.identifier, result.version, Star::output_optional(targetVersion), result.version));
+  };
+
+  auto applied = apply_sub_versions();
+  if (!applied) return std::unexpected(std::move(applied.error()));
+  if (auto scripts = m_versionUpdateScripts.find_ref(*identifier)) {
+    for (auto const& script : scripts->get()) {
+      if (result.version >= *target) break;
+      if (script.fromVersion != result.version || script.toVersion > *target) continue;
+      applied = apply_script(script);
+      if (!applied) return std::unexpected(std::move(applied.error()));
+      result.version = script.toVersion;
+      applied = apply_sub_versions();
+      if (!applied) return std::unexpected(std::move(applied.error()));
+    }
+  }
+  if (result.version != *target)
+    return std::unexpected(VersioningDatabaseException::format("Could not bring VersionedJson '{}' from version {} to {}, reached {}", input.identifier, input.version, *target, result.version));
+  if (required) {
+    auto missing = first_sub_version_mismatch(result.subVersions, required->get());
+    if (missing != required->get().end())
+      return std::unexpected(VersioningDatabaseException::format("VersionedJson '{}' at version {} requires sub identifier '{}' version {}, reached {}", input.identifier, result.version, missing->first, missing->second, result.subVersions.value(missing->first)));
+  }
   return result;
 }
 std::expected<Json, StarException> VersioningDatabase::loadVersionedJson(VersionedJson const& json, String const& expectedIdentifier) const {

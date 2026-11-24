@@ -42,6 +42,27 @@ std::shared_ptr<ObjectConfig> unanchored_physics_config() {
   return config;
 }
 
+const GameTestRegistration preferred_orientation("ObjectDatabase", "PreferredOrientationFallback", [](GameTest& fixture) {
+  auto storage = File::ephemeral_file(fixture.root().random());
+  ASSERT_TRUE(storage);
+  auto world = WorldServer::create(fixture.root(), Vec2U(128, 128), *storage);
+  ASSERT_TRUE(world) << world.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
+  ObjectConfig config{};
+  auto neutral = std::make_shared<ObjectOrientation>();
+  auto preferred = std::make_shared<ObjectOrientation>();
+  preferred->direction_affinity = Direction::Right;
+  config.orientations = {neutral, preferred};
+  Vec2I position(64, 64);
+  EXPECT_EQ(config.find_valid_orientation(**world, position), 0u);
+  EXPECT_EQ(config.find_valid_orientation(**world, position, Direction::Right), 1u);
+  // An empty world's background cannot satisfy the preferred candidate's anchor.
+  ObjectOrientation::Anchor anchor{};
+  anchor.layer = TileLayer::Background;
+  preferred->anchors.push_back(anchor);
+  EXPECT_EQ(config.find_valid_orientation(**world, position, Direction::Right), 0u);
+});
+
 const GameTestRegistration legacy_orientation_order("ObjectDatabase", "LegacyOrientationExpansion", [](GameTest& fixture) {
   auto parse = [&](Json const& entries) {
     return ObjectDatabase::parseOrientations(fixture.root(), "/test.object", entries, JsonObject());

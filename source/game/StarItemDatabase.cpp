@@ -44,6 +44,8 @@ import star.item;
 import star.item_database;
 import star.item_descriptor;
 import star.item_recipe;
+import star.player;
+import star.player_inventory;
 import star.asset_source;
 import star.assets;
 import star.root_base;
@@ -143,51 +145,43 @@ std::expected<std::optional<Ret>, StarException> invokeItemScript(LuaBaseCompone
 
 }// namespace
 
-std::uint64_t ItemDatabase::getCountOfItem(List<std::shared_ptr<Item>> const& bag, ItemDescriptor const& item, bool exactMatch) {
-  auto normalizedBag = normalizeBag(bag);
-  return getCountOfItem(normalizedBag, item, exactMatch);
+std::uint64_t ItemDatabase::get_count_of_item(List<std::shared_ptr<Item>> const& bag, ItemDescriptor const& item, bool exactMatch) {
+  auto normalizedBag = normalize_bag(bag);
+  return get_count_of_item(normalizedBag, item, exactMatch);
 }
 
-std::uint64_t ItemDatabase::getCountOfItem(HashMap<ItemDescriptor, std::uint64_t> const& bag, ItemDescriptor const& item, bool exactMatch) {
-  ItemDescriptor matchItem = exactMatch ? item.singular() : ItemDescriptor(item.name(), 1, JsonObject(), {});
-  auto found = bag.find(matchItem);
-  return found == bag.end() ? 0 : found->second;
+std::uint64_t ItemDatabase::get_count_of_item(RecipeStock const& bag, ItemDescriptor const& item, bool exactMatch) {
+  return exactMatch ? bag.by_parameters.value(item.singular(), 0) : bag.by_name.value(item.name(), 0);
 }
 
-HashMap<ItemDescriptor, std::uint64_t> ItemDatabase::normalizeBag(List<std::shared_ptr<Item>> const& bag) {
-  HashMap<ItemDescriptor, std::uint64_t> normalizedBag;
+RecipeStock ItemDatabase::normalize_bag(List<std::shared_ptr<Item>> const& bag) {
+  RecipeStock stock;
   for (auto const& item : bag) {
-    if (!item)
-      continue;
-
-    normalizedBag[ItemDescriptor(item->name(), 1, JsonObject(), {})] += item->count();
-
-    if (item->parameters() != Json(JsonObject()))
-      normalizedBag[item->descriptor().singular()] += item->count();
+    if (item)
+      stock.add(item->descriptor());
   }
-
-  return normalizedBag;
+  return stock;
 }
 
-HashSet<ItemRecipe> ItemDatabase::recipesFromSubset(HashMap<ItemDescriptor, std::uint64_t> const& normalizedBag, StringMap<std::uint64_t> const& availableCurrencies, HashSet<ItemRecipe> const& subset) {
+HashSet<ItemRecipe> ItemDatabase::recipesFromSubset(RecipeStock const& normalizedBag, StringMap<std::uint64_t> const& availableCurrencies, HashSet<ItemRecipe> const& subset) {
   HashSet<ItemRecipe> res;
   for (auto const& recipe : subset) {
     // add this recipe if we can make it.
-    if (canMakeRecipe(recipe, normalizedBag, availableCurrencies))
+    if (can_make_recipe(recipe, normalizedBag, availableCurrencies))
       res.add(recipe);
   }
 
   return res;
 }
 
-HashSet<ItemRecipe> ItemDatabase::recipesFromSubset(HashMap<ItemDescriptor, std::uint64_t> const& normalizedBag, StringMap<std::uint64_t> const& availableCurrencies,
+HashSet<ItemRecipe> ItemDatabase::recipesFromSubset(RecipeStock const& normalizedBag, StringMap<std::uint64_t> const& availableCurrencies,
     HashSet<ItemRecipe> const& subset, StringSet const& allowedTypes) {
   HashSet<ItemRecipe> res;
   for (auto const& recipe : subset) {
     // is it the right kind of recipe for this check ?
     if (recipe.groups.has_intersection(allowedTypes) || allowedTypes.empty() || recipe.groups.empty()) {
       // do we have the ingredients to make it.
-      if (canMakeRecipe(recipe, normalizedBag, availableCurrencies)) {
+      if (can_make_recipe(recipe, normalizedBag, availableCurrencies)) {
         res.add(recipe);
       }
     }
@@ -206,19 +200,34 @@ std::expected<String, StarException> ItemDatabase::guiFilterString(std::shared_p
   return split->join("");
 }
 
-bool ItemDatabase::canMakeRecipe(ItemRecipe const& recipe, HashMap<ItemDescriptor, std::uint64_t> const& availableIngredients, StringMap<std::uint64_t> const& availableCurrencies) {
-  for (auto const& p : recipe.currencyInputs) {
-    if (availableCurrencies.value(p.first, 0) < p.second)
-      return false;
+std::expected<bool, StarException> ItemDatabase::craft_recipe(Player& player, ItemRecipe const& recipe, std::uint64_t batches) const {
+  if (!batches || recipe.output.count() > std::numeric_limits<std::uint64_t>::max() / batches)
+    return false;
+  if (!player.isAdmin()) {
+    auto consumed = player.inventory()->consume_recipe(recipe, batches);
+    if (!consumed || !*consumed)
+      return consumed;
   }
-
-  for (auto const& input : recipe.inputs) {
-    ItemDescriptor matchInput = recipe.matchInputParameters ? input.singular() : ItemDescriptor(input.name(), 1, JsonObject(), {});
-    if (availableIngredients.value(matchInput) < input.count())
-      return false;
+  auto remaining = recipe.output.count() * batches;
+  while (remaining) {
+    auto product = item(recipe.output.withCount(remaining));
+    if (!product)
+      return std::unexpected(std::move(product.error()));
+    if (!*product || !(*product)->count() || (*product)->count() > remaining)
+      return std::unexpected(RecipeException("Invalid crafted stack size"));
+    remaining -= (*product)->count();
+    if (auto given = player.giveItem(*product); !given)
+      return std::unexpected(std::move(given.error()));
+    for (auto const& [collection, name] : recipe.collectables) {
+      if (auto added = player.add_collectable(collection, name); !added)
+        return std::unexpected(std::move(added.error()));
+    }
   }
-
   return true;
+}
+
+bool ItemDatabase::can_make_recipe(ItemRecipe const& recipe, RecipeStock const& availableIngredients, StringMap<std::uint64_t> const& availableCurrencies) {
+  return max_craftable_in_bag(availableIngredients, availableCurrencies, recipe) != 0;
 }
 
 ItemDatabase::ItemDatabase(Root& root) : m_root(root), m_itemCache(root.random()) {}
@@ -451,49 +460,62 @@ HashSet<ItemRecipe> ItemDatabase::recipesForOutputItem(String itemName) const {
 }
 
 HashSet<ItemRecipe> ItemDatabase::recipesFromBagContents(List<std::shared_ptr<Item>> const& bag, StringMap<std::uint64_t> const& availableCurrencies) const {
-  auto normalizedBag = normalizeBag(bag);
+  auto normalizedBag = normalize_bag(bag);
   return recipesFromBagContents(normalizedBag, availableCurrencies);
 }
 
-HashSet<ItemRecipe> ItemDatabase::recipesFromBagContents(HashMap<ItemDescriptor, std::uint64_t> const& bag, StringMap<std::uint64_t> const& availableCurrencies) const {
+HashSet<ItemRecipe> ItemDatabase::recipesFromBagContents(RecipeStock const& bag, StringMap<std::uint64_t> const& availableCurrencies) const {
   return recipesFromSubset(bag, availableCurrencies, m_recipes);
 }
 
 HashSet<ItemRecipe> ItemDatabase::recipesFromBagContents(List<std::shared_ptr<Item>> const& bag, StringMap<std::uint64_t> const& availableCurrencies, StringSet const& allowedTypes) const {
-  auto normalizedBag = normalizeBag(bag);
+  auto normalizedBag = normalize_bag(bag);
   return recipesFromBagContents(normalizedBag, availableCurrencies, allowedTypes);
 }
 
-HashSet<ItemRecipe> ItemDatabase::recipesFromBagContents(HashMap<ItemDescriptor, std::uint64_t> const& bag, StringMap<std::uint64_t> const& availableCurrencies, StringSet const& allowedTypes) const {
+HashSet<ItemRecipe> ItemDatabase::recipesFromBagContents(RecipeStock const& bag, StringMap<std::uint64_t> const& availableCurrencies, StringSet const& allowedTypes) const {
   return recipesFromSubset(bag, availableCurrencies, m_recipes, allowedTypes);
 }
 
-std::uint64_t ItemDatabase::maxCraftableInBag(List<std::shared_ptr<Item>> const& bag, StringMap<std::uint64_t> const& availableCurrencies, ItemRecipe const& recipe) const {
-  auto normalizedBag = normalizeBag(bag);
+std::uint64_t ItemDatabase::max_craftable_in_bag(List<std::shared_ptr<Item>> const& bag, StringMap<std::uint64_t> const& availableCurrencies, ItemRecipe const& recipe) const {
+  auto normalizedBag = normalize_bag(bag);
 
-  return maxCraftableInBag(normalizedBag, availableCurrencies, recipe);
+  return max_craftable_in_bag(normalizedBag, availableCurrencies, recipe);
 }
 
-std::uint64_t ItemDatabase::maxCraftableInBag(HashMap<ItemDescriptor, std::uint64_t> const& bag, StringMap<std::uint64_t> const& availableCurrencies, ItemRecipe const& recipe) const {
-  std::uint64_t res = std::numeric_limits<std::uint64_t>::max();
-
-  for (auto const& p : recipe.currencyInputs) {
-    std::uint64_t available = availableCurrencies.value(p.first, 0);
-    if (available == 0)
-      return 0;
-    else if (p.second > 0)
-      res = std::min(available / p.second, res);
+std::uint64_t ItemDatabase::max_craftable_in_bag(RecipeStock const& stock, StringMap<std::uint64_t> const& currencies, ItemRecipe const& recipe) {
+  auto limit = std::numeric_limits<std::uint64_t>::max();
+  if (recipe.output.count())
+    limit /= recipe.output.count();
+  for (auto const& [name, amount] : recipe.currencyInputs) {
+    if (amount)
+      limit = std::min(limit, currencies.value(name, 0) / amount);
   }
-
-  for (auto const& input : recipe.inputs) {
-    auto found = bag.find(input.singular());
-    if (found == bag.end())
-      return 0;
-    else if (input.count() > 0)
-      res = std::min(found->second / input.count(), res);
+  if (!limit || recipe.inputs.empty())
+    return limit;
+  if (recipe.inputs.size() == 1) {
+    auto const& input = recipe.inputs.front();
+    return input.count() ? std::min(limit, get_count_of_item(stock, input, recipe.matchInputParameters) / input.count()) : limit;
   }
-
-  return res;
+  auto aggregate = [&](auto const& available, std::invocable<ItemDescriptor const&> auto key) {
+    std::remove_cvref_t<decltype(available)> required;
+    for (auto const& input : recipe.inputs) {
+      if (!input.count())
+        continue;
+      auto&& id = key(input);
+      auto& amount = required[id];
+      if (input.count() > std::numeric_limits<std::uint64_t>::max() - amount)
+        return std::uint64_t{0};
+      amount += input.count();
+      limit = std::min(limit, available.value(id, 0) / amount);
+      if (!limit)
+        break;
+    }
+    return limit;
+  };
+  if (recipe.matchInputParameters)
+    return aggregate(stock.by_parameters, [](ItemDescriptor const& input) { return input.singular(); });
+  return aggregate(stock.by_name, [](ItemDescriptor const& input) -> String const& { return input.name(); });
 }
 
 ItemRecipe ItemDatabase::getPreciseRecipeForMaterials(String const& group, List<std::shared_ptr<Item>> const& bag, StringMap<std::uint64_t> const& availableCurrencies) const {
@@ -552,7 +574,11 @@ std::expected<ItemRecipe, StarException> ItemDatabase::parseRecipe(Json const& c
         if (!shared)
           return std::unexpected(std::move(shared.error()));
         auto currencyItem = as<CurrencyItem>(*shared);
-        res.currencyInputs[currencyItem->currencyType()] += currencyItem->totalValue();
+        auto& total = res.currencyInputs[currencyItem->currencyType()];
+        auto value = currencyItem->currencyValue();
+        if (value && id->count() > (std::numeric_limits<std::uint64_t>::max() - total) / value)
+          return std::unexpected(RecipeException("Currency requirement exceeds supported range"));
+        total += id->count() * value;
       } else {
         res.inputs.push_back(std::move(*id));
       }
