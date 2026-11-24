@@ -1919,16 +1919,10 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
     m_dance.tick(dt);
 
     if (m_chat_message_updated) {
-      auto emoteProcessorResult = root().emoteProcessor();
-      if (!emoteProcessorResult)
-        return std::unexpected(std::move(emoteProcessorResult.error()));
-      auto emoteProcessor = std::move(*emoteProcessorResult);
-      auto stateResult = emoteProcessor->detectEmotes(m_chat_message);
-      if (!stateResult)
-        return std::unexpected(std::move(stateResult.error()));
-      auto state = std::move(*stateResult);
-      if (state != HumanoidEmote::Idle)
-        addEmote(state);
+      auto state = EmoteProcessor::detect_chat_emote(root(), m_chat_message);
+      if (!state) return std::unexpected(std::move(state.error()));
+      if (*state != HumanoidEmote::Idle)
+        addEmote(*state);
       m_chat_message_updated = false;
     }
 

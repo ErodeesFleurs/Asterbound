@@ -868,6 +868,12 @@ std::expected<bool, StarException> NetworkedAnimator::setLocalState(String const
   return m_animatedParts.set_active_state(stateType, state, startNew, reverse);
 }
 
+std::expected<void, StarException> NetworkedAnimator::validate_local_state(String const& type, String const& state) const {
+  auto target = m_animatedParts.get_state(type, state);
+  if (!target) return std::unexpected(std::move(target.error()));
+  return {};
+}
+
 std::expected<String, StarException> NetworkedAnimator::queryState(String const& stateType, Sample const* sample) const {
   auto state = sample ? m_animatedParts.active_state(stateType, sample->m_presentation->parts) : m_animatedParts.active_state(stateType);
   if (!state) return std::unexpected(std::move(state.error()));
@@ -1003,14 +1009,15 @@ std::expected<Mat3F, StarException> NetworkedAnimator::query_group_transformatio
     if (!group) return std::unexpected(std::move(group.error()));
     auto const& value = group->get();
     auto cache = sample ? &sample->get().m_presentation->groups[value.presentationIndex] : nullptr;
-    if (cache && cache->animationDirty) {
+    bool sampled_animation = sample && !sample->get().m_presentation->parts.logical_reset;
+    if (sampled_animation && cache->animationDirty) {
       auto sampled = animationGroupTransformation(name, value, value.animationBaseTransform, &sample->get());
       if (!sampled) return std::unexpected(std::move(sampled.error()));
       cache->animationTransform = *sampled;
       cache->animationDirty = false;
     }
     auto base = sample ? cache->transform : value.affineTransform();
-    auto animation = sample ? cache->animationTransform : value.animationAffineTransform();
+    auto animation = sampled_animation ? cache->animationTransform : value.animationAffineTransform();
     mat = base * (sample ? cache->localTransform : value.localAffineTransform()) * animation * mat;
   }
   return mat;
@@ -2201,6 +2208,16 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
 
 std::expected<void, StarException> NetworkedAnimator::finishAnimations() {
   return m_animatedParts.finish_animations();
+}
+
+void NetworkedAnimator::commit_local_reset(Sample const& staged) {
+  auto const& presentation = *staged.m_presentation;
+  m_animatedParts.commit_finished_states(presentation.parts);
+  for (auto& [name, group] : m_transformationGroups)
+    group.setLocalAffineTransform(presentation.groups[group.presentationIndex].localTransform);
+  for (auto const& [name, tag] : presentation.tags)
+    if (tag.active)
+      setLocalTag(name, tag.value);
 }
 
 Mat3F NetworkedAnimator::TransformationGroup::affineTransform() const {

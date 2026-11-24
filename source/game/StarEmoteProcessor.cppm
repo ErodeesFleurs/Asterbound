@@ -7,6 +7,7 @@ import star.format;
 
 namespace Star {
 class Assets;
+class Root;
 
 
 // Keep the game-heavy Humanoid definition out of interface BMIs.
@@ -16,16 +17,18 @@ class EmoteProcessor {
 public:
   [[nodiscard]] static std::expected<std::shared_ptr<EmoteProcessor>, StarException> create(std::shared_ptr<Assets const> const& assets);
 
-  [[nodiscard]] std::expected<HumanoidEmote, StarException> detectEmotes(String const& chatter) const;
+  [[nodiscard]] std::expected<HumanoidEmote, StarException> detect_emotes(String const& chatter) const;
+  [[nodiscard]] static std::expected<HumanoidEmote, StarException> detect_chat_emote(Root& root, String const& chatter);
 
 private:
   EmoteProcessor() = default;
   struct EmoteBinding {
-    EmoteBinding() = default;
+    float length_bonus;
+    bool ascii;
     String text;
     HumanoidEmote emote{};
   };
-  List<EmoteBinding> m_emoteBindings;
+  List<EmoteBinding> m_emote_bindings;
 };
 
 }

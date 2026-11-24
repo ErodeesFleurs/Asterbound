@@ -52,62 +52,68 @@ std::expected<std::shared_ptr<EmoteProcessor>, StarException> EmoteProcessor::cr
   if (!bindings) return std::unexpected(std::move(bindings.error()));
   if (!HumanoidEmoteNames) return std::unexpected(HumanoidEmoteNames.error());
   for (auto const& binding : *bindings) {
-    auto array = binding.second.to_array();
+    auto array = binding.second.array_ptr();
     if (!array) return std::unexpected(std::move(array.error()));
-    for (auto const& text : *array) {
-      auto emote = HumanoidEmoteNames->get_left(binding.first);
-      if (!emote) return std::unexpected(std::move(emote.error()));
+    if ((*array)->empty()) continue;
+    auto emote = HumanoidEmoteNames->get_left(binding.first);
+    if (!emote) return std::unexpected(std::move(emote.error()));
+    for (auto const& text : **array) {
       auto string = text.to_string();
       if (!string) return std::unexpected(std::move(string.error()));
-      EmoteBinding value;
-      value.emote = emote->get();
-      value.text = std::move(*string);
-      result->m_emoteBindings.push_back(std::move(value));
+      auto length = string->length();
+      // Invalid needles must fail only if the old search actually inspects them.
+      float bonus = length ? static_cast<float>(*length) * 0.01f : 0.f;
+      bool ascii = length && *length == string->utf8().size();
+      result->m_emote_bindings.push_back(EmoteBinding{bonus, ascii, std::move(*string), emote->get()});
     }
   }
   return result;
 }
 
-std::expected<HumanoidEmote, StarException> EmoteProcessor::detectEmotes(String const& chatter) const {
-  auto isShouty = [](String const& text) -> std::expected<bool, StarException> {
-    int caps = 0;
-    int noCaps = 0;
-    auto begin = text.begin();
-    if (!begin) return std::unexpected(std::move(begin.error()));
-    for (auto it = *begin; it != text.end(); ++it) {
-      auto c = *it;
-      if (String::to_upper(c) != String::to_lower(c)) {
-        if (String::to_upper(c) == c)
-          caps++;
-        else
-          noCaps++;
-      }
+std::expected<HumanoidEmote, StarException> EmoteProcessor::detect_chat_emote(Root& root, String const& chatter) {
+  auto processor = root.emoteProcessor();
+  if (!processor) return std::unexpected(std::move(processor.error()));
+  return (*processor)->detect_emotes(chatter);
+}
+
+std::expected<HumanoidEmote, StarException> EmoteProcessor::detect_emotes(String const& chatter) const {
+  auto const& bytes = chatter.utf8();
+  bool ascii = true;
+  std::size_t caps = 0, lowercase = 0;
+  for (unsigned char byte : bytes) {
+    if (byte >= 128) {
+      ascii = false;
+      break;
     }
-    return caps > noCaps;
-  };
-
-  HumanoidEmote result = HumanoidEmote::Idle;
-  if (!chatter.empty()) {
-    auto shouty = isShouty(chatter);
-    if (!shouty) return std::unexpected(std::move(shouty.error()));
-    if (*shouty)
-      result = HumanoidEmote::Shouting;
-    else
-      result = HumanoidEmote::Blabbering;
+    caps += byte >= 'A' && byte <= 'Z';
+    lowercase += byte >= 'a' && byte <= 'z';
   }
-
-  float bestMatch = -1;
-
-  for (auto const& option : m_emoteBindings) {
-    auto p = chatter.find(option.text);
-    if (!p) return std::unexpected(std::move(p.error()));
-    if (*p == npos)
-      continue;
-    auto length = option.text.length();
-    if (!length) return std::unexpected(std::move(length.error()));
-    float r = *p + static_cast<float>(*length) * 0.01f;
-    if (r > bestMatch) {
-      bestMatch = r;
+  if (!ascii) {
+    auto begin = chatter.begin(); // Validates the entire message, including unmatched suffixes.
+    if (!begin) return std::unexpected(std::move(begin.error()));
+    caps = lowercase = 0;
+    for (auto it = *begin; it != chatter.end(); ++it) {
+      auto point = *it;
+      caps += point >= 'A' && point <= 'Z';
+      lowercase += point >= 'a' && point <= 'z';
+    }
+  }
+  auto result = bytes.empty() ? HumanoidEmote::Idle
+      : caps > lowercase ? HumanoidEmote::Shouting : HumanoidEmote::Blabbering;
+  float best_match = -1;
+  for (auto const& option : m_emote_bindings) {
+    std::size_t position;
+    if (ascii && option.ascii) {
+      position = bytes.find(option.text.utf8());
+    } else {
+      auto found = chatter.find(option.text);
+      if (!found) return std::unexpected(std::move(found.error()));
+      position = *found;
+    }
+    if (position == npos) continue;
+    float score = position + option.length_bonus;
+    if (score > best_match) {
+      best_match = score;
       result = option.emote;
     }
   }

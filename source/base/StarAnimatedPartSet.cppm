@@ -160,6 +160,7 @@ public:
       bool properties_valid = false;
     };
     float interpolation = 1;
+    bool logical_reset = false;
     std::vector<StateCache> states;
     std::vector<PartCache> parts;
     std::shared_ptr<JsonObject const> configuration;
@@ -270,6 +271,10 @@ public:
   [[nodiscard]] std::expected<Json, StarException> get_part_state_frame_property(String const& part_name, String const& property_name, String const& state_type, String const& state, int frame) const;
 
 private:
+  friend class NetworkedAnimator;
+  // Prepare all terminal cursors in scratch; publish only after the enclosing pose succeeds.
+  [[nodiscard]] std::expected<void, StarException> stage_finished_states(Sample& sample) const;
+  void commit_finished_states(Sample const& sample);
   struct SampleIdentity {
     SampleIdentity();
     SampleIdentity(SampleIdentity const&) : SampleIdentity() {}

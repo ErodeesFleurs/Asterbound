@@ -1207,6 +1207,84 @@ const GameTestRegistration authoredAnimationGroupSampling(
     EXPECT_NEAR(*timer, .6f, 1e-5f);
   });
 
+const GameTestRegistration emote_transaction(
+  "HumanoidRenderTest", "EmoteTransitionsAndForcedResetAreRetryable", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto root = human_animation_root(fixture, *directory);
+    ASSERT_TRUE(root) << root.error().what();
+    auto built = Humanoid::create(**root, HumanoidIdentity{}, JsonObject{{"useAnimation", true}});
+    ASSERT_TRUE(built) << built.error().what();
+    auto config = (*built)->humanoidConfig(false);
+    ASSERT_TRUE(config);
+    // Try both targets as the broken one: iteration order is not a contract.
+    for (bool break_body : {false, true}) {
+      JsonObject group{{"body", JsonArray{break_body ? Json("missing") : Json("walk"), true, true}},
+                       {"emote", JsonArray{break_body ? Json("happy") : Json("missing"), true, false}}};
+      auto broken = config->set_path("emoteAnimations.happy", group);
+      ASSERT_TRUE(broken);
+      auto made = Humanoid::create(**root, *broken);
+      ASSERT_TRUE(made) << made.error().what();
+      auto& model = **made;
+      ASSERT_TRUE(model.setIdentity(HumanoidIdentity{}));
+      ASSERT_TRUE(model.setState(Humanoid::Run));
+      ASSERT_TRUE(model.setEmoteState(HumanoidEmote::Laugh));
+      ASSERT_TRUE(model.animate(.05f, {}));
+      ASSERT_TRUE(model.animate(.06f, {}));
+      auto handle = model.networkedAnimator();
+      ASSERT_TRUE(handle);
+      {
+        auto& animator = handle->get();
+        auto before = animator.sample(0.f).stateTimer("emote");
+        auto after = animator.stateTimer("emote");
+        auto body = animator.stateTimer("body");
+        ASSERT_TRUE(before && after && body);
+        EXPECT_GT(*before, 0.f);
+        EXPECT_GT(*after, *before);
+        for (int attempt = 0; attempt < 2; ++attempt) {
+          EXPECT_FALSE(model.setEmoteState(HumanoidEmote::Happy));
+          EXPECT_EQ(model.emoteState(), HumanoidEmote::Laugh);
+          EXPECT_EQ(animator.state("emote").value(), "laugh");
+          EXPECT_EQ(animator.state("body").value(), "run");
+          EXPECT_EQ(animator.sample(0.f).stateTimer("emote").value(), *before);
+          EXPECT_EQ(animator.stateTimer("emote").value(), *after);
+          EXPECT_EQ(animator.stateTimer("body").value(), *body);
+        }
+        EXPECT_FALSE(model.setEmoteState(static_cast<HumanoidEmote>(-1)));
+      }
+
+      JsonObject repaired{{"body", JsonArray{"run", false, false}}, {"emote", JsonArray{"laugh", false, false}}};
+      ASSERT_TRUE(model.setHumanoidParameters(JsonObject{{"emoteAnimations", JsonObject{{"happy", repaired}}}}));
+      ASSERT_TRUE(model.loadAnimation());
+      auto& animator = model.networkedAnimator().value().get();
+      ASSERT_TRUE(animator.setLocalState("emote", "laugh"));
+      ASSERT_TRUE(model.animate(.05f, {}));
+      auto timer = animator.stateTimer("emote").value();
+      ASSERT_GT(timer, 0.f);
+      ASSERT_TRUE(model.setEmoteState(HumanoidEmote::Happy));
+      EXPECT_EQ(model.emoteState(), HumanoidEmote::Happy);
+      EXPECT_EQ(animator.stateTimer("emote").value(), timer); // Authored startNew=false.
+
+      // A late pose error follows both state groups and local transform writes.
+      // It must not finish or restart any logical cursor, or clear a transform.
+      ASSERT_TRUE(animator.translateLocalTransformationGroup("headRotation", {2, 3}));
+      auto transform = animator.getLocalTransformationGroup("headRotation").value();
+      auto arm = animator.parts().get("frontArm");
+      ASSERT_TRUE(arm);
+      auto& properties = arm->get().part_properties;
+      auto center = properties.get("rotationCenter").value().get();
+      properties.set("rotationCenter", false);
+      EXPECT_FALSE(model.resetAnimation());
+      EXPECT_EQ(animator.stateTimer("emote").value(), timer);
+      EXPECT_EQ(animator.getLocalTransformationGroup("headRotation").value(), transform);
+      properties.set("rotationCenter", center);
+      ASSERT_TRUE(model.resetAnimation());
+      EXPECT_EQ(animator.sample(0.f).stateTimer("emote").value(), 0.f);
+      EXPECT_EQ(animator.stateTimer("emote").value(), 0.f); // Forced restart even for the same state.
+    }
+  });
+
 const GameTestRegistration humanoidTickOwnedPose(
   "HumanoidRenderTest", "TickPoseAndFreshLightSamplesDoNotDependOnPreviousRender", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());

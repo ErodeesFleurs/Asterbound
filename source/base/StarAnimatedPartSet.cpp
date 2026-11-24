@@ -230,7 +230,8 @@ void AnimatedPartSet::prepare_sample(Sample& sample, float interpolation) const 
   sample.interpolation = std::clamp(interpolation, 0.f, 1.f);
   sample.states.resize(m_state_types.size());
   sample.parts.resize(m_parts.size());
-  bool same_configuration = sample.configuration == m_sample_configuration && sample.animator_version == m_animator_version;
+  bool same_configuration = !sample.logical_reset && sample.configuration == m_sample_configuration && sample.animator_version == m_animator_version;
+  sample.logical_reset = false;
   sample.configuration = m_sample_configuration;
   sample.animator_version = m_animator_version;
   for (auto& cache : sample.states) {
@@ -258,8 +259,10 @@ std::expected<bool, StarException> AnimatedPartSet::set_presentation_state(Strin
   auto entry = m_state_types.get(type);
   if (!entry) return std::unexpected(std::move(entry.error()));
   auto& state_type = entry->get();
-  auto fresh = freshen_active_state(state_type, std::ref(sample));
-  if (!fresh) return std::unexpected(std::move(fresh.error()));
+  if (!sample.logical_reset) {
+    auto fresh = freshen_active_state(state_type, std::ref(sample));
+    if (!fresh) return std::unexpected(std::move(fresh.error()));
+  }
   auto& active = sample.states[state_type.presentation_index].state;
   if (active.state_name == name && active.reverse == reverse && !always_start)
     return false;
@@ -430,32 +433,62 @@ std::expected<void, StarException> AnimatedPartSet::update(float dt) {
   return {};
 }
 
+static std::expected<void, StarException> finish_cursor(AnimatedPartSet::StateType const& type,
+    String& name, float& timer, std::shared_ptr<AnimatedPartSet::State const>& definition) {
+  auto remaining = type.states.size();
+  while (definition->animation_mode == AnimatedPartSet::Transition) {
+    if (remaining-- == 0)
+      return std::unexpected(AnimatedPartSetException("Cyclic animation transition"));
+    auto next = type.states.get(definition->transition_state);
+    if (!next) return std::unexpected(std::move(next.error()));
+    name = definition->transition_state;
+    timer = 0;
+    definition = next->get();
+  }
+  if (definition->animation_mode == AnimatedPartSet::End)
+    timer = definition->cycle;
+  return {};
+}
+
+std::expected<void, StarException> AnimatedPartSet::stage_finished_states(Sample& sample) const {
+  sample.logical_reset = true;
+  for (auto& part : sample.parts)
+    part.properties_valid = false;
+  for (auto const& [name, type] : m_state_types) {
+    auto& cache = sample.states[type.presentation_index];
+    cache.state.state_type_name = name;
+    cache.state.state_name = type.active_state.state_name;
+    cache.state.reverse = type.active_state.reverse;
+    cache.state.timer = type.active_state.timer;
+    cache.override_state = type.active_state_reference;
+    cache.initialized = true;
+    auto finished = finish_cursor(type, cache.state.state_name, cache.state.timer, cache.override_state);
+    if (!finished) return finished;
+  }
+  return {};
+}
+
+void AnimatedPartSet::commit_finished_states(Sample const& sample) {
+  for (auto& [name, type] : m_state_types) {
+    auto const& cache = sample.states[type.presentation_index];
+    type.active_state.state_name = cache.state.state_name;
+    type.active_state.reverse = cache.state.reverse;
+    type.active_state.timer = type.previous_timer = cache.state.timer;
+    type.timer_advance = 0;
+    type.active_state_reference = cache.override_state;
+    type.active_state_dirty = true;
+  }
+  for (auto&& entry : m_parts)
+    entry.second.active_part_dirty = true;
+}
+
 std::expected<void, StarException> AnimatedPartSet::finish_animations() {
-  for (auto& pair : m_state_types) {
-    auto& state_type = pair.second;
-
-    auto remaining = state_type.states.size();
-    while (true) {
-      auto const& state = *state_type.active_state_reference;
-
-      if (state.animation_mode == End) {
-        state_type.active_state.timer = state.cycle;
-      } else if (state.animation_mode == Transition) {
-        if (remaining-- == 0)
-          return std::unexpected(AnimatedPartSetException("Cyclic animation transition"));
-        auto next = state_type.states.get(state.transition_state);
-        if (!next) return std::unexpected(std::move(next.error()));
-        state_type.active_state.state_name = state.transition_state;
-        state_type.active_state.timer = 0.0f;
-        state_type.active_state_reference = next->get();
-        continue;
-      }
-      break;
-    }
-
-    state_type.previous_timer = state_type.active_state.timer;
-    state_type.timer_advance = 0;
-    state_type.active_state_dirty = true;
+  for (auto& [name, type] : m_state_types) {
+    auto finished = finish_cursor(type, type.active_state.state_name, type.active_state.timer, type.active_state_reference);
+    if (!finished) return finished;
+    type.previous_timer = type.active_state.timer;
+    type.timer_advance = 0;
+    type.active_state_dirty = true;
   }
 
   for (auto&& pair : m_parts)
@@ -679,7 +712,8 @@ std::expected<void, StarException> AnimatedPartSet::freshen_active_part(Part con
   auto& active = cache ? cache->get().part : part.active_part;
   if (!cache)
     part.active_part_base_pose = active;
-  AffinePose const& base = cache && part.active_part_dirty ? static_cast<AffinePose const&>(part.active_part) : part.active_part_base_pose;
+  bool logical_reset = sample && sample->get().logical_reset;
+  AffinePose const& base = cache && (logical_reset || part.active_part_dirty) ? static_cast<AffinePose const&>(part.active_part) : part.active_part_base_pose;
 
   struct Selection {
     ActiveStateInformation const& state;
@@ -733,7 +767,7 @@ std::expected<void, StarException> AnimatedPartSet::freshen_active_part(Part con
   } else {
     if (cache)
       cache->get().properties_valid = false;
-    auto endpoints = transform_endpoints(base, active, sample.has_value(), version() > 0);
+    auto endpoints = transform_endpoints(base, active, sample.has_value() && !logical_reset, version() > 0);
     if (!endpoints) return std::unexpected(std::move(endpoints.error()));
     apply_endpoints(active, *endpoints, progress);
     // A retained parts() reference can mutate any definition between prepares.

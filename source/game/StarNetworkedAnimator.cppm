@@ -165,6 +165,7 @@ public:
   // this state is already the current state.
   [[nodiscard]] std::expected<bool, StarException> setState(String const& stateType, String const& state, bool startNew = false, bool reverse = false);
   [[nodiscard]] std::expected<bool, StarException> setLocalState(String const& stateType, String const& state, bool startNew = false, bool reverse = false);
+  [[nodiscard]] std::expected<void, StarException> validate_local_state(String const& type, String const& state) const;
   [[nodiscard]] std::expected<String, StarException> state(String const& stateType) const;
   [[nodiscard]] std::expected<int, StarException> stateFrame(String const& stateType) const;
   [[nodiscard]] std::expected<int, StarException> stateNextFrame(String const& stateType) const;
@@ -315,9 +316,22 @@ public:
   // Run through the current animations until the final frame, including any
   // transition animations.
   [[nodiscard]] std::expected<void, StarException> finishAnimations();
+  template <typename Pose> requires requires(Pose& pose, Sample& staged) {
+    { pose(staged) } -> std::same_as<std::expected<void, StarException>>;
+  }
+  [[nodiscard]] std::expected<void, StarException> reset_local_animation(Pose&& pose) {
+    auto staged = sample(1.f);
+    if (auto finished = m_animatedParts.stage_finished_states(staged.m_presentation->parts); !finished)
+      return finished;
+    if (auto applied = pose(staged); !applied)
+      return applied;
+    commit_local_reset(staged);
+    return {};
+  }
   std::uint8_t version() const;
 
 private:
+  void commit_local_reset(Sample const& staged);
   [[nodiscard]] std::expected<String, StarException> queryState(String const& stateType, Sample const* sample) const;
   [[nodiscard]] std::expected<int, StarException> queryStateFrame(String const& stateType, Sample const* sample) const;
   [[nodiscard]] std::expected<int, StarException> queryStateNextFrame(String const& stateType, Sample const* sample) const;

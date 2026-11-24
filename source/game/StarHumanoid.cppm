@@ -52,41 +52,45 @@ struct DanceStep;
 template <typename T>
 concept humanoid_pose_animator = std::same_as<T, NetworkedAnimator> || std::same_as<T, NetworkedAnimator::Sample>;
 
+// Row order is shared by NPC wire ordinals and humanoid.config timing arrays.
 enum class HumanoidEmote {
-  Idle,
-  Blabbering,
-  Shouting,
-  Happy,
-  Sad,
-  NEUTRAL,
-  Laugh,
-  Annoyed,
-  Oh,
-  OOOH,
-  Blink,
-  Wink,
-  Eat,
-  Sleep
+  Idle, Blabbering, Shouting, Happy, Sad, NEUTRAL, Laugh, Annoyed, Oh, OOOH, Blink, Wink, Eat, Sleep
 };
-extern std::expected<EnumMap<HumanoidEmote>, StarException> const HumanoidEmoteNames;
-inline constexpr std::size_t EmoteSize = 14;
 
+// Keep the distinct native type for modules that overload on HumanoidHand.
 enum class HumanoidHand {
-  Idle,
-  Blabbering,
-  Shouting,
-  Happy,
-  Sad,
-  NEUTRAL,
-  Laugh,
-  Annoyed,
-  Oh,
-  OOOH,
-  Blink,
-  Wink,
-  Eat,
-  Sleep
+  Idle, Blabbering, Shouting, Happy, Sad, NEUTRAL, Laugh, Annoyed, Oh, OOOH, Blink, Wink, Eat, Sleep
 };
+
+struct EmoteDescription {
+  HumanoidEmote state;
+  std::string_view name;
+  std::string_view frame;
+  bool cyclic;
+};
+inline constexpr std::array emote_descriptions{
+  EmoteDescription{HumanoidEmote::Idle, "Idle", "idle", false},
+  EmoteDescription{HumanoidEmote::Blabbering, "Blabbering", "blabber", true},
+  EmoteDescription{HumanoidEmote::Shouting, "Shouting", "shout", true},
+  EmoteDescription{HumanoidEmote::Happy, "Happy", "happy", false},
+  EmoteDescription{HumanoidEmote::Sad, "Sad", "sad", true},
+  EmoteDescription{HumanoidEmote::NEUTRAL, "NEUTRAL", "neutral", false},
+  EmoteDescription{HumanoidEmote::Laugh, "Laugh", "laugh", true},
+  EmoteDescription{HumanoidEmote::Annoyed, "Annoyed", "annoyed", false},
+  EmoteDescription{HumanoidEmote::Oh, "Oh", "oh", false},
+  EmoteDescription{HumanoidEmote::OOOH, "OOOH", "oooh", false},
+  EmoteDescription{HumanoidEmote::Blink, "Blink", "blink", false},
+  EmoteDescription{HumanoidEmote::Wink, "Wink", "wink", false},
+  EmoteDescription{HumanoidEmote::Eat, "Eat", "eat", true},
+  EmoteDescription{HumanoidEmote::Sleep, "Sleep", "sleep", true}
+};
+inline constexpr std::size_t EmoteSize = emote_descriptions.size();
+static_assert([] {
+  for (std::size_t i = 0; i < EmoteSize; ++i)
+    if (static_cast<std::size_t>(emote_descriptions[i].state) != i)
+      return false;
+  return EmoteSize == static_cast<std::size_t>(HumanoidEmote::Sleep) + 1;
+}());
 extern std::expected<EnumMap<HumanoidEmote>, StarException> const HumanoidEmoteNames;
 
 struct Personality {
@@ -387,7 +391,6 @@ private:
   void wearableRemoved(Wearable const& wearable);
 
   [[nodiscard]] std::expected<String, StarException> frameBase(State state) const;
-  [[nodiscard]] std::expected<String, StarException> emoteFrameBase(HumanoidEmote state) const;
 
   Directives const& getBodyDirectives() const;
   Directives const& getHairDirectives() const;
@@ -407,6 +410,7 @@ private:
   [[nodiscard]] std::expected<CachedDance, StarException> load_dance(String const& name) const;
   [[nodiscard]] std::expected<std::optional<std::reference_wrapper<Dance const>>, StarException> current_dance() const;
   [[nodiscard]] std::expected<std::optional<std::reference_wrapper<DanceStep const>>, StarException> sample_dance_step(float interpolation) const;
+  [[nodiscard]] std::expected<std::optional<std::reference_wrapper<DanceStep const>>, StarException> dance_step_at(float timer) const;
 
   [[nodiscard]] std::expected<void, StarException> refreshAnimationState(bool startNew = false);
   Vec2F base_head_offset() const;
@@ -536,6 +540,11 @@ private:
     bool startNew;
     bool reverse;
   };
+  using AnimationGroup = HashMap<String, AnimationStateArgs>;
+  using AnimationGroupRef = std::optional<std::reference_wrapper<AnimationGroup const>>;
+  AnimationGroupRef movement_animation_group() const;
+  template <humanoid_pose_animator Animator>
+  [[nodiscard]] static std::expected<void, StarException> apply_animation_group(Animator& animator, AnimationGroupRef group, bool restart);
   HashMap<Humanoid::State, HashMap<String,AnimationStateArgs>> m_animationStates;
   HashMap<Humanoid::State, HashMap<String,AnimationStateArgs>> m_animationStatesBackwards;
   HashMap<HumanoidEmote, HashMap<String,AnimationStateArgs>> m_emoteAnimationStates;
@@ -613,6 +622,8 @@ export namespace Star {
   using ::Star::humanoid_pose_animator;
   using ::Star::Dance;
   using ::Star::HumanoidEmote;
+  using ::Star::EmoteDescription;
+  using ::Star::emote_descriptions;
   using ::Star::HumanoidEmoteNames;
   using ::Star::EmoteSize;
   using ::Star::HumanoidHand;

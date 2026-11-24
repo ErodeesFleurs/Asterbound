@@ -39,6 +39,8 @@ import star.effect_source_database;
 import star.effect_emitter;
 import star.entity_rendering;
 import star.particle;
+import star.emote_processor;
+import star.humanoid;
 import star.set;
 import star.net_compatibility;
 import star.lua;
@@ -2919,6 +2921,75 @@ const GameTestRegistration recoverableDatabaseProvider(
       auto result = (*database)->get_dance(String(entry.name));
       ASSERT_TRUE(result);
       EXPECT_EQ(*result, *recovered);
+    }
+  });
+
+const GameTestRegistration emote_matcher_differential(
+  "AssetsTest", "EmoteMatcherDifferential", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(*directory, "preload.config")));
+    std::string long_binding(160, 'x');
+    long_binding.front() = 'y'; // Its 1.60 length bonus beats "x" one codepoint later.
+    for (bool with_empty : {false, true}) {
+      String config(std::string(R"json({"emoteBindings":{"notAnEmote":[],"Happy":[":)",":o","共享",")json")
+          + long_binding + R"("],"Oh":[":O",":D","共享","中","x"])"
+          + (with_empty ? R"(,"Sad":[""])" : "") + "}}");
+      ASSERT_TRUE(File::write_file(config, File::relative_to(*directory, "emotes.config")));
+      Logger logger;
+      Assets::Settings settings{};
+      settings.worker_pool_size = 1;
+      auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {*directory});
+      ASSERT_TRUE(assets);
+      auto processor = EmoteProcessor::create(*assets);
+      ASSERT_TRUE(processor);
+      auto json = (*assets)->json("/emotes.config");
+      ASSERT_TRUE(json);
+      auto groups = json->get_object("emoteBindings");
+      ASSERT_TRUE(groups);
+      for (String const& message : List<String>{"", "ABC", "Aa", "好ABC啊", "中:) :D :)", ":) :D :)",
+               ":O", ":o", "共享", String(long_binding), String(std::string("a\0:D", 4)),
+               String(std::string(":)\xff")), String(std::string("\xe4\xb8"))}) {
+        auto result = (*processor)->detect_emotes(message);
+        auto begin = message.begin();
+        if (!begin) {
+          ASSERT_FALSE(result);
+          EXPECT_EQ(result.error().what(), begin.error().what());
+          continue;
+        }
+        int balance = 0;
+        for (auto it = *begin; it != message.end(); ++it) {
+          auto point = *it;
+          if (String::to_upper(point) != String::to_lower(point))
+            balance += String::to_upper(point) == point ? 1 : -1;
+        }
+        auto expected = message.empty() ? HumanoidEmote::Idle
+            : balance > 0 ? HumanoidEmote::Shouting : HumanoidEmote::Blabbering;
+        float best = -1;
+        for (auto const& [name, group] : *groups) {
+          auto bindings = group.to_array();
+          ASSERT_TRUE(bindings);
+          for (auto const& binding : *bindings) {
+            auto text = binding.to_string();
+            ASSERT_TRUE(text);
+            auto position = message.find(*text);
+            ASSERT_TRUE(position);
+            if (*position == std::string::npos) continue;
+            auto length = text->length();
+            ASSERT_TRUE(length);
+            float score = *position + static_cast<float>(*length) * 0.01f;
+            if (score > best) {
+              auto emote = HumanoidEmoteNames->get_left(name);
+              ASSERT_TRUE(emote);
+              expected = emote->get();
+              best = score;
+            }
+          }
+        }
+        ASSERT_TRUE(result);
+        EXPECT_EQ(*result, expected);
+      }
     }
   });
 

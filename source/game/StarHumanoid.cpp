@@ -95,40 +95,23 @@ import star.math_common;
 import star.algorithm;
 namespace Star {
 
-extern std::expected<EnumMap<HumanoidEmote>, StarException> const HumanoidEmoteNames = EnumMap<HumanoidEmote>::create({
-  {HumanoidEmote::Idle, "Idle"},
-  {HumanoidEmote::Blabbering, "Blabbering"},
-  {HumanoidEmote::Shouting, "Shouting"},
-  {HumanoidEmote::Happy, "Happy"},
-  {HumanoidEmote::Sad, "Sad"},
-  {HumanoidEmote::NEUTRAL, "NEUTRAL"},
-  {HumanoidEmote::Laugh, "Laugh"},
-  {HumanoidEmote::Annoyed, "Annoyed"},
-  {HumanoidEmote::Oh, "Oh"},
-  {HumanoidEmote::OOOH, "OOOH"},
-  {HumanoidEmote::Blink, "Blink"},
-  {HumanoidEmote::Wink, "Wink"},
-  {HumanoidEmote::Eat, "Eat"},
-  {HumanoidEmote::Sleep, "Sleep"}
-});
+namespace {
+using EmoteMap = EnumMap<HumanoidEmote>;
 
-// Raptor - I hate the fact that its inconsistent between the strings used in the map above and with the switch case down below
-extern std::expected<EnumMap<HumanoidEmote>, StarException> const HumanoidEmoteFrameBaseNames = EnumMap<HumanoidEmote>::create({
-  {HumanoidEmote::Idle, "idle"},
-  {HumanoidEmote::Blabbering, "blabber"},
-  {HumanoidEmote::Shouting, "shout"},
-  {HumanoidEmote::Happy, "happy"},
-  {HumanoidEmote::Sad, "sad"},
-  {HumanoidEmote::NEUTRAL, "neutral"},
-  {HumanoidEmote::Laugh, "laugh"},
-  {HumanoidEmote::Annoyed, "annoyed"},
-  {HumanoidEmote::Oh, "oh"},
-  {HumanoidEmote::OOOH, "oooh"},
-  {HumanoidEmote::Blink, "blink"},
-  {HumanoidEmote::Wink, "wink"},
-  {HumanoidEmote::Eat, "eat"},
-  {HumanoidEmote::Sleep, "sleep"}
-});
+std::expected<EmoteMap, StarException> make_emote_map(bool frame_names) {
+  EmoteMap result;
+  for (auto const& description : emote_descriptions) {
+    auto added = result.add({description.state, String(frame_names ? description.frame : description.name)});
+    if (!added)
+      return std::unexpected(std::move(added.error()));
+  }
+  return result;
+}
+
+auto const emote_frame_names = make_emote_map(true);
+}
+
+extern std::expected<EnumMap<HumanoidEmote>, StarException> const HumanoidEmoteNames = make_emote_map(false);
 
 std::expected<Personality, StarException> parsePersonalityArray(Json const& config) {
   {
@@ -576,30 +559,29 @@ timing.stateFrames = std::move(*checked86);
 }
 }
 
-  {
-auto checked87 = config.contains("emoteCycle");
-if (!checked87) return std::unexpected(std::move(checked87.error()));
-if (std::move(*checked87))
-    {
-auto checked88 = config.get("emoteCycle");
-if (!checked88) return std::unexpected(std::move(checked88.error()));
-auto checked89 = json_to_array_f<EmoteSize>(std::move(*checked88));
-if (!checked89) return std::unexpected(std::move(checked89.error()));
-timing.emoteCycle = std::move(*checked89);
-}
-}
-  {
-auto checked90 = config.contains("emoteFrames");
-if (!checked90) return std::unexpected(std::move(checked90.error()));
-if (std::move(*checked90))
-    {
-auto checked91 = config.get("emoteFrames");
-if (!checked91) return std::unexpected(std::move(checked91.error()));
-auto checked92 = json_to_array_u<EmoteSize>(std::move(*checked91));
-if (!checked92) return std::unexpected(std::move(checked92.error()));
-timing.emoteFrames = std::move(*checked92);
-}
-}
+  auto cycles = config.get("emoteCycle");
+  if (!cycles)
+    return std::unexpected(std::move(cycles.error()));
+  auto frames = config.get("emoteFrames");
+  if (!frames)
+    return std::unexpected(std::move(frames.error()));
+  auto cycle_values = json_to_array_d<EmoteSize>(*cycles);
+  if (!cycle_values)
+    return std::unexpected(std::move(cycle_values.error()));
+  auto frame_values = json_to_array_d<EmoteSize>(*frames);
+  if (!frame_values)
+    return std::unexpected(std::move(frame_values.error()));
+  for (std::size_t i = 0; i < EmoteSize; ++i) {
+    auto cycle = (*cycle_values)[i];
+    if (!is_finite(cycle) || cycle <= 0 || cycle > std::numeric_limits<float>::max()
+        || static_cast<float>(cycle) == 0)
+      return std::unexpected(StarException(Star::format("Invalid emoteCycle for {}", emote_descriptions[i].name)));
+    auto count = (*frame_values)[i];
+    if (!is_finite(count) || count < 1 || count > std::numeric_limits<int>::max() || std::trunc(count) != count)
+      return std::unexpected(StarException(Star::format("Invalid emoteFrames for {}", emote_descriptions[i].name)));
+    timing.emoteCycle[i] = static_cast<float>(cycle);
+    timing.emoteFrames[i] = static_cast<unsigned>(count);
+  }
   return timing;
 }
 
@@ -615,17 +597,8 @@ bool Humanoid::HumanoidTiming::cyclicState(State state) {
 }
 
 bool Humanoid::HumanoidTiming::cyclicEmoteState(HumanoidEmote state) {
-  switch (state) {
-    case HumanoidEmote::Blabbering:
-    case HumanoidEmote::Shouting:
-    case HumanoidEmote::Sad:
-    case HumanoidEmote::Laugh:
-    case HumanoidEmote::Eat:
-    case HumanoidEmote::Sleep:
-      return true;
-    default:
-      return false;
-  }
+  auto index = static_cast<std::size_t>(state);
+  return index < EmoteSize && emote_descriptions[index].cyclic;
 }
 
 int Humanoid::HumanoidTiming::stateSeq(float timer, State state) const {
@@ -633,15 +606,35 @@ int Humanoid::HumanoidTiming::stateSeq(float timer, State state) const {
 }
 
 int Humanoid::HumanoidTiming::emoteStateSeq(float timer, HumanoidEmote state) const {
-  return genericSeq(timer, emoteCycle[static_cast<std::size_t>(state)], emoteFrames[static_cast<std::size_t>(state)],
-                    cyclicEmoteState(state));
+  auto index = static_cast<std::size_t>(state);
+  return genericSeq(timer, emoteCycle[index], emoteFrames[index], emote_descriptions[index].cyclic);
 }
 
 int Humanoid::HumanoidTiming::genericSeq(float timer, float cycle, unsigned frames, bool cyclic) const {
-  if (cyclic) {
+  if (frames <= 1 || timer <= 0)
+    return 1;
+  auto last = static_cast<int>(std::min(frames, static_cast<unsigned>(std::numeric_limits<int>::max())));
+  if (timer >= cycle) {
+    if (!cyclic)
+      return last;
     timer = std::fmod(timer, cycle);
   }
-  return clamp<int>(timer * frames / cycle, 0, frames - 1) + 1;
+  // Preserve the original float rounding for ordinary configurations. Widen
+  // only when the numerator could overflow before division brings it back.
+  if (timer >= 0x1p95f) [[unlikely]] {
+    double frame = static_cast<double>(timer) * frames / cycle;
+    if (!is_finite(frame) || frame <= 0)
+      return 1;
+    return frame >= last - 1 ? last : static_cast<int>(frame) + 1;
+  }
+  float frame = timer * frames / cycle;
+  // For nonnegative IEEE floats the bits are ordered by magnitude. One
+  // comparison excludes negatives, nonfinite values and the int overflow
+  // boundary (INT_MAX itself rounds up as a float).
+  auto bits = std::bit_cast<std::uint32_t>(frame);
+  if (bits >= std::bit_cast<std::uint32_t>(0x1p31f)) [[unlikely]]
+    return bits < std::bit_cast<std::uint32_t>(std::numeric_limits<float>::infinity()) ? last : 1;
+  return std::min(static_cast<int>(frame), last - 1) + 1;
 }
 
 std::expected<EnumMap<Humanoid::State>, StarException> const Humanoid::StateNames = EnumMap<Humanoid::State>::create({
@@ -1260,12 +1253,12 @@ for (auto const& pair : std::move(*checked225)) {
       animations.set(anim.first, {std::move(*checked229), std::move(*checked231), std::move(*checked233)});
     }
   }
-  if (!HumanoidEmoteFrameBaseNames)
-    return std::unexpected(HumanoidEmoteFrameBaseNames.error());
-  auto checked234 = HumanoidEmoteFrameBaseNames->get_left(pair.first);
-  if (!checked234)
-    return std::unexpected(std::move(checked234.error()));
-  m_emoteAnimationStates.set(checked234->get(), animations);
+  if (!emote_frame_names)
+    return std::unexpected(emote_frame_names.error());
+  auto emote = emote_frame_names->get_left(pair.first);
+  if (!emote)
+    return std::unexpected(std::move(emote.error()));
+  m_emoteAnimationStates.set(emote->get(), std::move(animations));
 }
 }
     {
@@ -1679,21 +1672,38 @@ if (!checked277) return std::unexpected(std::move(checked277.error()));
   return {};
 }
 
-std::expected<void, StarException> Humanoid::setEmoteState(HumanoidEmote state) {
-  if (m_emoteState != state) {
-    m_emoteState = state;
-    m_emoteAnimationTimer = 0.0f;
-    m_previousEmoteAnimationTimer = 0;
-    if (m_useAnimation) {
-      if (auto animationStates = m_emoteAnimationStates.maybe(m_emoteState))
-        for (auto const& args : *animationStates) {
-          auto checked278 = m_networkedAnimator->setLocalState(args.first, args.second.state, args.second.startNew,
-                                                               args.second.reverse);
-          if (!checked278)
-            return std::unexpected(std::move(checked278.error()));
-        }
+template <humanoid_pose_animator Animator>
+std::expected<void, StarException> Humanoid::apply_animation_group(Animator& animator, AnimationGroupRef group, bool restart) {
+  if (!group)
+    return {};
+  auto const& states = group->get();
+  if constexpr (std::same_as<Animator, NetworkedAnimator>) {
+    // Both lookups are against immutable definitions. There are no other
+    // fallible operations in a logical setLocalState once its target exists.
+    if (states.size() > 1) {
+      for (auto const& [type, args] : states)
+        if (auto valid = animator.validate_local_state(type, args.state); !valid)
+          return valid;
     }
   }
+  for (auto const& [type, args] : states) {
+    auto changed = animator.setLocalState(type, args.state, restart || args.startNew, args.reverse);
+    if (!changed) return std::unexpected(std::move(changed.error()));
+  }
+  return {};
+}
+
+std::expected<void, StarException> Humanoid::setEmoteState(HumanoidEmote state) {
+  if (static_cast<std::size_t>(state) >= EmoteSize)
+    return std::unexpected(StarException("Invalid humanoid emote"));
+  if (m_emoteState == state)
+    return {};
+  if (m_useAnimation) {
+    auto applied = apply_animation_group(*m_networkedAnimator, std::as_const(m_emoteAnimationStates).find_ref(state), false);
+    if (!applied) return applied;
+  }
+  m_emoteState = state;
+  m_emoteAnimationTimer = m_previousEmoteAnimationTimer = 0;
   return {};
 }
 
@@ -1855,27 +1865,29 @@ if (!checked285) return std::unexpected(std::move(checked285.error()));
 }
 
 std::expected<void, StarException> Humanoid::resetAnimation() {
-  m_animationTimer = 0.0f;
-  m_emoteAnimationTimer = 0.0f;
-  m_dance_timer = 0;
-  m_headRotation = m_root.humanoidHeadRotation() ? 0.f : m_headRotationTarget;
+  auto head_rotation = m_root.humanoidHeadRotation();
+  if (!head_rotation) return std::unexpected(std::move(head_rotation.error()));
+  auto head = head_rotation->get() ? 0.f : m_headRotationTarget;
+  if (m_useAnimation) {
+    refreshWearables(*m_fashion);
+    auto step = dance_step_at(0.f);
+    if (!step) return std::unexpected(std::move(step.error()));
+    auto reset = m_networkedAnimator->reset_local_animation([&](NetworkedAnimator::Sample& staged) -> std::expected<void, StarException> {
+      auto emote = apply_animation_group(staged, std::as_const(m_emoteAnimationStates).find_ref(m_emoteState), true);
+      if (!emote) return emote;
+      auto movement = apply_animation_group(staged, movement_animation_group(), true);
+      if (!movement) return movement;
+      auto const& front = m_facingDirection == Direction::Left || m_twoHanded ? m_primaryHand : m_altHand;
+      auto const& back = m_facingDirection == Direction::Right || m_twoHanded ? m_primaryHand : m_altHand;
+      return apply_animator_pose(staged, front, back, front.angle, back.angle, head, *step, true);
+    });
+    if (!reset) return reset;
+  }
+  m_headRotation = head;
+  m_animationTimer = m_emoteAnimationTimer = m_dance_timer = 0;
   m_previousAnimationTimer = m_previousEmoteAnimationTimer = m_previous_dance_timer = 0;
   m_presentationHistory = false;
-
-  if (m_useAnimation) {
-    auto checked286 = m_networkedAnimator->finishAnimations();
-if (!checked286) return std::unexpected(std::move(checked286.error()));
-    // reset set all animations and force startnew
-    if (auto animationStates = m_emoteAnimationStates.maybe(m_emoteState))
-      for (auto const& args : *animationStates) {
-        auto checked287 = m_networkedAnimator->setLocalState(args.first, args.second.state, true, args.second.reverse);
-        if (!checked287)
-          return std::unexpected(std::move(checked287.error()));
-      }
-    auto checked288 = refreshAnimationState(true);
-if (!checked288) return std::unexpected(std::move(checked288.error()));
-  }
-  return prepare_animator_pose();
+  return {};
 }
 
 Vec2F Humanoid::base_head_offset() const {
@@ -2327,10 +2339,9 @@ if (!checked370) return std::unexpected(std::move(checked370.error()));
     }
 
     if (!m_emoteFrameset.empty() && !m_bodyHidden) {
-      auto emoteDirectives = getEmoteDirectives();
-      auto checked371 = emoteFrameBase(m_emoteState);
-if (!checked371) return std::unexpected(std::move(checked371.error()));
-String image = Star::format("{}:{}.{}{}", m_emoteFrameset, std::move(*checked371), emoteStateSeq, emoteDirectives.prefix());
+      auto const& emote_directives = getEmoteDirectives();
+      auto frame = emote_descriptions[static_cast<std::size_t>(m_emoteState)].frame;
+      String image = Star::format("{}:{}.{}{}", m_emoteFrameset, frame, emoteStateSeq, emote_directives.prefix());
       auto checked372 = m_root.imageMetadataDatabase();
 if (!checked372) return std::unexpected(std::move(checked372.error()));
 auto checked373 = Drawable::make_image(*std::move(*checked372), std::move(image), 1.0f / tile_pixels, true, headPosition);
@@ -2338,7 +2349,7 @@ if (!checked373) return std::unexpected(std::move(checked373.error()));
 auto drawable = std::move(*checked373);
       auto checked374 = m_root.imageMetadataDatabase();
 if (!checked374) return std::unexpected(std::move(checked374.error()));
-auto checked375 = drawable.image_part().add_directives(*std::move(*checked374), emoteDirectives, true);
+auto checked375 = drawable.image_part().add_directives(*std::move(*checked374), emote_directives, true);
 if (!checked375) return std::unexpected(std::move(checked375.error()));
       addHeadDrawable(std::move(drawable), m_bodyFullbright);
     }
@@ -2882,9 +2893,8 @@ if (!checked483) return std::unexpected(std::move(checked483.error()));
 
     if (!m_emoteFrameset.empty()) {
       auto& emoteDirectives = getEmoteDirectives();
-      auto checked484 = emoteFrameBase(m_emoteState);
-if (!checked484) return std::unexpected(std::move(checked484.error()));
-String image = Star::format("{}:{}.{}{}", m_emoteFrameset, std::move(*checked484), emoteStateSeq, emoteDirectives.prefix());
+      auto frame = emote_descriptions[static_cast<std::size_t>(m_emoteState)].frame;
+      String image = Star::format("{}:{}.{}{}", m_emoteFrameset, frame, emoteStateSeq, emoteDirectives.prefix());
       auto checked485 = m_root.imageMetadataDatabase();
 if (!checked485) return std::unexpected(std::move(checked485.error()));
 auto checked486 = Drawable::make_image(*std::move(*checked485), std::move(image), 1.0f, true, personality.headOffset);
@@ -3365,46 +3375,6 @@ std::expected<String, StarException> Humanoid::frameBase(State state) const {
   }
 }
 
-std::expected<String, StarException> Humanoid::emoteFrameBase(HumanoidEmote state) const {
-  switch (state) {
-    case HumanoidEmote::Idle:
-      return "idle";
-    case HumanoidEmote::Blabbering:
-      return "blabber";
-    case HumanoidEmote::Shouting:
-      return "shout";
-    case HumanoidEmote::Happy:
-      return "happy";
-    case HumanoidEmote::Sad:
-      return "sad";
-    case HumanoidEmote::NEUTRAL:
-      return "neutral";
-    case HumanoidEmote::Laugh:
-      return "laugh";
-    case HumanoidEmote::Annoyed:
-      return "annoyed";
-    case HumanoidEmote::Oh:
-      return "oh";
-    case HumanoidEmote::OOOH:
-      return "oooh";
-    case HumanoidEmote::Blink:
-      return "blink";
-    case HumanoidEmote::Wink:
-      return "wink";
-    case HumanoidEmote::Eat:
-      return "eat";
-    case HumanoidEmote::Sleep:
-      return "sleep";
-
-    default:
-      if (!HumanoidEmoteNames) return std::unexpected(HumanoidEmoteNames.error());
-      {
-        auto name = HumanoidEmoteNames->get_right(state);
-        if (!name) return std::unexpected(std::move(name.error()));
-        return std::unexpected(StarException(Star::format("No such emote state '{}'", name->get())));
-      }
-  }
-}
 
 String Humanoid::getHeadFromIdentity() const {
   return Star::format("/humanoid/{}/{}head.png",
@@ -3557,6 +3527,12 @@ std::expected<std::optional<std::reference_wrapper<Dance const>>, StarException>
 }
 
 std::expected<std::optional<std::reference_wrapper<DanceStep const>>, StarException> Humanoid::sample_dance_step(float interpolation) const {
+  if (!m_dance)
+    return std::nullopt;
+  return dance_step_at(lerp(interpolation, m_previous_dance_timer, m_dance_timer));
+}
+
+std::expected<std::optional<std::reference_wrapper<DanceStep const>>, StarException> Humanoid::dance_step_at(float timer) const {
   auto resolved = current_dance();
   if (!resolved)
     return std::unexpected(std::move(resolved.error()));
@@ -3570,28 +3546,18 @@ std::expected<std::optional<std::reference_wrapper<DanceStep const>>, StarExcept
   auto const& dance = (*resolved)->get();
   if (!dance.states.contains(state_name->get()))
     return std::nullopt;
-  return dance.step_at(lerp(interpolation, m_previous_dance_timer, m_dance_timer));
+  return dance.step_at(timer);
+}
+
+Humanoid::AnimationGroupRef Humanoid::movement_animation_group() const {
+  if (m_movingBackwards)
+    if (auto group = m_animationStatesBackwards.find_ref(m_state))
+      return group;
+  return m_animationStates.find_ref(m_state);
 }
 
 std::expected<void, StarException> Humanoid::refreshAnimationState(bool startNew) {
-  if (m_movingBackwards)
-    if (auto animationStates = m_animationStatesBackwards.maybe(m_state)) {
-      for (auto const& args : *animationStates) {
-        auto checked634 = m_networkedAnimator->setLocalState(args.first, args.second.state,
-                                                             startNew || args.second.startNew, args.second.reverse);
-        if (!checked634)
-          return std::unexpected(std::move(checked634.error()));
-      }
-      return {};
-    }
-  if (auto animationStates = m_animationStates.maybe(m_state))
-    for (auto const& args : *animationStates) {
-      auto checked635 = m_networkedAnimator->setLocalState(args.first, args.second.state,
-                                                           startNew || args.second.startNew, args.second.reverse);
-      if (!checked635)
-        return std::unexpected(std::move(checked635.error()));
-    }
-  return {};
+  return apply_animation_group(*m_networkedAnimator, movement_animation_group(), startNew);
 }
 
 std::expected<float, StarException> Humanoid::getBobYOffset(float interpolation) const {

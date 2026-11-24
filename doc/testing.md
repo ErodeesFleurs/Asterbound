@@ -619,6 +619,13 @@ with a conservative earliest-timestamp bound; negative smear, TTL changes and
 failed-insertion timestamps must remain covered. Filtered cleanup still visits
 every entry. Revisiting evicted cells re-executes their deterministic callbacks.
 
+### Chat emotes and animation timing
+
+Run `game_tests --gtest_filter='*Emote*'` with real assets. Matching ranks the
+first occurrence of each binding by codepoint position and binding length;
+equal scores retain configuration iteration order. The animation tests cover
+wire names and ordinals, frame boundaries, and retry after a rejected transition.
+
 ### Effect delivery and status lifecycle
 
 Run `game_tests --gtest_filter='EffectSourceTest.*:StatusControllerTest.*'` with

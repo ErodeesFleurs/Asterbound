@@ -1095,13 +1095,10 @@ if (!result208) return std::unexpected(std::move(result208.error()));
     m_dance.tick(dt);
 
     if (m_chat_message_updated) {
-      auto result225 = this->root().emoteProcessor();
-if (!result225) return std::unexpected(std::move(result225.error()));
-auto result226 = std::move(*result225)->detectEmotes(m_chat_message.get());
-if (!result226) return std::unexpected(std::move(result226.error()));
-auto state = std::move(*result226);
-      if (state != HumanoidEmote::Idle)
-        addEmote(state);
+      auto state = EmoteProcessor::detect_chat_emote(root(), m_chat_message.get());
+      if (!state) return std::unexpected(std::move(state.error()));
+      if (*state != HumanoidEmote::Idle)
+        addEmote(*state);
       m_chat_message_updated = false;
     }
 
