@@ -29,7 +29,7 @@ enum class NodeStatus;
 
 template <>
 struct LuaConverter<InventorySlot> {
-  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, InventorySlot k);
+  [[nodiscard]] static std::expected<void, StarException> from(LuaStack stack, InventorySlot const& k);
   [[nodiscard]] static std::expected<std::optional<InventorySlot>, StarException> to(LuaStackValue v);
 };
 

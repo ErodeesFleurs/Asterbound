@@ -343,6 +343,80 @@ const GameTestRegistration warp_target_wire("WarpTargetTest", "LegacyWireAndJson
   EXPECT_EQ(*trash, hex_decode("03"));
 });
 
+TEST(InventorySlotTest, NamesIndicesAndLegacyWire) {
+  auto wire = [](InventorySlot const& slot, std::string_view hex) {
+    auto bytes = DataStreamBuffer::serialize(slot);
+    ASSERT_TRUE(bytes);
+    auto expected = hex_decode(hex);
+    EXPECT_EQ(*bytes, expected);
+    EXPECT_EQ(DataStreamBuffer::deserialize<InventorySlot>(expected.span()), slot);
+  };
+  wire(EquipmentSlot::Cosmetic12, "0013");
+  wire(BagSlot{"bag", 255}, "0103626167ff");
+  wire(SwapSlot{}, "02");
+  wire(TrashSlot{}, "03");
+  CustomBarLink link{TrashSlot{}, BagSlot{"bag", 255}};
+  auto bytes = DataStreamBuffer::serialize(link);
+  ASSERT_TRUE(bytes);
+  EXPECT_EQ(*bytes, hex_decode("0103010103626167ff"));
+  EXPECT_EQ(DataStreamBuffer::deserialize<CustomBarLink>(bytes->span()), link);
+  EXPECT_LT((BagSlot{"a", 255}), (BagSlot{"b", 0}));
+  EXPECT_LT((BagSlot{"a", 0}), (BagSlot{"a", 1}));
+
+  for (auto const& [value, name] : equipment_slot_names) {
+    Json encoded = JsonObject{{"type", "equipment"}, {"location", name}};
+    EXPECT_EQ(json_to_inventory_slot(encoded), InventorySlot(value));
+    EXPECT_EQ(json_from_inventory_slot(value), encoded);
+  }
+  for (auto const& [value, name] : essential_item_names) {
+    EXPECT_EQ(json_to_selected_action_bar_location(Json(name)), SelectedActionBarLocation(value));
+    EXPECT_EQ(json_from_selected_action_bar_location(value), Json(name));
+  }
+  EXPECT_EQ(enum_value<equipment_slot_names>("hEaDcOsMeTiC"), EquipmentSlot::HeadCosmetic);
+  EXPECT_EQ(enum_value<essential_item_names>("beamAxe"), EssentialItem::BeamAxe);
+  EXPECT_FALSE(enum_value<equipment_slot_names>("unknown"));
+  EXPECT_FALSE(maybe_enum_value<equipment_slot_names>("head\xff"));
+  EXPECT_FALSE(maybe_enum_value<essential_item_names>("\xff"));
+  EXPECT_EQ(json_to_inventory_slot(JsonObject{{"type", "swap"}, {"location", false}}), InventorySlot(SwapSlot{}));
+  EXPECT_EQ(json_to_inventory_slot(JsonObject{{"type", "trash"}}), InventorySlot(TrashSlot{}));
+  for (String const& name : {String("swap"), String("trash"), String("equipment")}) {
+    EXPECT_TRUE(is_reserved_bag_name(name));
+    EXPECT_FALSE(json_from_inventory_slot(BagSlot{name, 0}));
+  }
+  EXPECT_FALSE(is_reserved_bag_name("Swap"));
+  for (auto index : {0, 255}) {
+    Json encoded = JsonObject{{"type", "bag"}, {"location", index}};
+    InventorySlot slot = BagSlot{"bag", static_cast<std::uint8_t>(index)};
+    EXPECT_EQ(json_from_inventory_slot(slot), encoded);
+    EXPECT_EQ(json_to_inventory_slot(encoded), slot);
+    EXPECT_EQ(json_to_selected_action_bar_location(Json(index)), SelectedActionBarLocation(static_cast<CustomBarIndex>(index)));
+  }
+  for (Json const& index : {Json(-1), Json(256), Json(std::int64_t{4294967296}), Json(1.5), Json(-0.5), Json(1e100)}) {
+    EXPECT_FALSE(json_to_inventory_slot(JsonObject{{"type", "bag"}, {"location", index}}));
+    EXPECT_FALSE(json_to_selected_action_bar_location(index));
+  }
+}
+
+TEST(InventorySlotTest, RealLuaSlotConversion) {
+  auto engine = LuaEngine::create();
+  ASSERT_TRUE(engine);
+  auto context = (*engine)->create_context();
+  ASSERT_TRUE(context);
+  auto bag = InventorySlot(BagSlot{"trash", 255});
+  ASSERT_TRUE(context->set("bag", bag));
+  EXPECT_EQ(context->eval<bool>("bag[1] == 'trash' and bag[2] == 255"), true);
+  EXPECT_EQ(context->eval<InventorySlot>("bag"), bag);
+  EXPECT_EQ(context->eval<InventorySlot>("{'items', 0}"), InventorySlot(BagSlot{"items", 0}));
+  EXPECT_EQ(context->eval<InventorySlot>("'hEaD'"), InventorySlot(EquipmentSlot::Head));
+  EXPECT_EQ(context->eval<InventorySlot>("'SwAp'"), InventorySlot(SwapSlot{}));
+  EXPECT_EQ(context->eval<InventorySlot>("'TRASH'"), InventorySlot(TrashSlot{}));
+  EXPECT_FALSE(context->eval<InventorySlot>("'unknown'"));
+  EXPECT_FALSE(context->eval<InventorySlot>("string.char(255)"));
+  for (std::string_view script : {"{'bag', -1}", "{'bag', 256}", "{'bag', 4294967296}", "{'bag', 1.5}", "{'bag', 1e100}",
+                                  "{'bag', 0/0}", "{'bag', math.huge}", "{'bag', '255'}"})
+    EXPECT_FALSE(context->eval<InventorySlot>(script)) << script;
+}
+
 const GameTestRegistration dungeon_part_offsets("DungeonPartTest", "OutpostOffsetsMatchOrderedTileEvents", [](GameTest& fixture) {
   auto definitions = fixture.root().dungeonDefinitions();
   ASSERT_TRUE(definitions) << definitions.error().what();
@@ -2738,7 +2812,7 @@ std::expected<BagSlot, StarException> hudItemBagSlot(Root& root, PlayerInventory
     if (!allowed) return std::unexpected(std::move(allowed.error()));
     if (*allowed)
       // An empty earlier slot must not steal the cursor's native return slot.
-      return BagSlot(name, static_cast<std::uint8_t>(bag->size() - 1));
+      return BagSlot{name, static_cast<std::uint8_t>(bag->size() - 1)};
   }
   return std::unexpected(ItemException("HUD inventory regression requires a configured accepting bag"));
 }
@@ -2750,7 +2824,7 @@ const GameTestRegistration hudInventoryLinks("HudDomainTest", "InventoryLinksPre
   auto created = PlayerInventory::create(root);
   ASSERT_TRUE(created) << created.error().what();
   auto& inventory = **created;
-  ASSERT_GE(inventory.customBarIndexes(), 2);
+  ASSERT_GE(inventory.custom_bar_indexes(), 2);
   auto expectSlot = [](std::expected<std::optional<InventorySlot>, StarException> const& actual,
       std::optional<InventorySlot> const& expected) {
     ASSERT_TRUE(actual) << actual.error().what();
@@ -2776,62 +2850,62 @@ const GameTestRegistration hudInventoryLinks("HudDomainTest", "InventoryLinksPre
   ASSERT_TRUE(oneSlot) << oneSlot.error().what();
   ASSERT_TRUE(twoSlot) << twoSlot.error().what();
   if (*oneSlot == *twoSlot)
-    --twoSlot->second;
+    --twoSlot->index;
   ASSERT_EQ(inventory.setItem(*oneSlot, *oneHanded), true);
   ASSERT_EQ(inventory.setItem(*twoSlot, *twoHanded), true);
-  ASSERT_TRUE(inventory.setCustomBarSecondarySlot(1, InventorySlot(*oneSlot)));
+  ASSERT_TRUE(inventory.set_custom_bar_secondary_slot(1, InventorySlot(*oneSlot)));
   ASSERT_TRUE(inventory.shiftSwap(*oneSlot));
-  expectSlot(inventory.customBarSecondarySlot(1),
+  expectSlot(inventory.custom_bar_secondary_slot(1),
       std::optional<InventorySlot>(InventorySlot(SwapSlot())));
-  ASSERT_TRUE(inventory.linkCustomBarSwap(0, false));
+  ASSERT_TRUE(inventory.link_custom_bar_swap(0, false));
   EXPECT_FALSE(inventory.swapSlotItem());
   expectItem(inventory.itemsAt(*oneSlot), oneDescriptor);
-  expectSlot(inventory.customBarSecondarySlot(0), std::optional<InventorySlot>(InventorySlot(*oneSlot)));
-  expectSlot(inventory.customBarSecondarySlot(1), std::optional<InventorySlot>(InventorySlot(*oneSlot)));
+  expectSlot(inventory.custom_bar_secondary_slot(0), std::optional<InventorySlot>(InventorySlot(*oneSlot)));
+  expectSlot(inventory.custom_bar_secondary_slot(1), std::optional<InventorySlot>(InventorySlot(*oneSlot)));
 
-  ASSERT_TRUE(inventory.setCustomBarPrimarySlot(1, InventorySlot(*twoSlot)));
+  ASSERT_TRUE(inventory.set_custom_bar_primary_slot(1, InventorySlot(*twoSlot)));
   ASSERT_TRUE(inventory.shiftSwap(*twoSlot));
   auto beforeInvalid = inventory.store();
   ASSERT_TRUE(beforeInvalid) << beforeInvalid.error().what();
   for (bool primary : {false, true}) {
-    EXPECT_FALSE(inventory.linkCustomBarSwap(inventory.customBarIndexes(), primary));
-    EXPECT_FALSE(inventory.clearCustomBarLink(inventory.customBarIndexes(), primary));
+    EXPECT_FALSE(inventory.link_custom_bar_swap(inventory.custom_bar_indexes(), primary));
+    EXPECT_FALSE(inventory.clear_custom_bar_link(inventory.custom_bar_indexes(), primary));
     auto afterInvalid = inventory.store();
     ASSERT_TRUE(afterInvalid) << afterInvalid.error().what();
     EXPECT_EQ(*afterInvalid, *beforeInvalid);
   }
   // Dropping onto the right half redirects a two-handed tool to primary,
   // returns it to its exact bag slot, and retargets all existing cursor links.
-  ASSERT_TRUE(inventory.linkCustomBarSwap(0, false));
+  ASSERT_TRUE(inventory.link_custom_bar_swap(0, false));
   EXPECT_FALSE(inventory.swapSlotItem());
   expectItem(inventory.itemsAt(*twoSlot), twoDescriptor);
-  expectSlot(inventory.customBarPrimarySlot(0), std::optional<InventorySlot>(InventorySlot(*twoSlot)));
-  expectSlot(inventory.customBarPrimarySlot(1), std::optional<InventorySlot>(InventorySlot(*twoSlot)));
-  expectSlot(inventory.customBarSecondarySlot(0), std::optional<InventorySlot>(InventorySlot(*oneSlot)));
-  inventory.selectActionBarLocation(CustomBarIndex(0));
-  expectItem(inventory.primaryHeldItem(), twoDescriptor);
-  expectItem(inventory.secondaryHeldItem(), {});
-  ASSERT_TRUE(inventory.clearCustomBarLink(0, false));
-  expectSlot(inventory.customBarPrimarySlot(0), std::optional<InventorySlot>{});
-  expectItem(inventory.secondaryHeldItem(), oneDescriptor);
+  expectSlot(inventory.custom_bar_primary_slot(0), std::optional<InventorySlot>(InventorySlot(*twoSlot)));
+  expectSlot(inventory.custom_bar_primary_slot(1), std::optional<InventorySlot>(InventorySlot(*twoSlot)));
+  expectSlot(inventory.custom_bar_secondary_slot(0), std::optional<InventorySlot>(InventorySlot(*oneSlot)));
+  ASSERT_TRUE(inventory.select_action_bar_location(CustomBarIndex(0)));
+  expectItem(inventory.primary_held_item(), twoDescriptor);
+  expectItem(inventory.secondary_held_item(), {});
+  ASSERT_TRUE(inventory.clear_custom_bar_link(0, false));
+  expectSlot(inventory.custom_bar_primary_slot(0), std::optional<InventorySlot>{});
+  expectItem(inventory.secondary_held_item(), oneDescriptor);
   expectItem(inventory.itemsAt(*twoSlot), twoDescriptor);
-  expectSlot(inventory.customBarPrimarySlot(1), std::optional<InventorySlot>(InventorySlot(*twoSlot)));
-  ASSERT_TRUE(inventory.clearCustomBarLink(0, false));
-  expectSlot(inventory.customBarSecondarySlot(0), std::optional<InventorySlot>{});
+  expectSlot(inventory.custom_bar_primary_slot(1), std::optional<InventorySlot>(InventorySlot(*twoSlot)));
+  ASSERT_TRUE(inventory.clear_custom_bar_link(0, false));
+  expectSlot(inventory.custom_bar_secondary_slot(0), std::optional<InventorySlot>{});
   expectItem(inventory.itemsAt(*oneSlot), oneDescriptor);
-  expectSlot(inventory.customBarSecondarySlot(1), std::optional<InventorySlot>(InventorySlot(*oneSlot)));
+  expectSlot(inventory.custom_bar_secondary_slot(1), std::optional<InventorySlot>(InventorySlot(*oneSlot)));
   auto items = inventory.allItems();
   ASSERT_TRUE(items) << items.error().what();
   EXPECT_EQ(items->size(), 2u);
   // Empty-cursor clicks select a valid cell, but cannot install an invalid
   // selection that would make subsequent held-item queries fail.
-  ASSERT_TRUE(inventory.linkCustomBarSwap(1, false));
-  EXPECT_TRUE(inventory.selectedActionBarLocation() == SelectedActionBarLocation(CustomBarIndex(1)));
+  ASSERT_TRUE(inventory.link_custom_bar_swap(1, false));
+  EXPECT_TRUE(inventory.selected_action_bar_location() == SelectedActionBarLocation(CustomBarIndex(1)));
   auto beforeEmptyInvalid = inventory.store();
   ASSERT_TRUE(beforeEmptyInvalid) << beforeEmptyInvalid.error().what();
   for (bool primary : {false, true}) {
-    EXPECT_FALSE(inventory.linkCustomBarSwap(inventory.customBarIndexes(), primary));
-    EXPECT_FALSE(inventory.clearCustomBarLink(inventory.customBarIndexes(), primary));
+    EXPECT_FALSE(inventory.link_custom_bar_swap(inventory.custom_bar_indexes(), primary));
+    EXPECT_FALSE(inventory.clear_custom_bar_link(inventory.custom_bar_indexes(), primary));
     auto afterEmptyInvalid = inventory.store();
     ASSERT_TRUE(afterEmptyInvalid) << afterEmptyInvalid.error().what();
     EXPECT_EQ(*afterEmptyInvalid, *beforeEmptyInvalid);

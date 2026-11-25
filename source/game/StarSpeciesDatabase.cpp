@@ -282,17 +282,16 @@ std::expected<CharacterCreationResult, StarException> SpeciesDatabase::create_hu
     result.identity.facial_mask_directives = facial_mask_directive;
     result.identity.personality = personality_result->get();
 
-    if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
-    auto chest_slot = EquipmentSlotNames->get_right(EquipmentSlot::Chest);
+    auto chest_slot = enum_name<equipment_slot_names>(EquipmentSlot::Chest);
     if (!chest_slot) return std::unexpected(std::move(chest_slot.error()));
-    auto leg_slot = EquipmentSlotNames->get_right(EquipmentSlot::Legs);
+    auto leg_slot = enum_name<equipment_slot_names>(EquipmentSlot::Legs);
     if (!leg_slot) return std::unexpected(std::move(leg_slot.error()));
     auto chest = ItemDescriptor::create(shirt->get(), 1, JsonObject{{"colorIndex", shirt_color}});
     if (!chest) return std::unexpected(std::move(chest.error()));
     auto legs = ItemDescriptor::create(pants->get(), 1, JsonObject{{"colorIndex", pants_color}});
     if (!legs) return std::unexpected(std::move(legs.error()));
-    result.armor.set(chest_slot->get(), chest->toJson());
-    result.armor.set(leg_slot->get(), legs->toJson());
+    result.armor.set(*chest_slot, chest->toJson());
+    result.armor.set(*leg_slot, legs->toJson());
 
     result.humanoid_parameters.set("choices", JsonArray({gender_choice, body_color_choice, alty, hair_choice, heady, shirt_choice, shirt_color, pants_choice, pants_color, personality}));
   }

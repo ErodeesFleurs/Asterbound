@@ -6,6 +6,7 @@ import star.list;
 import star.image_processing;
 import star.hash;
 import star.data_stream;
+import star.data_stream_extra;
 import star.data_stream_devices;
 import star.game_timers;
 import star.string_view;
@@ -791,8 +792,19 @@ const GameTestRegistration constInventoryObservesExternallyConsumedItemsWithoutM
   };
   for (auto const& entry : items)
     ASSERT_EQ(inventory.setItem(entry.first, entry.second), true);
-  ASSERT_TRUE(inventory.setCustomBarPrimarySlot(0, InventorySlot(bagSlot)));
-  inventory.selectActionBarLocation(CustomBarIndex(0));
+  ASSERT_TRUE(inventory.set_custom_bar_primary_slot(0, InventorySlot(bagSlot)));
+  ASSERT_TRUE(inventory.select_action_bar_location(CustomBarIndex(0)));
+
+  std::vector<InventorySlot> visited_slots;
+  ASSERT_TRUE(view.for_each_item([&](InventorySlot const& position, std::shared_ptr<Item> const&) -> std::expected<void, StarException> {
+    visited_slots.push_back(position);
+    return {};
+  }));
+  ASSERT_EQ(visited_slots.size(), items.size());
+  for (std::size_t i = 0; i < items.size(); ++i)
+    EXPECT_EQ(visited_slots[i], items[i].first);
+  EXPECT_EQ(view.primary_held_item(), items[2].second);
+  EXPECT_EQ(view.secondary_held_item(), nullptr);
 
   List<long> owners;
   for (auto const& entry : items) {
@@ -803,15 +815,15 @@ const GameTestRegistration constInventoryObservesExternallyConsumedItemsWithoutM
 
   EXPECT_FALSE(view.headArmor());
   EXPECT_FALSE(view.equipment(EquipmentSlot::Head));
-  auto bag = view.bagContents(bagSlot.first);
+  auto bag = view.bagContents(bagSlot.bag_name);
   ASSERT_TRUE(bag);
-  EXPECT_EQ(bag->at(bagSlot.second), nullptr);
+  EXPECT_EQ(bag->at(bagSlot.index), nullptr);
   EXPECT_FALSE(view.swapSlotItem());
-  EXPECT_EQ(view.primaryHeldItem(), nullptr);
-  EXPECT_EQ(view.secondaryHeldItem(), nullptr);
-  auto primaryHeldSlot = view.primaryHeldSlot();
-  ASSERT_TRUE(primaryHeldSlot);
-  EXPECT_EQ(*primaryHeldSlot, std::optional<InventorySlot>(InventorySlot(bagSlot)));
+  EXPECT_EQ(view.primary_held_item(), nullptr);
+  EXPECT_EQ(view.secondary_held_item(), nullptr);
+  auto primary_held_slot = view.primary_held_slot();
+  ASSERT_TRUE(primary_held_slot);
+  EXPECT_EQ(*primary_held_slot, std::optional<InventorySlot>(InventorySlot(bagSlot)));
   auto all = view.allItems();
   ASSERT_TRUE(all);
   EXPECT_TRUE(all->empty());
@@ -823,7 +835,7 @@ const GameTestRegistration constInventoryObservesExternallyConsumedItemsWithoutM
   EXPECT_TRUE(available->by_name.empty());
   EXPECT_TRUE(available->by_parameters.empty());
   std::size_t visited = 0;
-  ASSERT_TRUE(view.forEveryItem([&](InventorySlot const&, std::shared_ptr<Item> const&) -> std::expected<void, StarException> {
+  ASSERT_TRUE(view.for_each_item([&](InventorySlot const&, std::shared_ptr<Item> const&) -> std::expected<void, StarException> {
     ++visited;
     return {};
   }));
@@ -848,9 +860,9 @@ const GameTestRegistration constInventoryObservesExternallyConsumedItemsWithoutM
   ASSERT_TRUE(inventory.cleanup());
   for (std::size_t i = 0; i < items.size(); ++i)
     EXPECT_EQ(items[i].second.use_count(), owners[i] - 1);
-  auto customBarPrimarySlot = view.customBarPrimarySlot(0);
-  ASSERT_TRUE(customBarPrimarySlot);
-  EXPECT_FALSE(*customBarPrimarySlot);
+  auto custom_bar_primary_slot = view.custom_bar_primary_slot(0);
+  ASSERT_TRUE(custom_bar_primary_slot);
+  EXPECT_FALSE(*custom_bar_primary_slot);
 });
 
 const GameTestRegistration inventoryMutationNormalizesEmptySlots("ItemTest", "InventoryMutationNormalizesEmptySlots", [](GameTest& fixture) {
@@ -973,23 +985,187 @@ const GameTestRegistration inventoryMutationNormalizesEmptySlots("ItemTest", "In
   EXPECT_TRUE(all->empty());
   EXPECT_EQ(inventory.exchangeItems(EquipmentSlot::Head, TrashSlot()), true);
 
+  auto fail_item = makeItems(1);
+  ASSERT_TRUE(fail_item);
+  ASSERT_EQ(inventory.setItem(bagSlot, *fail_item), true);
+  auto failed = inventory.for_each_item([&](InventorySlot const& position, std::shared_ptr<Item>& current) -> std::expected<void, StarException> {
+    EXPECT_EQ(position, InventorySlot(bagSlot));
+    EXPECT_TRUE(current->consume(1));
+    return std::unexpected(ItemException("stop traversal"));
+  });
+  EXPECT_FALSE(failed);
+  EXPECT_EQ(fail_item->use_count(), 1);
+  (*fail_item)->setCount(1);
+  EXPECT_EQ(inventory.itemsAt(bagSlot), nullptr);
+
   auto missingRead = std::as_const(inventory).itemsAt(BagSlot("missingInventoryTestBag", 0));
   ASSERT_FALSE(missingRead);
   EXPECT_TRUE(missingRead.error().is<ItemException>());
   auto missingTake = inventory.takeSlot(BagSlot("missingInventoryTestBag", 0));
   ASSERT_FALSE(missingTake);
   EXPECT_TRUE(missingTake.error().is<ItemException>());
-  auto bag = inventory.bagContents(bagSlot.first);
+  auto bag = inventory.bagContents(bagSlot.bag_name);
   ASSERT_TRUE(bag);
   auto bagSize = bag->size();
   ASSERT_LE(bagSize, std::numeric_limits<std::uint8_t>::max());
-  BagSlot pastEnd(bagSlot.first, static_cast<std::uint8_t>(bagSize));
+  BagSlot pastEnd(bagSlot.bag_name, static_cast<std::uint8_t>(bagSize));
   auto pastEndRead = std::as_const(inventory).itemsAt(pastEnd);
   ASSERT_FALSE(pastEndRead);
   EXPECT_TRUE(pastEndRead.error().is<OutOfRangeException>());
   auto pastEndTake = inventory.takeSlot(pastEnd);
   ASSERT_FALSE(pastEndTake);
   EXPECT_TRUE(pastEndTake.error().is<OutOfRangeException>());
+});
+
+namespace {
+
+auto layout_inventory(Root& root, Json groups, Json indexes, String bag_name, Json bag_size) {
+  Json config = JsonObject{{"customBarGroups", std::move(groups)}, {"customBarIndexes", std::move(indexes)},
+    {"itemBags", JsonObject{{std::move(bag_name), JsonObject{{"size", std::move(bag_size)}}}}}};
+  return NetElementTop<PlayerInventory>::create(root, std::move(config), Json(JsonObject{}));
+}
+
+}
+
+const GameTestRegistration inventory_layout("ItemTest", "InventoryLayoutCountsAndLostSaveLinks", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  for (std::string_view name : {"equipment", "swap", "trash"})
+    EXPECT_FALSE(layout_inventory(root, 1, 1, String(name), 1));
+  for (Json invalid : {Json(-1), Json(257), Json(0.5), Json("1")}) {
+    EXPECT_FALSE(layout_inventory(root, invalid, 1, "bag", 1));
+    EXPECT_FALSE(layout_inventory(root, 1, invalid, "bag", 1));
+    EXPECT_FALSE(layout_inventory(root, 1, 1, "bag", invalid));
+  }
+  EXPECT_FALSE(layout_inventory(root, 0, 1, "bag", 1));
+  EXPECT_FALSE(layout_inventory(root, 1, 0, "bag", 1));
+  auto many_groups = layout_inventory(root, 256, 1, "bag", 0);
+  ASSERT_TRUE(many_groups);
+  EXPECT_EQ((*many_groups)->custom_bar_groups(), 256u);
+  EXPECT_TRUE((*many_groups)->set_custom_bar_group(255));
+  EXPECT_FALSE((*many_groups)->set_custom_bar_group(256));
+  EXPECT_EQ((*many_groups)->custom_bar_group(), 255u);
+
+  auto original = layout_inventory(root, 2, 256, "bag", 256);
+  ASSERT_TRUE(original);
+  auto& inventory = **original;
+  EXPECT_EQ(inventory.custom_bar_indexes(), 256u);
+  ASSERT_TRUE(inventory.set_custom_bar_group(1));
+  ASSERT_TRUE(inventory.select_action_bar_location(CustomBarIndex{255}));
+  EXPECT_FALSE(inventory.set_custom_bar_primary_slot(256, {}));
+  auto database = root.itemDatabase();
+  ASSERT_TRUE(database);
+  auto item = inventoryTestItem(**database, "perfectlygenericitem", 3,
+      JsonObject{{"inventoryFilters", JsonObject{{"default", JsonObject{}}}}});
+  ASSERT_TRUE(item);
+  auto blocker = inventoryTestItem(**database, "perfectlygenericitem", 1,
+      JsonObject{{"inventoryFilters", JsonObject{{"default", JsonObject{}}}}, {"marker", "keep"}});
+  ASSERT_TRUE(blocker);
+  ASSERT_EQ(inventory.setItem(BagSlot{"bag", 0}, *blocker), true);
+  ASSERT_EQ(inventory.setItem(BagSlot{"bag", 255}, *item), true);
+  ASSERT_TRUE(inventory.set_custom_bar_primary_slot(255, BagSlot{"bag", 255}));
+  ASSERT_EQ(inventory.primary_held_item(), *item);
+  ASSERT_TRUE(inventory.set_custom_bar_group(0));
+  ASSERT_TRUE(inventory.set_custom_bar_primary_slot(0, BagSlot{"bag", 255}));
+  ASSERT_TRUE(inventory.set_custom_bar_group(1));
+  inventory.setEssentialItem(EssentialItem::WireTool, *item);
+  auto save = inventory.store();
+  ASSERT_TRUE(save);
+  EXPECT_EQ(save->get_uint("customBarGroup"), 1u);
+  EXPECT_EQ(save->get_uint("selectedActionBar"), 255u);
+  EXPECT_EQ(save->contains("wireTool"), true);
+  EXPECT_EQ(save->contains("wiretool"), false);
+
+  auto smaller = layout_inventory(root, 1, 1, "bag", 1);
+  ASSERT_TRUE(smaller);
+  auto& recovered = **smaller;
+  ASSERT_TRUE(recovered.load(*save));
+  EXPECT_EQ(recovered.custom_bar_group(), 0u);
+  EXPECT_EQ(recovered.selected_action_bar_location(), SelectedActionBarLocation{});
+  auto cleared = recovered.custom_bar_primary_slot(0);
+  ASSERT_TRUE(cleared);
+  EXPECT_FALSE(*cleared);
+  auto retained = recovered.itemsAt(BagSlot{"bag", 0});
+  ASSERT_TRUE(retained && *retained);
+  EXPECT_EQ((*retained)->descriptor(), (*blocker)->descriptor());
+  auto overflow = recovered.pullOverflow();
+  ASSERT_EQ(overflow.size(), 1u);
+  EXPECT_EQ(overflow.front()->count(), 3u);
+  ASSERT_TRUE(recovered.select_action_bar_location(EssentialItem::WireTool));
+  auto held = recovered.primary_held_item();
+  ASSERT_TRUE(held && *held);
+  EXPECT_EQ((*held)->descriptor(), (*item)->descriptor());
+  EXPECT_EQ(recovered.secondary_held_item(), nullptr);
+  EXPECT_FALSE(recovered.select_action_bar_location(CustomBarIndex{1}));
+  EXPECT_EQ(recovered.selected_action_bar_location(), SelectedActionBarLocation(EssentialItem::WireTool));
+
+  for (Json invalid : {Json(-1), Json(256), Json(0.25)}) {
+    for (std::string_view key : {"customBarGroup", "selectedActionBar"}) {
+      auto broken = save->set(String(key), invalid);
+      ASSERT_TRUE(broken);
+      EXPECT_FALSE(recovered.load(*broken));
+    }
+    auto broken = save->set("customBar", JsonArray{JsonArray{JsonArray{JsonObject{{"type", "bag"}, {"location", invalid}}}}});
+    ASSERT_TRUE(broken);
+    EXPECT_FALSE(recovered.load(*broken));
+  }
+});
+
+const GameTestRegistration inventory_net_layout("ItemTest", "InventoryNetworkLayoutAndLegacyOrdinals", [](GameTest& fixture) {
+  // No bag elements, one custom link. Version 9 inserts twelve equipment elements
+  // ahead of swap/trash/currencies/group. Field numbers in deltas are one-based.
+  for (std::uint32_t version : {8u, 9u}) {
+    NetCompatibilityRules rules(version);
+    auto created = layout_inventory(fixture.root(), 1, 1, "bag", 0);
+    ASSERT_TRUE(created);
+    auto& inventory = **created;
+    auto baseline = inventory.write_net_state(0, rules);
+    ASSERT_TRUE(baseline);
+    auto head = inventoryTestHeadArmor(fixture.root());
+    ASSERT_TRUE(head);
+    ASSERT_EQ(inventory.setItem(EquipmentSlot::HeadCosmetic, *head), true);
+    ASSERT_EQ(inventory.setItem(EquipmentSlot::Cosmetic12, *head), true);
+    auto delta = inventory.write_net_state(baseline->second, rules);
+    ASSERT_TRUE(delta);
+    DataStreamBuffer wire(std::move(delta->first));
+    wire.set_stream_compatibility_version(rules);
+    ASSERT_EQ(wire.read<bool>(), false);
+    ASSERT_EQ(wire.read_vlq_u(), 5u);
+    EXPECT_EQ(wire.read<ItemDescriptor>(), (*head)->descriptor());
+    if (version >= 9) {
+      ASSERT_EQ(wire.read_vlq_u(), 20u);
+      EXPECT_EQ(wire.read<ItemDescriptor>(), (*head)->descriptor());
+    }
+    EXPECT_EQ(wire.read_vlq_u(), 0u);
+
+    std::uint64_t group_field = version >= 9 ? 24 : 12;
+    // Each invalid packet is followed by a valid full snapshot to restore the
+    // wire fields. Rejected values must never be published or alias index 0.
+    for (unsigned invalid = 0; invalid < 5; ++invalid) {
+      DataStreamBuffer packet;
+      ASSERT_TRUE(packet.write(false));
+      if (invalid < 2) {
+        ASSERT_TRUE(packet.write_vlq_u(group_field));
+        ASSERT_TRUE(packet.write_vlq_u(invalid == 0 ? 1 : 256));
+      } else if (invalid == 2) {
+        ASSERT_TRUE(packet.write_vlq_u(group_field + 1));
+        ASSERT_TRUE(packet.write(CustomBarLink{BagSlot{"bag", 0}, {}}));
+      } else {
+        ASSERT_TRUE(packet.write_vlq_u(group_field + 2));
+        auto selected = invalid == 3 ? SelectedActionBarLocation(CustomBarIndex{1})
+            : SelectedActionBarLocation(static_cast<EssentialItem>(255));
+        ASSERT_TRUE(packet.write(selected));
+      }
+      ASSERT_TRUE(packet.write_vlq_u(0));
+      auto rejected = inventory.read_net_state(packet.take_data(), 0.0f, rules);
+      EXPECT_FALSE(rejected);
+      EXPECT_EQ(inventory.custom_bar_group(), 0u);
+      EXPECT_EQ(inventory.selected_action_bar_location(), SelectedActionBarLocation{});
+      auto link = inventory.custom_bar_primary_slot(0);
+      ASSERT_TRUE(link);
+      EXPECT_FALSE(*link);
+      ASSERT_TRUE(inventory.read_net_state(baseline->first, 0.0f, rules));
+    }
+  }
 });
 
 const GameTestRegistration inventory_delta_visibility(
@@ -1062,7 +1238,7 @@ const GameTestRegistration inventoryMutableTraversalAndNetworkNormalizeConsumpti
     ASSERT_TRUE(trash);
     ASSERT_EQ(master.setItem(TrashSlot(), std::move(*trash)), true);
   }
-  ASSERT_TRUE(master.setCustomBarPrimarySlot(0, InventorySlot(bagSlot)));
+  ASSERT_TRUE(master.set_custom_bar_primary_slot(0, InventorySlot(bagSlot)));
 
   auto initial = master.write_net_state();
   ASSERT_TRUE(initial);
@@ -1078,7 +1254,7 @@ const GameTestRegistration inventoryMutableTraversalAndNetworkNormalizeConsumpti
   }
 
   std::size_t visited = 0;
-  ASSERT_TRUE(master.forEveryItem([&](InventorySlot const&, std::shared_ptr<Item>& current) -> std::expected<void, StarException> {
+  ASSERT_TRUE(master.for_each_item([&](InventorySlot const&, std::shared_ptr<Item>& current) -> std::expected<void, StarException> {
     ++visited;
     EXPECT_TRUE(current->consume(current->count()));
     return {};
@@ -1094,7 +1270,7 @@ const GameTestRegistration inventoryMutableTraversalAndNetworkNormalizeConsumpti
   auto slaveItems = slave.allItems();
   ASSERT_TRUE(slaveItems);
   EXPECT_TRUE(slaveItems->empty());
-  auto slaveCustomBarPrimarySlot = slave.customBarPrimarySlot(0);
+  auto slaveCustomBarPrimarySlot = slave.custom_bar_primary_slot(0);
   ASSERT_TRUE(slaveCustomBarPrimarySlot);
   EXPECT_FALSE(*slaveCustomBarPrimarySlot);
 

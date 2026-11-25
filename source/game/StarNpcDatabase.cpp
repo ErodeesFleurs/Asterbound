@@ -1001,9 +1001,7 @@ if (!result209) return std::unexpected(std::move(result209.error()));
 auto armor = std::move(*result209);
 for (auto const& item : npcVariant.items) {
   {
-    if (!EquipmentSlotNames)
-      return std::unexpected(EquipmentSlotNames.error());
-    auto result210 = EquipmentSlotNames->maybe_left(item.first);
+    auto result210 = maybe_enum_value<equipment_slot_names>(item.first);
     if (!result210)
       return std::unexpected(std::move(result210.error()));
     if (auto equipmentSlot = std::move(*result210)) {

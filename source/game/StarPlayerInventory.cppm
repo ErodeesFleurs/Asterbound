@@ -83,7 +83,7 @@ public:
 
   [[nodiscard]] std::expected<bool, StarException> consumeSlot(InventorySlot const& slot, std::uint64_t count = 1);
 
-  bool slotValid(InventorySlot const& slot) const;
+  bool slot_valid(InventorySlot const& slot) const;
 
   // Adds items to any slot except the trash or swap slots, returns stack left
   // over.
@@ -158,44 +158,44 @@ public:
   // will simply be cleared.  If a primary slot is set to a two handed item, it
   // will clear the secondary slot.  Any secondary slot that is set must be a
   // one handed item.
-  [[nodiscard]] std::expected<std::optional<InventorySlot>, StarException> customBarPrimarySlot(CustomBarIndex customBarIndex) const;
-  [[nodiscard]] std::expected<std::optional<InventorySlot>, StarException> customBarSecondarySlot(CustomBarIndex customBarIndex) const;
-  [[nodiscard]] std::expected<void, StarException> setCustomBarPrimarySlot(CustomBarIndex customBarIndex, std::optional<InventorySlot> slot);
-  [[nodiscard]] std::expected<void, StarException> setCustomBarSecondarySlot(CustomBarIndex customBarIndex, std::optional<InventorySlot> slot);
+  [[nodiscard]] std::expected<std::optional<InventorySlot>, StarException> custom_bar_primary_slot(std::size_t index) const;
+  [[nodiscard]] std::expected<std::optional<InventorySlot>, StarException> custom_bar_secondary_slot(std::size_t index) const;
+  [[nodiscard]] std::expected<void, StarException> set_custom_bar_primary_slot(std::size_t index, std::optional<InventorySlot> slot);
+  [[nodiscard]] std::expected<void, StarException> set_custom_bar_secondary_slot(std::size_t index, std::optional<InventorySlot> slot);
 
   // Link the cursor's real item and return it to inventory as one operation.
   // A two-handed cursor item always occupies the primary link.
-  [[nodiscard]] std::expected<void, StarException> linkCustomBarSwap(CustomBarIndex index, bool primary);
+  [[nodiscard]] std::expected<void, StarException> link_custom_bar_swap(std::size_t index, bool primary);
   // Clearing the displayed secondary half of a two-handed item clears primary.
-  [[nodiscard]] std::expected<void, StarException> clearCustomBarLink(CustomBarIndex index, bool primary);
+  [[nodiscard]] std::expected<void, StarException> clear_custom_bar_link(std::size_t index, bool primary);
 
   // Add the given slot to a free place in the custom bar if one is available.
-  [[nodiscard]] std::expected<void, StarException> addToCustomBar(InventorySlot slot);
+  [[nodiscard]] std::expected<void, StarException> add_to_custom_bar(InventorySlot slot);
 
   // The custom bar has 'CustomBarGroups' groups that can be switched between.
   // This will not change the selected action bar location, but may change the
   // item if the selected location points to the custom bar and the contents
   // change.
-  std::uint8_t customBarGroup() const;
-  void setCustomBarGroup(std::uint8_t group);
-  std::uint8_t customBarGroups() const;
-  std::uint8_t customBarIndexes() const;
+  std::uint8_t custom_bar_group() const;
+  [[nodiscard]] std::expected<void, StarException> set_custom_bar_group(std::uint64_t group);
+  std::size_t custom_bar_groups() const;
+  std::size_t custom_bar_indexes() const;
 
   // The action bar is the combination of the custom bar and the essential
   // items, and any of these locations can be selected.
-  SelectedActionBarLocation selectedActionBarLocation() const;
-  void selectActionBarLocation(SelectedActionBarLocation selectedActionBarLocation);
+  SelectedActionBarLocation selected_action_bar_location() const;
+  [[nodiscard]] std::expected<void, StarException> select_action_bar_location(SelectedActionBarLocation location);
 
   // Held items are either the items shortcutted to in the currently selected
   // ActionBar primary / secondary locations, or if the swap slot is non-empty
   // then the swap slot.
-  [[nodiscard]] std::expected<std::shared_ptr<Item>, StarException> primaryHeldItem() const;
-  [[nodiscard]] std::expected<std::shared_ptr<Item>, StarException> secondaryHeldItem() const;
+  [[nodiscard]] std::expected<std::shared_ptr<Item>, StarException> primary_held_item() const;
+  [[nodiscard]] std::expected<std::shared_ptr<Item>, StarException> secondary_held_item() const;
 
   // If the primary / secondary held items are valid manageable slots, returns
   // them.
-  [[nodiscard]] std::expected<std::optional<InventorySlot>, StarException> primaryHeldSlot() const;
-  [[nodiscard]] std::expected<std::optional<InventorySlot>, StarException> secondaryHeldSlot() const;
+  [[nodiscard]] std::expected<std::optional<InventorySlot>, StarException> primary_held_slot() const;
+  [[nodiscard]] std::expected<std::optional<InventorySlot>, StarException> secondary_held_slot() const;
 
   List<std::shared_ptr<Item>> pullOverflow();
   void setEquipmentVisibility(EquipmentSlot slot, bool visible);
@@ -204,9 +204,9 @@ public:
   [[nodiscard]] std::expected<void, StarException> load(Json const& store);
   [[nodiscard]] std::expected<Json, StarException> store() const;
 
-  // Checked traversal retains normalization after each successful mutation.
-  [[nodiscard]] std::expected<void, StarException> forEveryItem(std::function<std::expected<void, StarException>(InventorySlot const&, std::shared_ptr<Item>&)> function);
-  [[nodiscard]] std::expected<void, StarException> forEveryItem(std::function<std::expected<void, StarException>(InventorySlot const&, std::shared_ptr<Item> const&)> function) const;
+  // Mutable traversal normalizes before and after the callback, even on failure.
+  [[nodiscard]] std::expected<void, StarException> for_each_item(std::function<std::expected<void, StarException>(InventorySlot const&, std::shared_ptr<Item>&)> function);
+  [[nodiscard]] std::expected<void, StarException> for_each_item(std::function<std::expected<void, StarException>(InventorySlot const&, std::shared_ptr<Item> const&)> function) const;
   // Return every manageable item
   [[nodiscard]] std::expected<List<std::shared_ptr<Item>>, StarException> allItems() const;
   // Return summary of every manageable item name and the count of that item
@@ -227,8 +227,6 @@ public:
   [[nodiscard]] std::expected<bool, StarException> write_net_delta(DataStream& ds, std::uint64_t fromVersion, NetCompatibilityRules rules = {}) const override;
 
 private:
-  using CustomBarLink = std::pair<std::optional<InventorySlot>, std::optional<InventorySlot>>;
-
   template <std::derived_from<NetElement>> friend class NetElementTop;
   explicit PlayerInventory(Root& root);
   PlayerInventory(Root& root, Json inventoryConfig, Json currenciesConfig);
@@ -241,8 +239,10 @@ private:
   [[nodiscard]] std::expected<std::shared_ptr<Item>, StarException> retrieve(InventorySlot const& slot) const;
   [[nodiscard]] std::expected<std::reference_wrapper<std::shared_ptr<Item>>, StarException> retrieveForMutation(InventorySlot const& slot);
 
-  void swapCustomBarLinks(InventorySlot a, InventorySlot b);
-  [[nodiscard]] std::expected<void, StarException> autoAddToCustomBar(InventorySlot slot);
+  bool action_bar_location_valid(SelectedActionBarLocation const& location) const;
+  [[nodiscard]] std::expected<std::optional<std::reference_wrapper<InventorySlot const>>, StarException> secondary_held_link() const;
+  void swap_custom_bar_links(InventorySlot const& a, InventorySlot const& b);
+  [[nodiscard]] std::expected<void, StarException> auto_add_to_custom_bar(InventorySlot slot);
 
   [[nodiscard]] std::expected<void, StarException> net_elements_need_load(bool full) override;
   [[nodiscard]] std::expected<void, StarException> net_elements_need_store() override;
@@ -261,9 +261,9 @@ private:
   std::shared_ptr<Item> m_trashSlot;
   Map<EssentialItem, std::shared_ptr<Item>> m_essential;
   StringMap<std::uint64_t> m_currencies;
-  std::uint8_t m_customBarGroup;
-  MultiArray<CustomBarLink, 2> m_customBar;
-  SelectedActionBarLocation m_selectedActionBar;
+  std::uint8_t m_custom_bar_group;
+  MultiArray<CustomBarLink, 2> m_custom_bar;
+  SelectedActionBarLocation m_selected_action_bar;
 
   Map<EquipmentSlot, NetElementData<ItemDescriptor>> m_equipmentNetState;
   Map<String, List<NetElementData<ItemDescriptor>>> m_bagsNetState;
@@ -271,9 +271,9 @@ private:
   NetElementData<ItemDescriptor> m_trashSlotNetState;
   Map<EssentialItem, NetElementData<ItemDescriptor>> m_essentialNetState;
   NetElementData<StringMap<std::uint64_t>> m_currenciesNetState;
-  NetElementUInt m_customBarGroupNetState;
-  MultiArray<NetElementData<CustomBarLink>, 2> m_customBarNetState;
-  NetElementData<SelectedActionBarLocation> m_selectedActionBarNetState;
+  NetElementUInt m_custom_bar_group_net_state;
+  MultiArray<NetElementData<CustomBarLink>, 2> m_custom_bar_net_state;
+  NetElementData<SelectedActionBarLocation> m_selected_action_bar_net_state;
 
   List<std::shared_ptr<Item>> m_inventoryLoadOverflow;
   unsigned m_equipmentVisibilityMask;

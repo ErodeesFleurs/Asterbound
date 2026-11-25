@@ -685,9 +685,8 @@ std::expected<String, StarException> ClientCommandProcessor::suicide() {
 }
 
 std::expected<String, StarException> ClientCommandProcessor::naked() {
-  if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
   auto inventory = m_universeClient->mainPlayer()->inventory();
-  for (auto slot : EquipmentSlotNames->left_values()) {
+  for (auto const& [slot, name] : equipment_slot_names) {
     auto item = inventory->takeSlot(slot);
     if (!item) return std::unexpected(std::move(item.error()));
     auto remaining = inventory->addToBags(std::move(*item));
@@ -733,13 +732,12 @@ std::expected<String, StarException> ClientCommandProcessor::giveEssentialItem(S
   if (!descriptor) return std::unexpected(std::move(descriptor.error()));
   auto item = (*database)->item(*descriptor);
   if (!item) return std::unexpected(std::move(item.error()));
-  if (!EssentialItemNames) return std::unexpected(EssentialItemNames.error());
-  auto slot = EssentialItemNames->get_left((*arguments)[1]);
+  auto slot = enum_value<essential_item_names>((*arguments)[1]);
   if (!slot) {
     if (slot.error().is<MapException>()) return Star::format("Invalid essential item slot {}.", (*arguments)[1]);
     return std::unexpected(std::move(slot.error()));
   }
-  m_universeClient->mainPlayer()->inventory()->setEssentialItem(slot->get(), *item);
+  m_universeClient->mainPlayer()->inventory()->setEssentialItem(*slot, *item);
   return Star::format("Put {} in player slot {}", (*item)->name(), (*arguments)[1]);
 }
 

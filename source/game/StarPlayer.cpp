@@ -1699,11 +1699,11 @@ std::expected<void, StarException> Player::dropItem() {
   if (!currentWorld || !canUseTool())
     return {};
   Vec2F throwDirection = currentWorld->get().geometry().diff(m_aimPosition, position());
-  auto primarySlotResult = m_inventory->primaryHeldSlot();
+  auto primarySlotResult = m_inventory->primary_held_slot();
   if (!primarySlotResult)
     return std::unexpected(std::move(primarySlotResult.error()));
   auto primarySlot = std::move(*primarySlotResult);
-  auto secondarySlotResult = m_inventory->secondaryHeldSlot();
+  auto secondarySlotResult = m_inventory->secondary_held_slot();
   if (!secondarySlotResult)
     return std::unexpected(std::move(secondarySlotResult.error()));
   auto secondarySlot = std::move(*secondarySlotResult);
@@ -2236,7 +2236,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
   if (!itemDatabaseResult)
     return std::unexpected(std::move(itemDatabaseResult.error()));
   auto itemDatabase = std::move(*itemDatabaseResult);
-      if (auto result = m_inventory->forEveryItem([&](InventorySlot const&, std::shared_ptr<Item>& item) -> std::expected<void, StarException> {
+      if (auto result = m_inventory->for_each_item([&](InventorySlot const&, std::shared_ptr<Item>& item) -> std::expected<void, StarException> {
         if (auto result = itemDatabase->ageItem(item, m_age_items_timer.duration); !result)
           return std::unexpected(std::move(result.error()));
         return {};
@@ -2934,11 +2934,11 @@ std::expected<void, StarException> Player::clearSwap() {
 std::expected<void, StarException> Player::refreshItems() {
   if (isSlave())
     return {};
-  auto primaryResult = m_inventory->primaryHeldItem();
+  auto primaryResult = m_inventory->primary_held_item();
   if (!primaryResult)
     return std::unexpected(std::move(primaryResult.error()));
   auto primary = std::move(*primaryResult);
-  auto secondaryResult = m_inventory->secondaryHeldItem();
+  auto secondaryResult = m_inventory->secondary_held_item();
   if (!secondaryResult)
     return std::unexpected(std::move(secondaryResult.error()));
   auto secondary = std::move(*secondaryResult);
@@ -4020,12 +4020,10 @@ std::expected<void, StarException> Player::setNetStates() {
 }
 
 std::expected<void, StarException> Player::setNetArmorSecret(EquipmentSlot slot, std::shared_ptr<ArmorItem> const& armor, bool visible) {
-  if (!EquipmentSlotNames)
-    return std::unexpected(EquipmentSlotNames.error());
-  auto slotNameResult = EquipmentSlotNames->get_right(slot);
+  auto slotNameResult = enum_name<equipment_slot_names>(slot);
   if (!slotNameResult)
     return std::unexpected(std::move(slotNameResult.error()));
-  auto const& slotName = slotNameResult->get();
+  auto const& slotName = *slotNameResult;
   ItemDescriptor descriptor = visible ? itemSafeDescriptor(armor) : ItemDescriptor();
   auto versioningResult = root().versioningDatabase();
   if (!versioningResult)
@@ -4069,14 +4067,12 @@ std::expected<void, StarException> Player::getNetArmorSecrets() {
     if (!databaseResult)
       return std::unexpected(std::move(databaseResult.error()));
     auto database = std::move(*databaseResult);
-    if (!EquipmentSlotNames)
-      return std::unexpected(EquipmentSlotNames.error());
     for (std::uint8_t i = 0; i != 12; ++i) {
       auto slot = EquipmentSlot(static_cast<std::uint8_t>(EquipmentSlot::Cosmetic1) + i);
-      auto slotNameResult = EquipmentSlotNames->get_right(slot);
+      auto slotNameResult = enum_name<equipment_slot_names>(slot);
       if (!slotNameResult)
         return std::unexpected(std::move(slotNameResult.error()));
-      auto const& slotName = slotNameResult->get();
+      auto const& slotName = *slotNameResult;
       auto& currentVersion = m_armorSecretNetVersions[slot];
       std::uint64_t newVersion = 0;
       auto versionResult = getSecretProperty(Star::format("armorWearer.{}.version", slotName), 0);
@@ -4830,7 +4826,7 @@ std::expected<void, StarException> Player::dropSelectedItems(std::function<std::
   auto currentWorld = maybeWorld();
   if (!currentWorld)
     return {};
-  return m_inventory->forEveryItem([&](InventorySlot const&, std::shared_ptr<Item>& item) -> std::expected<void, StarException> {
+  return m_inventory->for_each_item([&](InventorySlot const&, std::shared_ptr<Item>& item) -> std::expected<void, StarException> {
     if (!item)
       return {};
     if (filter) {

@@ -251,7 +251,10 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
     if (!grid)
       return std::unexpected(std::move(grid.error()));
     auto& itemGrid = grid->get();
-    InventorySlot inventorySlot = BagSlot(bagType, itemGrid.selectedIndex());
+    auto index = itemGrid.selectedIndex();
+    if (index >= itemGrid.bagSize() || !std::in_range<std::uint8_t>(index))
+      return {};
+    InventorySlot inventorySlot = BagSlot{bagType, static_cast<std::uint8_t>(index)};
 
     auto inventory = m_player->inventory();
     if (context().shiftHeld()) {
@@ -379,7 +382,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
             return std::unexpected(std::move(setItemResult22.error()));
         } else if (std::holds_alternative<BagSlot>(slot)) {
           {
-            auto itemAllowedInBagResult23 = inventory->itemAllowedInBag(swapSlot, std::get<BagSlot>(slot).first);
+            auto itemAllowedInBagResult23 = inventory->itemAllowedInBag(swapSlot, std::get<BagSlot>(slot).bag_name);
             if (!itemAllowedInBagResult23)
               return std::unexpected(std::move(itemAllowedInBagResult23.error()));
             if (std::move(*itemAllowedInBagResult23))
@@ -405,7 +408,10 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
     auto grid = convert_ref<ItemGridWidget>(widget);
     if (!grid)
       return std::unexpected(std::move(grid.error()));
-    auto slot = BagSlot(bagType, grid->get().selectedIndex());
+    auto index = grid->get().selectedIndex();
+    if (index >= grid->get().bagSize() || !std::in_range<std::uint8_t>(index))
+      return {};
+    auto slot = BagSlot{bagType, static_cast<std::uint8_t>(index)};
     auto rightClickCallbackResult27 = rightClickCallback(slot);
     if (!rightClickCallbackResult27)
       return std::unexpected(std::move(rightClickCallbackResult27.error()));
@@ -558,15 +564,12 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
   };
 
   {
-    auto const& enumResult53 = EquipmentSlotNames;
-    if (!enumResult53)
-      return std::unexpected(enumResult53.error());
-    for (auto const p : (*enumResult53)) {
+    for (auto const& p : equipment_slot_names) {
       EquipmentSlot slot = p.first;
       auto registerSlotCallbacksResult54 = registerSlotCallbacks(p.second, slot);
       if (!registerSlotCallbacksResult54)
         return std::unexpected(std::move(registerSlotCallbacksResult54.error()));
-      invWindowReader.registerCallback(p.second + ".middle", [slot, this](Widget&)  -> std::expected<void, StarException> {
+      invWindowReader.registerCallback(String(p.second) + ".middle", [slot, this](Widget&)  -> std::expected<void, StarException> {
         auto inventory = m_player->inventory();
         inventory->setEquipmentVisibility(slot, !inventory->equipmentVisibility(slot));
       
@@ -611,10 +614,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
   m_disabledTechOverlays.push_back(std::move(*legs_overlay));
 
   {
-    auto const& enumResult64 = EquipmentSlotNames;
-    if (!enumResult64)
-      return std::unexpected(enumResult64.error());
-    for (auto const p : (*enumResult64)) {
+    for (auto const& p : equipment_slot_names) {
       {
         auto fetchChildResult65 = fetchChild<ItemSlotWidget>(p.second);
         if (!fetchChildResult65)
@@ -713,10 +713,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
       return std::unexpected(std::move(getBoolResult86.error()));
     if ((m_displayingCosmetics = m_alwaysDisplayCosmetics = std::move(*getBoolResult86))) {
       {
-        auto const& enumResult87 = EquipmentSlotNames;
-        if (!enumResult87)
-          return std::unexpected(enumResult87.error());
-        for (auto const& p : (*enumResult87)) {
+        for (auto const& p : equipment_slot_names) {
           if (p.first >= EquipmentSlot::Cosmetic1) {
             {
               auto fetchChildResult88 = fetchChild<ItemSlotWidget>(p.second);
@@ -887,10 +884,7 @@ std::expected<bool, StarException> InventoryPane::sendEvent(InputEvent const& ev
   if (auto mousePosition = Widget::context().mousePosition(event)) {
     bool displayingCosmetics = false;
     {
-      auto const& enumResult114 = EquipmentSlotNames;
-      if (!enumResult114)
-        return std::unexpected(enumResult114.error());
-      for (auto const& p : (*enumResult114)) {
+      for (auto const& p : equipment_slot_names) {
         if (p.first >= EquipmentSlot::HeadCosmetic) {
           {
             auto fetchChildResult115 = fetchChild<ItemSlotWidget>(p.second);
@@ -907,10 +901,7 @@ std::expected<bool, StarException> InventoryPane::sendEvent(InputEvent const& ev
 
     if (m_displayingCosmetics != displayingCosmetics) {
       {
-        auto const& enumResult116 = EquipmentSlotNames;
-        if (!enumResult116)
-          return std::unexpected(enumResult116.error());
-        for (auto const& p : (*enumResult116)) {
+        for (auto const& p : equipment_slot_names) {
           if (p.first >= EquipmentSlot::Cosmetic1) {
             {
               auto fetchChildResult117 = fetchChild<ItemSlotWidget>(p.second);
@@ -999,9 +990,9 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
   auto& context = Widget::context();
 
   HashSet<std::shared_ptr<Item>> customBarItems;
-  for (std::uint8_t i = 0; i < inventory->customBarIndexes(); ++i) {
+  for (std::size_t i = 0; i < inventory->custom_bar_indexes(); ++i) {
     {
-      auto customBarPrimarySlotResult125 = inventory->customBarPrimarySlot(i);
+      auto customBarPrimarySlotResult125 = inventory->custom_bar_primary_slot(i);
       if (!customBarPrimarySlotResult125)
         return std::unexpected(std::move(customBarPrimarySlotResult125.error()));
       if (auto primarySlot = std::move(*customBarPrimarySlotResult125)) {
@@ -1015,7 +1006,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
       }
     }
     {
-      auto customBarSecondarySlotResult127 = inventory->customBarSecondarySlot(i);
+      auto customBarSecondarySlotResult127 = inventory->custom_bar_secondary_slot(i);
       if (!customBarSecondarySlotResult127)
         return std::unexpected(std::move(customBarSecondarySlotResult127.error()));
       if (auto secondarySlot = std::move(*customBarSecondarySlotResult127)) {
@@ -1052,10 +1043,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
   m_trashSlot->setProgress(m_trash_burn.remaining_fraction());
 
   {
-    auto const& enumResult131 = EquipmentSlotNames;
-    if (!enumResult131)
-      return std::unexpected(enumResult131.error());
-    for (auto const& p : (*enumResult131)) {
+    for (auto const& p : equipment_slot_names) {
       {
         auto fetchChildResult132 = fetchChild<ItemSlotWidget>(p.second);
         if (!fetchChildResult132)

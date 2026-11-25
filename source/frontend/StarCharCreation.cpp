@@ -538,12 +538,10 @@ std::expected<void, StarException> CharCreationPane::changed() {
     return std::unexpected(std::move(result.error()));
   if (auto result = m_previewPlayer->refresh_humanoid_parameters(); !result)
     return std::unexpected(std::move(result.error()));
-  if (!EquipmentSlotNames)
-    return std::unexpected(EquipmentSlotNames.error());
   auto itemDatabase = root.itemDatabase();
   if (!itemDatabase)
     return std::unexpected(std::move(itemDatabase.error()));
-  for (auto const& slot : *EquipmentSlotNames) {
+  for (auto const& slot : equipment_slot_names) {
     if (auto equipment = results->armor.maybe(slot.second)) {
       auto descriptor = ItemDescriptor::create(*equipment);
       if (!descriptor)

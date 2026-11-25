@@ -1877,11 +1877,10 @@ if (!result407) return std::unexpected(std::move(result407.error()));
 
   auto result412 = callbacks.register_callback("getItemSlot", [this](String const& entry) -> std::expected<Json, StarException> {
       {
-  if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
-  auto result408 = EquipmentSlotNames->find_left_ref(entry);
+  auto result408 = maybe_enum_value<equipment_slot_names>(entry);
   if (!result408) return std::unexpected(std::move(result408.error()));
   if (auto equipmentSlot = std::move(*result408)) {
-    return m_armor->item_descriptor(static_cast<std::uint8_t>(equipmentSlot->get())).toJson();
+    return m_armor->item_descriptor(static_cast<std::uint8_t>(*equipmentSlot)).toJson();
         } else {
     auto result409 = entry.equals_ignore_case("primary");
     if (!result409) return std::unexpected(std::move(result409.error()));
@@ -2271,11 +2270,10 @@ if (!result491) return std::unexpected(std::move(result491.error()));
 auto item = std::move(*result491);
 
   {
-  if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
-  auto result492 = EquipmentSlotNames->find_left_ref(slot);
+  auto result492 = maybe_enum_value<equipment_slot_names>(slot);
   if (!result492) return std::unexpected(std::move(result492.error()));
   if (auto equipmentSlot = std::move(*result492)) {
-    m_armor->set_item(static_cast<std::uint8_t>(equipmentSlot->get()), as<ArmorItem>(item));
+    m_armor->set_item(static_cast<std::uint8_t>(*equipmentSlot), as<ArmorItem>(item));
     } else {
     auto result493 = slot.equals_ignore_case("primary");
     if (!result493) return std::unexpected(std::move(result493.error()));

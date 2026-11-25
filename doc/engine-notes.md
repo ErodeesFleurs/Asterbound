@@ -59,6 +59,7 @@ commits identify upstream sources; they are not cross-platform validation report
 
 ### Gameplay catalogs and physics
 
+- Bag and custom action-bar indices are zero-based bytes: a 256-slot bag ends at index 255. JSON and Lua reject an out-of-range index rather than wrapping to another item. Bag names cannot be the JSON slot discriminators `equipment`, `swap`, or `trash`. Equipment names such as `headCosmetic` and essential-tool save keys such as `beamAxe` retain their original spelling.
 - Entity interaction scripts return an action name or `[name, data]`; additional array entries are ignored. An object without a script result uses its configured action. A vehicle without a script action chooses the nearest enabled lounge position, retaining the first enabled seat on a tie. A vehicle with no enabled seats returns no action.
 - Player interaction results are delivered in enqueue order among ready actions. A pending action does not block later ready actions. If observing an action fails, the batch remains queued for retry.
 - [Known blueprint relearning](https://github.com/OpenStarbound/OpenStarbound/commit/9814f594) without a failure notification no longer constructs an Item or loads notification assets. New unlocks still validate Item construction before changing blueprint state.

@@ -2,83 +2,99 @@ import std;
 import star.string;
 import star.json;
 import star.bi_map;
-import star.strong_typedef;
+import star.data_stream;
+import star.data_stream_extra;
 import star.format;
 import star.text_formatter;
-import star.json_extra;
 import star.inventory_types;
 
 namespace Star {
 
-extern std::expected<EnumMap<EquipmentSlot>, StarException> const EquipmentSlotNames = EnumMap<EquipmentSlot>::create({
-  {EquipmentSlot::Head, "head"},
-  {EquipmentSlot::Chest, "chest"},
-  {EquipmentSlot::Legs, "legs"},
-  {EquipmentSlot::Back, "back"},
-  {EquipmentSlot::HeadCosmetic, "headCosmetic"},
-  {EquipmentSlot::ChestCosmetic, "chestCosmetic"},
-  {EquipmentSlot::LegsCosmetic, "legsCosmetic"},
-  {EquipmentSlot::BackCosmetic, "backCosmetic"},
-  {EquipmentSlot::Cosmetic1, "cosmetic1"},
-  {EquipmentSlot::Cosmetic2, "cosmetic2"},
-  {EquipmentSlot::Cosmetic3, "cosmetic3"},
-  {EquipmentSlot::Cosmetic4, "cosmetic4"},
-  {EquipmentSlot::Cosmetic5, "cosmetic5"},
-  {EquipmentSlot::Cosmetic6, "cosmetic6"},
-  {EquipmentSlot::Cosmetic7, "cosmetic7"},
-  {EquipmentSlot::Cosmetic8, "cosmetic8"},
-  {EquipmentSlot::Cosmetic9, "cosmetic9"},
-  {EquipmentSlot::Cosmetic10, "cosmetic10"},
-  {EquipmentSlot::Cosmetic11, "cosmetic11"},
-  {EquipmentSlot::Cosmetic12, "cosmetic12"}
-});
-
-[[nodiscard]] std::expected<InventorySlot, StarException> jsonToInventorySlot(Json const& json) {
-  auto type = json.get_string("type");
-  if (!type) return std::unexpected(std::move(type.error()));
-  auto location = json.get("location", Json());
-  if (!location) return std::unexpected(std::move(location.error()));
-  if (*type == "equipment") {
-    auto name = location->to_string();
-    if (!name) return std::unexpected(std::move(name.error()));
-    if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
-    auto slot = EquipmentSlotNames->get_left(*name);
-    if (!slot) return std::unexpected(std::move(slot.error()));
-    return InventorySlot(slot->get());
-  } else if (*type == "swap") {
-    return InventorySlot(SwapSlot());
-  } else if (*type == "trash") {
-    return InventorySlot(TrashSlot());
-  } else {
-    auto index = location->to_uint();
-    if (!index) return std::unexpected(std::move(index.error()));
-    return InventorySlot(BagSlot(*type, *index));
-  }
+bool is_reserved_bag_name(String const& name) {
+  return name == "equipment" || name == "swap" || name == "trash";
 }
 
-[[nodiscard]] std::expected<Json, StarException> jsonFromInventorySlot(InventorySlot const& slot) {
-  if (std::holds_alternative<EquipmentSlot>(slot)) {
-    if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
-    auto name = EquipmentSlotNames->get_right(std::get<EquipmentSlot>(slot));
+std::optional<std::uint8_t> inventory_index(double value) {
+  // Inspect the representation so fast-math cannot accept a NaN or flush a fraction to zero.
+  static_assert(std::numeric_limits<double>::is_iec559);
+  auto bits = std::bit_cast<std::uint64_t>(value);
+  if ((bits << 1) == 0) return 0;
+  if (bits < std::bit_cast<std::uint64_t>(1.0) || bits > std::bit_cast<std::uint64_t>(255.0)) return {};
+  auto fractional_bits = 52 - ((bits >> 52) - 1023);
+  if (bits & ((std::uint64_t{1} << fractional_bits) - 1)) return {};
+  return static_cast<std::uint8_t>(value);
+}
+
+namespace {
+std::expected<std::uint8_t, StarException> json_index(Json const& json) {
+  auto number = json.to_double();
+  if (!number) return std::unexpected(std::move(number.error()));
+  if (auto index = inventory_index(*number)) return *index;
+  return std::unexpected(JsonException("Inventory index must be an integer between 0 and 255"));
+}
+}
+
+std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, BagSlot const& slot) {
+  return ds << slot.bag_name << slot.index;
+}
+
+std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, BagSlot& slot) {
+  BagSlot decoded;
+  auto result = ds >> decoded.bag_name >> decoded.index;
+  if (result) slot = std::move(decoded);
+  return result;
+}
+
+std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, CustomBarLink const& link) {
+  return ds << link.primary << link.secondary;
+}
+
+std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, CustomBarLink& link) {
+  CustomBarLink decoded;
+  auto result = ds >> decoded.primary >> decoded.secondary;
+  if (result) link = std::move(decoded);
+  return result;
+}
+
+std::expected<InventorySlot, StarException> json_to_inventory_slot(Json const& json) {
+  auto type = json.get("type").and_then([](Json const& value) { return value.string_ptr(); });
+  if (!type) return std::unexpected(std::move(type.error()));
+  if (**type == "swap") return SwapSlot{};
+  if (**type == "trash") return TrashSlot{};
+  auto location = json.get("location");
+  if (!location) return std::unexpected(std::move(location.error()));
+  if (**type == "equipment") {
+    auto name = location->string_ptr();
     if (!name) return std::unexpected(std::move(name.error()));
-    return JsonObject{{"type", "equipment"}, {"location", name->get()}};
+    return enum_value<equipment_slot_names>(**name);
+  }
+  auto index = json_index(*location);
+  if (!index) return std::unexpected(std::move(index.error()));
+  return BagSlot{**type, *index};
+}
+
+[[nodiscard]] std::expected<Json, StarException> json_from_inventory_slot(InventorySlot const& slot) {
+  if (std::holds_alternative<EquipmentSlot>(slot)) {
+    auto name = enum_name<equipment_slot_names>(std::get<EquipmentSlot>(slot));
+    if (!name) return std::unexpected(std::move(name.error()));
+    return JsonObject{{"type", "equipment"}, {"location", *name}};
   } else if (std::holds_alternative<SwapSlot>(slot)) {
     return JsonObject{{"type", "swap"}};
   } else if (std::holds_alternative<TrashSlot>(slot)) {
     return JsonObject{{"type", "trash"}};
   } else {
     auto const& bag = std::get<BagSlot>(slot);
-    return JsonObject{{"type", bag.first}, {"location", bag.second}};
+    if (is_reserved_bag_name(bag.bag_name)) return std::unexpected(JsonException("Reserved inventory bag name"));
+    return JsonObject{{"type", bag.bag_name}, {"location", bag.index}};
   }
 }
 
 [[nodiscard]] std::expected<void, StarException> write_text(TextBuffer& output, InventorySlot const& slot) {
   if (std::holds_alternative<EquipmentSlot>(slot)) {
-    if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
-    auto name = EquipmentSlotNames->get_right(std::get<EquipmentSlot>(slot));
+    auto name = enum_name<equipment_slot_names>(std::get<EquipmentSlot>(slot));
     if (!name) return std::unexpected(std::move(name.error()));
     output.append("InventorySlot{type: equipment, location: ");
-    append_text(output, name->get());
+    output.append(*name);
     output.push_back('}');
   } else if (std::holds_alternative<SwapSlot>(slot)) {
     output.append("InventorySlot{type: swap}");
@@ -87,46 +103,37 @@ extern std::expected<EnumMap<EquipmentSlot>, StarException> const EquipmentSlotN
   } else {
     auto const& bag = std::get<BagSlot>(slot);
     output.append("InventorySlot{type: ");
-    append_text(output, bag.first);
+    append_text(output, bag.bag_name);
     output.append(", location: ");
-    std::format_to(std::back_inserter(output), "{}", bag.second);
+    std::format_to(std::back_inserter(output), "{}", bag.index);
     output.push_back('}');
   }
   return {};
 }
 
-extern std::expected<EnumMap<EssentialItem>, StarException> const EssentialItemNames = EnumMap<EssentialItem>::create({
-  {EssentialItem::BeamAxe, "beamaxe"},
-  {EssentialItem::WireTool, "wiretool"},
-  {EssentialItem::PaintTool, "painttool"},
-  {EssentialItem::InspectionTool, "inspectiontool"}
-});
-
-[[nodiscard]] std::expected<SelectedActionBarLocation, StarException> jsonToSelectedActionBarLocation(Json const& json) {
+[[nodiscard]] std::expected<SelectedActionBarLocation, StarException> json_to_selected_action_bar_location(Json const& json) {
   if (json.is_type(Json::Type::String)) {
-    auto name = json.to_string();
+    auto name = json.string_ptr();
     if (!name) return std::unexpected(std::move(name.error()));
-    if (!EssentialItemNames) return std::unexpected(EssentialItemNames.error());
-    auto item = EssentialItemNames->get_left(*name);
+    auto item = enum_value<essential_item_names>(**name);
     if (!item) return std::unexpected(std::move(item.error()));
-    return SelectedActionBarLocation(item->get());
+    return SelectedActionBarLocation(*item);
   } else if (json.is_null()) {
     return SelectedActionBarLocation();
   } else {
-    auto index = json.to_uint();
+    auto index = json_index(json);
     if (!index) return std::unexpected(std::move(index.error()));
-    return SelectedActionBarLocation(static_cast<CustomBarIndex>(*index));
+    return SelectedActionBarLocation(*index);
   }
 }
 
-[[nodiscard]] std::expected<Json, StarException> jsonFromSelectedActionBarLocation(SelectedActionBarLocation const& location) {
+[[nodiscard]] std::expected<Json, StarException> json_from_selected_action_bar_location(SelectedActionBarLocation const& location) {
   if (std::holds_alternative<CustomBarIndex>(location))
     return Json(std::get<CustomBarIndex>(location));
   if (std::holds_alternative<EssentialItem>(location)) {
-    if (!EssentialItemNames) return std::unexpected(EssentialItemNames.error());
-    auto name = EssentialItemNames->get_right(std::get<EssentialItem>(location));
+    auto name = enum_name<essential_item_names>(std::get<EssentialItem>(location));
     if (!name) return std::unexpected(std::move(name.error()));
-    return Json(name->get());
+    return Json(*name);
   }
   return Json();
 }

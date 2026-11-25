@@ -183,6 +183,12 @@ import star.quests;
 
 namespace Star {
 
+static std::expected<CustomBarIndex, StarException> lua_action_bar_index(PlayerInventory const& inventory, std::int64_t slot) {
+  if (slot < 1 || std::cmp_greater(slot, inventory.custom_bar_indexes()))
+    return std::unexpected(StarException("Action bar slot out of range"));
+  return static_cast<CustomBarIndex>(slot - 1);
+}
+
 std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root& root, Player& player) {
   LuaCallbacks callbacks;
 
@@ -571,34 +577,34 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.register_callback("actionBarGroup", [&player]() -> std::expected<decltype(lua_tuple_return(int(), std::uint8_t())), StarException> {
-    return lua_tuple_return(player.inventory()->customBarGroup() + 1, player.inventory()->customBarGroups());
+  if (auto registered = callbacks.register_callback("actionBarGroup", [&player] {
+    auto inventory = player.inventory();
+    return lua_tuple_return(inventory->custom_bar_group() + 1, inventory->custom_bar_groups());
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered =
         callbacks.register_callback("setActionBarGroup",
-                                   [&player](int group) -> std::expected<void, StarException> {
-                                     player.inventory()->setCustomBarGroup(
-                                       (group - 1) % static_cast<unsigned>(player.inventory()->customBarGroups()));
-                                     return {};
+                                   [&player](std::int64_t group) -> std::expected<void, StarException> {
+                                     if (group < 1)
+                                       return std::unexpected(StarException("Action bar group out of range"));
+                                     return player.inventory()->set_custom_bar_group(static_cast<std::uint64_t>(group - 1));
                                    });
       !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("selectedActionBarSlot", [&player](LuaEngine& engine) -> std::expected<std::optional<LuaValue>, StarException> {
-    auto location = player.inventory()->selectedActionBarLocation();
+    auto location = player.inventory()->selected_action_bar_location();
     if (std::holds_alternative<CustomBarIndex>(location)) {
-      auto value = engine.lua_from<CustomBarIndex>(std::get<CustomBarIndex>(location) + 1);
-    if (!value) return std::unexpected(std::move(value.error()));
-    return std::optional<LuaValue>(std::move(*value));
+      auto value = engine.lua_from<int>(std::get<CustomBarIndex>(location) + 1);
+      if (!value) return std::unexpected(std::move(value.error()));
+      return std::optional<LuaValue>(std::move(*value));
     }
     if (std::holds_alternative<EssentialItem>(location)) {
-      if (!EssentialItemNames) return std::unexpected(EssentialItemNames.error());
-      auto name = EssentialItemNames->get_right(std::get<EssentialItem>(location));
+      auto name = enum_name<essential_item_names>(std::get<EssentialItem>(location));
       if (!name)
         return std::unexpected(std::move(name.error()));
-      auto value = engine.lua_from<String>(name->get());
+      auto value = engine.lua_from<std::string_view>(*name);
       if (!value)
         return std::unexpected(std::move(value.error()));
       return std::optional<LuaValue>(std::move(*value));
@@ -607,45 +613,45 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.register_callback("setSelectedActionBarSlot", [&player](std::variant<std::monostate, int, String> const& slot) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setSelectedActionBarSlot", [&player](std::variant<std::monostate, std::int64_t, String> const& slot) -> std::expected<void, StarException> {
     auto inventory = player.inventory();
-    if (std::holds_alternative<std::monostate>(slot)) {
-      inventory->selectActionBarLocation({});
-    } else if (std::holds_alternative<int>(slot)) {
-      CustomBarIndex wrapped = (std::get<int>(slot) - 1) % static_cast<unsigned>(inventory->customBarIndexes());
-      inventory->selectActionBarLocation(SelectedActionBarLocation(wrapped));
-    } else {
-      if (!EssentialItemNames) return std::unexpected(EssentialItemNames.error());
-      auto item = EssentialItemNames->get_left(std::get<String>(slot));
-      if (!item)
-        return std::unexpected(std::move(item.error()));
-      inventory->selectActionBarLocation(SelectedActionBarLocation(item->get()));
+    if (std::holds_alternative<std::monostate>(slot))
+      return inventory->select_action_bar_location({});
+    if (auto number = std::get_if<std::int64_t>(&slot)) {
+      auto index = lua_action_bar_index(*inventory, *number);
+      if (!index) return std::unexpected(std::move(index.error()));
+      return inventory->select_action_bar_location(*index);
     }
-    return {};
+    auto item = enum_value<essential_item_names>(std::get<String>(slot));
+    if (!item) return std::unexpected(std::move(item.error()));
+    return inventory->select_action_bar_location(*item);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.register_callback("actionBarSlotLink", [&player](int slot, String const& handName) -> std::expected<std::optional<InventorySlot>, StarException> {
+  if (auto registered = callbacks.register_callback("actionBarSlotLink", [&player](std::int64_t slot, String const& handName) -> std::expected<std::optional<InventorySlot>, StarException> {
     auto inventory = player.inventory();
-    CustomBarIndex wrapped = (slot - 1) % static_cast<unsigned>(inventory->customBarIndexes());
-    if (handName == "primary") return inventory->customBarPrimarySlot(wrapped);
-    if (handName == "alt") return inventory->customBarSecondarySlot(wrapped);
+    auto index = lua_action_bar_index(*inventory, slot);
+    if (!index) return std::unexpected(std::move(index.error()));
+    if (handName == "primary") return inventory->custom_bar_primary_slot(*index);
+    if (handName == "alt") return inventory->custom_bar_secondary_slot(*index);
     return std::unexpected(StarException::format("Unknown tool hand {}", handName));
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.register_callback("setActionBarSlotLink", [&player](int slot, String const& handName, std::optional<InventorySlot> inventorySlot) -> std::expected<void, StarException> {
+  if (auto registered = callbacks.register_callback("setActionBarSlotLink", [&player](std::int64_t slot, String const& handName, std::optional<InventorySlot> inventorySlot) -> std::expected<void, StarException> {
     auto inventory = player.inventory();
-    CustomBarIndex wrapped = (slot - 1) % static_cast<unsigned>(inventory->customBarIndexes());
-    if (inventorySlot && !inventory->slotValid(*inventorySlot)) inventorySlot.reset();
-    if (handName == "primary") return inventory->setCustomBarPrimarySlot(wrapped, inventorySlot);
-    if (handName == "alt") return inventory->setCustomBarSecondarySlot(wrapped, inventorySlot);
+    auto index = lua_action_bar_index(*inventory, slot);
+    if (!index) return std::unexpected(std::move(index.error()));
+    if (inventorySlot && !inventory->slot_valid(*inventorySlot))
+      return std::unexpected(StarException("Inventory slot out of range"));
+    if (handName == "primary") return inventory->set_custom_bar_primary_slot(*index, std::move(inventorySlot));
+    if (handName == "alt") return inventory->set_custom_bar_secondary_slot(*index, std::move(inventorySlot));
     return std::unexpected(StarException::format("Unknown tool hand {}", handName));
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
   struct ActionBarViewCache {
-    PlayerInventory const* inventory = nullptr;
+    std::weak_ptr<PlayerInventory const> inventory;
     List<std::shared_ptr<Item>> items;
     List<unsigned> flags;
     SelectedActionBarLocation selection;
@@ -655,11 +661,12 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   if (auto registered = callbacks.register_callback("actionBarView",
       [&player, cache = ActionBarViewCache{}](LuaEngine& engine, std::optional<std::uint64_t> knownRevision) mutable -> std::expected<std::optional<LuaTable>, StarException> {
     auto inventory = player.inventory();
-    auto indexes = inventory->customBarIndexes();
-    std::size_t size = indexes * 2 + EssentialItemCount + 1;
-    bool changed = cache.inventory != inventory.get() || cache.items.size() != size
-      || cache.selection != inventory->selectedActionBarLocation() || cache.group != inventory->customBarGroup();
-    cache.inventory = inventory.get();
+    auto indexes = inventory->custom_bar_indexes();
+    std::size_t size = indexes * 2 + essential_item_count + 1;
+    bool rebound = cache.inventory.owner_before(inventory) || inventory.owner_before(cache.inventory);
+    bool changed = rebound || cache.items.size() != size
+      || cache.selection != inventory->selected_action_bar_location() || cache.group != inventory->custom_bar_group();
+    if (rebound) cache.inventory = inventory;
     cache.items.resize(size);
     cache.flags.resize(size);
     auto remember = [&](std::size_t i, std::shared_ptr<Item> item) {
@@ -668,10 +675,10 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
       cache.items[i] = std::move(item);
       cache.flags[i] = flags;
     };
-    for (CustomBarIndex i = 0; i < indexes; ++i) {
-      auto primary = inventory->customBarPrimarySlot(i);
+    for (std::size_t i = 0; i < indexes; ++i) {
+      auto primary = inventory->custom_bar_primary_slot(i);
       if (!primary) return std::unexpected(std::move(primary.error()));
-      auto secondary = inventory->customBarSecondarySlot(i);
+      auto secondary = inventory->custom_bar_secondary_slot(i);
       if (!secondary) return std::unexpected(std::move(secondary.error()));
       auto first = *primary ? inventory->itemsAt(**primary) : std::expected<std::shared_ptr<Item>, StarException>(std::shared_ptr<Item>{});
       if (!first) return std::unexpected(std::move(first.error()));
@@ -680,11 +687,11 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
       remember(i * 2, std::move(*first));
       remember(i * 2 + 1, std::move(*second));
     }
-    for (unsigned i = 0; i < EssentialItemCount; ++i)
+    for (unsigned i = 0; i < essential_item_count; ++i)
       remember(indexes * 2 + i, inventory->essentialItem(static_cast<EssentialItem>(i)));
     remember(size - 1, inventory->swapSlotItem());
-    cache.selection = inventory->selectedActionBarLocation();
-    cache.group = inventory->customBarGroup();
+    cache.selection = inventory->selected_action_bar_location();
+    cache.group = inventory->custom_bar_group();
     // Context rebinding must not reuse a token still held by a session pane.
     static std::atomic<std::uint64_t> nextRevision{0};
     if (changed || !cache.revision) cache.revision = nextRevision.fetch_add(1, std::memory_order_relaxed) + 1;
@@ -694,15 +701,14 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     auto put = [&](std::string_view name, auto value) { return view->set(name, std::move(value)); };
     if (auto r = put("revision", cache.revision); !r) return std::unexpected(std::move(r.error()));
     if (auto r = put("indexes", indexes); !r) return std::unexpected(std::move(r.error()));
-    if (auto r = put("groups", inventory->customBarGroups()); !r) return std::unexpected(std::move(r.error()));
+    if (auto r = put("groups", inventory->custom_bar_groups()); !r) return std::unexpected(std::move(r.error()));
     if (auto r = put("group", cache.group + 1); !r) return std::unexpected(std::move(r.error()));
     if (auto index = std::get_if<CustomBarIndex>(&cache.selection)) {
       if (auto r = put("selected", *index + 1); !r) return std::unexpected(std::move(r.error()));
     } else if (auto essential = std::get_if<EssentialItem>(&cache.selection)) {
-      if (!EssentialItemNames) return std::unexpected(EssentialItemNames.error());
-      auto name = EssentialItemNames->get_right(*essential);
+      auto name = enum_name<essential_item_names>(*essential);
       if (!name) return std::unexpected(std::move(name.error()));
-      if (auto r = put("selected", name->get()); !r) return std::unexpected(std::move(r.error()));
+      if (auto r = put("selected", *name); !r) return std::unexpected(std::move(r.error()));
     }
     auto items = engine.create_table(static_cast<int>(size), 0);
     if (!items) return std::unexpected(std::move(items.error()));
@@ -726,17 +732,19 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.register_callback("linkActionBarSwap", [&player](unsigned slot, bool primary) -> std::expected<void, StarException> {
-    if (!slot || slot > player.inventory()->customBarIndexes())
-      return std::unexpected(StarException("Action bar slot out of range"));
-    return player.inventory()->linkCustomBarSwap(static_cast<CustomBarIndex>(slot - 1), primary);
+  if (auto registered = callbacks.register_callback("linkActionBarSwap", [&player](std::int64_t slot, bool primary) -> std::expected<void, StarException> {
+    auto inventory = player.inventory();
+    auto index = lua_action_bar_index(*inventory, slot);
+    if (!index) return std::unexpected(std::move(index.error()));
+    return inventory->link_custom_bar_swap(*index, primary);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.register_callback("clearActionBarLink", [&player](unsigned slot, bool primary) -> std::expected<void, StarException> {
-    if (!slot || slot > player.inventory()->customBarIndexes())
-      return std::unexpected(StarException("Action bar slot out of range"));
-    return player.inventory()->clearCustomBarLink(static_cast<CustomBarIndex>(slot - 1), primary);
+  if (auto registered = callbacks.register_callback("clearActionBarLink", [&player](std::int64_t slot, bool primary) -> std::expected<void, StarException> {
+    auto inventory = player.inventory();
+    auto index = lua_action_bar_index(*inventory, slot);
+    if (!index) return std::unexpected(std::move(index.error()));
+    return inventory->clear_custom_bar_link(*index, primary);
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
@@ -762,7 +770,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("item", [&player](InventorySlot const& slot) -> std::expected<std::optional<Json>, StarException> {
-    if (!player.inventory()->slotValid(slot)) return {};
+    if (!player.inventory()->slot_valid(slot)) return {};
     auto item = player.inventory()->itemsAt(slot);
     if (!item) return std::unexpected(std::move(item.error()));
     if (!*item) return {};
@@ -771,7 +779,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("setItem", [&root, &player](InventorySlot const& slot, Json const& item) -> std::expected<void, StarException> {
-    if (!player.inventory()->slotValid(slot)) return {};
+    if (!player.inventory()->slot_valid(slot)) return {};
     auto database = root.itemDatabase();
     if (!database) return std::unexpected(std::move(database.error()));
     auto descriptor = ItemDescriptor::create(item);
@@ -976,8 +984,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("giveEssentialItem", [&root, &player](String const& slotName, Json const& item) -> std::expected<void, StarException> {
-    if (!EssentialItemNames) return std::unexpected(EssentialItemNames.error());
-    auto slot = EssentialItemNames->get_left(slotName);
+    auto slot = enum_value<essential_item_names>(slotName);
     if (!slot) return std::unexpected(std::move(slot.error()));
     auto database = root.itemDatabase();
     if (!database) return std::unexpected(std::move(database.error()));
@@ -985,31 +992,28 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     if (!descriptor) return std::unexpected(std::move(descriptor.error()));
     auto created = (*database)->item(*descriptor);
     if (!created) return std::unexpected(std::move(created.error()));
-    player.inventory()->setEssentialItem(slot->get(), *created);
+    player.inventory()->setEssentialItem(*slot, *created);
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("essentialItem", [&player](String const& slotName) -> std::expected<Json, StarException> {
-    if (!EssentialItemNames) return std::unexpected(EssentialItemNames.error());
-    auto slot = EssentialItemNames->get_left(slotName);
+    auto slot = enum_value<essential_item_names>(slotName);
     if (!slot) return std::unexpected(std::move(slot.error()));
-    return itemSafeDescriptor(player.inventory()->essentialItem(slot->get())).toJson();
+    return itemSafeDescriptor(player.inventory()->essentialItem(*slot)).toJson();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("removeEssentialItem", [&player](String const& slotName) -> std::expected<void, StarException> {
-    if (!EssentialItemNames) return std::unexpected(EssentialItemNames.error());
-    auto slot = EssentialItemNames->get_left(slotName);
+    auto slot = enum_value<essential_item_names>(slotName);
     if (!slot) return std::unexpected(std::move(slot.error()));
-    player.inventory()->setEssentialItem(slot->get(), {});
+    player.inventory()->setEssentialItem(*slot, {});
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("setEquippedItem", [&root, &player](String const& slotName, Json const& item) -> std::expected<void, StarException> {
-    if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
-    auto slot = EquipmentSlotNames->get_left(slotName);
+    auto slot = enum_value<equipment_slot_names>(slotName);
     if (!slot) return std::unexpected(std::move(slot.error()));
     auto database = root.itemDatabase();
     if (!database) return std::unexpected(std::move(database.error()));
@@ -1017,17 +1021,16 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     if (!descriptor) return std::unexpected(std::move(descriptor.error()));
     auto created = (*database)->item(*descriptor);
     if (!created) return std::unexpected(std::move(created.error()));
-    auto changed = player.inventory()->setItem(InventorySlot(slot->get()), *created);
+    auto changed = player.inventory()->setItem(InventorySlot(*slot), *created);
     if (!changed) return std::unexpected(std::move(changed.error()));
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("equippedItem", [&player](String const& slotName) -> std::expected<Json, StarException> {
-    if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
-    auto slot = EquipmentSlotNames->get_left(slotName);
+    auto slot = enum_value<equipment_slot_names>(slotName);
     if (!slot) return std::unexpected(std::move(slot.error()));
-    auto item = player.inventory()->itemsAt(InventorySlot(slot->get()));
+    auto item = player.inventory()->itemsAt(InventorySlot(*slot));
     if (!item) return std::unexpected(std::move(item.error()));
     if (*item) return (*item)->descriptor().toJson();
     return Json();
@@ -1035,21 +1038,19 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("armorVisible", [&player](String const& slotName) -> std::expected<std::optional<bool>, StarException> {
-    if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
-    auto slot = EquipmentSlotNames->find_left_ref(slotName);
+    auto slot = maybe_enum_value<equipment_slot_names>(slotName);
     if (!slot) return std::unexpected(std::move(slot.error()));
     if (*slot)
-      return player.inventory()->equipmentVisibility((*slot)->get());
+      return player.inventory()->equipmentVisibility(**slot);
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("setArmorVisible", [&player](String const& slotName, bool visible) -> std::expected<bool, StarException> {
-    if (!EquipmentSlotNames) return std::unexpected(EquipmentSlotNames.error());
-    auto slot = EquipmentSlotNames->find_left_ref(slotName);
+    auto slot = maybe_enum_value<equipment_slot_names>(slotName);
     if (!slot) return std::unexpected(std::move(slot.error()));
     if (*slot) {
-      player.inventory()->setEquipmentVisibility((*slot)->get(), visible);
+      player.inventory()->setEquipmentVisibility(**slot, visible);
       return true;
     }
     return false;

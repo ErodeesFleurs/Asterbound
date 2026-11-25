@@ -90,32 +90,17 @@ template <typename Key, typename Value, typename... Rest>
   return readFields(table, std::forward<Rest>(rest)...);
 }
 
-template <typename Enum>
-[[nodiscard]] std::expected<std::reference_wrapper<String const>, StarException> enum_name(std::expected<EnumMap<Enum>, StarException> const& names, Enum value) {
-  if (!names)
-    return std::unexpected(names.error());
-  return names->get_right(value);
 }
 
-template <typename Enum>
-[[nodiscard]] std::expected<std::optional<Enum>, StarException> enum_value(std::expected<EnumMap<Enum>, StarException> const& names, String const& value) {
-  if (!names)
-    return std::unexpected(names.error());
-  return names->maybe_left(value);
-}
-
-
-}
-
-std::expected<void, StarException> LuaConverter<InventorySlot>::from(LuaStack stack, InventorySlot k) {
+std::expected<void, StarException> LuaConverter<InventorySlot>::from(LuaStack stack, InventorySlot const& k) {
   if (std::holds_alternative<EquipmentSlot>(k)) {
-    auto name = enum_name(EquipmentSlotNames, std::get<EquipmentSlot>(k));
+    auto name = enum_name<equipment_slot_names>(std::get<EquipmentSlot>(k));
     if (!name)
       return std::unexpected(std::move(name.error()));
-    return stack.push(name->get());
+    return stack.push(*name);
   } else if (std::holds_alternative<BagSlot>(k)) {
     auto const& bag = std::get<BagSlot>(k);
-    return makeTable(stack, 1, bag.first, 2, bag.second);
+    return makeTable(stack, 1, bag.bag_name, 2, bag.index);
   } else if (std::holds_alternative<SwapSlot>(k)) {
     return stack.push("swap");
   } else if (std::holds_alternative<TrashSlot>(k)) {
@@ -126,7 +111,7 @@ std::expected<void, StarException> LuaConverter<InventorySlot>::from(LuaStack st
 
 std::expected<std::optional<InventorySlot>, StarException> LuaConverter<InventorySlot>::to(LuaStackValue v) {
   if (v.is<LuaString>()) {
-    auto string = v.to_string();
+    auto string = v.string_view();
     auto swap = string.equals_ignore_case("swap");
     if (!swap)
       return std::unexpected(std::move(swap.error()));
@@ -137,20 +122,26 @@ std::expected<std::optional<InventorySlot>, StarException> LuaConverter<Inventor
       return std::unexpected(std::move(trash.error()));
     if (*trash)
       return InventorySlot(TrashSlot());
-    auto equipment = enum_value(EquipmentSlotNames, string);
+    auto equipment = maybe_enum_value<equipment_slot_names>(string);
     if (!equipment)
       return std::unexpected(std::move(equipment.error()));
     if (*equipment)
       return InventorySlot(**equipment);
   } else if (v.is<LuaTable>()) {
-    String name;
-    unsigned index;
-    auto read = readFields(v, 1, name, 2, index);
-    if (!read)
-      return std::unexpected(std::move(read.error()));
-    if (!*read)
-      return std::nullopt;
-    return InventorySlot(BagSlot(std::move(name), static_cast<std::uint8_t>(index)));
+    auto name = v.maybe_get<String>(1);
+    if (!name) return std::unexpected(std::move(name.error()));
+    if (!*name) return std::nullopt;
+    auto value = v.get<LuaValue>(2);
+    if (!value) return std::unexpected(std::move(value.error()));
+    if (std::holds_alternative<LuaInt>(*value)) {
+      auto integer = std::get<LuaInt>(*value);
+      if (std::in_range<std::uint8_t>(integer))
+        return InventorySlot(BagSlot{std::move(**name), static_cast<std::uint8_t>(integer)});
+    } else if (std::holds_alternative<LuaFloat>(*value)) {
+      if (auto index = inventory_index(std::get<LuaFloat>(*value)))
+        return InventorySlot(BagSlot{std::move(**name), *index});
+    }
+    return std::nullopt;
   }
   return std::nullopt;
 }
