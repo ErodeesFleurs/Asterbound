@@ -781,6 +781,10 @@ the keeper for a subsequent valid response. A truncated binary batch must not
 dispatch even its complete prefix. Local cancellation and transform diagnostics
 are separate from these wire outcomes.
 
+Run the asset-backed `game_tests --gtest_filter=LuaComponentLifecycle.ClientEntityMessagesPreserveOrigin`
+to check entity-message origin at the Lua handler. A direct call on the owner
+is local; a server request and a request relayed from another client are not.
+
 When comparing performance, measure direct observation, delegated observation,
 cached transforms and a complete serialized round trip separately. Time the
 query, not construction of a long chain, when measuring observation cost.

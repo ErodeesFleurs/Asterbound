@@ -727,6 +727,86 @@ bool expect_forwarded_origin(GameTest& fixture, WorldServer& server, WorldClient
     "remote requester accepts its reply");
 }
 
+std::optional<EntityId> install_origin_probe(GameTest& fixture, WorldServer& server, WorldClient& owner,
+    Vec2F const& position) {
+  auto objects = fixture.root().objectDatabase();
+  if (!fixture.check(bool(objects), "load object database"))
+    return std::nullopt;
+  auto object = (*objects)->createObject("stoneteleporter",
+    JsonObject{{"clientEntityMode", "ClientMasterAllowed"}, {"scripts", JsonArray{}}, {"unbreakable", true}});
+  if (!fixture.check(bool(object), "create client-owned probe object"))
+    return std::nullopt;
+  if (!fixture.check(bool((*object)->setTilePosition(Vec2I::floor(position))), "position probe object"))
+    return std::nullopt;
+  if (!fixture.check(bool(owner.addEntity(*object)), "publish probe object"))
+    return std::nullopt;
+  if (!fixture.check((*object)->isMaster(), "probe object is authoritative on the owner"))
+    return std::nullopt;
+  auto const id = (*object)->entityId();
+  if (!fixture.check(bool(server.handleIncomingPackets(origin_owner, owner.getOutgoingPackets())),
+      "server accepts probe replication"))
+    return std::nullopt;
+  auto replica = server.entity(id);
+  if (!fixture.check(replica && replica->isSlave(), "server holds a replica of the probe object"))
+    return std::nullopt;
+
+  auto script = (*object)->eval_script(R"LUA(
+    message.setHandler("originProbe", function(_, localMessage, label)
+      return {localMessage, label}
+    end)
+    return true
+  )LUA");
+  if (!fixture.check(script && *script, "install Lua origin probe"))
+    return std::nullopt;
+  return id;
+}
+
+void check_origin_messages(GameTest& fixture, WorldServer& server, WorldClient& owner, WorldClient& remote,
+    EntityId id) {
+  auto direct = owner.send_entity_message(id, "originProbe", {"direct"});
+  if (!fixture.check(bool(direct), "send direct message"))
+    return;
+  auto direct_result = direct->result();
+  if (!fixture.check(direct_result && *direct_result, "direct message resolves immediately"))
+    return;
+  fixture.check(**direct_result == Json(JsonArray{true, "direct"}), "Lua reports the direct message as local");
+  fixture.check(owner.getOutgoingPackets().empty(), "direct message did not emit a packet");
+
+  auto from_server = server.send_entity_message(id, "originProbe", {"server"});
+  if (!fixture.check(bool(from_server), "send server-originated message"))
+    return;
+  auto requests = server.getOutgoingPackets(origin_owner);
+  if (!fixture.check(requests && requests->size() == 1u, "server queued one request to the owner"))
+    return;
+  auto request = as<EntityMessagePacket>(requests->front());
+  if (!fixture.check(bool(request), "server queued an entity message"))
+    return;
+  fixture.check(request->fromConnection == server_connection_id, "server-originated packet identifies the server");
+  if (!fixture.check(bool(owner.handleIncomingPackets(*requests)), "owner accepts server request"))
+    return;
+  if (!fixture.check(bool(server.handleIncomingPackets(origin_owner, owner.getOutgoingPackets())),
+      "server accepts owner reply"))
+    return;
+  auto server_result = from_server->result();
+  if (!fixture.check(server_result && *server_result, "server-originated message completes its promise"))
+    return;
+  fixture.check(**server_result == Json(JsonArray{false, "server"}), "Lua does not report the server as local");
+
+  auto self_request = std::make_shared<EntityMessagePacket>(
+    id, "originProbe", JsonArray{"relay"}, Uuid(fixture.root().random()), server_connection_id);
+  if (!expect_forwarded_origin(fixture, server, owner, origin_owner, {self_request}, std::nullopt))
+    return;
+  auto sent = remote.send_entity_message(id, "originProbe", {"relay"});
+  if (!fixture.check(bool(sent), "remote requester sends a message to the owner"))
+    return;
+  auto outgoing = remote.getOutgoingPackets();
+  if (!expect_forwarded_origin(fixture, server, owner, origin_remote, outgoing, std::ref(remote)))
+    return;
+  auto remote_result = sent->result();
+  if (fixture.check(remote_result && *remote_result, "forwarded remote reply completes its original promise"))
+    fixture.check(**remote_result == Json(JsonArray{false, "relay"}), "remote promise returns the non-local Lua reply");
+}
+
 void expect_entity_message_origins(GameTest& fixture) {
   auto& root = fixture.root();
   auto universe = TestUniverse::create(root, {100, 100});
@@ -769,78 +849,8 @@ void expect_entity_message_origins(GameTest& fixture) {
   if (!fixture.check((*client)->connection() == origin_owner, "world start sets the owner connection"))
     return;
 
-  auto objects = root.objectDatabase();
-  if (!fixture.check(bool(objects), "load object database"))
-    return;
-  auto object = (*objects)->createObject("stoneteleporter",
-    JsonObject{{"clientEntityMode", "ClientMasterAllowed"}, {"scripts", JsonArray{}}, {"unbreakable", true}});
-  if (!fixture.check(bool(object), "create client-owned probe object"))
-    return;
-  if (!fixture.check(bool((*object)->setTilePosition(Vec2I::floor(position))), "position probe object"))
-    return;
-  if (!fixture.check(bool((*client)->addEntity(*object)), "publish probe object"))
-    return;
-  if (!fixture.check((*object)->isMaster(), "probe object is authoritative on the owner"))
-    return;
-  auto const id = (*object)->entityId();
-  if (!fixture.check(bool((*server)->handleIncomingPackets(origin_owner, (*client)->getOutgoingPackets())),
-      "server accepts probe replication"))
-    return;
-  auto replica = (*server)->entity(id);
-  if (!fixture.check(replica && replica->isSlave(), "server holds a replica of the probe object"))
-    return;
-
-  auto script = (*object)->eval_script(R"LUA(
-    message.setHandler("originProbe", function(_, localMessage, label)
-      return {localMessage, label}
-    end)
-    return true
-  )LUA");
-  if (!fixture.check(script && *script, "install Lua origin probe"))
-    return;
-
-  auto direct = (*client)->send_entity_message(id, "originProbe", {"direct"});
-  if (!fixture.check(bool(direct), "send direct message"))
-    return;
-  auto direct_result = direct->result();
-  if (!fixture.check(direct_result && *direct_result, "direct message resolves immediately"))
-    return;
-  fixture.check(**direct_result == Json(JsonArray{true, "direct"}), "Lua reports the direct message as local");
-  fixture.check((*client)->getOutgoingPackets().empty(), "direct message did not emit a packet");
-
-  auto from_server = (*server)->send_entity_message(id, "originProbe", {"server"});
-  if (!fixture.check(bool(from_server), "send server-originated message"))
-    return;
-  auto requests = (*server)->getOutgoingPackets(origin_owner);
-  if (!fixture.check(requests && requests->size() == 1u, "server queued one request to the owner"))
-    return;
-  auto request = as<EntityMessagePacket>(requests->front());
-  if (!fixture.check(bool(request), "server queued an entity message"))
-    return;
-  fixture.check(request->fromConnection == server_connection_id, "server-originated packet identifies the server");
-  if (!fixture.check(bool((*client)->handleIncomingPackets(*requests)), "owner accepts server request"))
-    return;
-  if (!fixture.check(bool((*server)->handleIncomingPackets(origin_owner, (*client)->getOutgoingPackets())),
-      "server accepts owner reply"))
-    return;
-  auto server_result = from_server->result();
-  if (!fixture.check(server_result && *server_result, "server-originated message completes its promise"))
-    return;
-  fixture.check(**server_result == Json(JsonArray{false, "server"}), "Lua does not report the server as local");
-
-  auto self_request = std::make_shared<EntityMessagePacket>(
-    id, "originProbe", JsonArray{"relay"}, Uuid(root.random()), server_connection_id);
-  if (!expect_forwarded_origin(fixture, **server, **client, origin_owner, {self_request}, std::nullopt))
-    return;
-  auto sent = (*remote)->send_entity_message(id, "originProbe", {"relay"});
-  if (!fixture.check(bool(sent), "remote requester sends a message to the owner"))
-    return;
-  auto outgoing = (*remote)->getOutgoingPackets();
-  if (!expect_forwarded_origin(fixture, **server, **client, origin_remote, outgoing, std::ref(**remote)))
-    return;
-  auto remote_result = sent->result();
-  if (fixture.check(remote_result && *remote_result, "forwarded remote reply completes its original promise"))
-    fixture.check(**remote_result == Json(JsonArray{false, "relay"}), "remote promise returns the non-local Lua reply");
+  if (auto id = install_origin_probe(fixture, **server, **client, position))
+    check_origin_messages(fixture, **server, **client, **remote, *id);
 }
 
 const GameTestRegistration entity_message_origins(
