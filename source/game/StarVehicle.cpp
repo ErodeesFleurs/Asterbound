@@ -975,64 +975,49 @@ bool Vehicle::isInteractive() const {
 }
 
 std::expected<InteractAction, StarException> Vehicle::interact(InteractRequest const& request) {
-  auto result1134 = recover_lua_script_error(m_scriptComponent.invoke<Json>("onInteraction", JsonObject{
-      {"sourceId", request.sourceId},
-      {"sourcePosition", json_from_vec2f(request.sourcePosition)},
-      {"interactPosition", json_from_vec2f(request.interactPosition)}
-    }));
-if (!result1134) return std::unexpected(std::move(result1134.error()));
-  auto result = std::move(*result1134).value_or(Json{});
+  auto result = recover_lua_script_error(m_scriptComponent.invoke<Json>("onInteraction", JsonObject{
+      {"sourceId", request.source_id}, {"sourcePosition", json_from_vec2f(request.source_position)},
+      {"interactPosition", json_from_vec2f(request.interact_position)}}));
+  if (!result)
+    return std::unexpected(std::move(result.error()));
+  if (*result && !(**result).is_null())
+    return interact_action_from_script(**result, entityId());
 
-  if (result.is_type(Json::Type::String))
-    {
-auto result1136 = result.to_string();
-if (!result1136) return std::unexpected(std::move(result1136.error()));
-auto result1137 = InteractAction::create(std::move(*result1136), entityId(), Json());
-if (!result1137) return std::unexpected(std::move(result1137.error()));
-return std::move(*result1137);
-}
-  else if (!result.is_null())
-    {
-auto result1138 = result.get_string(0);
-if (!result1138) return std::unexpected(std::move(result1138.error()));
-auto result1139 = result.get(1);
-if (!result1139) return std::unexpected(std::move(result1139.error()));
-auto result1140 = InteractAction::create(std::move(*result1138), entityId(), std::move(*result1139));
-if (!result1140) return std::unexpected(std::move(result1140.error()));
-return std::move(*result1140);
-}
-
+  auto distance_squared = [&](LoungePositionConfig const& lounge) -> std::expected<float, StarException> {
+    auto anchor = m_networkedAnimator->partPoint(lounge.part, lounge.partAnchor);
+    if (!anchor)
+      return std::unexpected(std::move(anchor.error()));
+    if (!*anchor)
+      return std::unexpected(VehicleException(Star::format("Missing lounge anchor '{}' on part '{}'", lounge.partAnchor, lounge.part)));
+    return vmag_squared(**anchor + position() - request.interact_position);
+  };
   std::optional<std::size_t> index;
+  std::optional<float> best_distance;
   for (std::size_t i = 0; i < m_loungePositions.size(); ++i) {
+    auto candidate = m_loungePositions.value_at(i);
+    if (!candidate)
+      return std::unexpected(std::move(candidate.error()));
+    if (!candidate->get().enabled.get())
+      continue;
     if (!index) {
       index = i;
-    } else {
-      auto result1141 = m_loungePositions.value_at(i);
-      if (!result1141)
-        return std::unexpected(std::move(result1141.error()));
-      auto const& thisLounge = result1141->get();
-      if (!thisLounge.enabled.get())
-        continue;
-
-      auto result1142 = m_networkedAnimator->partPoint(thisLounge.part,thisLounge.partAnchor);
-if (!result1142) return std::unexpected(std::move(result1142.error()));
-auto thisAnchor = std::move(*result1142);
-      if (!thisAnchor) return std::unexpected(VehicleException(Star::format("Missing lounge anchor '{}' on part '{}'",thisLounge.partAnchor,thisLounge.part)));
-      Vec2F thisLoungePosition = *thisAnchor + position();
-
-      auto result1143 = m_loungePositions.value_at(*index);
-      if (!result1143)
-        return std::unexpected(std::move(result1143.error()));
-      auto const& selectedLounge = result1143->get();
-      auto result1144 = m_networkedAnimator->partPoint(selectedLounge.part,selectedLounge.partAnchor);
-if (!result1144) return std::unexpected(std::move(result1144.error()));
-auto selectedAnchor = std::move(*result1144);
-      if (!selectedAnchor) return std::unexpected(VehicleException(Star::format("Missing lounge anchor '{}' on part '{}'",selectedLounge.partAnchor,selectedLounge.part)));
-      Vec2F selectedLoungePosition = *selectedAnchor + position();
-
-      if (vmag_squared(thisLoungePosition - request.interactPosition)
-          < vmag_squared(selectedLoungePosition - request.interactPosition))
-        index = i;
+      continue;
+    }
+    auto distance = distance_squared(candidate->get());
+    if (!distance)
+      return std::unexpected(std::move(distance.error()));
+    if (!best_distance) {
+      auto selected = m_loungePositions.value_at(*index);
+      if (!selected)
+        return std::unexpected(std::move(selected.error()));
+      auto selected_distance = distance_squared(selected->get());
+      if (!selected_distance)
+        return std::unexpected(std::move(selected_distance.error()));
+      best_distance = *selected_distance;
+    }
+    if (*distance < *best_distance) {
+      index = i;
+      best_distance = *distance;
     }
   }
 

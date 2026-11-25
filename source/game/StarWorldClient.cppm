@@ -607,7 +607,7 @@ private:
   HashMap<String, List<RpcPromiseKeeper<Vec2F>>> m_findUniqueEntityResponses;
   HashMap<Uuid, RpcPromiseKeeper<Json>> m_entityMessageResponses;
   HashMap<Uuid, RpcPromise<Json>> m_entityMessagePromises;
-  HashMap<Uuid, RpcPromiseKeeper<InteractAction>> m_entityInteractionResponses;
+  HashMap<Uuid, RpcPromiseKeeper<InteractAction>> m_entity_interaction_responses;
 
   List<PhysicsForceRegion> m_force_regions;
 

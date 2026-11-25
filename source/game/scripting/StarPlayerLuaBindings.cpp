@@ -851,12 +851,13 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.register_callback("interact", [&player](String const& type, Json const& configData, std::optional<EntityId> const& sourceEntityId) -> std::expected<void, StarException> {
-    auto action = InteractAction::create(type, sourceEntityId.value_or(null_entity_id), configData);
-    if (!action) return std::unexpected(std::move(action.error()));
-    if (!sourceEntityId && action->type == InteractActionType::Message)
-      action->entityId = player.entityId();
-    return player.interact(*action);
+  if (auto registered = callbacks.register_callback("interact", [&player](String const& type, Json config_data, std::optional<EntityId> source_entity_id) -> std::expected<void, StarException> {
+    auto action = InteractAction::create(type, source_entity_id.value_or(null_entity_id), std::move(config_data));
+    if (!action)
+      return std::unexpected(std::move(action.error()));
+    if (!source_entity_id && action->type == InteractActionType::Message)
+      action->entity_id = player.entityId();
+    return player.interact(std::move(*action));
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 

@@ -940,16 +940,16 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       return LuaValue{};
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.register_callback("interact", [this](String const& type, Json const& configData, std::optional<EntityId> const& sourceEntityId) -> std::expected<void, StarException> {
-      auto itemOwner = owner();
-      if (!itemOwner)
-        return std::unexpected(std::move(itemOwner.error()));
-      auto action = InteractAction::create(type, sourceEntityId.value_or(null_entity_id), configData);
+  if (auto added = callbacks.register_callback("interact", [this](String const& type, Json config_data, std::optional<EntityId> source_entity_id) -> std::expected<void, StarException> {
+      auto item_owner = owner();
+      if (!item_owner)
+        return std::unexpected(std::move(item_owner.error()));
+      auto action = InteractAction::create(type, source_entity_id.value_or(null_entity_id), std::move(config_data));
       if (!action)
         return std::unexpected(std::move(action.error()));
-      if (!sourceEntityId && action->type == InteractActionType::Message)
-        action->entityId = itemOwner->get().entityId();
-      return itemOwner->get().interact(*action);
+      if (!source_entity_id && action->type == InteractActionType::Message)
+        action->entity_id = item_owner->get().entityId();
+      return item_owner->get().interact(std::move(*action));
     }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("emote", [this](String const& name) -> std::expected<void, StarException> {

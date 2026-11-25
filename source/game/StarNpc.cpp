@@ -2230,26 +2230,13 @@ bool Npc::isInteractive() const {
 }
 
 std::expected<InteractAction, StarException> Npc::interact(InteractRequest const& request) {
-  auto result486 = recover_lua_script_error(m_scriptComponent.invoke<Json>("interact",
-      JsonObject{{"sourceId", request.sourceId}, {"sourcePosition", json_from_vec2f(request.sourcePosition)}}));
-if (!result486) return std::unexpected(std::move(result486.error()));
-auto result = std::move(*result486).value_or(Json{});
-
-  if (result.is_null())
+  auto result = recover_lua_script_error(m_scriptComponent.invoke<Json>("interact",
+      JsonObject{{"sourceId", request.source_id}, {"sourcePosition", json_from_vec2f(request.source_position)}}));
+  if (!result)
+    return std::unexpected(std::move(result.error()));
+  if (!*result || (*result)->is_null())
     return {};
-
-  if (result.is_type(Json::Type::String))
-    {
-  auto result487 = result.to_string();
-  if (!result487) return std::unexpected(std::move(result487.error()));
-  return InteractAction::create(std::move(*result487), entityId(), Json());
-}
-
-  auto result488 = result.get_string(0);
-if (!result488) return std::unexpected(std::move(result488.error()));
-auto result489 = result.get(1);
-if (!result489) return std::unexpected(std::move(result489.error()));
-return InteractAction::create(std::move(*result488), entityId(), std::move(*result489));
+  return interact_action_from_script(**result, entityId());
 }
 
 RectF Npc::interactiveBoundBox() const {
@@ -2507,7 +2494,8 @@ std::expected<void, StarException> Npc::instrumentEquipped(String const& instrum
   return {};
 }
 
-std::expected<void, StarException> Npc::interact(InteractAction const&) {  return {};
+std::expected<void, StarException> Npc::interact(InteractAction) {
+  return {};
 }
 
 std::expected<void, StarException> Npc::addEffectEmitters(StringSet const& emitters) {

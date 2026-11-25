@@ -247,7 +247,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> queueUIMessage(String const& message) override;
   [[nodiscard]] std::expected<bool, StarException> instrumentPlaying() override;
   [[nodiscard]] std::expected<void, StarException> instrumentEquipped(String const& instrumentKind) override;
-  [[nodiscard]] std::expected<void, StarException> interact(InteractAction const& action) override;
+  [[nodiscard]] std::expected<void, StarException> interact(InteractAction action) override;
   [[nodiscard]] std::expected<void, StarException> addEffectEmitters(StringSet const& emitters) override;
   [[nodiscard]] std::expected<void, StarException> requestEmote(String const& emote) override;
   ActorMovementController& movementController() override;

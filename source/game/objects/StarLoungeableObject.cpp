@@ -134,7 +134,7 @@ std::expected<InteractAction, StarException> LoungeableObject::interact(Interact
   auto result = std::move(*resultResult);
   if (result.type == InteractActionType::None && !m_sitPositions.empty()) {
     std::optional<std::size_t> index;
-    Vec2F offset = direction() == Direction::Right ? position() - request.interactPosition : request.interactPosition - position();
+    Vec2F offset = direction() == Direction::Right ? position() - request.interact_position : request.interact_position - position();
     for (std::size_t i = 0; i < m_sitPositions.size(); ++i) {
       if (!index || vmag(m_sitPositions[i] + offset) < vmag(m_sitPositions[*index] + offset))
         index = i;

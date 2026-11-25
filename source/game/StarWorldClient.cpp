@@ -1959,28 +1959,20 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       } else {
         m_dungeonIdBreathable.remove(setDungeonBreathable->dungeonId);
       }
-    } else if (auto entityInteract = as<EntityInteractPacket>(packet)) {
-      auto result141 = interact(entityInteract->interactRequest);
-      if (!result141)
-        return std::unexpected(std::move(result141.error()));
-      auto result142 = (std::move(*result141)).result();
-      if (!result142)
-        return std::unexpected(std::move(result142.error()));
-      auto interactResult = (std::move(*result142));
+    } else if (auto incoming = as<EntityInteractPacket>(packet)) {
+      auto promise = interact(incoming->interact_request);
+      if (!promise)
+        return std::unexpected(std::move(promise.error()));
+      auto result = promise->result();
+      if (!result)
+        return std::unexpected(std::move(result.error()));
       m_outgoingPackets.push_back(std::make_shared<EntityInteractResultPacket>(
-        interactResult.value_or(InteractAction{}), entityInteract->requestId,
-        entityInteract->interactRequest.sourceId));
-    } else if (auto interactResult = as<EntityInteractResultPacket>(packet)) {
-      if (auto response = m_entityInteractionResponses.try_extract_value(interactResult->requestId)) {
-        if (interactResult->action) {
-          auto result143 = response->fulfill(interactResult->action);
-          if (!result143)
-            return std::unexpected(std::move(result143.error()));
-        } else {
-          auto result144 = response->fail("no interaction result");
-          if (!result144)
-            return std::unexpected(std::move(result144.error()));
-        }
+          std::move(*result).value_or(InteractAction{}), incoming->request_id, incoming->interact_request.source_id));
+    } else if (auto incoming = as<EntityInteractResultPacket>(packet)) {
+      if (auto response = m_entity_interaction_responses.try_extract_value(incoming->request_id)) {
+        auto delivered = incoming->action ? response->fulfill(incoming->action) : response->fail("no interaction result");
+        if (!delivered)
+          return std::unexpected(std::move(delivered.error()));
       }
     } else if (auto setPlayerStart = as<SetPlayerStartPacket>(packet)) {
       m_playerStart = setPlayerStart->playerStart;
@@ -3070,27 +3062,21 @@ std::expected<RpcPromise<InteractAction>, StarException> WorldClient::interact(I
     return RpcPromise<InteractAction>::make_failed("not initialized in world");
   }
   
-  if (auto targetEntity = m_entityMap->entity(request.targetId)) {
-    if (targetEntity->isMaster()) {
-      // client-side-master entities need to be handled here rather than over network
-      if (auto interactiveTarget = as<InteractiveEntity>(targetEntity)) {
-        auto action = interactiveTarget->interact(request);
-        if (!action) {
-          return std::unexpected(std::move(action.error()));
-        }
-        return RpcPromise<InteractAction>::make_fulfilled(std::move(*action));
-      } else {
-        return RpcPromise<InteractAction>::make_fulfilled(InteractAction());
-      }
+  if (auto target = m_entityMap->entity(request.target_id); target && target->isMaster()) {
+    if (auto interactive = as<InteractiveEntity>(target)) {
+      auto action = interactive->interact(request);
+      if (!action)
+        return std::unexpected(std::move(action.error()));
+      return RpcPromise<InteractAction>::make_fulfilled(std::move(*action));
     }
+    return RpcPromise<InteractAction>::make_fulfilled(InteractAction{});
   }
   
-  auto pair = RpcPromise<InteractAction>::make_pair();
-  Uuid requestId(this->root().random());
-  m_entityInteractionResponses[requestId] = pair.second;
-  m_outgoingPackets.push_back(std::make_shared<EntityInteractPacket>(request, requestId));
-
-  return pair.first;
+  auto [promise, keeper] = RpcPromise<InteractAction>::make_pair();
+  Uuid request_id(root().random());
+  m_entity_interaction_responses[request_id] = std::move(keeper);
+  m_outgoingPackets.push_back(std::make_shared<EntityInteractPacket>(request, request_id));
+  return promise;
 }
 
 std::expected<void, StarException> gatherClientLightingTiles(CellularLightingCalculator& calculator,
@@ -3632,7 +3618,7 @@ std::expected<void, StarException> WorldClient::clearWorld() {
     for (auto& response : responses.second)
       remember(response.cancel("Client world closed"));
   }
-  for (auto&& response : std::exchange(m_entityInteractionResponses, {}))
+  for (auto&& response : std::exchange(m_entity_interaction_responses, {}))
     remember(response.second.cancel("Client world closed"));
   m_entityMessagePromises = {};
 

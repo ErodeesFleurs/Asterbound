@@ -2430,11 +2430,11 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
     }
     app->setAcceptingTextInput(inputActive);
 
-    auto interactions = m_player->pullInteractActions();
+    auto interactions = m_player->pull_interact_actions();
     if (!interactions)
       return std::unexpected(std::move(interactions.error()));
-    for (auto const& interactAction : *interactions) {
-      if (auto handled = m_mainInterface->handleInteractAction(interactAction); !handled)
+    for (auto& interact_action : *interactions) {
+      if (auto handled = m_mainInterface->handle_interact_action(std::move(interact_action)); !handled)
         return std::unexpected(std::move(handled.error()));
     }
 

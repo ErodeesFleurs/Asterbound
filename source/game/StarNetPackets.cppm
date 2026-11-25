@@ -1175,14 +1175,14 @@ struct EntityInteractPacket : PacketBase<PacketType::EntityInteract> {
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<EntityInteractPacket>(); }
 
-  EntityInteractPacket();
-  EntityInteractPacket(InteractRequest interactRequest, Uuid requestId);
+  EntityInteractPacket() = default;
+  EntityInteractPacket(InteractRequest interact_request, Uuid request_id);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  InteractRequest interactRequest;
-  Uuid requestId;
+  InteractRequest interact_request;
+  Uuid request_id = Uuid::nil();
 };
 
 struct EntityInteractResultPacket : PacketBase<PacketType::EntityInteractResult> {
@@ -1191,15 +1191,15 @@ struct EntityInteractResultPacket : PacketBase<PacketType::EntityInteractResult>
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<EntityInteractResultPacket>(); }
 
-  EntityInteractResultPacket();
-  EntityInteractResultPacket(InteractAction action, Uuid requestId, EntityId sourceEntityId);
+  EntityInteractResultPacket() = default;
+  EntityInteractResultPacket(InteractAction action, Uuid request_id, EntityId source_entity_id);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
   InteractAction action;
-  Uuid requestId;
-  EntityId sourceEntityId;
+  Uuid request_id = Uuid::nil();
+  EntityId source_entity_id = null_entity_id;
 };
 
 struct HitRequestPacket : PacketBase<PacketType::HitRequest> {

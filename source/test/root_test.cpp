@@ -58,6 +58,7 @@ import star.item;
 import star.item_bag;
 import star.item_database;
 import star.inventory_types;
+import star.interaction_types;
 import star.player_inventory;
 import star.player;
 import star.player_types;
@@ -2835,6 +2836,102 @@ const GameTestRegistration hudInventoryLinks("HudDomainTest", "InventoryLinksPre
     ASSERT_TRUE(afterEmptyInvalid) << afterEmptyInvalid.error().what();
     EXPECT_EQ(*afterEmptyInvalid, *beforeEmptyInvalid);
   }
+});
+
+const GameTestRegistration pending_interaction_completion(
+    "InteractionQueueTest", "PendingAtObservationDeliversOnNextPoll", [](GameTest& fixture) {
+  auto factory = fixture.root().playerFactory();
+  ASSERT_TRUE(factory) << factory.error().what();
+  auto created = (*factory)->create();
+  ASSERT_TRUE(created) << created.error().what();
+  auto& player = **created;
+
+  struct CompleteOnSecondPoll {
+    RpcPromiseKeeper<InteractAction> keeper;
+    unsigned& polls;
+    std::expected<void, StarException> poll() {
+      if (++polls == 2)
+        return keeper.fulfill({InteractActionType::ShowPopup, 17, "ready"});
+      return {};
+    }
+    std::expected<void, StarException> cancel() { return {}; }
+  };
+  unsigned polls = 0;
+  auto [source, keeper] = RpcPromise<InteractAction>::make_pair();
+  auto observation = source.with_cancellation({}, "cancelled", CompleteOnSecondPoll{std::move(keeper), polls});
+  ASSERT_TRUE(observation) << observation.error().what();
+  player.queue_interact_action(std::move(*observation));
+
+  auto pending = player.pull_interact_actions();
+  ASSERT_TRUE(pending) << pending.error().what();
+  EXPECT_TRUE(pending->empty());
+  EXPECT_EQ(polls, 1u);
+  auto completed = player.pull_interact_actions();
+  ASSERT_TRUE(completed) << completed.error().what();
+  ASSERT_EQ(completed->size(), 1u);
+  EXPECT_EQ(completed->front().entity_id, 17);
+  EXPECT_EQ(completed->front().data, Json("ready"));
+  auto drained = player.pull_interact_actions();
+  ASSERT_TRUE(drained) << drained.error().what();
+  EXPECT_TRUE(drained->empty());
+  EXPECT_EQ(polls, 2u);
+});
+
+const GameTestRegistration retry_interaction_batch(
+    "InteractionQueueTest", "DiagnosticPreservesSiblingsAndStableOrder", [](GameTest& fixture) {
+  auto factory = fixture.root().playerFactory();
+  ASSERT_TRUE(factory) << factory.error().what();
+  auto created = (*factory)->create();
+  ASSERT_TRUE(created) << created.error().what();
+  auto& player = **created;
+  using Promise = RpcPromise<InteractAction>;
+  auto action = [](EntityId id) { return InteractAction{InteractActionType::Message, id, Json(id)}; };
+
+  auto [first, first_keeper] = Promise::make_pair();
+  auto [later, later_keeper] = Promise::make_pair();
+  auto shared = Promise::make_fulfilled(action(2));
+  unsigned attempts = 0;
+  auto retry = Promise::make_fulfilled(action(4)).wrap([&](InteractAction value) -> std::expected<InteractAction, StarException> {
+    if (++attempts == 1)
+      return std::unexpected(StarException("retry interaction"));
+    return value;
+  });
+  ASSERT_TRUE(retry) << retry.error().what();
+  auto [cancelled, cancel_keeper] = Promise::make_pair();
+  auto did_cancel = cancel_keeper.cancel("cancelled");
+  ASSERT_TRUE(did_cancel && *did_cancel);
+  player.queue_interact_action(std::move(first));
+  player.queue_interact_action(shared);
+  player.queue_interact_action(Promise::make_failed("failed"));
+  player.queue_interact_action(std::move(*retry));
+  player.queue_interact_action(std::move(later));
+  player.queue_interact_action(std::move(cancelled));
+  ASSERT_TRUE(player.interact(action(7)));
+
+  auto diagnostic = player.pull_interact_actions();
+  ASSERT_FALSE(diagnostic);
+  EXPECT_NE(std::string_view(diagnostic.error().what()).find("retry interaction"), std::string_view::npos);
+  auto delivered = player.pull_interact_actions();
+  ASSERT_TRUE(delivered) << delivered.error().what();
+  ASSERT_EQ(delivered->size(), 3u);
+  EXPECT_EQ((*delivered)[0].entity_id, 2);
+  EXPECT_EQ((*delivered)[1].entity_id, 4);
+  EXPECT_EQ((*delivered)[2].entity_id, 7);
+  EXPECT_EQ(attempts, 2u);
+  auto sibling = shared.result();
+  ASSERT_TRUE(sibling && *sibling);
+  EXPECT_EQ((*sibling)->data, Json(2));
+
+  ASSERT_TRUE(later_keeper.fulfill(action(5)));
+  ASSERT_TRUE(first_keeper.fulfill(action(1)));
+  auto remaining = player.pull_interact_actions();
+  ASSERT_TRUE(remaining) << remaining.error().what();
+  ASSERT_EQ(remaining->size(), 2u);
+  EXPECT_EQ((*remaining)[0].entity_id, 1);
+  EXPECT_EQ((*remaining)[1].entity_id, 5);
+  auto drained = player.pull_interact_actions();
+  ASSERT_TRUE(drained) << drained.error().what();
+  EXPECT_TRUE(drained->empty());
 });
 
 const GameTestRegistration hudRadioDequeue("HudDomainTest", "RadioUniqueAccountingOccursAtDequeue", [](GameTest& fixture) {

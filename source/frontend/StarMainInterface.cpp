@@ -1340,34 +1340,33 @@ std::expected<bool, StarException> MainInterface::textInputActive() const {
   return m_paneManager.keyboardCapturedForTextInput();
 }
 
-std::expected<void, StarException> MainInterface::handleInteractAction(InteractAction interactAction) {
-  auto assets = context().root().assets();
-  if (!assets)
-    return std::unexpected(std::move(assets.error()));
-  auto world = m_client->worldClient();
+std::expected<void, StarException> MainInterface::handle_interact_action(InteractAction interact_action) {
 
-  if (interactAction.type == InteractActionType::OpenContainer) {
-    if (m_containerPane && m_containerInteractor->openContainerId() == interactAction.entityId)
+  if (interact_action.type == InteractActionType::OpenContainer) {
+    if (m_containerPane && m_containerInteractor->openContainerId() == interact_action.entity_id)
       return m_paneManager.dismissPane(m_containerPane);
     if (m_containerPane) {
       if (auto dismissed = m_paneManager.dismissPane(m_containerPane); !dismissed)
         return std::unexpected(std::move(dismissed.error()));
     }
-    auto entity = world->get<ContainerEntity>(interactAction.entityId);
+    auto world = m_client->worldClient();
+    auto entity = world->get<ContainerEntity>(interact_action.entity_id);
     if (!entity)
       return {};
-    auto inventoryDisplayed = m_paneManager.registeredPaneIsDisplayed(MainInterfacePanes::Inventory);
-    if (!inventoryDisplayed)
-      return std::unexpected(std::move(inventoryDisplayed.error()));
+    auto inventory_displayed = m_paneManager.registeredPaneIsDisplayed(MainInterfacePanes::Inventory);
+    if (!inventory_displayed)
+      return std::unexpected(std::move(inventory_displayed.error()));
+    auto assets = context().root().assets();
+    if (!assets) return std::unexpected(std::move(assets.error()));
     auto opened = m_containerInteractor->openContainer(entity);
     if (!opened)
       return std::unexpected(std::move(opened.error()));
-    auto containerPane = ContainerPane::create(context(), world, m_client->mainPlayer(), m_containerInteractor);
-    if (!containerPane) {
+    auto container_pane = ContainerPane::create(context(), world, m_client->mainPlayer(), m_containerInteractor);
+    if (!container_pane) {
       auto closed = m_containerInteractor->closeContainer();
       if (!closed)
-        return std::unexpected(containerPane.error().with_related(closed.error(), "Closing container after pane construction failure also failed"));
-      return std::unexpected(std::move(containerPane.error()));
+        return std::unexpected(container_pane.error().with_related(closed.error(), "Closing container after pane construction failure also failed"));
+      return std::unexpected(std::move(container_pane.error()));
     }
     auto inventory = m_paneManager.displayRegisteredPane(MainInterfacePanes::Inventory);
     if (!inventory) {
@@ -1376,9 +1375,9 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
         return std::unexpected(inventory.error().with_related(closed.error(), "Closing container after inventory display failure also failed"));
       return std::unexpected(std::move(inventory.error()));
     }
-    m_containerPane = std::move(*containerPane);
-    auto displayed = m_paneManager.displayPane(PaneLayer::Window, m_containerPane, [this, closeWithInventory = !*inventoryDisplayed](std::shared_ptr<Pane> const&) -> std::expected<void, StarException> {
-      if (closeWithInventory) {
+    m_containerPane = std::move(*container_pane);
+    auto displayed = m_paneManager.displayPane(PaneLayer::Window, m_containerPane, [this, close_with_inventory = !*inventory_displayed](std::shared_ptr<Pane> const&) -> std::expected<void, StarException> {
+      if (close_with_inventory) {
         auto dismissed = m_paneManager.dismissRegisteredPane(MainInterfacePanes::Inventory);
         if (!dismissed)
           return std::unexpected(std::move(dismissed.error()));
@@ -1397,86 +1396,89 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
         return std::unexpected(displayed.error().with_related(closed.error(), "Closing container after pane display failure also failed"));
       return std::unexpected(std::move(displayed.error()));
     }
-    auto inventoryPane = m_paneManager.registeredPane(MainInterfacePanes::Inventory);
-    if (!inventoryPane)
-      return std::unexpected(std::move(inventoryPane.error()));
-    auto gapConfig = (*assets)->json("/interface.config:bringAdjacentWindowGap");
-    if (!gapConfig)
-      return std::unexpected(std::move(gapConfig.error()));
-    auto gap = gapConfig->to_float();
+    auto inventory_pane = m_paneManager.registeredPane(MainInterfacePanes::Inventory);
+    if (!inventory_pane)
+      return std::unexpected(std::move(inventory_pane.error()));
+    auto gap_config = (*assets)->json("/interface.config:bringAdjacentWindowGap");
+    if (!gap_config)
+      return std::unexpected(std::move(gap_config.error()));
+    auto gap = gap_config->to_float();
     if (!gap)
       return std::unexpected(std::move(gap.error()));
-    return m_paneManager.bringPaneAdjacent(*inventoryPane, m_containerPane, *gap);
-  } else if (interactAction.type == InteractActionType::SitDown) {
-    auto index = interactAction.data.to_uint();
+    return m_paneManager.bringPaneAdjacent(*inventory_pane, m_containerPane, *gap);
+  } else if (interact_action.type == InteractActionType::SitDown) {
+    auto index = interact_action.data.to_uint();
     if (!index)
       return std::unexpected(std::move(index.error()));
-    auto lounged = m_client->mainPlayer()->lounge(interactAction.entityId, *index);
+    auto lounged = m_client->mainPlayer()->lounge(interact_action.entity_id, *index);
     if (!lounged)
       return std::unexpected(std::move(lounged.error()));
-  } else if (interactAction.type == InteractActionType::OpenCraftingInterface || interactAction.type == InteractActionType::OpenNpcCraftingInterface) {
-    if (interactAction.entityId != null_entity_id && !world->entity(interactAction.entityId))
+  } else if (interact_action.type == InteractActionType::OpenCraftingInterface || interact_action.type == InteractActionType::OpenNpcCraftingInterface) {
+    if (interact_action.entity_id != null_entity_id && !m_client->worldClient()->entity(interact_action.entity_id))
       return {};
-    return openCraftingWindow(interactAction.data, interactAction.entityId);
-  } else if (interactAction.type == InteractActionType::OpenSongbookInterface) {
+    return openCraftingWindow(interact_action.data, interact_action.entity_id);
+  } else if (interact_action.type == InteractActionType::OpenSongbookInterface) {
     return sendPaneEvent("$ui", "open", JsonObject{{"id", "songbook"}});
-  } else if (interactAction.type == InteractActionType::OpenMerchantInterface) {
-    if (interactAction.entityId != null_entity_id && !world->entity(interactAction.entityId))
+  } else if (interact_action.type == InteractActionType::OpenMerchantInterface) {
+    if (interact_action.entity_id != null_entity_id && !m_client->worldClient()->entity(interact_action.entity_id))
       return {};
-    return openMerchantWindow(interactAction.data, interactAction.entityId);
-  } else if (interactAction.type == InteractActionType::OpenAiInterface) {
+    return openMerchantWindow(interact_action.data, interact_action.entity_id);
+  } else if (interact_action.type == InteractActionType::OpenAiInterface) {
     auto displayed = m_paneManager.displayRegisteredPane(MainInterfacePanes::Ai);
     if (!displayed)
       return std::unexpected(std::move(displayed.error()));
-  } else if (interactAction.type == InteractActionType::OpenTeleportDialog) {
-    auto teleportAllowed = m_client->canTeleport();
-    if (!teleportAllowed)
-      return std::unexpected(std::move(teleportAllowed.error()));
-    if (!*teleportAllowed)
+  } else if (interact_action.type == InteractActionType::OpenTeleportDialog) {
+    auto teleport_allowed = m_client->canTeleport();
+    if (!teleport_allowed)
+      return std::unexpected(std::move(teleport_allowed.error()));
+    if (!*teleport_allowed)
       return {};
-    TeleportBookmark currentLocation;
+    TeleportBookmark current_location;
     auto reject = [&](StarException const& error) {
       return context().root().logger().warn("Ignoring malformed OpenTeleportDialog: {}", error.what());
     };
-    auto config = (*assets)->fetch_json(interactAction.data);
+    auto assets = context().root().assets();
+    if (!assets) return std::unexpected(std::move(assets.error()));
+    auto config = (*assets)->fetch_json(interact_action.data);
     if (!config)
       return reject(config.error());
     auto request = TeleportDialog::Request::parse(*config);
     if (!request)
       return reject(request.error());
     if (request->canBookmark) {
-      if (auto entity = world->entity(interactAction.entityId)) {
-        if (auto uniqueEntityId = entity->uniqueId()) {
-          auto worldTemplate = world->currentTemplate();
-          String icon, planetName;
-          auto playerWorld = m_client->player_world();
-          if (std::holds_alternative<ClientShipWorldId>(playerWorld)) {
+      auto world = m_client->worldClient();
+      if (auto entity = world->entity(interact_action.entity_id)) {
+        if (auto unique_entity_id = entity->uniqueId()) {
+          auto world_template = world->currentTemplate();
+          String icon, planet_name;
+          auto player_world = m_client->player_world();
+          if (std::holds_alternative<ClientShipWorldId>(player_world)) {
             icon = "ship";
-            planetName = "Player Ship";
-          } else if (std::holds_alternative<CelestialWorldId>(playerWorld)
-              || std::holds_alternative<InstanceWorldId>(playerWorld)
-              || std::holds_alternative<CustomWorldId>(playerWorld)
-              || std::holds_alternative<ClientCustomWorldId>(playerWorld)) {
-            icon = worldTemplate->worldParameters()->typeName;
-            planetName = worldTemplate->worldName();
+            planet_name = "Player Ship";
+          } else if (std::holds_alternative<CelestialWorldId>(player_world)
+              || std::holds_alternative<InstanceWorldId>(player_world)
+              || std::holds_alternative<CustomWorldId>(player_world)
+              || std::holds_alternative<ClientCustomWorldId>(player_world)) {
+            icon = world_template->worldParameters()->typeName;
+            planet_name = world_template->worldName();
           } else {
             icon = "default";
-            planetName = "???";
+            planet_name = "???";
           }
-          currentLocation = TeleportBookmark{.target = {playerWorld, SpawnTargetUniqueEntity(*uniqueEntityId)},
-                                             .targetName = std::move(planetName),
+          current_location = TeleportBookmark{.target = {player_world, SpawnTargetUniqueEntity(*unique_entity_id)},
+                                             .targetName = std::move(planet_name),
                                              .bookmarkName = std::move(request->bookmarkName),
                                              .icon = std::move(icon)};
           auto bookmarks = m_client->mainPlayer()->universeMap()->teleportBookmarks();
           if (!bookmarks)
             return std::unexpected(std::move(bookmarks.error()));
-          if (!bookmarks->contains(currentLocation) || !request->canTeleport) {
-            auto bookmark = currentLocation.toJson();
+          if (!bookmarks->contains(current_location) || !request->canTeleport) {
+            auto bookmark = current_location.toJson();
             if (!bookmark)
               return std::unexpected(std::move(bookmark.error()));
             auto sent = sendPaneEvent("bookmarkEditor", "edit", JsonObject{
-                {"bookmark", std::move(*bookmark)}, {"sourceEntityId", interactAction.entityId},
-                {"sourceUniqueId", *uniqueEntityId}});
+                {"bookmark", std::move(*bookmark)}, {"sourceEntityId", interact_action.entity_id},
+                {"sourceUniqueId", *unique_entity_id}});
             if (!sent) return std::unexpected(std::move(sent.error()));
             if (auto previous = m_teleportDialog; previous && !previous->isDismissed()) {
               // enqueue() alone does not establish the replacement editor.
@@ -1493,7 +1495,7 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
       }
     }
     if (request->canTeleport) {
-      auto sendEvent = [this, lifetime = m_callbackStopSource.get_token(), session = uiSession()](
+      auto send_event = [this, lifetime = m_callbackStopSource.get_token(), session = uiSession()](
           String const& id, String const& event, Json payload) -> std::expected<void, StarException> {
         if (lifetime.stop_requested())
           return std::unexpected(GuiException("Interface is detached"));
@@ -1501,7 +1503,7 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
           return {};
         return sendPaneEvent(id, event, std::move(payload));
       };
-      auto dialog = TeleportDialog::create(context(), m_client, std::move(sendEvent), std::move(*request), interactAction.entityId, std::move(currentLocation));
+      auto dialog = TeleportDialog::create(context(), m_client, std::move(send_event), std::move(*request), interact_action.entity_id, std::move(current_location));
       if (!dialog)
         return std::unexpected(std::move(dialog.error()));
       auto displayed = m_paneManager.displayPane(PaneLayer::ModalWindow, *dialog);
@@ -1515,49 +1517,49 @@ std::expected<void, StarException> MainInterface::handleInteractAction(InteractA
       if (m_teleportDialog)
         m_teleportDialog->dismiss();
       m_teleportDialog = std::move(*dialog);
-      std::erase_if(m_teleportDialogs, [](auto const& dialog) { return dialog.expired(); });
+      std::erase_if(m_teleportDialogs, [](std::weak_ptr<TeleportDialog> const& dialog) { return dialog.expired(); });
       m_teleportDialogs.emplace_back(m_teleportDialog);
     }
-  } else if (interactAction.type == InteractActionType::ShowPopup) {
+  } else if (interact_action.type == InteractActionType::ShowPopup) {
     auto reject = [&](StarException const& error) {
       return context().root().logger().warn("Ignoring malformed ShowPopup: {}", error.what());
     };
-    auto message = interactAction.data.get_string("message");
+    auto message = interact_action.data.get_string("message");
     if (!message)
       return reject(message.error());
-    auto title = interactAction.data.get_string("title", "");
+    auto title = interact_action.data.get_string("title", "");
     if (!title)
       return reject(title.error());
-    auto subtitle = interactAction.data.get_string("subtitle", "");
+    auto subtitle = interact_action.data.get_string("subtitle", "");
     if (!subtitle)
       return reject(subtitle.error());
-    auto sound = interactAction.data.opt_string("sound");
+    auto sound = interact_action.data.opt_string("sound");
     if (!sound)
       return reject(sound.error());
     JsonObject payload{{"message", std::move(*message)}, {"title", std::move(*title)}, {"subtitle", std::move(*subtitle)}};
     if (*sound)
       payload.set("sound", std::move(**sound));
     return sendPaneEvent("popup", "show", std::move(payload));
-  } else if (interactAction.type == InteractActionType::ScriptPane) {
-    auto sourceEntity = interactAction.entityId;
-    if (sourceEntity != null_entity_id && m_interactionScriptPanes.contains(sourceEntity) && m_paneManager.isDisplayed(m_interactionScriptPanes[sourceEntity])) {
-      if (auto dismissed = m_paneManager.dismissPane(m_interactionScriptPanes[sourceEntity]); !dismissed)
+  } else if (interact_action.type == InteractActionType::ScriptPane) {
+    auto source_entity = interact_action.entity_id;
+    if (source_entity != null_entity_id && m_interactionScriptPanes.contains(source_entity) && m_paneManager.isDisplayed(m_interactionScriptPanes[source_entity])) {
+      if (auto dismissed = m_paneManager.dismissPane(m_interactionScriptPanes[source_entity]); !dismissed)
         return std::unexpected(std::move(dismissed.error()));
     }
-    auto pane = ScriptPane::create(context(), m_client, interactAction.data, sourceEntity);
+    auto pane = ScriptPane::create(context(), m_client, interact_action.data, source_entity);
     if (!pane)
       return std::unexpected(std::move(pane.error()));
-    return displayScriptPane(*pane, sourceEntity);
-  } else if (interactAction.type == InteractActionType::Message) {
-    auto type = interactAction.data.get_string("messageType");
+    return displayScriptPane(*pane, source_entity);
+  } else if (interact_action.type == InteractActionType::Message) {
+    auto type = interact_action.data.get_string("messageType");
     if (!type)
       return std::unexpected(std::move(type.error()));
-    auto arguments = interactAction.data.get_array("messageArgs");
+    auto arguments = interact_action.data.get_array("messageArgs");
     if (!arguments)
       return std::unexpected(std::move(arguments.error()));
-    auto owner = connection_for_entity(interactAction.entityId);
+    auto owner = connection_for_entity(interact_action.entity_id);
     if (!owner)
-      return context().root().logger().warn("Ignoring interaction message from unowned entity {}", interactAction.entityId);
+      return context().root().logger().warn("Ignoring interaction message from unowned entity {}", interact_action.entity_id);
     auto received = m_client->mainPlayer()->receiveMessage(*owner, *type, *arguments);
     if (!received)
       return std::unexpected(std::move(received.error()));

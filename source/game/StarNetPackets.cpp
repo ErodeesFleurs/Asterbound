@@ -341,10 +341,10 @@ std::expected<std::shared_ptr<Packet>, StarException> createPacket(RandomService
       static_cast<ClientConnectPacket&>(*packet).playerUuid = Uuid(random);
       break;
     case PacketType::EntityInteract:
-      static_cast<EntityInteractPacket&>(*packet).requestId = Uuid(random);
+      static_cast<EntityInteractPacket&>(*packet).request_id = Uuid(random);
       break;
     case PacketType::EntityInteractResult:
-      static_cast<EntityInteractResultPacket&>(*packet).requestId = Uuid(random);
+      static_cast<EntityInteractResultPacket&>(*packet).request_id = Uuid(random);
       break;
     case PacketType::EntityMessage:
       static_cast<EntityMessagePacket&>(*packet).uuid = Uuid(random);
@@ -1283,34 +1283,46 @@ std::expected<void, StarException> SpawnEntityPacket::write(DataStream& ds) cons
   return ds.write(fields);
 }
 
-EntityInteractPacket::EntityInteractPacket() : requestId(unfilledPacketUuid()) {}
-
-EntityInteractPacket::EntityInteractPacket(InteractRequest interactRequest, Uuid requestId)
-  : interactRequest(interactRequest), requestId(requestId) {}
+EntityInteractPacket::EntityInteractPacket(InteractRequest interact_request, Uuid request_id)
+    : interact_request(interact_request), request_id(request_id) {}
 
 std::expected<void, StarException> EntityInteractPacket::read(DataStream& ds) {
-  auto fields = std::tie(interactRequest, requestId);
-  return ds.read(fields);
+  auto request = ds.read<InteractRequest>();
+  if (!request)
+    return std::unexpected(std::move(request.error()));
+  auto id = ds.read<Uuid>();
+  if (!id)
+    return std::unexpected(std::move(id.error()));
+  interact_request = *request;
+  request_id = *id;
+  return {};
 }
 
 std::expected<void, StarException> EntityInteractPacket::write(DataStream& ds) const {
-  auto fields = std::tie(interactRequest, requestId);
-  return ds.write(fields);
+  return ds.write(std::tie(interact_request, request_id));
 }
 
-EntityInteractResultPacket::EntityInteractResultPacket() : requestId(unfilledPacketUuid()) {}
-
-EntityInteractResultPacket::EntityInteractResultPacket(InteractAction action, Uuid requestId, EntityId sourceEntityId)
-    : action(std::move(action)), requestId(requestId), sourceEntityId(sourceEntityId) {}
+EntityInteractResultPacket::EntityInteractResultPacket(InteractAction action, Uuid request_id, EntityId source_entity_id)
+    : action(std::move(action)), request_id(request_id), source_entity_id(source_entity_id) {}
 
 std::expected<void, StarException> EntityInteractResultPacket::read(DataStream& ds) {
-  auto fields = std::tie(action, requestId, sourceEntityId);
-  return ds.read(fields);
+  auto decoded = ds.read<InteractAction>();
+  if (!decoded)
+    return std::unexpected(std::move(decoded.error()));
+  auto id = ds.read<Uuid>();
+  if (!id)
+    return std::unexpected(std::move(id.error()));
+  auto source = ds.read<EntityId>();
+  if (!source)
+    return std::unexpected(std::move(source.error()));
+  action = std::move(*decoded);
+  request_id = *id;
+  source_entity_id = *source;
+  return {};
 }
 
 std::expected<void, StarException> EntityInteractResultPacket::write(DataStream& ds) const {
-  auto fields = std::tie(action, requestId, sourceEntityId);
-  return ds.write(fields);
+  return ds.write(std::tie(action, request_id, source_entity_id));
 }
 
 EntityCreatePacket::EntityCreatePacket() {

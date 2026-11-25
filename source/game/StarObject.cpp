@@ -2254,51 +2254,31 @@ bool Object::isInteractive() const {
 }
 
 std::expected<InteractAction, StarException> Object::interact(InteractRequest const& request) {
-  auto currentWorldResult = world();
-  if (!currentWorldResult)
-    return std::unexpected(std::move(currentWorldResult.error()));
-  auto& currentWorld = currentWorldResult->get();
-  Vec2F diff = currentWorld.geometry().diff(request.sourcePosition, position());
-  auto resultResult = recover_lua_script_error(m_scriptComponent.invoke<Json>("onInteraction", JsonObject{{"source", JsonArray{diff[0], diff[1]}}, {"sourceId", request.sourceId}}));
-  if (!resultResult)
-    return std::unexpected(std::move(resultResult.error()));
-  auto result = std::move(*resultResult);
-  if (result) {
-    if (result->is_null())
-      return InteractAction();
-    if (result->is_type(Json::Type::String)) {
-      auto typeResult = result->to_string();
-      if (!typeResult)
-        return std::unexpected(std::move(typeResult.error()));
-      auto type = std::move(*typeResult);
-      return InteractAction::create(type, entityId(), Json());
-    }
-    auto typeResult = result->get_string(0);
-    if (!typeResult)
-      return std::unexpected(std::move(typeResult.error()));
-    auto type = std::move(*typeResult);
-    auto dataResult = result->get(1);
-    if (!dataResult)
-      return std::unexpected(std::move(dataResult.error()));
-    auto data = std::move(*dataResult);
-    return InteractAction::create(type, entityId(), std::move(data));
+  auto current_world = world();
+  if (!current_world)
+    return std::unexpected(std::move(current_world.error()));
+  auto diff = current_world->get().geometry().diff(request.source_position, position());
+  auto result = recover_lua_script_error(m_scriptComponent.invoke<Json>("onInteraction",
+      JsonObject{{"source", json_from_vec2f(diff)}, {"sourceId", request.source_id}}));
+  if (!result)
+    return std::unexpected(std::move(result.error()));
+  if (*result) {
+    if ((*result)->is_null())
+      return {};
+    return interact_action_from_script(**result, entityId());
   }
-  auto actionResult = configValue("interactAction", Json());
-  if (!actionResult)
-    return std::unexpected(std::move(actionResult.error()));
-  auto action = std::move(*actionResult);
-  if (!action.is_null()) {
-    auto typeResult = action.to_string();
-    if (!typeResult)
-      return std::unexpected(std::move(typeResult.error()));
-    auto type = std::move(*typeResult);
-    auto dataResult = configValue("interactData", Json());
-    if (!dataResult)
-      return std::unexpected(std::move(dataResult.error()));
-    auto data = std::move(*dataResult);
-    return InteractAction::create(type, entityId(), std::move(data));
-  }
-  return InteractAction();
+  auto action = configValue("interactAction", Json());
+  if (!action)
+    return std::unexpected(std::move(action.error()));
+  if (action->is_null())
+    return {};
+  auto type = action->string_ptr();
+  if (!type)
+    return std::unexpected(std::move(type.error()));
+  auto data = configValue("interactData", Json());
+  if (!data)
+    return std::unexpected(std::move(data.error()));
+  return InteractAction::create(**type, entityId(), std::move(*data));
 }
 
 List<Vec2I> Object::interactiveSpaces() const {

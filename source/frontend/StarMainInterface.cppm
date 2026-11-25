@@ -168,7 +168,7 @@ public:
   [[nodiscard]] std::expected<bool, StarException> inputFocus() const;
   // If input is focused, should MainInterface also accept text input events?
   [[nodiscard]] std::expected<bool, StarException> textInputActive() const;
-  [[nodiscard]] std::expected<void, StarException> handleInteractAction(InteractAction interactAction);
+  [[nodiscard]] std::expected<void, StarException> handle_interact_action(InteractAction interact_action);
 
   [[nodiscard]] std::expected<void, StarException> preUpdate(float dt);
   // Handles incoming client messages, aims main player, etc.

@@ -808,7 +808,7 @@ void exercise_teleport_replacement(GameTest& fixture, Application const& applica
   auto open = [&](Json data) { return InteractAction(InteractActionType::OpenTeleportDialog, player->entityId(), std::move(data)); };
   Json destination = JsonObject{{"warpAction", "OwnShip"}, {"name", "Ship"}};
   Json valid = JsonObject{{"destinations", JsonArray{destination}}};
-  auto displayed = (*interface)->handleInteractAction(open(valid));
+  auto displayed = (*interface)->handle_interact_action(open(valid));
   ASSERT_TRUE(displayed) << displayed.error().what();
   auto& manager = (*interface)->paneManager();
   auto previous = as<TeleportDialog>(manager.topPane({PaneLayer::ModalWindow}));
@@ -832,14 +832,14 @@ void exercise_teleport_replacement(GameTest& fixture, Application const& applica
   ASSERT_TRUE(player->interact(open(std::move(bad))));
   Json replacement = JsonObject{{"destinations", JsonArray{JsonObject{{"warpAction", "Return"}, {"name", "Return trip"}}}}};
   ASSERT_TRUE(player->interact(open(std::move(replacement))));
-  auto actions = player->pullInteractActions();
+  auto actions = player->pull_interact_actions();
   ASSERT_TRUE(actions);
   ASSERT_EQ(actions->size(), 2u);
-  ASSERT_TRUE((*interface)->handleInteractAction(std::move((*actions)[0])));
+  ASSERT_TRUE((*interface)->handle_interact_action(std::move((*actions)[0])));
   EXPECT_EQ(manager.topPane({PaneLayer::ModalWindow}), previous);
   EXPECT_FALSE(previous->isDismissed());
   expectDestination(*previous, "Ship");
-  ASSERT_TRUE((*interface)->handleInteractAction(std::move((*actions)[1])));
+  ASSERT_TRUE((*interface)->handle_interact_action(std::move((*actions)[1])));
   auto next = as<TeleportDialog>(manager.topPane({PaneLayer::ModalWindow}));
   ASSERT_TRUE(next);
   EXPECT_NE(previous, next);

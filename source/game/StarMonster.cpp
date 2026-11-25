@@ -1539,25 +1539,13 @@ std::expected<List<PhysicsForceRegion>, StarException> Monster::force_regions() 
 }
 
 std::expected<InteractAction, StarException> Monster::interact(InteractRequest const& request) {
-  auto result246 = recover_lua_script_error(m_scriptComponent.invoke<Json>("interact", JsonObject{{"sourceId", request.sourceId}, {"sourcePosition", json_from_vec2f(request.sourcePosition)}}));
-if (!result246) return std::unexpected(std::move(result246.error()));
-auto result = std::move(*result246).value_or(Json{});
-
-  if (result.is_null())
+  auto result = recover_lua_script_error(m_scriptComponent.invoke<Json>("interact",
+      JsonObject{{"sourceId", request.source_id}, {"sourcePosition", json_from_vec2f(request.source_position)}}));
+  if (!result)
+    return std::unexpected(std::move(result.error()));
+  if (!*result || (*result)->is_null())
     return {};
-
-  if (result.is_type(Json::Type::String))
-    {
-  auto result247 = result.to_string();
-  if (!result247) return std::unexpected(std::move(result247.error()));
-  return InteractAction::create(std::move(*result247), entityId(), {});
-}
-
-  auto result248 = result.get_string(0);
-if (!result248) return std::unexpected(std::move(result248.error()));
-auto result249 = result.get(1);
-if (!result249) return std::unexpected(std::move(result249.error()));
-return InteractAction::create(std::move(*result248), entityId(), std::move(*result249));
+  return interact_action_from_script(**result, entityId());
 }
 
 bool Monster::isInteractive() const {

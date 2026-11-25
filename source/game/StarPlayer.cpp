@@ -2152,15 +2152,13 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
               return std::unexpected(std::move(result.error()));
           }
         else if (useTool) {
-          auto ieResult = bestInteractionEntity(true);
-          if (!ieResult)
-            return std::unexpected(std::move(ieResult.error()));
-          auto ie = std::move(*ieResult);
-          if (ie)
-            {
-              if (auto result = interactWithEntity(ie); !result)
-                return std::unexpected(std::move(result.error()));
-            }
+          auto target = bestInteractionEntity(true);
+          if (!target)
+            return std::unexpected(std::move(target.error()));
+          if (*target) {
+            if (auto result = interact_with_entity(std::move(*target)); !result)
+              return std::unexpected(std::move(result.error()));
+          }
         }
       }
 
@@ -3157,68 +3155,60 @@ std::expected<std::shared_ptr<InteractiveEntity>, StarException> Player::bestInt
   return reachable ? entity : std::shared_ptr<InteractiveEntity>{};
 }
 
-std::expected<void, StarException> Player::interactWithEntity(std::shared_ptr<InteractiveEntity> entity) {
-  bool questIntercepted = false;
+std::expected<void, StarException> Player::interact_with_entity(std::shared_ptr<InteractiveEntity> entity) {
+  bool quest_intercepted = false;
   for (auto const& quest : m_questManager->listActiveQuests()) {
-    auto interceptedResult = quest->interactWithEntity(entity->entityId());
-    if (!interceptedResult)
-      return std::unexpected(std::move(interceptedResult.error()));
-    auto intercepted = std::move(*interceptedResult);
-    if (intercepted)
-      questIntercepted = true;
+    auto intercepted = quest->interactWithEntity(entity->entityId());
+    if (!intercepted)
+      return std::unexpected(std::move(intercepted.error()));
+    if (*intercepted)
+      quest_intercepted = true;
   }
-  if (questIntercepted)
+  if (quest_intercepted)
     return {};
-  bool anyTurnedIn = false;
-  auto turnInsResult = entity->turnInQuests();
-  if (!turnInsResult)
-    return std::unexpected(std::move(turnInsResult.error()));
-  auto turnIns = std::move(*turnInsResult);
-  for (auto const& questId : turnIns) {
-    if (m_questManager->canTurnIn(questId)) {
-      auto questResult = m_questManager->getQuest(questId);
-      if (!questResult)
-        return std::unexpected(std::move(questResult.error()));
-      auto quest = std::move(*questResult);
-      if (auto result = quest->setEntityParameter("questReceiver", entity); !result)
+  bool any_turned_in = false;
+  auto turn_ins = entity->turnInQuests();
+  if (!turn_ins)
+    return std::unexpected(std::move(turn_ins.error()));
+  for (auto const& quest_id : *turn_ins) {
+    if (m_questManager->canTurnIn(quest_id)) {
+      auto quest = m_questManager->getQuest(quest_id);
+      if (!quest)
+        return std::unexpected(std::move(quest.error()));
+      if (auto result = (*quest)->setEntityParameter("questReceiver", entity); !result)
         return std::unexpected(std::move(result.error()));
-      if (auto result = quest->complete(); !result)
+      if (auto result = (*quest)->complete(); !result)
         return std::unexpected(std::move(result.error()));
-      anyTurnedIn = true;
+      any_turned_in = true;
     }
   }
-  if (anyTurnedIn)
+  if (any_turned_in)
     return {};
-  auto offersResult = entity->offeredQuests();
-  if (!offersResult)
-    return std::unexpected(std::move(offersResult.error()));
-  auto offers = std::move(*offersResult);
-  for (auto const& arc : offers) {
-    auto canStartResult = m_questManager->canStart(arc);
-    if (!canStartResult)
-      return std::unexpected(std::move(canStartResult.error()));
-    auto canStart = std::move(*canStartResult);
-    if (canStart) {
-      auto questResult = Quest::create(root(), arc, 0, *this);
-      if (!questResult)
-        return std::unexpected(std::move(questResult.error()));
-      auto quest = std::move(*questResult);
-      quest->setWorldId(client_context()->player_world_id());
-      quest->setServerUuid(client_context()->server_uuid());
-      if (auto result = quest->setEntityParameter("questGiver", entity); !result)
+  auto offers = entity->offeredQuests();
+  if (!offers)
+    return std::unexpected(std::move(offers.error()));
+  for (auto const& arc : *offers) {
+    auto can_start = m_questManager->canStart(arc);
+    if (!can_start)
+      return std::unexpected(std::move(can_start.error()));
+    if (*can_start) {
+      auto quest = Quest::create(root(), arc, 0, *this);
+      if (!quest)
+        return std::unexpected(std::move(quest.error()));
+      (*quest)->setWorldId(client_context()->player_world_id());
+      (*quest)->setServerUuid(client_context()->server_uuid());
+      if (auto result = (*quest)->setEntityParameter("questGiver", entity); !result)
         return std::unexpected(std::move(result.error()));
-      return m_questManager->offer(quest);
+      return m_questManager->offer(*quest);
     }
   }
-  auto currentWorldResult = world();
-  if (!currentWorldResult)
-    return std::unexpected(std::move(currentWorldResult.error()));
-  auto& currentWorld = currentWorldResult->get();
-  auto actionResult = currentWorld.interact(InteractRequest{entityId(), position(), entity->entityId(), m_aimPosition});
-  if (!actionResult)
-    return std::unexpected(std::move(actionResult.error()));
-  auto action = std::move(*actionResult);
-  m_pendingInteractActions.push_back(std::move(action));
+  auto current_world = world();
+  if (!current_world)
+    return std::unexpected(std::move(current_world.error()));
+  auto action = current_world->get().interact(InteractRequest{entityId(), position(), entity->entityId(), m_aimPosition});
+  if (!action)
+    return std::unexpected(std::move(action.error()));
+  queue_interact_action(std::move(*action));
   return {};
 }
 
@@ -3321,25 +3311,44 @@ void Player::setInteractRadius(float interactRadius) {
   m_interactRadius = interactRadius;
 }
 
-std::expected<List<InteractAction>, StarException> Player::pullInteractActions() {
-  List<InteractAction> results;
-  for (auto it = m_pendingInteractActions.begin(); it != m_pendingInteractActions.end();) {
-    auto responseResult = it->result();
-    if (!responseResult)
-      return std::unexpected(std::move(responseResult.error()));
-    auto response = std::move(*responseResult);
-    if (response)
-      results.push_back(std::move(*response));
-    auto finishedResult = it->finished();
-    if (!finishedResult)
-      return std::unexpected(std::move(finishedResult.error()));
-    auto finished = std::move(*finishedResult);
-    if (finished)
-      it = m_pendingInteractActions.erase(it);
-    else
-      ++it;
+void Player::queue_interact_action(RpcPromise<InteractAction> action) {
+  m_pending_interact_actions.push_back(std::move(action));
+}
+
+std::expected<List<InteractAction>, StarException> Player::pull_interact_actions() {
+  auto& queue = m_pending_interact_actions;
+  auto const count = queue.size();
+  auto first_finished = count;
+  List<std::size_t> pending_after_gap;
+  List<InteractAction> actions;
+  for (std::size_t i = 0; i < count; ++i) {
+    auto status = queue[i].status();
+    if (!status)
+      return std::unexpected(std::move(status.error()));
+    if (*status == RpcPromiseStatus::Pending) {
+      if (first_finished != count)
+        pending_after_gap.push_back(i);
+      continue;
+    }
+    if (first_finished == count)
+      first_finished = i;
+    if (*status == RpcPromiseStatus::Succeeded) {
+      // Success is terminal. Read the shared value without consuming it for other observers.
+      auto action = queue[i].result();
+      if (!action)
+        return std::unexpected(std::move(action.error()));
+      actions.push_back(std::move(**action));
+    }
   }
-  return results;
+
+  // Nothing is removed until every query succeeded. Keep the pending prefix in place.
+  if (first_finished != count) {
+    auto write = first_finished;
+    for (auto read : pending_after_gap)
+      queue[write++] = std::move(queue[read]);
+    queue.erase(queue.begin() + write, queue.begin() + count);
+  }
+  return actions;
 }
 
 std::uint64_t Player::currency(String const& currencyType) const {
@@ -4575,11 +4584,11 @@ std::expected<void, StarException> Player::instrumentEquipped(String const& inst
   return {};
 }
 
-std::expected<void, StarException> Player::interact(InteractAction const& action) {
+std::expected<void, StarException> Player::interact(InteractAction action) {
   if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((!isSlave()));
   }
-  m_pendingInteractActions.push_back(RpcPromise<InteractAction>::make_fulfilled(action));
+  queue_interact_action(RpcPromise<InteractAction>::make_fulfilled(std::move(action)));
   return {};
 }
 

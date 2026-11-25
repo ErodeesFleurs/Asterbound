@@ -264,6 +264,7 @@ set (star_game_tests_SOURCES
       dungeon_tmx_test.cpp
       function_test.cpp
       humanoid_render_test.cpp
+      interaction_types_test.cpp
       lighting_test.cpp
       item_test.cpp
       liquid_types_test.cpp
@@ -273,6 +274,7 @@ set (star_game_tests_SOURCES
       mod_storage_test.cpp
       particle_presentation_test.cpp
       parallax_wind_presentation_test.cpp
+      interaction_entities_test.cpp
       physics_object_test.cpp
       platformer_astar_test.cpp
       player_storage_test.cpp

@@ -413,60 +413,43 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
     return {};
   };
 
-  auto middleClickCallback = [this](String const& bagType, Widget& widget)  -> std::expected<void, StarException> {
+  auto middle_click = [this](Widget& widget) -> std::expected<void, StarException> {
     if (!m_player->inWorld()) 
       return {};
 
     auto grid = convert_ref<ItemGridWidget>(widget);
     if (!grid)
       return std::unexpected(std::move(grid.error()));
-    auto& itemGrid = grid->get();
-    InventorySlot inventorySlot = BagSlot(bagType, itemGrid.selectedIndex());
-    auto inventory = m_player->inventory();
-    {
-      auto selectedItemResult29 = itemGrid.selectedItem();
-      if (!selectedItemResult29)
-        return std::unexpected(std::move(selectedItemResult29.error()));
-      if (auto sourceItem = as<ObjectItem>(std::move(*selectedItemResult29))) {
-        {
-          auto instanceValueResult30 = sourceItem->instanceValue("interactAction");
-          if (!instanceValueResult30)
-            return std::unexpected(std::move(instanceValueResult30.error()));
-          if (auto actionTypeName = std::move(*instanceValueResult30)) {
-            auto const& action_names = InteractActionTypeNames;
-            if (!action_names)
-              return std::unexpected(action_names.error());
-            auto action_name = actionTypeName.to_string();
-            if (!action_name)
-              return std::unexpected(std::move(action_name.error()));
-            auto action_lookup = (*action_names).get_left(std::move(*action_name));
-            if (!action_lookup)
-              return std::unexpected(std::move(action_lookup.error()));
-            auto actionType = action_lookup->get();
-            if (actionType >= InteractActionType::OpenCraftingInterface && actionType <= InteractActionType::ScriptPane) {
-              auto instanceValueResult34 = sourceItem->instanceValue("interactData", Json());
-              if (!instanceValueResult34)
-                return std::unexpected(std::move(instanceValueResult34.error()));
-              auto actionData = std::move(*instanceValueResult34);
-              if (actionData.is_type(Json::Type::Object))
-                {
-                  auto setResult35 = actionData.set("openWithInventory", false);
-                  if (!setResult35)
-                    return std::unexpected(std::move(setResult35.error()));
-                  actionData = std::move(*setResult35);
-                }
-              InteractAction action(actionType, null_entity_id, actionData);
-              auto interactResult36 = m_player->interact(action);
-              if (!interactResult36)
-                return std::unexpected(std::move(interactResult36.error()));
-            }
+    auto selected = grid->get().selectedItem();
+    if (!selected)
+      return std::unexpected(std::move(selected.error()));
+    if (auto item = as<ObjectItem>(std::move(*selected))) {
+      auto configured = item->instanceValue("interactAction");
+      if (!configured)
+        return std::unexpected(std::move(configured.error()));
+      if (*configured) {
+        auto name = configured->to_string();
+        if (!name)
+          return std::unexpected(std::move(name.error()));
+        auto type = parse_interact_action_type(*name);
+        if (!type)
+          return std::unexpected(std::move(type.error()));
+        if (can_open_from_inventory(*type)) {
+          auto data = item->instanceValue("interactData", Json());
+          if (!data)
+            return std::unexpected(std::move(data.error()));
+          if (data->is_type(Json::Type::Object)) {
+            auto updated = data->set("openWithInventory", false);
+            if (!updated)
+              return std::unexpected(std::move(updated.error()));
+            *data = std::move(*updated);
           }
+          return m_player->interact(InteractAction{*type, null_entity_id, std::move(*data)});
         }
       }
     }
-  
-  return {};
-};
+    return {};
+  };
 
   auto getResult37 = config.get("bagConfig");
   if (!getResult37)
@@ -503,10 +486,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
       itemGrid + ".right", [bagGridCallback, name](Widget& widget) mutable -> std::expected<void, StarException> {
         return bagGridCallback(name, widget);
       });
-    invWindowReader.registerCallback(
-      itemGrid + ".middle", [middleClickCallback, name](Widget& widget) mutable -> std::expected<void, StarException> {
-        return middleClickCallback(name, widget);
-      });
+    invWindowReader.registerCallback(itemGrid + ".middle", middle_click);
   }
 
   invWindowReader.registerCallback("close", [this](Widget&)  -> std::expected<void, StarException> {

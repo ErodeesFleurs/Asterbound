@@ -1066,39 +1066,39 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           pair.second->outgoingPackets.push_back(
             std::make_shared<DamageNotificationPacket>(damage->remoteDamageNotification));
       }
-    } else if (auto entityInteract = as<EntityInteractPacket>(packet)) {
-      auto target_owner = connection_for_entity(entityInteract->interactRequest.targetId);
+    } else if (auto entity_interact = as<EntityInteractPacket>(packet)) {
+      auto target_owner = connection_for_entity(entity_interact->interact_request.target_id);
       if (!target_owner)
         return std::unexpected(WorldServerException("Interaction target has no owning connection"));
       if (*target_owner == server_connection_id) {
-        auto result89 = interact(entityInteract->interactRequest);
+        auto result89 = interact(entity_interact->interact_request);
         if (!result89)
           return std::unexpected(std::move(result89.error()));
         auto result90 = std::move(*result89).result();
         if (!result90)
           return std::unexpected(std::move(result90.error()));
-        auto interactResult = std::move(*result90);
-        auto result91 = take_optional(interactResult);
+        auto interact_result = std::move(*result90);
+        auto result91 = take_optional(interact_result);
         if (!result91)
           return std::unexpected(std::move(result91.error()));
         clientInfo->outgoingPackets.push_back(std::make_shared<EntityInteractResultPacket>(
-          std::move(*result91), entityInteract->requestId, entityInteract->interactRequest.sourceId));
+          std::move(*result91), entity_interact->request_id, entity_interact->interact_request.source_id));
       } else {
         auto result92 = m_clientInfo.get(*target_owner);
         if (!result92)
           return std::unexpected(std::move(result92.error()));
-        auto const& forwardClientInfo = result92->get();
-        forwardClientInfo->outgoingPackets.push_back(entityInteract);
+        auto const& forward_client_info = result92->get();
+        forward_client_info->outgoingPackets.push_back(entity_interact);
       }
-    } else if (auto interactResult = as<EntityInteractResultPacket>(packet)) {
-      auto source_owner = connection_for_entity(interactResult->sourceEntityId);
+    } else if (auto interact_result = as<EntityInteractResultPacket>(packet)) {
+      auto source_owner = connection_for_entity(interact_result->source_entity_id);
       if (!source_owner)
         return std::unexpected(WorldServerException("Interaction source has no owning connection"));
       auto result93 = m_clientInfo.get(*source_owner);
       if (!result93)
         return std::unexpected(std::move(result93.error()));
-      auto const& forwardClientInfo = result93->get();
-      forwardClientInfo->outgoingPackets.push_back(interactResult);
+      auto const& forward_client_info = result93->get();
+      forward_client_info->outgoingPackets.push_back(interact_result);
     } else if (auto entityCreate = as<EntityCreatePacket>(packet)) {
       auto legalEntityId = entity_id_in_space(entityCreate->entityId, clientInfo->clientId);
       if (!legalEntityId)
@@ -4593,7 +4593,7 @@ std::expected<bool, StarException> WorldServer::canReachEntity(Vec2F const& posi
 }
 
 std::expected<RpcPromise<InteractAction>, StarException> WorldServer::interact(InteractRequest const& request) {
-  if (auto entity = as<InteractiveEntity>(m_entityMap->entity(request.targetId))) {
+  if (auto entity = as<InteractiveEntity>(m_entityMap->entity(request.target_id))) {
     auto action = entity->interact(request);
     if (!action)
       return std::unexpected(std::move(action.error()));

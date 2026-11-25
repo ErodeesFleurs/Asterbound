@@ -252,7 +252,8 @@ public:
   [[nodiscard]] std::expected<float, StarException> toolRadius() const;
   [[nodiscard]] std::expected<float, StarException> interactRadius() const override;
   void setInteractRadius(float interactRadius);
-  [[nodiscard]] std::expected<List<InteractAction>, StarException> pullInteractActions();
+  void queue_interact_action(RpcPromise<InteractAction> action);
+  [[nodiscard]] std::expected<List<InteractAction>, StarException> pull_interact_actions();
 
   std::uint64_t currency(String const& currencyType) const;
 
@@ -355,7 +356,7 @@ public:
   std::shared_ptr<PlayerLog> log() const;
 
   [[nodiscard]] std::expected<std::shared_ptr<InteractiveEntity>, StarException> bestInteractionEntity(bool includeNearby);
-  [[nodiscard]] std::expected<void, StarException> interactWithEntity(std::shared_ptr<InteractiveEntity> entity);
+  [[nodiscard]] std::expected<void, StarException> interact_with_entity(std::shared_ptr<InteractiveEntity> entity);
 
   // Aim this player's target at the given world position.
   void aim(Vec2F const& position);
@@ -522,7 +523,7 @@ public:
 
   [[nodiscard]] std::expected<bool, StarException> instrumentPlaying() override;
   [[nodiscard]] std::expected<void, StarException> instrumentEquipped(String const& instrumentKind) override;
-  [[nodiscard]] std::expected<void, StarException> interact(InteractAction const& action) override;
+  [[nodiscard]] std::expected<void, StarException> interact(InteractAction action) override;
   [[nodiscard]] std::expected<void, StarException> addEffectEmitters(StringSet const& emitters) override;
   [[nodiscard]] std::expected<void, StarException> requestEmote(String const& emote) override;
 
@@ -753,7 +754,7 @@ private:
   // when not pointing at
   // an interactable with the mouse
 
-  List<RpcPromise<InteractAction>> m_pendingInteractActions;
+  List<RpcPromise<InteractAction>> m_pending_interact_actions;
 
   List<Particle> m_callbackParticles;
   List<std::tuple<String, float, float>> m_callbackSounds;

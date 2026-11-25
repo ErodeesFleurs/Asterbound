@@ -86,7 +86,7 @@ public:
   // that, NPCs cannot possibly implement these properly (and do not implement
   // them at all).
   [[nodiscard]] virtual std::expected<void, StarException> queueUIMessage(String const& message) = 0;
-  [[nodiscard]] virtual std::expected<void, StarException> interact(InteractAction const& action) = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> interact(InteractAction action) = 0;
 
   // FIXME: Ditto here, instrumentPlaying() is just an accessor to the songbook
   // for when the songbook has had a song selected, and the instrument decides

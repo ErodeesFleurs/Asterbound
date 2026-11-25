@@ -59,6 +59,8 @@ commits identify upstream sources; they are not cross-platform validation report
 
 ### Gameplay catalogs and physics
 
+- Entity interaction scripts return an action name or `[name, data]`; additional array entries are ignored. An object without a script result uses its configured action. A vehicle without a script action chooses the nearest enabled lounge position, retaining the first enabled seat on a tie. A vehicle with no enabled seats returns no action.
+- Player interaction results are delivered in enqueue order among ready actions. A pending action does not block later ready actions. If observing an action fails, the batch remains queued for retry.
 - [Known blueprint relearning](https://github.com/OpenStarbound/OpenStarbound/commit/9814f594) without a failure notification no longer constructs an Item or loads notification assets. New unlocks still validate Item construction before changing blueprint state.
 - [Damage kind names](https://github.com/OpenStarbound/OpenStarbound/commit/b37ef403) are case-insensitive at insertion and lookup, including duplicate detection. Elemental type names remain case-sensitive and are validated against their own catalog.
 - [Legacy humanoid back sleeves](https://github.com/OpenStarbound/OpenStarbound/commit/75eb1c9d) retain the armor's fullbright setting while holding items.
