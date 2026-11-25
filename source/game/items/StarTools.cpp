@@ -101,6 +101,7 @@ import star.tile_modification;
 import star.force_regions;
 import star.world;
 import star.liquid_types;
+import star.liquids_database;
 import star.tile_sector_array;
 import star.weather_types;
 import star.sky_types;
@@ -933,8 +934,8 @@ std::expected<void, StarException> BeamMiningTool::fire(FireMode mode, bool shif
             continue;
 
           auto liquid = worldp.liquidLevel(pos);
-          if (liquid.liquid != EmptyLiquidId) {
-            if (targetLiquid == EmptyLiquidId)
+          if (liquid.liquid != empty_liquid_id) {
+            if (targetLiquid == empty_liquid_id)
               targetLiquid = liquid.liquid;
 
             if (liquid.liquid == targetLiquid) {
@@ -947,10 +948,10 @@ std::expected<void, StarException> BeamMiningTool::fire(FireMode mode, bool shif
         auto assets = root().assets();
         if (!assets)
           return std::unexpected(std::move(assets.error()));
-        auto bucketSize = (*assets)->json("/items/defaultParameters.config:liquidItems.bucketSize").and_then([](Json const& value) { return value.to_uint(); });
-        if (!bucketSize)
-          return std::unexpected(std::move(bucketSize.error()));
-        if (totalLiquid >= *bucketSize) {
+        auto bucket_size = load_liquid_bucket_size(**assets);
+        if (!bucket_size)
+          return std::unexpected(std::move(bucket_size.error()));
+        if (totalLiquid >= *bucket_size) {
           if (auto clientWorld = as_ref<WorldClient>(worldp)) {
             auto collected = clientWorld->get().collectLiquid(drainTiles, targetLiquid);
             if (!collected)

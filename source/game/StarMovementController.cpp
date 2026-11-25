@@ -301,7 +301,7 @@ MovementController::MovementController(Root& root) : m_root(root) {
   m_timeStep = root.timing().time_step;
 
   m_liquidPercentage = 0.0f;
-  m_liquidId = EmptyLiquidId;
+  m_liquidId = empty_liquid_id;
 
   m_xPosition.set_fixed_point_base(0.0125f);
   m_yPosition.set_fixed_point_base(0.0125f);

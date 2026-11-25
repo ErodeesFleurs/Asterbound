@@ -122,7 +122,7 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
     if (!image_scale)
       return std::unexpected(std::move(image_scale.error()));
 
-    if (terrestrial_parameters->primarySurfaceLiquid != EmptyLiquidId && !liquid_images->empty()) {
+    if (terrestrial_parameters->primarySurfaceLiquid != empty_liquid_id && !liquid_images->empty()) {
       auto liquid_name = (*liquids_database)->liquid_name(terrestrial_parameters->primarySurfaceLiquid);
       if (!liquid_name)
         return std::unexpected(std::move(liquid_name.error()));
@@ -336,7 +336,7 @@ std::expected<List<std::pair<String, String>>, StarException> CelestialGraphics:
       return std::unexpected(std::move(mask_per_planet_range.error()));
     auto biome_hue_shift =
       "?" + image_operation_to_string(HueShiftImageOperation::hue_shift_degrees(terrestrial_parameters->hueShift));
-    if (terrestrial_parameters->primarySurfaceLiquid != EmptyLiquidId) {
+    if (terrestrial_parameters->primarySurfaceLiquid != empty_liquid_id) {
       RandomSource random(celestial_parameters.seed());
       auto count = random.uniform_int((*mask_per_planet_range)[0], (*mask_per_planet_range)[1]);
       if (!count)

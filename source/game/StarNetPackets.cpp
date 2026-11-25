@@ -1031,8 +1031,8 @@ std::expected<void, StarException> TileUpdatePacket::write(DataStream& ds) const
 
 TileLiquidUpdatePacket::TileLiquidUpdatePacket() = default;
 
-TileLiquidUpdatePacket::TileLiquidUpdatePacket(Vec2I const& position, LiquidNetUpdate liquidUpdate)
-  : position(position), liquidUpdate(liquidUpdate) {}
+TileLiquidUpdatePacket::TileLiquidUpdatePacket(Vec2I const& position, LiquidNetUpdate liquid_update)
+  : position(position), liquid_update(liquid_update) {}
 
 std::expected<void, StarException> TileLiquidUpdatePacket::read(DataStream& ds) {
   {
@@ -1045,7 +1045,7 @@ std::expected<void, StarException> TileLiquidUpdatePacket::read(DataStream& ds) 
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  auto fields = std::tie(liquidUpdate.liquid, liquidUpdate.level);
+  auto fields = std::tie(liquid_update.liquid, liquid_update.level);
   return ds.read(fields);
 }
 
@@ -1060,7 +1060,7 @@ std::expected<void, StarException> TileLiquidUpdatePacket::write(DataStream& ds)
     if (!result)
       return std::unexpected(std::move(result.error()));
   }
-  auto fields = std::tie(liquidUpdate.liquid, liquidUpdate.level);
+  auto fields = std::tie(liquid_update.liquid, liquid_update.level);
   return ds.write(fields);
 }
 

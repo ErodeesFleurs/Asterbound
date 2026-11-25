@@ -75,7 +75,7 @@ struct PreviewTile {
   Vec2I position;
   bool foreground = false;
 
-  LiquidId liq_id = EmptyLiquidId;
+  LiquidId liq_id = empty_liquid_id;
   MaterialId mat_id = NullMaterialId;
   MaterialHue hue_shift = 0;
   bool update_mat_id = false;

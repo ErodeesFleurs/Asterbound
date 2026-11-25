@@ -82,7 +82,7 @@ TEST(EntityRenderingTypes, PreviewDefaultsAndBarSchema) {
   EXPECT_FALSE(blank.update_mat_id);
   EXPECT_FALSE(blank.update_light);
   EXPECT_EQ(blank.mat_id, NullMaterialId);
-  EXPECT_EQ(blank.liq_id, EmptyLiquidId);
+  EXPECT_EQ(blank.liq_id, empty_liquid_id);
   EXPECT_EQ(blank.hue_shift, 0);
   EXPECT_EQ(blank.color_variant, DefaultMaterialColorVariant);
   PreviewTile liquid(Vec2I(2, 3), LiquidId{5});

@@ -351,40 +351,69 @@ namespace WorldImpl {
     return std::pair<Vec2F, Vec2I>(position, normal);
   }
 
-  template <typename TileSectorArray>
+  template <world_tile_array Tiles>
+    requires requires(typename Tiles::Tile const& tile) {
+      requires std::derived_from<decltype(tile.liquid), LiquidLevel>;
+    }
   [[nodiscard]]
-  inline std::expected<LiquidLevel, StarException> liquidLevel(std::shared_ptr<TileSectorArray> const& tileSectorArray, RectF const& region) {
+  std::expected<LiquidLevel, StarException> liquid_level(Tiles const& tiles, RectF const& region) {
+#pragma clang fp reassociate(off)
     if (region.is_empty())
       return LiquidLevel();
 
-    RectI sampleRect = RectI::integral(region);
-    // This is not entirely accurate, even though all liquid types in the
-    // region count towards the grand total liquid percentage, only the most
-    // common liquid is reported.
-    float totalSpace = 0;
-    Map<LiquidId, float> totals;
-    auto sampled = tileSectorArray->tile_each(sampleRect, [&region, &totalSpace, &totals](Vec2I const& pos, typename TileSectorArray::Tile const& tile) -> std::expected<void, StarException> {
-        float blockIncidence = RectF(pos[0], pos[1], pos[0] + 1, pos[1] + 1).overlap(region).volume();
-        totalSpace += blockIncidence;
-        auto liquidLevel = tile.liquid;
-        if (liquidLevel.liquid != EmptyLiquidId)
-          totals[liquidLevel.liquid] += std::min(1.0f, liquidLevel.level) * blockIncidence;
+    float total_space = 0.0f;
+    LiquidId first_id = empty_liquid_id;
+    float first_total = 0.0f;
+    unsigned min_id = 0;
+    unsigned max_id = 0;
+    // The usual empty and single-liquid samples do not initialize the table.
+    std::optional<std::array<float, std::numeric_limits<LiquidId>::max() + 1>> mixed_totals;
+    auto sampled = tiles.tile_each(RectI::integral(region), [&](Vec2I const& pos, typename Tiles::Tile const& tile) -> std::expected<void, StarException> {
+      float incidence = RectF(pos[0], pos[1], pos[0] + 1, pos[1] + 1).overlap(region).volume();
+      total_space += incidence;
+      LiquidLevel const& liquid = tile.liquid;
+      if (liquid.liquid == empty_liquid_id)
         return {};
-      });
+
+      if (!mixed_totals) {
+        if (first_id == empty_liquid_id)
+          first_id = liquid.liquid;
+        if (liquid.liquid == first_id) {
+          first_total += std::min(1.0f, liquid.level) * incidence;
+          return {};
+        }
+
+        mixed_totals.emplace();
+        (*mixed_totals)[first_id] = first_total;
+        min_id = max_id = first_id;
+      }
+      unsigned id = liquid.liquid;
+      (*mixed_totals)[id] += std::min(1.0f, liquid.level) * incidence;
+      min_id = std::min(min_id, id);
+      max_id = std::max(max_id, id);
+      return {};
+    });
     if (!sampled)
       return std::unexpected(std::move(sampled.error()));
+    if (total_space == 0.0f || first_id == empty_liquid_id)
+      return LiquidLevel();
+    if (!mixed_totals)
+      return LiquidLevel(first_total > 0.0f ? first_id : empty_liquid_id, first_total / total_space);
 
-    float totalLiquidLevel = 0.0f;
-    float maximumLiquidLevel = 0.0f;
-    LiquidId maximumLiquidId = EmptyLiquidId;
-    for (auto const& p : totals) {
-      totalLiquidLevel += p.second;
-      if (p.second > maximumLiquidLevel) {
-        maximumLiquidLevel = p.second;
-        maximumLiquidId = p.first;
+    // All liquids contribute to the level. Reduce by ascending ID to keep the
+    // summation order and let the lowest ID win equal positive volumes.
+    float total_level = 0.0f;
+    float max_level = 0.0f;
+    LiquidId dominant_id = empty_liquid_id;
+    for (unsigned id = min_id; id <= max_id; ++id) {
+      float volume = (*mixed_totals)[id];
+      total_level += volume;
+      if (volume > max_level) {
+        max_level = volume;
+        dominant_id = static_cast<LiquidId>(id);
       }
     }
-    return LiquidLevel(maximumLiquidId, totalLiquidLevel / totalSpace);
+    return LiquidLevel(dominant_id, total_level / total_space);
   }
 
   template <collision_tile_source Tiles>
@@ -923,5 +952,5 @@ export namespace Star::WorldImpl {
   using ::Star::WorldImpl::getInteractiveInRange;
   using ::Star::WorldImpl::isTileEntityInRange;
   using ::Star::WorldImpl::can_reach_entity;
-  using ::Star::WorldImpl::liquidLevel;
+  using ::Star::WorldImpl::liquid_level;
 }

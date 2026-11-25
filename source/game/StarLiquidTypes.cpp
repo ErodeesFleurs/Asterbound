@@ -4,74 +4,60 @@ import star.liquid_types;
 
 namespace Star {
 
-LiquidLevel LiquidLevel::take(float amount) {
-  if (liquid == EmptyLiquidId)
-    return LiquidLevel();
-  amount = std::min(amount, level);
+void LiquidLevel::drain(float amount) {
+  if (liquid == empty_liquid_id || amount <= 0.0f || !is_finite(amount))
+    return;
 
-  LiquidLevel taken = {liquid, amount};
-
-  level -= amount;
+  level -= std::min(amount, level);
   if (level <= 0.0f)
-    liquid = EmptyLiquidId;
-
-  return taken;
+    liquid = empty_liquid_id;
 }
 
 LiquidStore LiquidStore::filled(LiquidId liquid, float level, std::optional<float> pressure) {
-  if (liquid == EmptyLiquidId)
-    return LiquidStore();
+  if (liquid == empty_liquid_id)
+    return {};
   return LiquidStore(liquid, level, pressure.value_or(level), false);
 }
 
 LiquidStore LiquidStore::endless(LiquidId liquid, float pressure) {
-  if (liquid == EmptyLiquidId)
-    return LiquidStore();
+  if (liquid == empty_liquid_id)
+    return {};
   return LiquidStore(liquid, 1.0f, pressure, true);
 }
 
-LiquidStore::LiquidStore() : LiquidLevel(), pressure(0), source(false) {}
-
-LiquidStore::LiquidStore(LiquidId liquid, float level, float pressure, bool source)
-  : LiquidLevel(liquid, level), pressure(pressure), source(source) {}
-
-LiquidNetUpdate LiquidStore::netUpdate() const {
+LiquidNetUpdate LiquidStore::net_update() const {
   return LiquidNetUpdate{liquid, float_to_byte(level, true)};
 }
 
-std::optional<LiquidNetUpdate> LiquidStore::update(LiquidId liquid, float level, float pressure) {
+bool LiquidStore::update(LiquidId liquid, float level, float pressure) {
   if (source) {
     if (this->liquid != liquid)
-      return {};
+      return false;
     level = std::max(level, this->level);
     pressure = std::max(pressure, this->pressure);
   }
 
   if (level <= 0.0f) {
-    liquid = EmptyLiquidId;
+    liquid = empty_liquid_id;
     pressure = 0.0f;
   }
 
-  bool netUpdate = this->liquid != liquid || float_to_byte(this->level, true) != float_to_byte(level, true);
+  bool wire_changed = this->liquid != liquid
+      || (this->level != level && float_to_byte(this->level, true) != float_to_byte(level, true));
 
   this->liquid = liquid;
   this->level = level;
   this->pressure = pressure;
 
-  if (netUpdate)
-    return LiquidNetUpdate{liquid, float_to_byte(level, true)};
-  else
-    return {};
+  return wire_changed;
 }
 
-LiquidLevel LiquidStore::take(float amount) {
-  if (source)
-    return LiquidLevel(liquid, amount);
-
-  auto taken = LiquidLevel::take(amount);
-  if (level == 0.0f)
+void LiquidStore::drain(float amount) {
+  if (source || liquid == empty_liquid_id)
+    return;
+  LiquidLevel::drain(amount);
+  if (liquid == empty_liquid_id)
     pressure = 0.0f;
-  return taken;
 }
 
 }

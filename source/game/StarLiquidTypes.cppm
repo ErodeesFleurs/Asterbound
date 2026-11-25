@@ -6,23 +6,22 @@ import star.math_common;
 namespace Star {
 
 using LiquidId = std::uint8_t;
-inline constexpr LiquidId EmptyLiquidId = 0;
+inline constexpr LiquidId empty_liquid_id = 0;
 
 struct LiquidLevel {
-  LiquidLevel();
-  LiquidLevel(LiquidId liquid, float level);
+  void drain(float amount);
 
-  LiquidLevel take(float amount);
-
-  LiquidId liquid;
-  float level;
+  LiquidId liquid = empty_liquid_id;
+  float level = 0.0f;
 };
 
 struct LiquidNetUpdate {
-  LiquidId liquid;
-  std::uint8_t level;
+  LiquidId liquid = empty_liquid_id;
+  std::uint8_t level = 0;
 
-  LiquidLevel liquidLevel() const;
+  [[nodiscard]] constexpr LiquidLevel liquid_level() const {
+    return {liquid, byte_to_float(level)};
+  }
 };
 
 struct LiquidStore : LiquidLevel {
@@ -31,28 +30,21 @@ struct LiquidStore : LiquidLevel {
   // Returns a LiquidStore source liquid block
   static LiquidStore endless(LiquidId liquid, float pressure);
 
-  LiquidStore();
-  LiquidStore(LiquidId liquid, float level, float pressure, bool source);
+  LiquidStore() = default;
+  constexpr LiquidStore(LiquidId liquid, float level, float pressure, bool source)
+    : LiquidLevel{liquid, level}, pressure(pressure), source(source) {}
 
-  LiquidNetUpdate netUpdate() const;
+  [[nodiscard]] LiquidNetUpdate net_update() const;
 
-  std::optional<LiquidNetUpdate> update(LiquidId liquid, float level, float pressure);
+  // Returns whether the liquid ID or quantized level changed. Physics uses the
+  // full level and pressure even when there is no change to send.
+  [[nodiscard]] bool update(LiquidId liquid, float level, float pressure);
 
-  LiquidLevel take(float amount);
+  void drain(float amount);
 
-  float pressure;
-  bool source;
+  float pressure = 0.0f;
+  bool source = false;
 };
-
-inline LiquidLevel::LiquidLevel()
-  : liquid(EmptyLiquidId), level(0.0f) {}
-
-inline LiquidLevel::LiquidLevel(LiquidId liquid, float level)
-  : liquid(liquid), level(level) {}
-
-inline LiquidLevel LiquidNetUpdate::liquidLevel() const {
-  return LiquidLevel{liquid, byte_to_float(level)};
-}
 
 }
 
@@ -60,7 +52,7 @@ export module star.liquid_types;
 
 export namespace Star {
   using ::Star::LiquidId;
-  using ::Star::EmptyLiquidId;
+  using ::Star::empty_liquid_id;
   using ::Star::LiquidLevel;
   using ::Star::LiquidNetUpdate;
   using ::Star::LiquidStore;

@@ -1502,7 +1502,7 @@ const GameTestRegistration liquid_collection_overflow("ItemTest", "LiquidCollect
   if (!fixture.check(collected && collected->count() == std::numeric_limits<std::uint64_t>::max() &&
       collected->name() == "perfectlygenericitem" && collected->parameters() == JsonObject{{"fromFixture", true}},
       "one bucket with a wrapped duplicate pays the full descriptor")) return;
-  fixture.check(world->liquidLevel(positions[0]).liquid == EmptyLiquidId &&
+  fixture.check(world->liquidLevel(positions[0]).liquid == empty_liquid_id &&
       world->liquidLevel(positions[1]).level == 0.5f && world->liquidLevel(positions[3]).level == 0.25f,
       "pending drains and remainder follow the supplied input order");
   if (!fixture.check(bool(world->update(1.0f / 60.0f)), "flush successful liquid updates")) return;

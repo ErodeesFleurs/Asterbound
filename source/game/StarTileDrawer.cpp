@@ -102,7 +102,7 @@ RenderTile const TileDrawer::DefaultRenderTile{
     DefaultMaterialColorVariant,
     TileDamageType::Protected,
     0,
-    EmptyLiquidId,
+    empty_liquid_id,
     0
 };
 

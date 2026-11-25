@@ -158,7 +158,8 @@ PredictedTile::operator bool() const {
   || foregroundColorVariant
   || foregroundMod
   || foregroundModHueShift
-  || liquid
+  || liquid_remainder
+  || liquid_delta
   || collision;
 }
 
@@ -210,7 +211,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
   auto state = ds >> tile.collision >> tile.blockBiomeIndex >> tile.environmentBiomeIndex >> tile.liquid.liquid;
   if (!state)
     return std::unexpected(std::move(state.error()));
-  if (tile.liquid.liquid != EmptyLiquidId) {
+  if (tile.liquid.liquid != empty_liquid_id) {
     auto level = ds.read(tile.liquid.level);
     if (!level)
       return std::unexpected(std::move(level.error()));
@@ -263,7 +264,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
   auto state = ds << tile.collision << tile.blockBiomeIndex << tile.environmentBiomeIndex << tile.liquid.liquid;
   if (!state)
     return std::unexpected(std::move(state.error()));
-  if (tile.liquid.liquid != EmptyLiquidId) {
+  if (tile.liquid.liquid != empty_liquid_id) {
     auto level = ds.write(tile.liquid.level);
     if (!level)
       return std::unexpected(std::move(level.error()));

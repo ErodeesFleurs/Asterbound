@@ -80,6 +80,7 @@ import star.interactive_entity;
 import star.tile_entity;
 import star.tile_modification;
 import star.world;
+import star.world_impl;
 import star.liquid_types;
 import star.tile_damage;
 import star.world_layout;
@@ -157,6 +158,79 @@ TEST(PacketWire, PauseUsesStreamVersionThroughBaseInterface) {
     EXPECT_TRUE(*ended);
   }
 }
+
+const GameTestRegistration regional_liquid_sampling_across_seam(
+    "WorldSnapshot", "RegionalLiquidSamplingAcrossSeam", [](GameTest& fixture) {
+  TileSectorArray<ClientTile, 4> tiles(Vec2U(8, 4));
+  tiles.load_default_sector({0, 0});
+  tiles.load_default_sector({1, 0});
+
+  // Include fractional coverage on both sides of the seam and an empty row.
+  RectF const region(7.5f, -0.25f, 8.5f, 0.5f);
+  auto empty = WorldImpl::liquid_level(tiles, region);
+  if (!fixture.check(bool(empty), "sample empty region"))
+    return;
+  fixture.check(empty->liquid == empty_liquid_id && empty->level == 0.0f, "empty region has no liquid");
+
+  auto left = tiles.modify_tile({7, 0});
+  auto right = tiles.modify_tile({0, 0});
+  if (!fixture.check(left && right, "load tiles on both sides of the seam"))
+    return;
+
+  constexpr LiquidId high_id = std::numeric_limits<LiquidId>::max();
+  left->get().liquid = {high_id, 2.0f};
+  right->get().liquid = {high_id, 0.5f};
+  auto single = WorldImpl::liquid_level(tiles, region);
+  if (!fixture.check(bool(single), "sample single-liquid region"))
+    return;
+  fixture.check(single->liquid == high_id && single->level == 0.5f,
+      "single liquid uses fractional coverage and includes the empty row");
+
+  // Both liquids contribute, but the lower ID wins the tie despite being
+  // visited second. The overfilled tile contributed at most one tile's volume.
+  right->get().liquid = {1, 1.0f};
+  auto mixed = WorldImpl::liquid_level(tiles, region);
+  if (!fixture.check(bool(mixed), "sample mixed-liquid region"))
+    return;
+  fixture.check(mixed->liquid == LiquidId{1}, "lower liquid ID wins the volume tie");
+  fixture.check(std::abs(mixed->level - 2.0f / 3.0f) <= std::numeric_limits<float>::epsilon(),
+      "mixed level includes both liquids");
+
+  constexpr float tiny = std::numeric_limits<float>::min();
+  for (auto const& zero_region : {RectF(0.5f, 0, 0.5f, 1), RectF(0, 0, tiny, tiny)}) {
+    auto zero = WorldImpl::liquid_level(tiles, zero_region);
+    if (!fixture.check(bool(zero), "sample zero-area region"))
+      return;
+    fixture.check(zero->liquid == empty_liquid_id && zero->level == 0.0f, "zero area has no liquid");
+  }
+});
+
+const GameTestRegistration regional_liquid_sampling_retains_ordered_sums(
+    "WorldSnapshot", "RegionalLiquidSamplingRetainsOrderedSums", [](GameTest& fixture) {
+  TileSectorArray<ClientTile, 4> tiles(Vec2U(12, 4));
+  tiles.load_default_sector({0, 0});
+  tiles.load_default_sector({1, 0});
+
+  constexpr float half_ulp = 0x1p-24f;
+  std::array<LiquidLevel, 6> const row{{
+      {3, half_ulp / 2}, {3, half_ulp / 2}, {2, half_ulp},
+      {1, 1.0f}, {1, half_ulp}, {1, half_ulp}}};
+  auto populated = tiles.tile_eval(RectI(0, 0, 6, 1),
+      [&](Vec2I const& position, ClientTile& tile) -> std::expected<void, StarException> {
+    tile.liquid = row[static_cast<std::size_t>(position[0])];
+    return {};
+  });
+  if (!fixture.check(bool(populated), "populate order-sensitive liquid tiles"))
+    return;
+
+  // The half-ULPs each round away at 1.0, both in the liquid 1 bucket
+  // and when summing the three buckets by ID rather than by visit order.
+  auto level = WorldImpl::liquid_level(tiles, RectF(0, 0, 8, 1));
+  if (!fixture.check(bool(level), "sample order-sensitive liquid region"))
+    return;
+  fixture.check(level->liquid == LiquidId{1}, "liquid 1 has the greatest volume");
+  fixture.check(level->level == 0.125f, "tile and liquid ID summation preserve ordered rounding");
+});
 
 namespace {
   // Hashes one tile together with its position.  The per sample hashes are
@@ -959,7 +1033,7 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
                 expected.backgroundColorVariant = tile.backgroundColorVariant;
                 expected.backgroundMod = tile.backgroundMod;
                 expected.backgroundModHueShift = tile.backgroundModHueShift;
-                expected.liquid = tile.liquid.netUpdate();
+                expected.liquid = tile.liquid.net_update();
                 expected.collision = tile.getCollision();
                 expected.blockBiomeIndex = tile.blockBiomeIndex;
                 expected.environmentBiomeIndex = tile.environmentBiomeIndex;
@@ -980,7 +1054,7 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
           } else if (auto liquid = as<TileLiquidUpdatePacket>(packet)) {
             auto tile = clientTiles[i].get(liquid->position);
             ASSERT_TRUE(tile) << tile.error().what();
-            tile->get().liquid = liquid->liquidUpdate;
+            tile->get().liquid = liquid->liquid_update;
           }
           if (auto entityCreate = as<EntityCreatePacket>(packet)) {
             EXPECT_TRUE(stepSeen);
@@ -1014,7 +1088,7 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
           ASSERT_TRUE(installed) << installed.error().what();
           auto live = world->getServerTile(Vec2I(1100, 1004));
           ASSERT_TRUE(live) << live.error().what();
-          auto expected = live->get().liquid.netUpdate();
+          auto expected = live->get().liquid.net_update();
           EXPECT_EQ(installed->get().liquid.liquid, expected.liquid);
           EXPECT_EQ(installed->get().liquid.level, expected.level);
         }

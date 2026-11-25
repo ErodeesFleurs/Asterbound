@@ -119,9 +119,9 @@ std::expected<List<Particle>, StarException> EntitySplashConfig::generate_partic
   auto const top_liquid = bottom == top ? bottom_liquid : world.liquidLevel(top);
   if (!(bottom_liquid.level - top_liquid.level >= splash_min_water_level)) return particles;
 
-  auto const liquid = bottom_liquid.level > 0 && bottom_liquid.liquid != EmptyLiquidId
+  auto const liquid = bottom_liquid.level > 0 && bottom_liquid.liquid != empty_liquid_id
     ? bottom_liquid.liquid : top_liquid.liquid;
-  if (liquid == EmptyLiquidId) return particles;
+  if (liquid == empty_liquid_id) return particles;
   auto& root = world.root();
   auto database = root.liquids_database();
   if (!database) return std::unexpected(std::move(database.error()));

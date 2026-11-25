@@ -276,7 +276,7 @@ std::expected<CellularLiquidCell<LiquidId>, StarException> LiquidWorld::cell(Vec
   if (*blocked) return CellularLiquidCollisionCell{};
   if (tile.liquid.source)
     return CellularLiquidSourceCell<LiquidId>{.liquid = tile.liquid.liquid, .pressure = tile.liquid.pressure};
-  if (tile.liquid.liquid != EmptyLiquidId)
+  if (tile.liquid.liquid != empty_liquid_id)
     return CellularLiquidFlowCell<LiquidId>{.liquid = tile.liquid.liquid,
                                            .level = tile.liquid.level,
                                            .pressure = tile.liquid.pressure};
@@ -285,7 +285,7 @@ std::expected<CellularLiquidCell<LiquidId>, StarException> LiquidWorld::cell(Vec
 
 std::expected<void, StarException> LiquidWorld::set_flow(Vec2I const& location, CellularLiquidFlowCell<LiquidId> const& flow) {
   if (!flow.liquid)
-    return m_world_server.setLiquid(location, EmptyLiquidId, 0.0f, 0.0f);
+    return m_world_server.setLiquid(location, empty_liquid_id, 0.0f, 0.0f);
   auto written = m_world_server.setLiquid(location, *flow.liquid, flow.level, flow.pressure);
   if (!written) return std::unexpected(std::move(written.error()));
   auto result = m_world_server.getServerTile(location);
@@ -297,7 +297,7 @@ std::expected<void, StarException> LiquidWorld::set_flow(Vec2I const& location, 
     if (!modified) return std::unexpected(std::move(modified.error()));
     if (*modified) {
       auto& target = (*modified)->get();
-      target.liquid.take(interaction->consumeLiquid);
+      target.liquid.drain(interaction->consumeLiquid);
       target.background = interaction->transformTo;
       auto activated = m_world_server.activateLiquidLocation(location);
       if (!activated) return std::unexpected(std::move(activated.error()));
@@ -309,7 +309,7 @@ std::expected<void, StarException> LiquidWorld::set_flow(Vec2I const& location, 
     if (!modified) return std::unexpected(std::move(modified.error()));
     if (*modified) {
       auto& target = (*modified)->get();
-      target.liquid.take(interaction->consumeLiquid);
+      target.liquid.drain(interaction->consumeLiquid);
       target.backgroundMod = interaction->transformTo;
       return m_world_server.activateLiquidLocation(location);
     }
@@ -350,7 +350,7 @@ std::expected<void, StarException> LiquidWorld::liquid_collision(Vec2I const& li
     auto block_tile = m_world_server.modifyServerTile(block_pos);
     if (!block_tile) return std::unexpected(std::move(block_tile.error()));
     if (*liquid_tile && *block_tile) {
-      (*liquid_tile)->get().liquid.take(interaction->consumeLiquid);
+      (*liquid_tile)->get().liquid.drain(interaction->consumeLiquid);
       auto& target = (*block_tile)->get();
       target.foreground = interaction->transformTo;
       auto multicolor = m_material_database->isMultiColor(interaction->transformTo);
@@ -368,7 +368,7 @@ std::expected<void, StarException> LiquidWorld::liquid_collision(Vec2I const& li
     auto block_tile = m_world_server.modifyServerTile(block_pos);
     if (!block_tile) return std::unexpected(std::move(block_tile.error()));
     if (*liquid_tile && *block_tile) {
-      (*liquid_tile)->get().liquid.take(interaction->consumeLiquid);
+      (*liquid_tile)->get().liquid.drain(interaction->consumeLiquid);
       (*block_tile)->get().foregroundMod = interaction->transformTo;
       return m_world_server.activateLiquidLocation(liquid_pos);
     }
@@ -535,7 +535,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::setForegroundMaterial(
   if (!tileCheckedResult1) return std::unexpected(std::move(tileCheckedResult1.error()));
   if (auto tile = std::move((*tileCheckedResult1))) {
     {
-      auto operationResult1 = m_worldServer.modifyLiquid(position, EmptyLiquidId, 0);
+      auto operationResult1 = m_worldServer.modifyLiquid(position, empty_liquid_id, 0);
       if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
     }
     tile->get().foreground = material;
@@ -558,7 +558,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::setBackgroundMaterial(
   if (!tileCheckedResult1) return std::unexpected(std::move(tileCheckedResult1.error()));
   if (auto tile = std::move((*tileCheckedResult1))) {
     {
-      auto operationResult1 = m_worldServer.modifyLiquid(position, EmptyLiquidId, 0);
+      auto operationResult1 = m_worldServer.modifyLiquid(position, empty_liquid_id, 0);
       if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
     }
     tile->get().background = material;
@@ -1116,7 +1116,7 @@ std::expected<bool, StarException> DungeonGeneratorWorld::checkOceanLiquid(Vec2I
   auto autoconstblockResult1 = worldTemplate->blockInfo(position[0], position[1]);
   if (!autoconstblockResult1) return std::unexpected(std::move(autoconstblockResult1.error()));
   auto const& block = std::move((*autoconstblockResult1));
-  return block.oceanLiquid != EmptyLiquidId && position[1] < block.oceanLiquidLevel;
+  return block.oceanLiquid != empty_liquid_id && position[1] < block.oceanLiquidLevel;
 }
 
 std::expected<DungeonId, StarException> DungeonGeneratorWorld::getDungeonIdAt(Vec2I const& position) {
@@ -1543,7 +1543,7 @@ std::expected<void, StarException> WorldGenerator::prepareTiles(WorldStorage& wo
 
       if (tile->get().foreground != EmptyMaterialId) {
         tile->get().liquid = LiquidStore();
-      } else if (blockInfo.oceanLiquid != EmptyLiquidId && pos[1] < blockInfo.oceanLiquidLevel) {
+      } else if (blockInfo.oceanLiquid != empty_liquid_id && pos[1] < blockInfo.oceanLiquidLevel) {
         float pressure = blockInfo.oceanLiquidLevel - pos[1];
         if (tile->get().background == EmptyMaterialId)
           tile->get().liquid = LiquidStore::endless(blockInfo.oceanLiquid, pressure);
@@ -1725,7 +1725,7 @@ std::expected<void, StarException> WorldGenerator::generateCaveLiquid(WorldStora
     }
     if ((tile.dungeonId != no_dungeon_id && (!fillMicrodungeons || tile.dungeonId != biome_micro_dungeon_id))
         || (!encloseLiquids && tile.background == EmptyMaterialId)
-        || (tile.liquid.liquid != fillLiquid && tile.liquid.liquid != EmptyLiquidId)) {
+        || (tile.liquid.liquid != fillLiquid && tile.liquid.liquid != empty_liquid_id)) {
       badNodes.add(position);
       return {};
     }
@@ -1847,7 +1847,7 @@ std::expected<void, StarException> WorldGenerator::prepareSector(WorldStorage& w
         if (!is_real_dungeon(tile->get().dungeonId) && tile->get().background != EmptyMaterialId)
           tile->get().liquid.source = false;
         // pressurize liquid under the ocean
-        if (blockInfo.oceanLiquid != EmptyLiquidId && position[1] < blockInfo.oceanLiquidLevel) {
+        if (blockInfo.oceanLiquid != empty_liquid_id && position[1] < blockInfo.oceanLiquidLevel) {
           float pressure = blockInfo.oceanLiquidLevel - position[1];
           tile->get().liquid.pressure = pressure;
         }

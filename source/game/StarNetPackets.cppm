@@ -733,13 +733,13 @@ struct TileLiquidUpdatePacket : PacketBase<PacketType::TileLiquidUpdate> {
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<TileLiquidUpdatePacket>(); }
 
   TileLiquidUpdatePacket();
-  TileLiquidUpdatePacket(Vec2I const& position, LiquidNetUpdate liquidUpdate);
+  TileLiquidUpdatePacket(Vec2I const& position, LiquidNetUpdate liquid_update);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
   Vec2I position;
-  LiquidNetUpdate liquidUpdate;
+  LiquidNetUpdate liquid_update;
 };
 
 struct TileDamageUpdatePacket : PacketBase<PacketType::TileDamageUpdate> {

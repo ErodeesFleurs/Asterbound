@@ -20,11 +20,13 @@ struct LiquidExceptionTag {
 };
 using LiquidException = StarError<LiquidExceptionTag, StarException>;
 
+[[nodiscard]] std::expected<float, StarException> load_liquid_bucket_size(Assets const& assets);
+
 using LiquidInteractionResult = Either<MaterialId, LiquidId>;
 
 struct LiquidSettings {
   String name;
-  LiquidId id = EmptyLiquidId;
+  LiquidId id = empty_liquid_id;
   String path;
   Json config;
   String description;
@@ -64,7 +66,7 @@ public:
   [[nodiscard]]
   std::expected<String, StarException> liquid_description(LiquidId liquid_id) const;
 
-  // Borrows from this database; absent for EmptyLiquidId and unregistered IDs.
+  // Borrows from this database; absent for empty_liquid_id and unregistered IDs.
   [[nodiscard]] std::optional<std::reference_wrapper<LiquidSettings const>> liquid_settings(LiquidId liquid_id) const &;
   std::optional<std::reference_wrapper<LiquidSettings const>> liquid_settings(LiquidId liquid_id) const && = delete;
 
@@ -98,7 +100,7 @@ inline bool LiquidsDatabase::is_liquid_name(String const& name) const {
 }
 
 inline bool LiquidsDatabase::is_valid_liquid_id(LiquidId liquid_id) const {
-  return liquid_id == EmptyLiquidId || m_setting_slots[liquid_id] != 0;
+  return liquid_id == empty_liquid_id || m_setting_slots[liquid_id] != 0;
 }
 
 inline std::optional<std::reference_wrapper<LiquidSettings const>> LiquidsDatabase::liquid_settings(LiquidId liquid_id) const & {
@@ -120,6 +122,7 @@ export module star.liquids_database;
 export namespace Star {
   using ::Star::LiquidExceptionTag;
   using ::Star::LiquidException;
+  using ::Star::load_liquid_bucket_size;
   using ::Star::LiquidInteractionResult;
   using ::Star::LiquidSettings;
   using ::Star::LiquidsDatabase;

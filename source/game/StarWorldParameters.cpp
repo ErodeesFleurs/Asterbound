@@ -1379,7 +1379,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
         return std::unexpected(std::move(cave_liquid_density.error()));
       region.caveLiquidSeedDensity = *cave_liquid_density;
     } else {
-      region.caveLiquid = EmptyLiquidId;
+      region.caveLiquid = empty_liquid_id;
       region.caveLiquidSeedDensity = 0.0f;
     }
     auto ocean_liquid_choices = regionConfig.get_array("oceanLiquid", {});
@@ -1399,7 +1399,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
       if (!regionoceanLiquidLevelResult1) return std::unexpected(std::move(regionoceanLiquidLevelResult1.error()));
       region.oceanLiquidLevel = std::move(static_cast<int>((*regionoceanLiquidLevelResult1) + layerBaseHeight));
     } else {
-      region.oceanLiquid = EmptyLiquidId;
+      region.oceanLiquid = empty_liquid_id;
       region.oceanLiquidLevel = 0;
     }
     auto regionencloseLiquidsResult1 = regionConfig.get_bool("encloseLiquids", false);
@@ -1637,7 +1637,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
   auto parametershueShiftResult1 = biome_database->biome_hue_shift(parameters->primaryBiome, surfaceBiomeSeed);
   if (!parametershueShiftResult1) return std::unexpected(std::move(parametershueShiftResult1.error()));
   parameters->hueShift = std::move((*parametershueShiftResult1));
-  parameters->primarySurfaceLiquid = std::move(surfaceLayer.primaryRegion.oceanLiquid != EmptyLiquidId
+  parameters->primarySurfaceLiquid = std::move(surfaceLayer.primaryRegion.oceanLiquid != empty_liquid_id
       ? surfaceLayer.primaryRegion.oceanLiquid
       : surfaceLayer.primaryRegion.caveLiquid);
   auto parametersskyColoringResult1 = biome_database->biome_sky_coloring(parameters->primaryBiome, seed);

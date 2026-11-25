@@ -430,7 +430,7 @@ namespace Dungeon {
       return {};
 
     // TODO: delete objects too?
-    writer.setLiquid(position, LiquidStore(EmptyLiquidId, 0.0f, 0.0f, false));
+    writer.setLiquid(position, {});
     writer.setForegroundMaterial(position, EmptyMaterialId, 0, DefaultMaterialColorVariant);
     writer.setBackgroundMaterial(position, EmptyMaterialId, 0, DefaultMaterialColorVariant);
     writer.setForegroundMod(position, NoModId, 0);
@@ -460,7 +460,7 @@ namespace Dungeon {
     }
     auto collision = (*database)->materialCollisionKind(*material);
     if (!collision) return std::unexpected(std::move(collision.error()));
-    if (isSolidColliding(*collision)) writer.setLiquid(position, LiquidStore(EmptyLiquidId, 0.0f, 0.0f, false));
+    if (isSolidColliding(*collision)) writer.setLiquid(position, {});
     writer.setForegroundMaterial(position, *material, m_materialHue, m_materialColorVariant);
     if (isRealMod(mod)) writer.setForegroundMod(position, mod, m_modHue);
     return {};

@@ -38,6 +38,19 @@ import star.math_common;
 import star.algorithm;
 namespace Star {
 
+namespace {
+
+std::expected<float, StarException> read_consume_liquid(Json const& entry) {
+  auto amount = entry.get_double("consumeLiquid", 0.0);
+  if (!amount)
+    return std::unexpected(std::move(amount.error()));
+  if (!is_finite(*amount) || *amount < 0.0 || *amount > std::numeric_limits<float>::max())
+    return std::unexpected(MaterialException("consumeLiquid must be a finite, nonnegative float"));
+  return static_cast<float>(*amount);
+}
+
+}
+
 std::expected<std::shared_ptr<MaterialDatabase>, StarException> MaterialDatabase::create(std::shared_ptr<Assets const> const& assets, std::shared_ptr<ParticleDatabase const> const& pdb, ImageMetadataDatabase const& image_metadata, Logger& logger, RandomService& random) {
   auto result = std::shared_ptr<MaterialDatabase>(new MaterialDatabase(random));
   auto loaded = result->load(assets, pdb, image_metadata, logger);
@@ -305,7 +318,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
           return std::unexpected(std::move(liquid.error()));
         LiquidMaterialInteraction interaction;
         {
-          auto value = entry.get_float("consumeLiquid", 0.0f);
+          auto value = read_consume_liquid(entry);
           if (!value)
             return std::unexpected(std::move(value.error()));
           interaction.consumeLiquid = std::move(*value);
@@ -476,7 +489,7 @@ std::expected<void, StarException> MaterialDatabase::load(std::shared_ptr<Assets
           return std::unexpected(std::move(liquid.error()));
         LiquidModInteraction interaction;
         {
-          auto value = entry.get_float("consumeLiquid", 0.0f);
+          auto value = read_consume_liquid(entry);
           if (!value)
             return std::unexpected(std::move(value.error()));
           interaction.consumeLiquid = std::move(*value);

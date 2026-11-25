@@ -896,7 +896,7 @@ std::expected<WorldStorage::TileSectorStore, StarException> WorldStorage::readTi
         auto LiquidIdreplacementLiquidResult1 = storageConfig.get_uint("replacementLiquidId");
         if (!LiquidIdreplacementLiquidResult1) return std::unexpected(std::move(LiquidIdreplacementLiquidResult1.error()));
         LiquidId replacementLiquid = std::move((*LiquidIdreplacementLiquidResult1));
-        if (replacementLiquid == EmptyLiquidId)
+        if (replacementLiquid == empty_liquid_id)
           tile.liquid = LiquidStore();
         else
           tile.liquid.liquid = replacementLiquid;

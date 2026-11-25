@@ -60,6 +60,12 @@ import star.world;
 import star.byte_array;
 import star.world_render_data;
 import star.world_geometry;
+import star.collision_block;
+import star.liquid_types;
+import star.material_types;
+import star.math_common;
+import star.tile_modification;
+import star.world_tiles;
 #include "gtest/gtest.h"
 
 
@@ -234,6 +240,126 @@ const GameTestRegistration randomInstanceWorld("SpawnTest", "RandomInstanceWorld
   ASSERT_FALSE(closed);
   EXPECT_TRUE(closed.error().is<TestUniverseException>());
   ASSERT_TRUE((*testUniverse)->close());
+});
+
+const GameTestRegistration client_liquid_prediction("SpawnTest", "LiquidCollectionPredictsAbsoluteRemainders", [](GameTest& fixture) {
+  auto check_result = [&](auto const& result, std::string_view action, std::source_location at = std::source_location::current()) {
+    return fixture.check(bool(result), result ? action : result.error().what(), at);
+  };
+  auto directory = File::temporary_directory(fixture.root().random());
+  if (!check_result(directory, "create liquid prediction fixture directory")) return;
+  auto cleanup = make_scope_exit([&] { check_result(File::remove_all(*directory), "remove liquid prediction fixture directory"); });
+  auto overlay = File::relative_to(*directory, "assets");
+  auto items = File::relative_to(overlay, "items");
+  if (!check_result(File::create_directories(items), "create item patch directory")) return;
+  if (!check_result(File::write_file(String(R"([
+    {"op":"replace","path":"/liquidItems/bucketSize","value":1}
+  ])"), File::relative_to(items, "defaultParameters.config.patch")), "write one-unit bucket patch")) return;
+  auto settings = fixture.rootSettings();
+  settings.assetSources.push_back(overlay);
+  settings.storageDirectory = File::relative_to(*directory, "storage");
+  settings.runtimeConfigFile = {};
+  settings.logDirectory = {};
+  settings.logFile = {};
+  settings.includeUGC = false;
+  auto root = Root::create(std::move(settings));
+  if (!check_result(root, "create private liquid prediction root")) return;
+  auto universe = TestUniverse::create(**root, {100, 100});
+  if (!check_result(universe, "start isolated test universe")) return;
+  auto close = make_scope_exit([&] { check_result((*universe)->close(), "close isolated test universe"); });
+  (*universe)->client()->mainPlayer()->log()->setIntroComplete(true);
+  if (!check_result((*universe)->warpPlayer(InstanceWorldId("outpost")), "warp to outpost")) return;
+  auto world = (*universe)->worldClient();
+  if (!fixture.check(bool(world), "get loaded client world")) return;
+
+  // Inject authoritative levels into loaded, unprotected air. Do not tick
+  // the server: every acknowledgement below is applied explicitly.
+  auto patch = std::make_shared<TileArrayUpdatePacket>();
+  NetTile air;
+  air.foreground = EmptyMaterialId;
+  air.background = EmptyMaterialId;
+  air.collision = CollisionKind::None;
+  air.dungeonId = no_dungeon_id;
+  patch->min = {8, 8};
+  if (!check_result(patch->array.set_size({7, 7}, air), "allocate authoritative tile patch")) return;
+  constexpr LiquidId water = 1;
+  Vec2I const first(10, 11), second(11, 11), tail(12, 11), repeated(11, 12), placement(12, 12);
+  std::array const positions{first, second, tail, repeated, placement};
+  std::array<std::uint8_t, positions.size()> const levels{96, 192, 64, 160, 128};
+  for (std::size_t i = 0; i < positions.size(); ++i) {
+    auto local = positions[i] - patch->min;
+    patch->array(local[0], local[1]).liquid = {water, levels[i]};
+  }
+  if (!check_result(world->handleIncomingPackets({patch}), "seed authoritative liquid levels")) return;
+  auto const wrap = Vec2I(static_cast<int>(world->geometry().width()), 0);
+  world->setClientWindow(RectI::with_size(patch->min, {7, 7}));
+  world->setFullBright(true);
+  WorldRenderData frame;
+  auto render_frame = [&](std::source_location at = std::source_location::current()) {
+    return check_result(world->render(frame, 0, std::nullopt, PresentationContext()), "render liquid predictions", at);
+  };
+  auto expect_liquid = [&](Vec2I pos, LiquidId id, std::uint8_t level, std::source_location at = std::source_location::current()) {
+    auto local = pos - frame.tile_min_position;
+    if (!fixture.check(local[0] >= 0 && local[1] >= 0
+        && static_cast<std::size_t>(local[0]) < frame.tiles.extent(0)
+        && static_cast<std::size_t>(local[1]) < frame.tiles.extent(1), "tile is present in the rendered frame", at))
+      return;
+    auto const& tile = frame.tiles(local[0], local[1]);
+    fixture.check(tile.liquidId == id && tile.liquidLevel == level,
+        Star::format("tile {},{}: expected liquid {} at level {}, saw liquid {} at level {}",
+            pos[0], pos[1], id, level, tile.liquidId, tile.liquidLevel), at);
+  };
+
+  if (!check_result(world->collectLiquid({first + wrap, tail}, water), "predict partial bucket") || !render_frame()) return;
+  expect_liquid(first, water, levels[0]);
+  expect_liquid(tail, water, levels[2]);
+
+  // The first two visits count separately, then the wrapped spelling sees
+  // the completed drain. A stale first tile would fill another bucket.
+  if (!check_result(world->collectLiquid({first, first, second, first + wrap, tail}, water), "predict bucket with a wrapped duplicate") ||
+      !check_result(world->collectLiquid({repeated, repeated + wrap}, water), "predict bucket filled by revisiting its sole tile")) return;
+  float const second_remainder = byte_to_float(levels[1]) - (1.0f - byte_to_float(levels[0]) - byte_to_float(levels[0]));
+  if (!render_frame()) return;
+  expect_liquid(first, empty_liquid_id, 0);
+  expect_liquid(second, water, float_to_byte(second_remainder));
+  expect_liquid(tail, water, levels[2]);
+  expect_liquid(repeated, empty_liquid_id, 0);
+  fixture.check(world->liquidLevel(first).level == byte_to_float(levels[0]), "direct liquid query ignores predicted drain");
+  fixture.check(world->liquidLevel(second).level == byte_to_float(levels[1]), "direct liquid query ignores predicted remainder");
+
+  constexpr float added = 0.25f;
+  TileModificationList const placements{{second, PlaceLiquid{water, added}}, {placement, PlaceLiquid{water, added}}};
+  auto failed = world->applyTileModifications(placements, true);
+  if (!check_result(failed, "predict placements") ||
+      !fixture.check(failed->empty(), "both placements were accepted for prediction") || !render_frame()) return;
+  expect_liquid(second, water, float_to_byte(second_remainder + added));
+  expect_liquid(placement, water, float_to_byte(byte_to_float(levels[4]) + added));
+
+  // A placement rejection must not discard the earlier collection.
+  auto rejected = std::make_shared<TileModificationFailurePacket>(
+      TileModificationList{{second + wrap, PlaceLiquid{water, added}}});
+  if (!check_result(world->handleIncomingPackets({rejected}), "apply wrapped placement rejection") || !render_frame()) return;
+  expect_liquid(second, water, float_to_byte(second_remainder));
+  auto retried = world->applyTileModifications({{second, PlaceLiquid{water, added}}}, true);
+  if (!check_result(retried, "retry placement") ||
+      !fixture.check(retried->empty(), "retried placement was accepted for prediction")) return;
+
+  // A new collection must use the predicted remainder plus the placement,
+  // not the authoritative second tile or a delta applied to it twice.
+  if (!check_result(world->collectLiquid({second + wrap, tail}, water), "collect from the predicted liquid level")) return;
+  float const tail_remainder = byte_to_float(levels[2]) - (1.0f - (second_remainder + added));
+  if (!render_frame()) return;
+  expect_liquid(second, empty_liquid_id, 0);
+  expect_liquid(tail, water, float_to_byte(tail_remainder));
+
+  auto liquid_ack = std::make_shared<TileLiquidUpdatePacket>(second + wrap, LiquidNetUpdate{water, 77});
+  auto full_ack = std::make_shared<TileUpdatePacket>();
+  full_ack->position = placement;
+  full_ack->tile = air;
+  full_ack->tile.liquid = {water, 99};
+  if (!check_result(world->handleIncomingPackets({liquid_ack, full_ack}), "apply authoritative liquid and full-tile updates") || !render_frame()) return;
+  expect_liquid(second, water, 77);
+  expect_liquid(placement, water, 99);
 });
 
 namespace {

@@ -12,6 +12,7 @@ import star.hash;
 import star.liquids_database;
 import star.json;
 import star.logging;
+import star.image_metadata_database;
 import star.material_database;
 import star.rect;
 import star.root;
@@ -22,6 +23,7 @@ import star.color;
 import star.entity_splash;
 import star.list;
 import star.particle;
+import star.particle_database;
 import star.random;
 import star.world_server;
 #include "gtest/gtest.h"
@@ -51,21 +53,90 @@ TEST(DungeonLiquidTest, PressureTracksHighestConnectedCellOfSameLiquid) {
   EXPECT_EQ(cell(0, -2).level, 0.5f);
 }
 
-TEST(LiquidStoreTest, OverfullLevelSaturatesNetworkUpdates) {
-  auto store = LiquidStore::filled(1, 0.5f);
-  auto update = store.update(1, 1.1f, 3.0f);
-  ASSERT_TRUE(update);
-  EXPECT_EQ(update->liquid, 1);
-  EXPECT_EQ(update->level, 255);
-  EXPECT_EQ(store.netUpdate().level, 255);
-  EXPECT_FLOAT_EQ(store.level, 1.1f);
-  EXPECT_FLOAT_EQ(store.pressure, 3.0f);
+const GameTestRegistration liquid_default_values("LiquidStoreTest", "DefaultsAndFactoriesPreserveEmptyAndSourceState", [](GameTest& fixture) {
+  LiquidLevel level;
+  fixture.check(level.liquid == empty_liquid_id && level.level == 0.0f, "default liquid level is empty");
+  LiquidNetUpdate net;
+  level = net.liquid_level();
+  fixture.check(net.liquid == empty_liquid_id && net.level == 0
+      && level.liquid == empty_liquid_id && level.level == 0.0f, "default network update decodes as empty");
 
-  // Both overfull levels have the same wire value; only physics changes.
-  EXPECT_FALSE(store.update(1, 1.3f, 4.0f));
-  EXPECT_FLOAT_EQ(store.level, 1.3f);
-  EXPECT_FLOAT_EQ(store.pressure, 4.0f);
-}
+  for (auto const& store : {LiquidStore{}, LiquidStore::filled(empty_liquid_id, 0.5f, 4.0f),
+                            LiquidStore::endless(empty_liquid_id, 4.0f)}) {
+    fixture.check(store.liquid == empty_liquid_id && store.level == 0.0f && store.pressure == 0.0f && !store.source,
+                  "default and empty factories produce an ordinary empty store");
+  }
+  auto store = LiquidStore::filled(7, 0.5f);
+  fixture.check(store.liquid == 7 && store.level == 0.5f && store.pressure == 0.5f && !store.source,
+                "filled cells default pressure to level");
+  store = LiquidStore::endless(7, 4.0f);
+  fixture.check(store.liquid == 7 && store.level == 1.0f && store.pressure == 4.0f && store.source,
+                "endless cells start full at the requested pressure");
+});
+
+const GameTestRegistration liquid_drain_values("LiquidStoreTest", "DrainsDoNotCreateLiquidOrAffectSources", [](GameTest& fixture) {
+  constexpr auto nan = std::numeric_limits<float>::quiet_NaN();
+  constexpr auto infinity = std::numeric_limits<float>::infinity();
+  auto store = LiquidStore::filled(7, 0.75f, 3.0f);
+  LiquidLevel level = store;
+  for (auto amount : {0.0f, -0.25f, nan, infinity}) {
+    level.drain(amount);
+    store.drain(amount);
+    fixture.check(level.liquid == 7 && level.level == 0.75f && store.liquid == 7
+        && store.level == 0.75f && store.pressure == 3.0f, "nonpositive and nonfinite drains change nothing");
+  }
+
+  level.drain(0.25f);
+  store.drain(0.25f);
+  fixture.check(level.level == 0.5f && store.level == 0.5f && store.pressure == 3.0f,
+                "partial drains preserve pressure");
+  level.drain(2.0f);
+  store.drain(2.0f);
+  fixture.check(level.liquid == empty_liquid_id && level.level == 0.0f && store.liquid == empty_liquid_id
+      && store.level == 0.0f && store.pressure == 0.0f, "overdrain clears liquid and pressure without going below zero");
+  store.drain(1.0f);
+  fixture.check(store.level == 0.0f, "draining an empty tile leaves it empty");
+
+  auto source = LiquidStore::endless(7, 3.0f);
+  source.drain(2.0f);
+  fixture.check(source.liquid == 7 && source.level == 1.0f && source.pressure == 3.0f && source.source,
+                "draining a source leaves it untouched");
+});
+
+const GameTestRegistration liquid_wire_dirtiness("LiquidStoreTest", "OnlyWireChangesAreDirtyWhilePhysicsKeepsFullPrecision", [](GameTest& fixture) {
+  auto store = LiquidStore::filled(1, 0.5f);
+  fixture.check(store.net_update().level == 127, "wire levels truncate rather than round");
+  fixture.check(!store.update(1, 0.5f, 2.0f) && store.pressure == 2.0f, "pressure alone does not dirty the wire");
+  fixture.check(!store.update(1, 0.5001f, 1.0f) && store.level == 0.5001f && store.pressure == 1.0f,
+                "within-byte changes update only physics");
+  fixture.check(store.update(1, 0.502f, 1.0f) && store.net_update().level == 128, "crossing a byte boundary dirties the wire");
+  fixture.check(store.update(2, 0.502f, 1.0f), "a different ID dirties the wire with the same level");
+  auto decoded = store.net_update().liquid_level();
+  fixture.check(decoded.liquid == 2 && decoded.level == 128.0f / 255.0f, "decoding retains the ID and restores the byte fraction");
+
+  fixture.check(store.update(2, 1.1f, 3.0f) && store.net_update().level == 255 && store.level == 1.1f,
+                "overfull levels saturate the wire but not physics");
+  fixture.check(!store.update(2, 1.3f, 4.0f) && store.level == 1.3f && store.pressure == 4.0f,
+                "a second overfull level leaves the saturated wire unchanged");
+});
+
+const GameTestRegistration liquid_source_updates("LiquidStoreTest", "SourcesAreMonotonicAndAnExhaustedFlowClearsItsIdentity", [](GameTest& fixture) {
+  auto source = LiquidStore::endless(7, 3.0f);
+  fixture.check(!source.update(8, 2.0f, 4.0f) && source.liquid == 7 && source.level == 1.0f && source.pressure == 3.0f,
+                "a different ID cannot overwrite a source");
+  fixture.check(!source.update(7, 0.25f, 2.0f) && source.level == 1.0f && source.pressure == 3.0f,
+                "a source does not lose level or pressure");
+  fixture.check(!source.update(7, 0.25f, 4.0f) && source.level == 1.0f && source.pressure == 4.0f,
+                "a source can gain pressure without changing level");
+  fixture.check(!source.update(7, 1.25f, 2.0f) && source.level == 1.25f && source.pressure == 4.0f && source.source,
+                "a source can gain level without losing pressure or dirtying a saturated byte");
+
+  auto flow = LiquidStore::filled(7, 0.001f, 3.0f);
+  fixture.check(flow.net_update().level == 0, "a small positive level can encode to zero");
+  fixture.check(flow.update(7, -0.25f, 4.0f) && flow.liquid == empty_liquid_id
+      && flow.level == -0.25f && flow.pressure == 0.0f && flow.net_update().level == 0,
+      "an exhausted flow changes ID and clears pressure without rewriting the supplied finite level");
+});
 
 namespace {
 enum class TestLiquidId : std::uint8_t { Water, Lava };
@@ -178,7 +249,7 @@ const GameTestRegistration splash_world_cases("EntitySplashTest", "WorldSensorsP
   config->num_splash_particles = 0;
   expect_empty(4);
   config->num_splash_particles = 3;
-  ASSERT_TRUE(world.setLiquid(bottom, EmptyLiquidId, 0, 0));
+  ASSERT_TRUE(world.setLiquid(bottom, empty_liquid_id, 0, 0));
   expect_empty(4);
   config->splash_top_sensor = {0, 0.5f};
   config->splash_min_water_level = -0.25f;
@@ -240,15 +311,96 @@ struct LiquidReadbackFailureTag {
 };
 using LiquidReadbackFailure = StarError<LiquidReadbackFailureTag, StarException>;
 
+std::expected<std::shared_ptr<Assets>, StarException> open_liquid_fixture_assets(
+    GameTest& fixture, String const& directory, Logger& logger) {
+  auto preload = File::write_file(String("[]"), File::relative_to(directory, "preload.config"));
+  if (!preload)
+    return std::unexpected(std::move(preload.error()));
+  Assets::Settings settings{};
+  settings.worker_pool_size = 1;
+  settings.asset_time_to_live = 10;
+  return Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {directory});
+}
+
+const GameTestRegistration liquid_bucket_config("LiquidConfigTest", "RequiresFinitePositiveBucketSize", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  if (!fixture.check(bool(directory), "create bucket config fixture directory")) return;
+  auto cleanup = make_scope_exit([&] { fixture.check(bool(File::remove_all(*directory)), "remove bucket config fixture"); });
+  auto items = File::relative_to(*directory, "items");
+  if (!fixture.check(bool(File::create_directories(items)), "create bucket config asset directory")) return;
+  auto path = File::relative_to(items, "defaultParameters.config");
+  Logger logger;
+  for (auto const& [value, valid] : std::array<std::pair<std::string_view, bool>, 7>{{
+      {"0.75", true}, {"0", false}, {"-1", false}, {"1e-100", false}, {"1e100", false},
+      {"1e99999", false}, {R"("invalid")", false}}}) {
+    if (!fixture.check(bool(File::write_file(
+        String(R"({"liquidItems":{"bucketSize":)") + String(value) + "}}", path)), "write bucket size config")) return;
+    auto assets = open_liquid_fixture_assets(fixture, *directory, logger);
+    if (!fixture.check(bool(assets), assets ? "open bucket fixture assets" : assets.error().what())) return;
+    auto loaded = load_liquid_bucket_size(**assets);
+    if (valid)
+      fixture.check(loaded && *loaded == 0.75f, "preserve a valid fractional bucket size");
+    else
+      fixture.check(!loaded, Star::format("reject bucket size {}", value));
+  }
+});
+
+const GameTestRegistration liquid_material_config("LiquidConfigTest", "ConsumptionIsNonnegativeAndFitsFloat", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  auto directory = File::temporary_directory(root.random());
+  if (!fixture.check(bool(directory), "create material reaction fixture directory")) return;
+  auto cleanup = make_scope_exit([&] { fixture.check(bool(File::remove_all(*directory)), "remove material reaction fixture"); });
+  auto tiles = File::relative_to(*directory, "tiles");
+  if (!fixture.check(bool(File::create_directories(tiles)), "create damage config asset directory") ||
+      !fixture.check(bool(File::write_file(String("[]"), File::relative_to(*directory, "metamaterials.config"))),
+                     "write empty metamaterial list") ||
+      !fixture.check(bool(File::write_file(
+          String(R"({"defaultFootstepSound":"/fixture.ogg"})"), File::relative_to(*directory, "client.config"))),
+          "write default footstep configuration") ||
+      !fixture.check(bool(File::write_file(
+          String(R"({"damageFactors":{},"damageRecovery":0})"), File::relative_to(tiles, "defaultDamage.config"))),
+          "write material damage defaults")) return;
+  auto particles = root.particleDatabase();
+  auto image_metadata = root.image_metadata_database();
+  if (!fixture.check(particles && image_metadata, "load material catalog dependencies")) return;
+  auto with_interactions = [](String const& header, std::string_view second) {
+    return header + R"(,"liquidInteractions":[{"liquidId":1},{"liquidId":2,"consumeLiquid":)"
+        + String(second) + R"(},{"liquidId":3,"consumeLiquid":0.25}]})";
+  };
+  Logger logger;
+  for (auto const& [material, mod] : std::array<std::pair<std::string_view, std::string_view>, 5>{{
+      {"0", "0"}, {"-0.25", "0"}, {"1e100", "0"}, {"0", "-0.25"}, {"0", "1e99999"}}}) {
+    if (!fixture.check(bool(File::write_file(
+        with_interactions(R"({"materialId":1,"materialName":"fixture","category":"fixture")", material),
+        File::relative_to(*directory, "fixture.material"))), "write material reactions") ||
+        !fixture.check(bool(File::write_file(
+        with_interactions(R"({"modId":1,"modName":"fixture")", mod),
+        File::relative_to(*directory, "fixture.matmod"))), "write material mod reactions")) return;
+    auto assets = open_liquid_fixture_assets(fixture, *directory, logger);
+    if (!fixture.check(bool(assets), assets ? "open material fixture assets" : assets.error().what())) return;
+    auto database = MaterialDatabase::create(*assets, *particles, **image_metadata, logger, root.random());
+    if (material == "0" && mod == "0") {
+      if (!fixture.check(bool(database), database ? "load valid material reactions" : database.error().what())) return;
+      for (LiquidId id : {1, 2, 3}) {
+        auto material_rule = (*database)->liquidMaterialInteraction(id, 1);
+        auto mod_rule = (*database)->liquidModInteraction(id, 1);
+        float expected = id == 3 ? 0.25f : 0.0f;
+        fixture.check(material_rule && material_rule->consumeLiquid == expected, "preserve valid material consumption");
+        fixture.check(mod_rule && mod_rule->consumeLiquid == expected, "preserve valid mod consumption");
+      }
+    } else {
+      fixture.check(!database && database.error().is<MaterialException>(),
+                    Star::format("reject reaction amounts material={}, mod={}", material, mod));
+    }
+  }
+});
+
 std::expected<std::shared_ptr<LiquidsDatabase>, StarException> liquids_fixture(
     GameTest& fixture, String const& directory, Json const& config,
     std::initializer_list<std::pair<String, Json>> liquids = {}) {
   auto created = File::create_directories(directory);
   if (!created)
     return std::unexpected(std::move(created.error()));
-  auto preload = File::write_file(String("[]"), File::relative_to(directory, "preload.config"));
-  if (!preload)
-    return std::unexpected(std::move(preload.error()));
   auto contents = config.print_json();
   if (!contents)
     return std::unexpected(std::move(contents.error()));
@@ -263,11 +415,8 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> liquids_fixture(
     if (!written)
       return std::unexpected(std::move(written.error()));
   }
-  Assets::Settings settings{};
-  settings.worker_pool_size = 1;
-  settings.asset_time_to_live = 10;
   Logger logger;
-  auto assets = Assets::create(logger, fixture.root().random(), fixture.root().logMap(), settings, {directory});
+  auto assets = open_liquid_fixture_assets(fixture, directory, logger);
   if (!assets)
     return std::unexpected(std::move(assets.error()));
   auto materials = fixture.root().materialDatabase();
@@ -443,10 +592,10 @@ const GameTestRegistration liquid_catalog_lookup(
   fixture.check(ids == std::vector<LiquidId>{2, 17, 255}, "settings contain only registered IDs in ascending order");
   fixture.check(catalog.liquid_id("source") == LiquidId{17} && catalog.liquid_name(255) == String("high"),
                 "look up registered IDs and names");
-  fixture.check(catalog.is_valid_liquid_id(EmptyLiquidId) && catalog.is_liquid_name("empty")
-                  && catalog.liquid_id("empty") == EmptyLiquidId
-                  && catalog.liquid_name(EmptyLiquidId) == String("empty")
-                  && !catalog.liquid_settings(EmptyLiquidId),
+  fixture.check(catalog.is_valid_liquid_id(empty_liquid_id) && catalog.is_liquid_name("empty")
+                  && catalog.liquid_id("empty") == empty_liquid_id
+                  && catalog.liquid_name(empty_liquid_id) == String("empty")
+                  && !catalog.liquid_settings(empty_liquid_id),
                 "empty is a reserved name and ID, not a catalog entry");
   fixture.check(!catalog.is_valid_liquid_id(91) && !catalog.liquid_settings(91),
                 "an unregistered interaction target does not fill a catalog hole");
@@ -467,8 +616,8 @@ const GameTestRegistration liquid_catalog_lookup(
   auto unregistered = catalog.interact(17, 92);
   fixture.check(unregistered && unregistered->maybe_right() == LiquidId{93},
                 "in-range targets and results need not be registered");
-  auto empty = catalog.interact(17, EmptyLiquidId);
-  fixture.check(empty && empty->maybe_right() == EmptyLiquidId, "interaction IDs may be zero");
+  auto empty = catalog.interact(17, empty_liquid_id);
+  fixture.check(empty && empty->maybe_right() == empty_liquid_id, "interaction IDs may be zero");
 
   fixture.check(catalog.liquid_description(17, "human") == String("Human description"), "use species description");
   fixture.check(catalog.liquid_description(17, "floran") == String("Default description")
@@ -478,7 +627,7 @@ const GameTestRegistration liquid_catalog_lookup(
   fixture.check(!malformed && malformed.error().is<JsonException>(),
                 "malformed species description fails only when requested");
   fixture.check(catalog.liquid_description(2, "avian") == String()
-                  && catalog.liquid_description(EmptyLiquidId) == String(),
+                  && catalog.liquid_description(empty_liquid_id) == String(),
                 "missing descriptions and empty liquid yield empty text");
 });
 

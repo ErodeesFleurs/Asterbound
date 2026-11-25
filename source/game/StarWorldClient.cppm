@@ -361,7 +361,7 @@ public:
 
   DungeonId dungeonId(Vec2I const& pos) const;
 
-  [[nodiscard]] std::expected<void, StarException> collectLiquid(List<Vec2I> const& tilePositions, LiquidId liquidId);
+  [[nodiscard]] std::expected<void, StarException> collectLiquid(List<Vec2I> const& tile_positions, LiquidId liquid_id);
 
   [[nodiscard]] std::expected<bool, StarException> waitForLighting(std::optional<std::reference_wrapper<WorldRenderData>> renderData = std::nullopt);
 

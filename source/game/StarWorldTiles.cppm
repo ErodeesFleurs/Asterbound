@@ -181,10 +181,23 @@ struct PredictedTile {
   std::optional<MaterialColorVariant> foregroundColorVariant;
   std::optional<ModId> foregroundMod;
   std::optional<MaterialHue> foregroundModHueShift;
-  std::optional<LiquidLevel> liquid;
+  std::optional<LiquidLevel> liquid_remainder;
+  std::optional<LiquidLevel> liquid_delta;
   std::optional<CollisionKind> collision;
 
   operator bool() const;
+
+  LiquidLevel effective_liquid(LiquidLevel authoritative) const {
+    if (liquid_remainder)
+      authoritative = *liquid_remainder;
+    if (liquid_delta) {
+      if (authoritative.liquid != liquid_delta->liquid)
+        return *liquid_delta;
+      authoritative.level += liquid_delta->level;
+    }
+    return authoritative;
+  }
+
   template <typename Tile>
   void apply(Tile& tile) {
     if (foreground) tile.foreground = *foreground;

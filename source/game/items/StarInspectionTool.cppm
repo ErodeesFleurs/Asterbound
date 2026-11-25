@@ -440,7 +440,7 @@ std::expected<InspectionTool::InspectionResult, StarException> InspectionTool::i
   auto liquids_database = root().liquids_database();
   if (!liquids_database)
     return std::unexpected(std::move(liquids_database.error()));
-  if (liquid_level.liquid != EmptyLiquidId)
+  if (liquid_level.liquid != empty_liquid_id)
     return (*liquids_database)->liquid_description(liquid_level.liquid, species).transform([](String message) {
       return InspectionResult{.message = std::move(message), .objectName = {}};
     });

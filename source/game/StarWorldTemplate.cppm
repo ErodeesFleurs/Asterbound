@@ -109,10 +109,10 @@ public:
     MaterialId background = EmptyMaterialId;
     ModId backgroundMod = NoModId;
 
-    LiquidId caveLiquid = EmptyLiquidId;
+    LiquidId caveLiquid = empty_liquid_id;
     float caveLiquidSeedDensity = 0.0f;
 
-    LiquidId oceanLiquid = EmptyLiquidId;
+    LiquidId oceanLiquid = empty_liquid_id;
     int oceanLiquidLevel = 0;
 
     bool encloseLiquids = false;

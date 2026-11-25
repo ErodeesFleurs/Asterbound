@@ -1920,10 +1920,7 @@ LiquidLevel WorldServer::liquidLevel(Vec2I const& pos) const {
 }
 
 std::expected<LiquidLevel, StarException> WorldServer::liquidLevel(RectF const& region) const {
-  auto result216 = WorldImpl::liquidLevel(m_tileArray, region);
-  if (!result216)
-    return std::unexpected(std::move(result216.error()));
-  return std::move(*result216);
+  return WorldImpl::liquid_level(*m_tileArray, region);
 }
 
 std::expected<void, StarException> WorldServer::activateLiquidRegion(RectI const& region) {
@@ -2282,10 +2279,7 @@ std::expected<ItemDescriptor, StarException> WorldServer::collect_liquid(List<Ve
   auto assets = root().assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto bucket_config = (*assets)->json("/items/defaultParameters.config:liquidItems.bucketSize");
-  if (!bucket_config)
-    return std::unexpected(std::move(bucket_config.error()));
-  auto bucket_size = bucket_config->to_float();
+  auto bucket_size = load_liquid_bucket_size(**assets);
   if (!bucket_size)
     return std::unexpected(std::move(bucket_size.error()));
   if (tile_positions.empty())
@@ -2327,10 +2321,12 @@ std::expected<ItemDescriptor, StarException> WorldServer::collect_liquid(List<Ve
           if (drained_units > max_units)
             return drained_units;
         }
-        liquid.take(next_unit);
+        liquid.drain(next_unit);
         next_unit = *bucket_size;
-        for (auto pending : pending_tiles)
-          pending.get().take(pending.get().level);
+        for (auto pending : pending_tiles) {
+          auto& pending_liquid = pending.get();
+          pending_liquid.drain(pending_liquid.level);
+        }
         pending_tiles.clear();
       }
 
@@ -2340,9 +2336,12 @@ std::expected<ItemDescriptor, StarException> WorldServer::collect_liquid(List<Ve
       }
 
       if constexpr (!preflight) {
-        for (auto const& [_, client] : m_clientInfo) {
-          if (client->activeSectors.contains(m_tileArray->sector_for(pos)))
-            client->pendingLiquidUpdates.add(pos);
+        if (!m_clientInfo.empty()) {
+          auto const sector = m_tileArray->sector_for(pos);
+          for (auto const& [_, client] : m_clientInfo) {
+            if (client->activeSectors.contains(sector))
+              client->pendingLiquidUpdates.add(pos);
+          }
         }
         m_liquid_engine->visit_location(pos);
       }
@@ -3383,7 +3382,7 @@ std::shared_ptr<Sky> WorldServer::sky() const {
 }
 
 std::expected<void, StarException> WorldServer::modifyLiquid(Vec2I const& pos, LiquidId liquid, float quantity, bool additive) {
-  if (liquid == EmptyLiquidId)
+  if (liquid == empty_liquid_id)
     quantity = 0;
 
   if (auto tile = m_tileArray->modify_tile(pos)) {
@@ -3413,13 +3412,14 @@ std::expected<void, StarException> WorldServer::modifyLiquid(Vec2I const& pos, L
 
 std::expected<void, StarException> WorldServer::setLiquid(Vec2I const& pos, LiquidId liquid, float level, float pressure) {
   if (auto tile = m_tileArray->modify_tile(pos)) {
-    if (liquid == EmptyLiquidId)
+    if (liquid == empty_liquid_id)
       level = 0;
 
-    if (auto netUpdate = tile->get().liquid.update(liquid, level, pressure)) {
-      for (auto const& pair : m_clientInfo) {
-        if (pair.second->activeSectors.contains(m_tileArray->sector_for(pos)))
-          pair.second->pendingLiquidUpdates.add(pos);
+    if (tile->get().liquid.update(liquid, level, pressure) && !m_clientInfo.empty()) {
+      auto const sector = m_tileArray->sector_for(pos);
+      for (auto const& [_, client] : m_clientInfo) {
+        if (client->activeSectors.contains(sector))
+          client->pendingLiquidUpdates.add(pos);
       }
     }
   }
@@ -3521,7 +3521,7 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
     if (!result390)
       return std::unexpected(std::move(result390.error()));
     auto blockInfo = std::move(*result390);
-    if (blockInfo.oceanLiquid != EmptyLiquidId && !blockInfo.encloseLiquids && pos[1] < blockInfo.oceanLiquidLevel)
+    if (blockInfo.oceanLiquid != empty_liquid_id && !blockInfo.encloseLiquids && pos[1] < blockInfo.oceanLiquidLevel)
       tile->get().liquid = LiquidStore::endless(blockInfo.oceanLiquid, blockInfo.oceanLiquidLevel - pos[1]);
   }
 
@@ -3641,8 +3641,8 @@ std::expected<void, StarException> WorldServer::queueUpdatePackets(ConnectionId 
   clientInfo->pendingTileDamageUpdates.clear();
 
   for (auto pos : clientInfo->pendingLiquidUpdates) {
-    auto tile = m_tileArray->tile(pos);
-    clientInfo->outgoingPackets.push_back(std::make_shared<TileLiquidUpdatePacket>(pos, tile.liquid.netUpdate()));
+    auto const& tile = m_tileArray->tile(pos);
+    clientInfo->outgoingPackets.push_back(std::make_shared<TileLiquidUpdatePacket>(pos, tile.liquid.net_update()));
   }
   clientInfo->pendingLiquidUpdates.clear();
 
@@ -3964,7 +3964,7 @@ std::expected<void, StarException> WorldServer::writeNetTile(Vec2I const& pos, N
   netTile.backgroundColorVariant = tile.backgroundColorVariant;
   netTile.backgroundMod = tile.backgroundMod;
   netTile.backgroundModHueShift = tile.backgroundModHueShift;
-  netTile.liquid = tile.liquid.netUpdate();
+  netTile.liquid = tile.liquid.net_update();
   netTile.collision = tile.getCollision();
   netTile.blockBiomeIndex = tile.blockBiomeIndex;
   netTile.environmentBiomeIndex = tile.environmentBiomeIndex;
@@ -4084,7 +4084,7 @@ std::expected<bool, StarException> WorldServer::exposedToWeather(Vec2F const& po
       return std::unexpected(std::move(result450.error()));
     domain = std::move(*result450);
   }
-  if (domain && pos[1] > domain->get().effectsMinHeight && liquidLevel(Vec2I::floor(pos)).liquid == EmptyLiquidId) {
+  if (domain && pos[1] > domain->get().effectsMinHeight && liquidLevel(Vec2I::floor(pos)).liquid == empty_liquid_id) {
     auto result451 = this->root().assets();
     if (!result451)
       return std::unexpected(std::move(result451.error()));
@@ -4326,7 +4326,7 @@ std::expected<Vec2F, StarException> WorldServer::findPlayerStart(std::optional<V
       // out and try again if we can't signal the region or we are stuck in a
       // dungeon.
       for (int i = 0; i < maximumVerticalSearch; ++i) {
-        if (m_tileArray->tile(Vec2I::floor(pos)).liquid.liquid != EmptyLiquidId)
+        if (m_tileArray->tile(Vec2I::floor(pos)).liquid.liquid != empty_liquid_id)
           break;
 
         RectF spawnRect = RectF(pos[0] - spawnRectSize[0] / 2, pos[1], pos[0] + spawnRectSize[0] / 2, pos[1] + spawnRectSize[1]);

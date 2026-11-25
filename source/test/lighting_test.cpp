@@ -160,7 +160,7 @@ void gatherTileOracle(CellularLightingCalculator& calculator, ClientTileSectorAr
       Vec3F emission;
       if (tile.foreground != EmptyMaterialId || tile.foregroundMod != NoModId)
         emission += materials.radiantLight(tile.foreground, tile.foregroundMod);
-      if (tile.liquid.liquid != EmptyLiquidId && tile.liquid.level != 0.0f)
+      if (tile.liquid.liquid != empty_liquid_id && tile.liquid.level != 0.0f)
         emission += liquids.radiant_light(tile.liquid);
       if (tile.foregroundLightTransparent) {
         if (tile.background != EmptyMaterialId || tile.backgroundMod != NoModId)

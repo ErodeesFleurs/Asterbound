@@ -1103,7 +1103,7 @@ if (std::move(*result775))
       auto result776 = world();
 if (!result776) return std::unexpected(std::move(result776.error()));
       auto liquid_level = result776->get().liquidLevel(pos);
-      if (liquid_level.liquid == EmptyLiquidId || liquid_level.liquid == *liquid_id) {
+      if (liquid_level.liquid == empty_liquid_id || liquid_level.liquid == *liquid_id) {
         auto result777 = world();
 if (!result777) return std::unexpected(std::move(result777.error()));
         auto result778 = result777->get().modifyTile(pos, PlaceLiquid{*liquid_id, *quantity}, true);

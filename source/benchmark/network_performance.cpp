@@ -56,7 +56,7 @@ struct WorldServerTestAccess {
       for (int x = region.x_min(); x < region.x_max(); ++x) {
         for (int y = region.y_min(); y < region.y_max(); ++y) {
           auto const& liquid = world.m_tileArray->tile(Vec2I(x, y)).liquid;
-          if (liquid.liquid != EmptyLiquidId || liquid.level != 0.0f || liquid.source)
+          if (liquid.liquid != empty_liquid_id || liquid.level != 0.0f || liquid.source)
             return std::unexpected(StarException("Snapshot liquid seed would discard generated liquid"));
         }
       }

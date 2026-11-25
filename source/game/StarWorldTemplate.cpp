@@ -797,7 +797,7 @@ std::expected<List<BiomeItemPlacement>, StarException> WorldTemplate::valid_biom
   if (block->terrain && block->foregroundCave && !block->backgroundCave)
     biome_items.append_range(std::move(potential_biome_items.cave_background_biome_items));
 
-  if (block->oceanLiquid != EmptyLiquidId && y == block->oceanLiquidLevel)
+  if (block->oceanLiquid != empty_liquid_id && y == block->oceanLiquidLevel)
     biome_items.append_range(std::move(potential_biome_items.ocean_items));
 
   return biome_items;

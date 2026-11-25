@@ -10,6 +10,7 @@ import star.json_extra;
 import star.liquid_types;
 import star.liquids_database;
 import star.material_database;
+import star.math_common;
 import star.string;
 import star.vector;
 
@@ -76,6 +77,23 @@ StarException duplicate_liquid(Assets const& assets, StarException error, String
 
 }
 
+std::expected<float, StarException> load_liquid_bucket_size(Assets const& assets) {
+  String const path = "/items/defaultParameters.config:liquidItems.bucketSize";
+  auto config = assets.json(path);
+  if (!config)
+    return std::unexpected(std::move(config.error()));
+  auto size = config->to_double();
+  if (!size)
+    return std::unexpected(assets.with_asset_context(std::move(size.error()), path, "Loading liquid bucket size"));
+  if (is_finite(*size) && *size > 0.0 && *size <= std::numeric_limits<float>::max()) {
+    auto bucket_size = static_cast<float>(*size);
+    if (bucket_size > 0.0f)
+      return bucket_size;
+  }
+  return std::unexpected(assets.with_asset_context(
+      LiquidException("liquidItems.bucketSize must be a finite, positive float"), path, "Loading liquid bucket size"));
+}
+
 std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::create(
     Assets const& assets, MaterialDatabase const& material_database) {
   struct MakeShared final : LiquidsDatabase {};
@@ -112,7 +130,7 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
   if (!engine_parameters)
     return std::unexpected(assets.with_asset_context(
       std::move(engine_parameters.error()), "/liquids.config", "Loading liquid engine parameters"));
-  result->m_liquid_names.try_emplace("empty", EmptyLiquidId);
+  result->m_liquid_names.try_emplace("empty", empty_liquid_id);
   auto liquids = assets.scan_extension("liquid");
   if (!liquids) return std::unexpected(std::move(liquids.error()));
   auto queued = assets.queue_jsons(liquids->get());
@@ -165,7 +183,7 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
       if (!interactions)
         return std::unexpected(std::move(interactions.error()));
 
-      if (*id == EmptyLiquidId)
+      if (*id == empty_liquid_id)
         return std::unexpected(LiquidException::format(
           "Reserved liquidId {} in '{}': the built-in 'empty' liquid already uses it", *id, file));
       if (auto previous = result->liquid_settings(*id)) {
@@ -175,7 +193,7 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> LiquidsDatabase::
       }
       auto [name_entry, inserted] = result->m_liquid_names.try_emplace(*name, *id);
       if (!inserted) {
-        if (name_entry->second == EmptyLiquidId)
+        if (name_entry->second == empty_liquid_id)
           return std::unexpected(LiquidException::format(
             "Reserved liquid name '{}' in '{}': the built-in 'empty' liquid already uses it", *name, file));
         auto const& original_path = result->liquid_settings(name_entry->second)->get().path;
@@ -223,13 +241,13 @@ std::expected<LiquidId, StarException> LiquidsDatabase::liquid_id(String const& 
 }
 
 std::expected<String, StarException> LiquidsDatabase::liquid_name(LiquidId liquid_id) const {
-  if (liquid_id == EmptyLiquidId) return "empty";
+  if (liquid_id == empty_liquid_id) return "empty";
   if (auto settings = liquid_settings(liquid_id)) return settings->get().name;
   return std::unexpected(LiquidException::format("invalid liquid id {}", liquid_id));
 }
 
 std::expected<String, StarException> LiquidsDatabase::liquid_description(LiquidId liquid_id, String const& species) const {
-  if (liquid_id == EmptyLiquidId) return String();
+  if (liquid_id == empty_liquid_id) return String();
   if (auto settings = liquid_settings(liquid_id)) {
     auto const& entry = settings->get();
     auto description = entry.config.opt_string(Star::format("{}Description", species));
@@ -241,7 +259,7 @@ std::expected<String, StarException> LiquidsDatabase::liquid_description(LiquidI
 }
 
 std::expected<String, StarException> LiquidsDatabase::liquid_description(LiquidId liquid_id) const {
-  if (liquid_id == EmptyLiquidId) return String();
+  if (liquid_id == empty_liquid_id) return String();
   if (auto settings = liquid_settings(liquid_id)) return settings->get().description;
   return std::unexpected(LiquidException::format("invalid liquid id {}", liquid_id));
 }

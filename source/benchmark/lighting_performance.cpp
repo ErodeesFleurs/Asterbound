@@ -97,7 +97,7 @@ std::expected<std::shared_ptr<LightingFixture>, StarException> prepareLighting(R
     auto id = fixture->liquids->liquid_id(name);
     if (!id)
       return std::unexpected(std::move(id.error()));
-    if (*id != EmptyLiquidId)
+    if (*id != empty_liquid_id)
       liquid_ids.push_back(*id);
   }
   if (samples.empty() || radiantSamples.empty() || liquid_ids.empty())
@@ -151,7 +151,7 @@ std::expected<void, StarException> gatherReference(LightingFixture const& fixtur
       Vec3F light;
       if (tile.foreground != EmptyMaterialId || tile.foregroundMod != NoModId)
         light += fixture.materials->radiantLight(tile.foreground, tile.foregroundMod);
-      if (tile.liquid.liquid != EmptyLiquidId && tile.liquid.level != 0.0f)
+      if (tile.liquid.liquid != empty_liquid_id && tile.liquid.level != 0.0f)
         light += fixture.liquids->radiant_light(tile.liquid);
       if (tile.foregroundLightTransparent) {
         if (tile.background != EmptyMaterialId || tile.backgroundMod != NoModId)

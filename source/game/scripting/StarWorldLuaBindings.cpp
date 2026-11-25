@@ -2472,7 +2472,7 @@ namespace LuaBindings {
       auto level = world.liquidLevel(RectF::with_size(Vec2F(x, y), Vec2F(1, 1)));
       if (!level)
         return std::unexpected(std::move(level.error()));
-      if (level->liquid != EmptyLiquidId)
+      if (level->liquid != empty_liquid_id)
         levels.emplace_back(Vec2I(x, y), std::move(*level));
       return true;
     });
@@ -2798,7 +2798,7 @@ namespace LuaBindings {
     auto levelResult = std::visit([&world](auto const& value) -> std::expected<LiquidLevel, StarException> { return world.liquidLevel(value); }, boundBoxOrPoint);
     if (!levelResult)
       return std::unexpected(std::move(levelResult.error()));
-    if (levelResult->liquid != EmptyLiquidId)
+    if (levelResult->liquid != empty_liquid_id)
       return *levelResult;
     return {};
   }
@@ -2813,9 +2813,9 @@ namespace LuaBindings {
 
   std::expected<std::optional<LiquidLevel>, StarException> WorldEnvironmentCallbacks::destroyLiquid(World& world, Vec2F const& position) {
     auto liquidLevel = world.liquidLevel(Vec2I::floor(position));
-    if (liquidLevel.liquid != EmptyLiquidId) {
+    if (liquidLevel.liquid != empty_liquid_id) {
       auto modifiedResult =
-        world.modifyTile(Vec2I::floor(position), PlaceLiquid{.liquid = EmptyLiquidId, .liquidLevel = 0}, true);
+        world.modifyTile(Vec2I::floor(position), PlaceLiquid{.liquid = empty_liquid_id, .liquidLevel = 0}, true);
       if (!modifiedResult)
         return std::unexpected(std::move(modifiedResult.error()));
       auto modified = std::move(*modifiedResult);
@@ -2897,9 +2897,9 @@ namespace LuaBindings {
 
   std::expected<std::optional<LiquidLevel>, StarException> ServerWorldCallbacks::forceDestroyLiquid(WorldServer& world, Vec2F const& position) {
     auto liquidLevel = world.liquidLevel(Vec2I::floor(position));
-    if (liquidLevel.liquid != EmptyLiquidId) {
+    if (liquidLevel.liquid != empty_liquid_id) {
       auto modifiedResult =
-        world.forceModifyTile(Vec2I::floor(position), PlaceLiquid{.liquid = EmptyLiquidId, .liquidLevel = 0}, true);
+        world.forceModifyTile(Vec2I::floor(position), PlaceLiquid{.liquid = empty_liquid_id, .liquidLevel = 0}, true);
       if (!modifiedResult)
         return std::unexpected(std::move(modifiedResult.error()));
       auto modified = std::move(*modifiedResult);

@@ -14,6 +14,7 @@ import star.message_types;
 import star.material_types;
 import star.poly;
 import star.list;
+import star.small_vector;
 import star.rpc_promise;
 import star.vector;
 import star.rect;
@@ -825,7 +826,7 @@ std::expected<LiquidLevel, StarException> WorldClient::liquidLevel(RectF const& 
   if (!inWorld()) {
     return {};
   }
-  return WorldImpl::liquidLevel(m_tileArray, region);
+  return WorldImpl::liquid_level(*m_tileArray, region);
 }
 
 std::expected<TileModificationList, StarException> WorldClient::validTileModifications(TileModificationList const& modificationList, bool allowEntityOverlap) const {
@@ -1275,19 +1276,14 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
     if (tile_array_pos[0] >= 0 && tile_array_pos[0] < static_cast<int>(render_data.tiles.extent(0)) && tile_array_pos[1] >= 0
         && tile_array_pos[1] < static_cast<int>(render_data.tiles.extent(1))) {
       RenderTile& render_tile = render_data.tiles(tile_array_pos[0], tile_array_pos[1]);
-      PredictedTile& p = pair.second;
-      if (p.liquid) {
-        auto& liquid = *p.liquid;
-        if (liquid.liquid == render_tile.liquidId) {
-          std::uint8_t added = float_to_byte(liquid.level, true);
-          render_tile.liquidLevel = (render_tile.liquidLevel > 255 - added) ? 255 : render_tile.liquidLevel + added;
-        } else {
-          render_tile.liquidId = liquid.liquid;
-          render_tile.liquidLevel = float_to_byte(liquid.level, true);
-        }
+      auto& prediction = pair.second;
+      if (prediction.liquid_remainder || prediction.liquid_delta) {
+        auto liquid = prediction.effective_liquid({render_tile.liquidId, byte_to_float(render_tile.liquidLevel)});
+        render_tile.liquidId = liquid.liquid;
+        render_tile.liquidLevel = float_to_byte(liquid.level, true);
       }
       
-      pair.second.apply(render_tile);
+      prediction.apply(render_tile);
     }
   }
 
@@ -1312,7 +1308,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
         }
       }
       
-      if (preview_tile.liq_id != EmptyLiquidId) {
+      if (preview_tile.liq_id != empty_liquid_id) {
         render_tile.liquidId = preview_tile.liq_id;
         render_tile.liquidLevel = 255;
       }
@@ -1749,7 +1745,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
               p.backgroundColorVariant.reset();
             }
           } else if (std::holds_alternative<PlaceLiquid>(modification.second)) {
-            p.liquid.reset();
+            p.liquid_delta.reset();
           }
           
           if (!p) {
@@ -1783,14 +1779,16 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
           }
         }
       }
-    } else if (auto liquidUpdate = as<TileLiquidUpdatePacket>(packet)) {
-      auto prediction = m_predicted_tiles.find(m_geometry.xwrap(liquidUpdate->position));
+    } else if (auto liquid_update = as<TileLiquidUpdatePacket>(packet)) {
+      auto prediction = m_predicted_tiles.find(m_geometry.xwrap(liquid_update->position));
       if (prediction != m_predicted_tiles.end()) {
-        prediction->second.liquid.reset();
-        if (!prediction->second) m_predicted_tiles.erase(prediction);
+        prediction->second.liquid_remainder.reset();
+        prediction->second.liquid_delta.reset();
+        if (!prediction->second)
+          m_predicted_tiles.erase(prediction);
       }
-      if (auto tile = m_tileArray->modify_tile(liquidUpdate->position)) {
-        tile->get().liquid = liquidUpdate->liquidUpdate.liquidLevel();
+      if (auto tile = m_tileArray->modify_tile(liquid_update->position)) {
+        tile->get().liquid = liquid_update->liquid_update.liquid_level();
       }
     } else if (auto giveItem = as<GiveItemPacket>(packet)) {
       if (m_headless) {
@@ -2694,53 +2692,58 @@ DungeonId WorldClient::dungeonId(Vec2I const& pos) const {
   return m_tileArray->tile(pos).dungeonId;
 }
 
-std::expected<void, StarException> WorldClient::collectLiquid(List<Vec2I> const& tilePositions, LiquidId liquidId) {
-  if (!inWorld()) {
+std::expected<void, StarException> WorldClient::collectLiquid(List<Vec2I> const& tile_positions, LiquidId liquid_id) {
+  if (!inWorld())
     return {};
-  }
-  
-  auto result197 = this->root().assets();
-  if (!result197)
-    return std::unexpected(std::move(result197.error()));
-  auto result198 = (std::move(*result197))->json("/items/defaultParameters.config:liquidItems.bucketSize");
-  if (!result198)
-    return std::unexpected(std::move(result198.error()));
-  auto result199 = (std::move(*result198)).to_float();
-  if (!result199)
-    return std::unexpected(std::move(result199.error()));
-  float bucketSize = (std::move(*result199));
-  float nextUnit = bucketSize;
-  List<Vec2I> maybeDrainTiles;
-  
-  for (auto& pos : tilePositions) {
-    if (isTileProtected(pos))
+
+  auto assets = root().assets();
+  if (!assets)
+    return std::unexpected(std::move(assets.error()));
+  auto bucket_size = load_liquid_bucket_size(**assets);
+  if (!bucket_size)
+    return std::unexpected(std::move(bucket_size.error()));
+
+  auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
+  auto set_remainder = [this, now](Vec2I const& pos, LiquidLevel level) {
+    auto& prediction = m_predicted_tiles[pos];
+    prediction.time = now;
+    prediction.liquid_remainder = level;
+    prediction.liquid_delta.reset();
+  };
+  float next_unit = *bucket_size;
+  SmallVector<Vec2I, 8> pending_tiles;
+  for (auto const& pos : tile_positions) {
+    auto wrapped_pos = m_geometry.xwrap(pos);
+    if (isTileProtected(wrapped_pos))
       continue;
-    auto& p = m_predicted_tiles[m_geometry.xwrap(pos)];
-    auto const& tile = m_tileArray->tile(pos);
-    if ((p.liquid ? p.liquid->liquid : tile.liquid.liquid) == liquidId) {
-      if (!p.liquid) {
-        p.liquid.emplace(tile.liquid.liquid, tile.liquid.level);
+    auto liquid = m_tileArray->tile(wrapped_pos).liquid;
+    if (auto prediction = m_predicted_tiles.find_ref(wrapped_pos))
+      liquid = prediction->get().effective_liquid(liquid);
+    if (liquid.liquid != liquid_id)
+      continue;
+
+    if (liquid.level >= next_unit) {
+      liquid.drain(next_unit);
+      next_unit = *bucket_size;
+      // A partial bucket does not drain any tile. Once full, clear the
+      // contributors in input order, including the current tile if repeated.
+      for (auto const& pending_pos : pending_tiles) {
+        if (pending_pos == wrapped_pos)
+          liquid = {};
+        else
+          set_remainder(pending_pos, {});
       }
-      auto& liquid = *p.liquid;
-      if (liquid.level >= nextUnit) {
-        liquid.take(nextUnit);
-        nextUnit = bucketSize;
-        
-        for (std::size_t i = 0; i < maybeDrainTiles.size(); ++i) {
-          p.liquid.emplace(EmptyLiquidId, 0.0f);
-        }
-        
-        maybeDrainTiles.clear();
-      }
-      
-      if (liquid.level > 0) {
-        nextUnit -= liquid.level;
-        maybeDrainTiles.push_back(pos);
-      }
+      set_remainder(wrapped_pos, liquid);
+      pending_tiles.clear();
+    }
+
+    if (liquid.level > 0) {
+      next_unit -= liquid.level;
+      pending_tiles.push_back(wrapped_pos);
     }
   }
 
-  m_outgoingPackets.push_back(std::make_shared<CollectLiquidPacket>(tilePositions, liquidId));
+  m_outgoingPackets.push_back(std::make_shared<CollectLiquidPacket>(tile_positions, liquid_id));
   return {};
 }
 
@@ -3090,7 +3093,7 @@ std::expected<void, StarException> gatherClientLightingTiles(CellularLightingCal
       Vec3F light;
       if (tile.foreground != EmptyMaterialId || tile.foregroundMod != NoModId)
         light += materials.radiantLight(tile.foreground, tile.foregroundMod);
-      if (tile.liquid.liquid != EmptyLiquidId && tile.liquid.level != 0.0f)
+      if (tile.liquid.liquid != empty_liquid_id && tile.liquid.level != 0.0f)
         light += liquids.radiant_light(tile.liquid);
       if (tile.foregroundLightTransparent) {
         if (tile.background != EmptyMaterialId || tile.backgroundMod != NoModId)
@@ -3300,14 +3303,7 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
       if (!self.m_predicted_tiles.empty()) {
         if (auto p = self.m_predicted_tiles.find_ref(self.m_geometry.xwrap(pos))) {
           p->get().apply(tile = self.m_tileArray->tile(pos));
-          if (p->get().liquid) {
-            if (p->get().liquid->liquid == tile.liquid.liquid) {
-              tile.liquid.level += p->get().liquid->level;
-            } else {
-              tile.liquid.liquid = p->get().liquid->liquid;
-              tile.liquid.level = p->get().liquid->level;
-            }
-          }
+          tile.liquid = p->get().effective_liquid(tile.liquid);
           return std::cref(tile);
         }
       }
@@ -3733,6 +3729,8 @@ std::expected<bool, StarException> WorldClient::read_net_tile(Vec2I const& pos, 
       if (p.backgroundModHueShift && *p.backgroundModHueShift == net_tile.backgroundModHueShift) {
         p.backgroundModHueShift.reset();
       }
+      p.liquid_remainder.reset();
+      p.liquid_delta.reset();
       
       if (!p) {
         m_predicted_tiles.erase(prediction);
@@ -3753,7 +3751,7 @@ std::expected<bool, StarException> WorldClient::read_net_tile(Vec2I const& pos, 
   tile->get().collision = net_tile.collision;
   tile->get().blockBiomeIndex = net_tile.blockBiomeIndex;
   tile->get().environmentBiomeIndex = net_tile.environmentBiomeIndex;
-  tile->get().liquid = net_tile.liquid.liquidLevel();
+  tile->get().liquid = net_tile.liquid.liquid_level();
   tile->get().dungeonId = net_tile.dungeonId;
   if (collision_changed)
     WorldImpl::invalidate_collision_cache(*m_tileArray, RectI::with_size(m_geometry.xwrap(pos), {1, 1}));
@@ -3841,7 +3839,7 @@ std::expected<bool, StarException> WorldClient::exposedToWeather(Vec2F const& po
     return std::unexpected(std::move(domain.error()));
   }
   if (*domain && (*layer)->get().domain == m_weatherDomain && pos[1] > (*domain)->get().effectsMinHeight
-        && liquidLevel(Vec2I::floor(pos)).liquid == EmptyLiquidId) {
+        && liquidLevel(Vec2I::floor(pos)).liquid == empty_liquid_id) {
     auto result303 = this->root().assets();
     if (!result303)
       return std::unexpected(std::move(result303.error()));
@@ -4301,10 +4299,10 @@ std::expected<void, StarException> WorldClient::inform_tile_prediction(Vec2I con
     }
   } else if (std::holds_alternative<PlaceLiquid>(modification)) {
     auto const& place_liquid = std::get<PlaceLiquid>(modification);
-    if (!p.liquid || p.liquid->liquid != place_liquid.liquid) {
-      p.liquid = LiquidLevel(place_liquid.liquid, place_liquid.liquidLevel);
+    if (!p.liquid_delta || p.liquid_delta->liquid != place_liquid.liquid) {
+      p.liquid_delta = LiquidLevel(place_liquid.liquid, place_liquid.liquidLevel);
     } else {
-      p.liquid->level += place_liquid.liquidLevel;
+      p.liquid_delta->level += place_liquid.liquidLevel;
     }
   }
   return {};

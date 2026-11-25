@@ -168,7 +168,7 @@ std::expected<std::shared_ptr<LiquidItem>, StarException> LiquidItem::create(Roo
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto quantity = (*assets)->json("/items/defaultParameters.config:liquidItems.bucketSize").and_then([](Json const& value) { return value.to_uint(); });
+  auto quantity = load_liquid_bucket_size(**assets);
   if (!quantity)
     return std::unexpected(std::move(quantity.error()));
   item->m_quantity = *quantity;
@@ -329,7 +329,7 @@ std::expected<bool, StarException> LiquidItem::canPlaceAtTile(Vec2I pos) const {
     auto fgTileMaterial = itemWorld->get().material(pos, TileLayer::Foreground);
     if (fgTileMaterial == EmptyMaterialId) {
       auto tileLiquid = itemWorld->get().liquidLevel(pos).liquid;
-      if (tileLiquid == EmptyLiquidId || tileLiquid == liquidId())
+      if (tileLiquid == empty_liquid_id || tileLiquid == liquidId())
         return true;
     }
   }
