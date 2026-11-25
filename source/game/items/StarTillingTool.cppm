@@ -142,15 +142,15 @@ std::expected<std::shared_ptr<TillingTool>, StarException> TillingTool::create(R
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto image = item->instanceValue("image").and_then([](Json const& value) { return value.to_string(); });
+  auto image = item->instance_value("image").and_then([](Json const& value) { return value.to_string(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
   item->m_image = AssetPath::relative_to(directory, *image);
-  auto frames = item->instanceValue("frames", 1).and_then([](Json const& value) { return value.to_int(); });
+  auto frames = item->instance_value("frames", 1).and_then([](Json const& value) { return value.to_int(); });
   if (!frames)
     return std::unexpected(std::move(frames.error()));
   item->m_frames = *frames;
-  auto cycle = item->instanceValue("animationCycle", 1.0f).and_then([](Json const& value) { return value.to_float(); });
+  auto cycle = item->instance_value("animationCycle", 1.0f).and_then([](Json const& value) { return value.to_float(); });
   if (!cycle)
     return std::unexpected(std::move(cycle.error()));
   item->m_frameCycle = *cycle;
@@ -164,11 +164,11 @@ std::expected<std::shared_ptr<TillingTool>, StarException> TillingTool::create(R
   if (!idle)
     return std::unexpected(std::move(idle.error()));
   item->m_idleFrame = std::move(*idle);
-  auto position = item->instanceValue("handPosition").and_then(json_to_vec2f);
+  auto position = item->instance_value("handPosition").and_then(json_to_vec2f);
   if (!position)
     return std::unexpected(std::move(position.error()));
   item->m_handPosition = *position;
-  auto sounds = item->instanceValue("strikeSounds").and_then(json_to_string_list);
+  auto sounds = item->instance_value("strikeSounds").and_then(json_to_string_list);
   if (!sounds)
     return std::unexpected(std::move(sounds.error()));
   item->m_strikeSounds = std::move(*sounds);

@@ -161,7 +161,7 @@ std::expected<std::shared_ptr<Pane>, StarException> ItemTooltipBuilder::buildIte
     String title;
     String subTitle;
 
-    String tooltipKind = item->tooltipKind();
+    String tooltipKind = item->tooltip_kind();
 
     if (tooltipKind.empty())
       tooltipKind = "base";
@@ -192,7 +192,7 @@ std::expected<std::shared_ptr<Pane>, StarException> ItemTooltipBuilder::buildIte
 }
 
 std::expected<void, StarException> ItemTooltipBuilder::buildItemDescription(GuiContext& context, std::shared_ptr<Widget> const& container, std::shared_ptr<Item> const& item) {
-  String tooltipKind = item->tooltipKind();
+  String tooltipKind = item->tooltip_kind();
 
   if (tooltipKind.empty())
     tooltipKind = "base";
@@ -235,7 +235,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
   if (!assetsResult780)
     return std::unexpected(std::move(assetsResult780.error()));
   auto assets = std::move(*assetsResult780);
-  title = item->friendlyName();
+  title = item->friendly_name();
   auto categoryDisplayNameResult781 = categoryDisplayName(context, item->category());
   if (!categoryDisplayNameResult781)
     return std::unexpected(std::move(categoryDisplayNameResult781.error()));
@@ -279,7 +279,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
   if (!rarityLabel)
     return std::unexpected(std::move(rarityLabel.error()));
 
-  if (item->twoHanded())
+  if (item->two_handed())
     {
       auto setLabelResult792 = container->setLabel("handednessLabel", "2-Handed");
       if (!setLabelResult792)
@@ -294,7 +294,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
       
     }
 
-  auto instanceValueResult794 = item->instanceValue("fuelAmount", 0);
+  auto instanceValueResult794 = item->instance_value("fuelAmount", 0);
   if (!instanceValueResult794)
     return std::unexpected(std::move(instanceValueResult794.error()));
   auto toUIntResult795 = std::move(*instanceValueResult794).to_uint();
@@ -341,9 +341,9 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
         }
       }
 
-      if (objectItem->tooltipKind() == "container")
+      if (objectItem->tooltip_kind() == "container")
         {
-          auto instanceValueResult804 = objectItem->instanceValue("slotCount");
+          auto instanceValueResult804 = objectItem->instance_value("slotCount");
           if (!instanceValueResult804)
             return std::unexpected(std::move(instanceValueResult804.error()));
           auto reprResult805 = std::move(*instanceValueResult804).repr();
@@ -425,7 +425,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
     }
   }
 
-  auto instanceValueResult820 = item->instanceValue("tooltipFields", JsonObject());
+  auto instanceValueResult820 = item->instance_value("tooltipFields", JsonObject());
   if (!instanceValueResult820)
     return std::unexpected(std::move(instanceValueResult820.error()));
   auto tooltipFields = std::move(*instanceValueResult820);
@@ -545,7 +545,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
       auto fetchChildResult844 = container->fetchChild<ImageWidget>("largeImage");
       if (!fetchChildResult844)
         return std::unexpected(std::move(fetchChildResult844.error()));
-      auto setImageResult845 = std::move(*fetchChildResult844)->setImage(item->largeImage());
+      auto setImageResult845 = std::move(*fetchChildResult844)->setImage(item->large_image());
       if (!setImageResult845)
         return std::unexpected(std::move(setImageResult845.error()));
     }
@@ -581,7 +581,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
   }
 
   {
-    auto instanceValueResult851 = item->instanceValue("acceptsAugmentType", false);
+    auto instanceValueResult851 = item->instance_value("acceptsAugmentType", false);
     if (!instanceValueResult851)
       return std::unexpected(std::move(instanceValueResult851.error()));
     if (std::move(*instanceValueResult851)) {
@@ -591,7 +591,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
           return std::unexpected(std::move(fetchChildResult852.error()));
         if (auto augmentLabel = std::move(*fetchChildResult852)) {
           {
-            auto instanceValueResult853 = item->instanceValue("currentAugment");
+            auto instanceValueResult853 = item->instance_value("currentAugment");
             if (!instanceValueResult853)
               return std::unexpected(std::move(instanceValueResult853.error()));
             if (auto currentAugment = std::move(*instanceValueResult853)) {

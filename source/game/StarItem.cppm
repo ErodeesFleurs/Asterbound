@@ -57,32 +57,27 @@ public:
   // Sets the new item count, up to a max of the maximum stack size.  If this
   // value is over stack size, returns the overflow.  If 'overfill' is set to
   // true, then will fill past max stack level.
-  std::uint64_t setCount(std::uint64_t count, bool overfill = false);
+  std::uint64_t set_count(std::uint64_t count, bool overfill = false);
 
   // Is this item type stackable with the given item type at all?  Base class
   // implementation compares name(), and m_parameters fields and returns true
   // if they are both the same, similarly to matches. Null is not stackable.
-  virtual bool stackableWith(std::optional<std::reference_wrapper<Item const>> item) const;
-  std::uint64_t maxStack() const;
+  virtual bool stackable_with(std::optional<std::reference_wrapper<Item const>> item) const;
+  std::uint64_t max_stack() const;
 
   // Return how many of the given item could be shifted into this item, taking
-  // into acount whether the item is stackable at all, as well as maxStack and
+  // into account whether the item is stackable at all, as well as max_stack and
   // the count available. Null contributes no items.
-  std::uint64_t couldStack(std::optional<std::reference_wrapper<Item const>> item) const;
+  std::uint64_t could_stack(std::optional<std::reference_wrapper<Item const>> item) const;
 
   // If the given item is stackable with this one, takes as many from the given
   // item as possible and shifts it into this item's count.  Returns true if
   // any items at all were shifted. Null is left unchanged and returns false.
-  bool stackWith(std::optional<std::reference_wrapper<Item>> item);
+  bool stack_with(std::optional<std::reference_wrapper<Item>> item);
 
-  // Does this item match the given item or itemDescriptor
-  bool matches(ItemDescriptor const& descriptor, bool exactMatch = false) const;
-  bool matches(Item const& other, bool exactMatch = false) const;
-
-  // List of itemdescriptors for which the current item could be used in the
-  // place of
-  // in recipes and the like.
-  List<ItemDescriptor> matchingDescriptors() const;
+  // Does this item match the given item or descriptor?
+  bool matches(ItemDescriptor const& descriptor, bool exact_match = false) const;
+  bool matches(Item const& other, bool exact_match = false) const;
 
   // If the given number of this item is available, consumes that number and
   // returns true, otherwise returns false.
@@ -100,7 +95,7 @@ public:
   ItemDescriptor descriptor() const;
 
   String description() const;
-  String friendlyName() const;
+  String friendly_name() const;
 
   Rarity rarity() const;
   std::uint64_t price() const;
@@ -108,45 +103,46 @@ public:
   [[nodiscard]]
   virtual std::expected<List<Drawable>, StarException> icon_drawables() const;
   [[nodiscard]]
-  virtual std::expected<std::optional<List<Drawable>>, StarException> secondaryDrawables() const;
-  virtual bool hasSecondaryDrawables() const;
+  virtual std::expected<std::optional<List<Drawable>>, StarException> secondary_drawables() const;
+  virtual bool has_secondary_drawables() const;
 
   [[nodiscard]]
-  virtual std::expected<List<Drawable>, StarException> drop_drawables(std::optional<std::reference_wrapper<TileDrawer>> tileDrawer) const;
-  String largeImage() const;
+  virtual std::expected<List<Drawable>, StarException> drop_drawables(std::optional<std::reference_wrapper<TileDrawer>> tile_drawer) const;
+  String large_image() const;
 
-  String tooltipKind() const;
+  String tooltip_kind() const;
   virtual String category() const;
 
   [[nodiscard]]
-  virtual std::expected<String, StarException> pickupSound() const;
+  virtual std::expected<String, StarException> pickup_sound() const;
 
-  bool twoHanded() const;
-  float timeToLive() const;
+  bool two_handed() const;
+  float time_to_live() const;
 
   String const& directory() const&;
   String const& directory() const&& = delete;
-  List<ItemDescriptor> learnBlueprintsOnPickup() const;
+  List<ItemDescriptor> const& learn_blueprints_on_pickup() const&;
+  List<ItemDescriptor> const& learn_blueprints_on_pickup() const&& = delete;
   StringMap<String> const& collectables_on_pickup() const&;
   StringMap<String> const& collectables_on_pickup() const&& = delete;
 
   [[nodiscard]]
-  std::expected<List<QuestArcDescriptor>, StarException> pickupQuestTemplates() const;
+  std::expected<List<QuestArcDescriptor>, StarException> pickup_quest_templates() const;
   [[nodiscard]]
-  std::expected<StringSet, StarException> itemTags() const;
+  std::expected<StringSet, StarException> item_tags() const;
   [[nodiscard]]
-  std::expected<bool, StarException> hasItemTag(String const& itemTag) const;
+  std::expected<bool, StarException> has_item_tag(String const& item_tag) const;
 
   // Return either a parameter given to the item or a config value, if no such
   // parameter exists.
   [[nodiscard]]
-  std::expected<Json, StarException> instanceValue(String const& name, Json const& def = Json()) const;
+  std::expected<Json, StarException> instance_value(String const& name, Json const& def = Json()) const;
   [[nodiscard]]
-  std::expected<Json, StarException> instanceValueOfType(String const& name, Json::Type type, Json const& def = Json()) const;
+  std::expected<Json, StarException> instance_value_of_type(String const& name, Json::Type type, Json const& def = Json()) const;
 
   // Returns the full set of configuration values merged with parameters
   [[nodiscard]]
-  std::expected<Json, StarException> instanceValues() const;
+  std::expected<Json, StarException> instance_values() const;
 
   // Returns just the base config
   Json config() const;
@@ -154,7 +150,7 @@ public:
   // Returns just the dynamic parameters
   Json parameters() const;
 
-  static bool itemsEqual(std::optional<std::reference_wrapper<Item const>> a, std::optional<std::reference_wrapper<Item const>> b);
+  static bool items_equal(std::optional<std::reference_wrapper<Item const>> a, std::optional<std::reference_wrapper<Item const>> b);
 
 protected:
   explicit Item(Root& root);
@@ -162,22 +158,22 @@ protected:
   std::expected<void, StarException> initialize(Json config, String directory, Json parameters = JsonObject());
   Root& root() const;
 
-  void setMaxStack(std::uint64_t maxStack);
-  void setDescription(String const& description);
-  void setShortDescription(String const& description);
+  void set_max_stack(std::uint64_t max_stack);
+  void set_description(String const& description);
+  void set_short_description(String const& description);
 
-  void setRarity(Rarity rarity);
-  void setPrice(std::uint64_t price);
+  void set_rarity(Rarity rarity);
+  void set_price(std::uint64_t price);
   // icon drawables are pixels, not tile, based
   [[nodiscard]]
-  std::expected<void, StarException> setIconDrawables(List<Drawable> drawables);
+  std::expected<void, StarException> set_icon_drawables(List<Drawable> drawables);
   [[nodiscard]]
-  std::expected<void, StarException> setSecondaryIconDrawables(std::optional<List<Drawable>> drawables);
-  void setTwoHanded(bool twoHanded);
-  void setTimeToLive(float timeToLive);
+  std::expected<void, StarException> set_secondary_icon_drawables(std::optional<List<Drawable>> drawables);
+  void set_two_handed(bool two_handed);
+  void set_time_to_live(float time_to_live);
 
   [[nodiscard]]
-  std::expected<void, StarException> setInstanceValue(String const& name, Json const& val);
+  std::expected<void, StarException> set_instance_value(String const& name, Json const& value);
 
 private:
   std::reference_wrapper<Root> m_root;
@@ -188,27 +184,30 @@ private:
   std::uint64_t m_count;
   Json m_parameters;
 
-  std::uint64_t m_maxStack;
-  String m_shortDescription;
+  std::uint64_t m_max_stack;
+  String m_short_description;
   String m_description;
   Rarity m_rarity;
-  List<Drawable> m_iconDrawables;
-  std::optional<List<Drawable>> m_secondaryIconDrawables;
-  bool m_twoHanded;
-  float m_timeToLive;
+  List<Drawable> m_icon_drawables;
+  std::optional<List<Drawable>> m_secondary_icon_drawables;
+  bool m_two_handed;
+  float m_time_to_live;
   std::uint64_t m_price;
-  String m_tooltipKind;
-  String m_largeImage;
+  String m_tooltip_kind;
+  String m_large_image;
   String m_category;
-  StringSet m_pickupSounds;
+  StringSet m_pickup_sounds;
 
-  List<ItemDescriptor> m_matchingDescriptors;
-  List<ItemDescriptor> m_learnBlueprintsOnPickup;
+  List<ItemDescriptor> m_learn_blueprints_on_pickup;
   StringMap<String> m_collectables_on_pickup;
 };
 
 class GenericItem : public Item {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
+
 public:
+  GenericItem(ConstructionKey, Root& root) : Item(root) {}
+
   void query_type(TypeQuery& query) const noexcept override { query_type_of<GenericItem, Item>(*this, query); }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<GenericItem>(); }
 
@@ -216,23 +215,21 @@ public:
   static std::expected<std::shared_ptr<GenericItem>, StarException> create(Root& root, Json const& config, String const& directory, Json const& parameters);
   [[nodiscard]]
   std::expected<std::shared_ptr<Item>, StarException> clone() const override;
-private:
-  explicit GenericItem(Root& root) : Item(root) {}
 };
 
-inline std::uint64_t itemSafeCount(std::shared_ptr<Item> const& item) {
+inline std::uint64_t item_safe_count(std::shared_ptr<Item> const& item) {
   return item ? item->count() : 0;
 }
 
-inline bool itemSafeTwoHanded(std::shared_ptr<Item> const& item) {
-  return item && item->twoHanded();
+inline bool item_safe_two_handed(std::shared_ptr<Item> const& item) {
+  return item && item->two_handed();
 }
 
-inline bool itemSafeOneHanded(std::shared_ptr<Item> const& item) {
-  return item && !item->twoHanded();
+inline bool item_safe_one_handed(std::shared_ptr<Item> const& item) {
+  return item && !item->two_handed();
 }
 
-inline ItemDescriptor itemSafeDescriptor(std::shared_ptr<Item> const& item) {
+inline ItemDescriptor item_safe_descriptor(std::shared_ptr<Item> const& item) {
   return item ? item->descriptor() : ItemDescriptor();
 }
 }
@@ -247,9 +244,9 @@ export namespace Star {
   using ::Star::GenericItem;
   using ::Star::ItemExceptionTag;
   using ::Star::ItemException;
-  using ::Star::itemSafeCount;
-  using ::Star::itemSafeTwoHanded;
-  using ::Star::itemSafeOneHanded;
-  using ::Star::itemSafeDescriptor;
+  using ::Star::item_safe_count;
+  using ::Star::item_safe_two_handed;
+  using ::Star::item_safe_one_handed;
+  using ::Star::item_safe_descriptor;
 }
 

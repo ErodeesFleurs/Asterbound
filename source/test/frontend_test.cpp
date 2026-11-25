@@ -105,11 +105,14 @@ import star.mixer;
 import star.ai_database;
 import star.ai_interface;
 import star.crafting_interface;
+import star.merchant_interface;
+import star.world_client;
 import star.interaction_types;
 import star.teleport_dialog;
 import star.world_painter;
 import star.item_descriptor;
 import star.player_inventory;
+import star.inventory_types;
 import star.player_log;
 import star.ai_types;
 import star.application;
@@ -932,6 +935,137 @@ void exercise_crafting(GameTest& fixture, Application const& application) {
 
 const GameTestRegistration crafting_batches("CraftingPane", "TimedBatchesAndInstantQuantity", [](GameTest& fixture) {
   run_surface_scenario(fixture, exercise_crafting);
+});
+
+void exercise_merchant_purchase(GameTest& fixture, Application const& application) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(File::create_directory(overlay));
+  ASSERT_TRUE(File::write_file(String(R"({"itemName":"merchantprobeitem","rarity":"common","shortdescription":"Merchant sample","inventoryIcon":"/assetmissing.png"})"),
+      File::relative_to(overlay, "merchantprobe.item")));
+  ASSERT_TRUE(File::write_file(String(R"([{"op":"add","path":"/genericScriptContexts/merchantProbe","value":"/merchantProbe.lua"}])"),
+      File::relative_to(overlay, "player.config.patch")));
+  ASSERT_TRUE(File::write_file(String(R"([{"op":"add","path":"/money/playerMax","value":-1}])"),
+      File::relative_to(overlay, "currencies.config.patch")));
+  ASSERT_TRUE(File::write_file(String(R"LUA(
+    function init()
+      local calls, summary = 0, nil
+      message.setHandler("onBuy", function(_, isLocal, purchase)
+        assert(isLocal)
+        calls, summary = calls + 1, purchase
+        return true
+      end)
+      message.setHandler("merchantProbe", function()
+        return {calls = calls, summary = summary}
+      end)
+    end
+  )LUA"), File::relative_to(overlay, "merchantProbe.lua")));
+  auto owned = createPrivateOverlayRoot(fixture.rootSettings(), *directory, overlay, "merchant-test.config");
+  ASSERT_TRUE(owned) << owned.error().what();
+  auto& root = **owned;
+  auto configuration = root.configuration();
+  ASSERT_TRUE(configuration);
+  ASSERT_TRUE((*configuration)->set("bindings", JsonObject{}));
+  auto input = Input::create(root);
+  ASSERT_TRUE(input) << input.error().what();
+  auto context = GuiContext::create(root, std::make_shared<Mixer>(root.logger(), 44100, 2), application.appController());
+  ASSERT_TRUE(context) << context.error().what();
+  (*context)->bindInput(**input);
+  ASSERT_TRUE((*context)->renderInit(application.renderer()));
+
+  auto universe = TestUniverse::create(root, {800, 600});
+  ASSERT_TRUE(universe) << universe.error().what();
+  auto const& client = (*universe)->client();
+  auto player = client->mainPlayer();
+  player->log()->setIntroComplete(true);
+  ASSERT_TRUE((*universe)->warpPlayer(InstanceWorldId("outpost")));
+  auto inventory = player->inventory();
+  ASSERT_TRUE(inventory->addCurrency("money", std::numeric_limits<std::uint64_t>::max()));
+  auto before = inventory->currency("money");
+  ASSERT_EQ(before, std::numeric_limits<std::uint64_t>::max());
+  auto report = [&] {
+    return client->worldClient()->sendEntityMessage(player->entityId(), "merchantProbe")
+        .and_then([](RpcPromise<Json> const& promise) { return promise.result(); });
+  };
+  auto initial = report();
+  ASSERT_TRUE(initial && *initial);
+  ASSERT_EQ(**initial, (JsonObject{{"calls", 0}}));
+
+  constexpr std::uint64_t wide_price = 1'500'000'000;
+  constexpr std::uint64_t huge_bundle = std::uint64_t{1} << 62;
+  Json parameters = JsonObject{{"maxStack", 10}, {"merchantProbe", true}};
+  auto item = ItemDescriptor::create("merchantprobeitem", 5, parameters);
+  ASSERT_TRUE(item);
+  JsonObject settings{{"buyFactor", 1.0}, {"items", JsonArray{
+      JsonObject{{"item", item->toJson()}, {"price", wide_price}},
+      JsonObject{{"item", item->toJson()}, {"price", 0}},
+      JsonObject{{"item", JsonArray{item->name(), 0, parameters}}, {"price", 1}},
+      JsonObject{{"item", JsonArray{item->name(), 5, JsonObject{{"maxStack", 0}}}}, {"price", 1}},
+      JsonObject{{"item", JsonArray{item->name(), huge_bundle, JsonObject{{"maxStack", huge_bundle}}}}, {"price", 1}},
+      JsonObject{{"item", item->toJson()}, {"price", huge_bundle}},
+  }}};
+  auto created = MerchantPane::create(**context, client->worldClient(), player, settings, player->entityId());
+  ASSERT_TRUE(created) << created.error().what();
+  Pane& pane = **created;
+  ASSERT_TRUE(pane.displayed());
+  auto list = pane.findChild<ListWidget>("itemList");
+  auto count = pane.findChild<TextBoxWidget>("tbCount");
+  auto total = pane.findChild<LabelWidget>("lblBuyTotal");
+  auto button = pane.findChild<ButtonWidget>("btnBuy");
+  ASSERT_TRUE(list && *list && count && *count && total && *total && button && *button);
+  ASSERT_EQ((*list)->listSize(), 6u);
+  auto click_buy = [&] {
+    return (*button)->setPressed(true).and_then([&] { return (*button)->setPressed(false); });
+  };
+
+  ASSERT_TRUE((*list)->setSelected(0));
+  ASSERT_TRUE(pane.update(0));
+  ASSERT_TRUE((*count)->setText("3"));
+  ASSERT_EQ((*count)->getText(), "x3");
+  ASSERT_EQ((*total)->text(), "4500000000");
+  auto bought = click_buy();
+  ASSERT_TRUE(bought) << bought.error().what();
+  EXPECT_EQ(inventory->currency("money"), before - 3 * wide_price);
+  std::vector<std::uint64_t> received;
+  ASSERT_TRUE(std::as_const(*inventory).for_each_item([&](InventorySlot const&, std::shared_ptr<Item> const& slot_item)
+      -> std::expected<void, StarException> {
+    if (slot_item->matches(*item, true))
+      received.push_back(slot_item->count());
+    return {};
+  }));
+  std::ranges::sort(received);
+  EXPECT_EQ(received, (std::vector<std::uint64_t>{5, 10}));
+  auto status = report();
+  ASSERT_TRUE(status && *status);
+  auto summary = JsonObject{{"item", item->withCount(15).toJson()}, {"total", 3 * wide_price}};
+  EXPECT_EQ(**status, (JsonObject{{"calls", 1}, {"summary", std::move(summary)}})) << (**status).repr().value().utf8();
+
+  // Exercise the callback itself even for the invalid rows that disable the button.
+  for (std::size_t row = 1; row < (*list)->listSize(); ++row) {
+    SCOPED_TRACE(row);
+    ASSERT_TRUE((*list)->setSelected(row));
+    ASSERT_TRUE(pane.update(0));
+    bool price_overflow = row == 5;
+    ASSERT_TRUE((*count)->setText(price_overflow ? "3" : "4"));
+    ASSERT_EQ((*count)->getText(), price_overflow ? "x3" : "x4");
+    ASSERT_EQ((*total)->text(), row == 1 || price_overflow ? "0" : "4");
+    auto rejected = click_buy();
+    ASSERT_TRUE(rejected) << rejected.error().what();
+    EXPECT_EQ(inventory->currency("money"), before - 3 * wide_price);
+    EXPECT_EQ(inventory->hasCountOfItem(*item), 15u);
+    auto unchanged = report();
+    ASSERT_TRUE(unchanged && *unchanged);
+    EXPECT_EQ(**unchanged, **status);
+  }
+
+  ASSERT_TRUE(pane.dismissed());
+  ASSERT_TRUE((*universe)->close());
+}
+
+const GameTestRegistration merchant_purchase("MerchantPane", "PurchasesFullBundlesAcrossStacksWithExactSummary", [](GameTest& fixture) {
+  run_surface_scenario(fixture, exercise_merchant_purchase);
 });
 #endif
 

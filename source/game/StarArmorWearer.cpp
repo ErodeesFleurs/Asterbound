@@ -128,7 +128,7 @@ std::expected<bool, StarException> ArmorWearer::setup_humanoid(Humanoid& humanoi
   for (auto slots = m_visible_slots; slots; slots &= slots - 1) {
     auto const& item = *m_armors[std::countr_zero(slots)].item;
     body_hidden |= item.hideBody();
-    auto config = item.instanceValue("humanoidConfig");
+    auto config = item.instance_value("humanoidConfig");
     if (!config)
       return std::unexpected(std::move(config.error()));
     if (config->is_type(Json::Type::Object))
@@ -264,7 +264,7 @@ bool ArmorWearer::set_item(std::size_t slot, std::shared_ptr<ArmorItem> item, bo
     return false;
   auto& armor = m_armors[slot];
 
-  bool const item_changed = armor.item != item && !Item::itemsEqual(optional_ref(armor.item), optional_ref(item));
+  bool const item_changed = armor.item != item && !Item::items_equal(optional_ref(armor.item), optional_ref(item));
   if (!item_changed && armor.visible == visible)
     return false;
 

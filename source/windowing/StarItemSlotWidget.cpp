@@ -299,14 +299,14 @@ std::expected<void, StarException> ItemSlotWidget::renderImpl() {
     auto icons = m_item->icon_drawables();
     if (!icons) return std::unexpected(std::move(icons.error()));
     if (m_showSecondaryIcon) {
-      auto secondary = m_item->secondaryDrawables();
+      auto secondary = m_item->secondary_drawables();
       if (!secondary) return std::unexpected(std::move(secondary.error()));
       if (*secondary) *icons = std::move(**secondary);
     }
     if (m_showRarity) {
       // The override is optional presentation data, never a reason to omit
       // the item icon or count. Use the item's normal rarity when it is bad.
-      auto value = m_item->instanceValue("rarityBorder");
+      auto value = m_item->instance_value("rarityBorder");
       if (!value) return std::unexpected(std::move(value.error()));
       auto name = [&]() -> std::expected<String, StarException> {
         if (value->is_type(Json::Type::String)) {

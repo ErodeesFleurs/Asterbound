@@ -191,7 +191,7 @@ HashSet<ItemRecipe> ItemDatabase::recipesFromSubset(RecipeStock const& normalize
 }
 
 std::expected<String, StarException> ItemDatabase::guiFilterString(std::shared_ptr<Item> const& item) {
-  auto lowered = (item->name() + item->friendlyName() + item->description()).to_lower();
+  auto lowered = (item->name() + item->friendly_name() + item->description()).to_lower();
   if (!lowered)
     return std::unexpected(std::move(lowered.error()));
   auto split = lowered->split_any(" ,.?*\\+/|\t");
@@ -672,7 +672,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::applyAugment(s
     if (auto added = script.add_callbacks("item", std::move(*itemCallbacks)); !added)
       return std::unexpected(std::move(added.error()));
     auto configCallbacks = LuaBindings::makeConfigCallbacks(
-      [&augment](String const& name, Json const& def) { return augment.instanceValue(name, def); });
+      [&augment](String const& name, Json const& def) { return augment.instance_value(name, def); });
     if (!configCallbacks)
       return std::unexpected(std::move(configCallbacks.error()));
     return script.add_callbacks("config", std::move(*configCallbacks));
@@ -811,7 +811,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::tryCreateItem(
     auto result = instantiate(current);
     if (!result)
       return std::unexpected(std::move(result.error()));
-    (*result)->setCount(descriptor.count());
+    (*result)->set_count(descriptor.count());
     return result;
   }();
   if (initial || ignoreInvalid)
@@ -825,7 +825,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::tryCreateItem(
     auto recovered = instantiate(*recoveredDescriptor);
     if (!recovered)
       return std::unexpected(std::move(recovered.error()));
-    (*recovered)->setCount(recoveredDescriptor->count());
+    (*recovered)->set_count(recoveredDescriptor->count());
     result = std::move(*recovered);
     return {};
   });
@@ -871,7 +871,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::tryCreateItem(
   auto fallback = createItem(fallbackData->get().type, *fallbackConfig);
   if (!fallback)
     return std::unexpected(std::move(fallback.error()));
-  (*fallback)->setCount(descriptor.count());
+  (*fallback)->set_count(descriptor.count());
   return fallback;
 }
 
@@ -1114,14 +1114,14 @@ std::expected<void, StarException> ItemDatabase::addBlueprints() {
       auto description = (*assets)->json("/blueprint.config:description").and_then([](Json const& value) { return value.to_string(); });
       if (!description)
         return std::unexpected((*assets)->with_asset_context(std::move(description.error()), "/blueprint.config", "Loading blueprint defaults"));
-      auto replacedDescription = description->replace("<item>", (*baseItem)->friendlyName());
+      auto replacedDescription = description->replace("<item>", (*baseItem)->friendly_name());
       if (!replacedDescription)
         return std::unexpected(std::move(replacedDescription.error()));
       config["description"] = std::move(*replacedDescription);
       auto shortDescription = (*assets)->json("/blueprint.config:shortdescription").and_then([](Json const& value) { return value.to_string(); });
       if (!shortDescription)
         return std::unexpected((*assets)->with_asset_context(std::move(shortDescription.error()), "/blueprint.config", "Loading blueprint defaults"));
-      auto replacedShortDescription = shortDescription->replace("<item>", (*baseItem)->friendlyName());
+      auto replacedShortDescription = shortDescription->replace("<item>", (*baseItem)->friendly_name());
       if (!replacedShortDescription)
         return std::unexpected(std::move(replacedShortDescription.error()));
       data.friendlyName = std::move(*replacedShortDescription);
@@ -1132,11 +1132,11 @@ std::expected<void, StarException> ItemDatabase::addBlueprints() {
       config["category"] = std::move(*category);
       data.name = blueprintName;
       config["itemName"] = data.name;
-      auto icon = (*baseItem)->instanceValue("inventoryIcon", false);
+      auto icon = (*baseItem)->instance_value("inventoryIcon", false);
       if (!icon)
         return std::unexpected(std::move(icon.error()));
       if (*icon) {
-        auto inventoryIcon = (*baseItem)->instanceValue("inventoryIcon");
+        auto inventoryIcon = (*baseItem)->instance_value("inventoryIcon");
         if (!inventoryIcon)
           return std::unexpected(std::move(inventoryIcon.error()));
         config["inventoryIcon"] = std::move(*inventoryIcon);

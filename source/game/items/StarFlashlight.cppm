@@ -113,27 +113,27 @@ std::expected<std::shared_ptr<Flashlight>, StarException> Flashlight::create(Roo
   auto initialized = item->initialize(config, directory, parameters);
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
-  auto image = item->instanceValue("image").and_then([](Json const& value) { return value.to_string(); });
+  auto image = item->instance_value("image").and_then([](Json const& value) { return value.to_string(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
   item->m_image = AssetPath::relative_to(directory, *image);
-  auto handPosition = item->instanceValue("handPosition").and_then(json_to_vec2f);
+  auto handPosition = item->instance_value("handPosition").and_then(json_to_vec2f);
   if (!handPosition)
     return std::unexpected(std::move(handPosition.error()));
   item->m_handPosition = *handPosition;
-  auto lightPosition = item->instanceValue("lightPosition").and_then(json_to_vec2f);
+  auto lightPosition = item->instance_value("lightPosition").and_then(json_to_vec2f);
   if (!lightPosition)
     return std::unexpected(std::move(lightPosition.error()));
   item->m_lightPosition = *lightPosition;
-  auto lightColor = item->instanceValue("lightColor").and_then(json_to_color);
+  auto lightColor = item->instance_value("lightColor").and_then(json_to_color);
   if (!lightColor)
     return std::unexpected(std::move(lightColor.error()));
   item->m_lightColor = *lightColor;
-  auto beamWidth = item->instanceValue("beamLevel").and_then([](Json const& value) { return value.to_float(); });
+  auto beamWidth = item->instance_value("beamLevel").and_then([](Json const& value) { return value.to_float(); });
   if (!beamWidth)
     return std::unexpected(std::move(beamWidth.error()));
   item->m_beamWidth = *beamWidth;
-  auto ambientFactor = item->instanceValue("beamAmbience").and_then([](Json const& value) { return value.to_float(); });
+  auto ambientFactor = item->instance_value("beamAmbience").and_then([](Json const& value) { return value.to_float(); });
   if (!ambientFactor)
     return std::unexpected(std::move(ambientFactor.error()));
   item->m_ambientFactor = *ambientFactor;

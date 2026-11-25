@@ -670,7 +670,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     cache.items.resize(size);
     cache.flags.resize(size);
     auto remember = [&](std::size_t i, std::shared_ptr<Item> item) {
-      unsigned flags = item ? (item->twoHanded() ? 1u : 0u) | (item->hasSecondaryDrawables() ? 2u : 0u) : 0u;
+      unsigned flags = item ? (item->two_handed() ? 1u : 0u) | (item->has_secondary_drawables() ? 2u : 0u) : 0u;
       changed = changed || cache.items[i] != item || cache.flags[i] != flags;
       cache.items[i] = std::move(item);
       cache.flags[i] = flags;
@@ -774,7 +774,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     auto item = player.inventory()->itemsAt(slot);
     if (!item) return std::unexpected(std::move(item.error()));
     if (!*item) return {};
-    return itemSafeDescriptor(*item).toJson();
+    return item_safe_descriptor(*item).toJson();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
@@ -1000,7 +1000,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   if (auto registered = callbacks.register_callback("essentialItem", [&player](String const& slotName) -> std::expected<Json, StarException> {
     auto slot = enum_value<essential_item_names>(slotName);
     if (!slot) return std::unexpected(std::move(slot.error()));
-    return itemSafeDescriptor(player.inventory()->essentialItem(*slot)).toJson();
+    return item_safe_descriptor(player.inventory()->essentialItem(*slot)).toJson();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
@@ -1085,7 +1085,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     if (!items) return std::unexpected(std::move(items.error()));
     StringMap<std::size_t> counts;
     for (auto const& item : *items) {
-      auto tags = item->itemTags();
+      auto tags = item->item_tags();
     if (!tags) return std::unexpected(std::move(tags.error()));
     for (auto const& tag : *tags) ++counts[tag];
     }
@@ -1098,7 +1098,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     if (!inventory) return std::unexpected(std::move(inventory.error()));
     JsonArray items;
     for (auto const& item : *inventory) {
-      auto tags = item->itemTags();
+      auto tags = item->item_tags();
     if (!tags) return std::unexpected(std::move(tags.error()));
     for (auto const& itemTag : *tags) {
       if (itemTag == tag)
@@ -1113,7 +1113,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     auto items = player.inventory()->allItems();
     if (!items) return std::unexpected(std::move(items.error()));
     for (auto const& item : *items) {
-      auto matches = item->hasItemTag(itemTag);
+      auto matches = item->has_item_tag(itemTag);
     if (!matches) return std::unexpected(std::move(matches.error()));
     if (*matches) {
         std::uint64_t takeCount = std::min(item->count(), count);
@@ -1131,7 +1131,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     auto items = player.inventory()->allItems();
     if (!items) return std::unexpected(std::move(items.error()));
     for (auto const& item : *items) {
-      auto value = item->instanceValue(parameterName, Json());
+      auto value = item->instance_value(parameterName, Json());
     if (!value) return std::unexpected(std::move(value.error()));
     if (*value == parameterValue) return true;
     }
@@ -1143,7 +1143,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     auto items = player.inventory()->allItems();
     if (!items) return std::unexpected(std::move(items.error()));
     for (auto const& item : *items) {
-      auto matches = item->instanceValue(parameterName, Json());
+      auto matches = item->instance_value(parameterName, Json());
     if (!matches) return std::unexpected(std::move(matches.error()));
     if (*matches == parameterValue) {
         std::uint64_t takeCount = std::min(item->count(), count);
@@ -1161,7 +1161,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     auto items = player.inventory()->allItems();
     if (!items) return std::unexpected(std::move(items.error()));
     for (auto const& item : *items) {
-      auto value = item->instanceValue(parameterName, Json());
+      auto value = item->instance_value(parameterName, Json());
     if (!value) return std::unexpected(std::move(value.error()));
     if (*value == parameterValue) return item->descriptor().toJson();
     }
@@ -1186,14 +1186,14 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   if (auto registered = callbacks.register_callback("primaryHandItemTags", [&player]() -> std::expected<StringSet, StarException> {
     if (!player.primaryHandItem())
         return {};
-      return player.primaryHandItem()->itemTags();
+      return player.primaryHandItem()->item_tags();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("altHandItemTags", [&player]() -> std::expected<StringSet, StarException> {
     if (!player.altHandItem())
         return {};
-      return player.altHandItem()->itemTags();
+      return player.altHandItem()->item_tags();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 

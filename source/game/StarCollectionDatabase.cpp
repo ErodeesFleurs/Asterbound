@@ -215,12 +215,12 @@ std::expected<Collectable, StarException> CollectionDatabase::parse_item(String 
     return std::unexpected(std::move(item.error()));
   if (!*item)
     return std::unexpected(CollectionDatabaseException(Star::format("Collectable '{}' refers to an empty item", name)));
-  collectable->title = (*item)->friendlyName();
+  collectable->title = (*item)->friendly_name();
   collectable->description = (*item)->description();
   auto configured_icon = config.find("icon");
   if (!configured_icon) return std::unexpected(std::move(configured_icon.error()));
   if (!*configured_icon || (*configured_icon)->get().is_null()) {
-    auto inventory_icon = (*item)->instanceValue("inventoryIcon", "");
+    auto inventory_icon = (*item)->instance_value("inventoryIcon", "");
     if (!inventory_icon)
       return std::unexpected(std::move(inventory_icon.error()));
     if (inventory_icon->is_type(Json::Type::String)) {

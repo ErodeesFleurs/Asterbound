@@ -193,6 +193,19 @@ import star.quest_manager;
 import star.algorithm;
 namespace Star {
 
+namespace {
+
+// Both counts and totals must remain positive integers in the onBuy JSON.
+constexpr auto max_purchase_value = static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
+
+std::uint64_t purchase_total(std::uint64_t per_bundle, int bundles) {
+  if (bundles <= 0 || per_bundle > max_purchase_value / static_cast<std::uint64_t>(bundles))
+    return 0;
+  return per_bundle * static_cast<std::uint64_t>(bundles);
+}
+
+}
+
 MerchantPane::MerchantPane(GuiContext& guiContext) : Pane(guiContext) {}
 
 std::expected<std::shared_ptr<MerchantPane>, StarException> MerchantPane::create(GuiContext& guiContext,
@@ -262,73 +275,45 @@ std::expected<void, StarException> MerchantPane::initialize(std::shared_ptr<Worl
   auto jsonResult580 = assets->json("/interface/windowconfig/crafting.config:default");
   if (!jsonResult580)
     return std::unexpected(std::move(jsonResult580.error()));
-  auto getUIntResult581 = std::move(*jsonResult580).get_uint("maxSpinCount", 1000);
-  if (!getUIntResult581)
-    return std::unexpected(std::move(getUIntResult581.error()));
-  auto getUIntResult582 = m_settings.get_uint("maxSpinCount", std::move(*getUIntResult581));
-  if (!getUIntResult582)
-    return std::unexpected(std::move(getUIntResult582.error()));
-  m_maxBuyCount = std::move(*getUIntResult582);
+  auto default_max_buy_count = std::move(*jsonResult580).get_int("maxSpinCount", 1000);
+  if (!default_max_buy_count)
+    return std::unexpected(std::move(default_max_buy_count.error()));
+  auto max_buy_count_setting = m_settings.get_int("maxSpinCount", *default_max_buy_count);
+  if (!max_buy_count_setting)
+    return std::unexpected(std::move(max_buy_count_setting.error()));
+  m_max_buy_count = static_cast<int>(std::clamp<std::int64_t>(*max_buy_count_setting, 0, std::numeric_limits<int>::max()));
 
   GuiReader reader(context());
-  reader.registerCallback("spinCount.up", [this](Widget&)  -> std::expected<void, StarException> {
-      if (m_selectedIndex != npos) {
-        {
-          auto maxBuyCountResult583 = maxBuyCount();
-          if (!maxBuyCountResult583)
-            return std::unexpected(std::move(maxBuyCountResult583.error()));
-          if (m_buyCount < std::move(*maxBuyCountResult583))
-            m_buyCount++;
-          else
-            m_buyCount = 1;
-        }
-      } else {
-        m_buyCount = 0;
-      }
-      auto countChangedResult584 = countChanged();
-      if (!countChangedResult584)
-        return std::unexpected(std::move(countChangedResult584.error()));
-    
-  return {};
-});
+  reader.registerCallback("spinCount.up", [this](Widget&) -> std::expected<void, StarException> {
+    auto maximum = max_buy_count();
+    if (!maximum)
+      return std::unexpected(std::move(maximum.error()));
+    if (m_selectedIndex == npos || m_max_buy_count == 0)
+      m_buy_count = 0;
+    else if (m_buy_count < *maximum)
+      ++m_buy_count;
+    else
+      m_buy_count = 1;
+    return count_changed();
+  });
 
-  reader.registerCallback("spinCount.down", [this](Widget&)  -> std::expected<void, StarException> {
-      if (m_selectedIndex != npos) {
-        if (m_buyCount > 1)
-          m_buyCount--;
-        else
-          {
-            auto maxBuyCountResult585 = maxBuyCount();
-            if (!maxBuyCountResult585)
-              return std::unexpected(std::move(maxBuyCountResult585.error()));
-            m_buyCount = std::max(std::move(*maxBuyCountResult585), 1);
-          }
-      } else {
-        m_buyCount = 0;
-      }
-      auto countChangedResult586 = countChanged();
-      if (!countChangedResult586)
-        return std::unexpected(std::move(countChangedResult586.error()));
-    
-  return {};
-});
+  reader.registerCallback("spinCount.down", [this](Widget&) -> std::expected<void, StarException> {
+    if (m_selectedIndex == npos || m_max_buy_count == 0) {
+      m_buy_count = 0;
+    } else if (m_buy_count > 1) {
+      --m_buy_count;
+    } else {
+      auto maximum = max_buy_count();
+      if (!maximum)
+        return std::unexpected(std::move(maximum.error()));
+      m_buy_count = std::max(*maximum, 1);
+    }
+    return count_changed();
+  });
 
-  reader.registerCallback("countChanged", [this](Widget&)  -> std::expected<void, StarException> { auto countChangedResult587 = countChanged();
-                                                            if (!countChangedResult587)
-                                                              return std::unexpected(std::move(countChangedResult587.error())); 
-  return {};
-});
-  reader.registerCallback("parseCountText", [this](Widget&)  -> std::expected<void, StarException> { auto countTextChangedResult588 = countTextChanged();
-                                                              if (!countTextChangedResult588)
-                                                                return std::unexpected(std::move(countTextChangedResult588.error())); 
-  return {};
-});
-
-  reader.registerCallback("buy", [this](Widget&)  -> std::expected<void, StarException> { auto buyResult589 = buy();
-                                                   if (!buyResult589)
-                                                     return std::unexpected(std::move(buyResult589.error())); 
-  return {};
-});
+  reader.registerCallback("countChanged", [this](Widget&) { return count_changed(); });
+  reader.registerCallback("parseCountText", [this](Widget&) { return count_text_changed(); });
+  reader.registerCallback("buy", [this](Widget&) { return buy(); });
 
   reader.registerCallback("sell", [this](Widget&)  -> std::expected<void, StarException> { auto sellResult590 = sell();
                                                     if (!sellResult590)
@@ -406,6 +391,7 @@ std::expected<void, StarException> MerchantPane::initialize(std::shared_ptr<Worl
   if (!findChildResult603)
     return std::unexpected(std::move(findChildResult603.error()));
   m_buyButton = std::move(*findChildResult603);
+  m_buyButton->disable();
   auto findChildResult604 = findChild<LabelWidget>("lblSellTotal");
   if (!findChildResult604)
     return std::unexpected(std::move(findChildResult604.error()));
@@ -537,9 +523,8 @@ std::expected<void, StarException> MerchantPane::update(float dt) {
       if (!setupWidgetResult625)
         return std::unexpected(std::move(setupWidgetResult625.error()));
     }
-    auto updateBuyTotalResult626 = updateBuyTotal();
-    if (!updateBuyTotalResult626)
-      return std::unexpected(std::move(updateBuyTotalResult626.error()));
+    if (auto updated = update_buy_total(); !updated)
+      return std::unexpected(std::move(updated.error()));
   }
 
   auto updateSelectionResult627 = updateSelection();
@@ -737,7 +722,7 @@ std::expected<void, StarException> MerchantPane::setupWidget(std::shared_ptr<Wid
     return std::unexpected(std::move(itemSharedResult655.error()));
   std::shared_ptr<Item> item = std::move(*itemSharedResult655);
 
-  String name = item->friendlyName();
+  String name = item->friendly_name();
   if (item->count() > 1)
     name = Star::format("{} (x{})", name, item->count());
 
@@ -749,16 +734,25 @@ std::expected<void, StarException> MerchantPane::setupWidget(std::shared_ptr<Wid
   if (!setTextResult657)
     return std::unexpected(std::move(setTextResult657.error()));
 
-  auto getIntResult658 = itemConfig.get_int("price", item->price());
-  if (!getIntResult658)
-    return std::unexpected(std::move(getIntResult658.error()));
-  unsigned price = std::ceil(std::move(*getIntResult658) * m_buyFactor);
+  auto bundle_price = itemConfig.get_int("price", item->price());
+  if (!bundle_price)
+    return std::unexpected(std::move(bundle_price.error()));
+  std::uint64_t price = 0;
+  if (*bundle_price > 0) {
+    if (m_buyFactor == 1.0f) {
+      price = static_cast<std::uint64_t>(*bundle_price);
+    } else {
+      auto scaled_price = std::ceil(*bundle_price * m_buyFactor);
+      if (is_finite(scaled_price) && scaled_price > 0.0f && scaled_price < 0x1p63f)
+        price = static_cast<std::uint64_t>(scaled_price);
+    }
+  }
   auto setLabelResult659 = widget->setLabel("priceLabel", Star::to_string(price));
   if (!setLabelResult659)
     return std::unexpected(std::move(setLabelResult659.error()));
   widget->setData(price);
 
-  bool unavailable = price > m_player->currency("money");
+  bool unavailable = price == 0 || price > m_player->currency("money") || item->empty() || item->max_stack() == 0;
   auto fetchChildResult660 = widget->fetchChild<ImageWidget>("unavailableoverlay");
   if (!fetchChildResult660)
     return std::unexpected(std::move(fetchChildResult660.error()));
@@ -814,7 +808,7 @@ std::expected<void, StarException> MerchantPane::updateSelection() {
         return std::unexpected(std::move(findChildResult670.error()));
       std::move(*findChildResult670)->enable();
       m_countTextBox->setColor(Color::palette_white);
-      m_buyCount = 1;
+      m_buy_count = std::min(m_max_buy_count, 1);
     } else {
       auto findChildResult671 = findChild<ButtonWidget>("spinCount.up");
       if (!findChildResult671)
@@ -825,97 +819,78 @@ std::expected<void, StarException> MerchantPane::updateSelection() {
         return std::unexpected(std::move(findChildResult672.error()));
       std::move(*findChildResult672)->disable();
       m_countTextBox->setColor(Color::palette_gray);
-      m_buyCount = 0;
+      m_selectedItem.reset();
+      m_buy_count = 0;
     }
 
-    auto countChangedResult673 = countChanged();
-    if (!countChangedResult673)
-      return std::unexpected(std::move(countChangedResult673.error()));
+    return count_changed();
   }
   return {};
 }
 
-std::expected<void, StarException> MerchantPane::updateBuyTotal() {
-  if (auto selected = m_itemGuiList->selectedWidget())
-    {
-      auto toUIntResult674 = selected->data().to_uint();
-      if (!toUIntResult674)
-        return std::unexpected(std::move(toUIntResult674.error()));
-      m_buyTotal = std::move(*toUIntResult674) * m_buyCount;
-    }
-  else
-    m_buyTotal = 0;
-
-  auto setTextResult675 = m_buyTotalLabel->setText(Star::to_string(m_buyTotal));
-  if (!setTextResult675)
-    return std::unexpected(std::move(setTextResult675.error()));
-
-  if (m_selectedIndex != npos && m_buyCount > 0)
-    m_buyButton->enable();
-  else
-    m_buyButton->disable();
-
-  if (m_buyTotal > static_cast<int>(m_player->inventory()->currency("money"))) {
-    m_buyTotalLabel->setColor(Color::palette_red);
-    m_buyButton->disable();
-  } else {
-    m_buyTotalLabel->setColor(Color::palette_white);
+std::expected<void, StarException> MerchantPane::update_buy_total() {
+  m_buy_total = 0;
+  if (auto selected = m_itemGuiList->selectedWidget()) {
+    auto bundle_price = selected->data().to_uint();
+    if (!bundle_price)
+      return std::unexpected(std::move(bundle_price.error()));
+    m_buy_total = purchase_total(*bundle_price, m_buy_count);
   }
+
+  auto label = m_buyTotalLabel->setText(Star::to_string(m_buy_total));
+  if (!label)
+    return std::unexpected(std::move(label.error()));
+
+  bool unaffordable = m_buy_total > m_player->currency("money");
+  m_buyTotalLabel->setColor(unaffordable ? Color::palette_red : Color::palette_white);
+  m_buyButton->setEnabled(m_buy_total != 0 && !unaffordable && m_selectedItem && m_selectedItem->max_stack() != 0
+      && purchase_total(m_selectedItem->count(), m_buy_count) != 0);
   return {};
 }
 
 std::expected<void, StarException> MerchantPane::buy() {
-  if (m_buyTotal > 0 && m_player->inventory()->consumeCurrency("money", m_buyTotal)) {
-    auto countRemaining = m_buyCount;
-    while (countRemaining > 0) {
-      auto cloneResult676 = m_selectedItem->clone();
-      if (!cloneResult676)
-        return std::unexpected(std::move(cloneResult676.error()));
-      auto buyItem = std::move(*cloneResult676);
-      buyItem->setCount(m_selectedItem->count() * countRemaining);
-      countRemaining -= buyItem->count();
-      auto giveItemResult677 = m_player->giveItem(buyItem);
-      if (!giveItemResult677)
-        return std::unexpected(std::move(giveItemResult677.error()));
-    }
+  if (!m_selectedItem || m_selectedIndex != m_itemGuiList->selectedItem() || m_buy_total == 0 || m_selectedItem->max_stack() == 0)
+    return {};
+  auto total_items = purchase_total(m_selectedItem->count(), m_buy_count);
+  if (total_items == 0 || !m_player->inventory()->consumeCurrency("money", m_buy_total))
+    return {};
 
-    auto cloneResult678 = m_selectedItem->clone();
-    if (!cloneResult678)
-      return std::unexpected(std::move(cloneResult678.error()));
-    auto reportItem = std::move(*cloneResult678);
-    reportItem->setCount(reportItem->count() * m_buyCount, true);
-    auto buySummary = JsonObject{{"item", reportItem->descriptor().toJson()}, {"total", m_buyTotal}};
-    if (m_sourceEntityId != null_entity_id)
-      {
-        auto sendEntityMessageResult679 = m_worldClient->sendEntityMessage(m_sourceEntityId, "onBuy", {buySummary});
-        if (!sendEntityMessageResult679)
-          return std::unexpected(std::move(sendEntityMessageResult679.error()));
-        
-      }
-
-    auto& guiContext = context();
-    auto assetsResult680 = context().root().assets();
-    if (!assetsResult680)
-      return std::unexpected(std::move(assetsResult680.error()));
-    auto jsonResult681 = std::move(*assetsResult680)->json("/merchant.config:buySound");
-    if (!jsonResult681)
-      return std::unexpected(std::move(jsonResult681.error()));
-    auto toStringResult682 = std::move(*jsonResult681).to_string();
-    if (!toStringResult682)
-      return std::unexpected(std::move(toStringResult682.error()));
-    auto playAudioResult683 = guiContext.playAudio(std::move(*toStringResult682));
-    if (!playAudioResult683)
-      return std::unexpected(std::move(playAudioResult683.error()));
-
-    auto buildItemListResult684 = buildItemList();
-    if (!buildItemListResult684)
-      return std::unexpected(std::move(buildItemListResult684.error()));
-
-    auto updateBuyTotalResult685 = updateBuyTotal();
-    if (!updateBuyTotalResult685)
-      return std::unexpected(std::move(updateBuyTotalResult685.error()));
+  auto remaining_items = total_items;
+  while (remaining_items != 0) {
+    auto stack = m_selectedItem->clone();
+    if (!stack)
+      return std::unexpected(std::move(stack.error()));
+    if (!*stack)
+      return std::unexpected(ItemException("Could not clone merchant purchase item"));
+    auto overflow = (*stack)->set_count(remaining_items);
+    if (overflow == remaining_items)
+      return std::unexpected(ItemException("Merchant purchase item has no stack capacity"));
+    if (auto given = m_player->giveItem(*stack); !given)
+      return std::unexpected(std::move(given.error()));
+    remaining_items = overflow;
   }
-  return {};
+
+  if (m_sourceEntityId != null_entity_id) {
+    auto descriptor = m_selectedItem->descriptor().withCount(total_items);
+    auto summary = JsonObject{{"item", descriptor.toJson()}, {"total", m_buy_total}};
+    auto sent = m_worldClient->sendEntityMessage(m_sourceEntityId, "onBuy", {std::move(summary)});
+    if (!sent)
+      return std::unexpected(std::move(sent.error()));
+  }
+
+  auto& gui_context = context();
+  auto assets = gui_context.root().assets();
+  if (!assets)
+    return std::unexpected(std::move(assets.error()));
+  auto sound = (*assets)->json("/merchant.config:buySound").and_then([](Json const& value) { return value.to_string(); });
+  if (!sound)
+    return std::unexpected(std::move(sound.error()));
+  if (auto played = gui_context.playAudio(std::move(*sound)); !played)
+    return std::unexpected(std::move(played.error()));
+
+  if (auto rebuilt = buildItemList(); !rebuilt)
+    return std::unexpected(std::move(rebuilt.error()));
+  return updateSelection();
 }
 
 std::expected<void, StarException> MerchantPane::updateSellTotal() {
@@ -969,64 +944,43 @@ std::expected<void, StarException> MerchantPane::sell() {
   return {};
 }
 
-std::expected<int, StarException> MerchantPane::maxBuyCount() {
-  if (auto selected = m_itemGuiList->selectedWidget()) {
-    auto assetsResult695 = context().root().assets();
-    if (!assetsResult695)
-      return std::unexpected(std::move(assetsResult695.error()));
-    auto assets = std::move(*assetsResult695);
-    auto toUIntResult696 = selected->data().to_uint();
-    if (!toUIntResult696)
-      return std::unexpected(std::move(toUIntResult696.error()));
-    auto unitPrice = std::move(*toUIntResult696);
-    if (unitPrice == 0)
-      return m_maxBuyCount;
-    return std::min(m_maxBuyCount, static_cast<int>(std::floor(m_player->currency("money") / unitPrice)));
-  } else {
+std::expected<int, StarException> MerchantPane::max_buy_count() {
+  auto selected = m_itemGuiList->selectedWidget();
+  if (!selected)
     return 0;
-  }
+  auto bundle_price = selected->data().to_uint();
+  if (!bundle_price)
+    return std::unexpected(std::move(bundle_price.error()));
+  if (*bundle_price == 0)
+    return m_max_buy_count;
+  return static_cast<int>(std::min<std::uint64_t>(m_max_buy_count, m_player->currency("money") / *bundle_price));
 }
 
-std::expected<void, StarException> MerchantPane::countChanged() {
-  auto setTextResult697 = m_countTextBox->setText(Star::format("x{}", m_buyCount));
-  if (!setTextResult697)
-    return std::unexpected(std::move(setTextResult697.error()));
-  auto updateBuyTotalResult698 = updateBuyTotal();
-  if (!updateBuyTotalResult698)
-    return std::unexpected(std::move(updateBuyTotalResult698.error()));
-
-return {};
+std::expected<void, StarException> MerchantPane::count_changed() {
+  auto text = m_countTextBox->setText(Star::format("x{}", m_buy_count), false);
+  if (!text)
+    return std::unexpected(std::move(text.error()));
+  return update_buy_total();
 }
 
-std::expected<void, StarException> MerchantPane::countTextChanged() {
-  if (m_selectedIndex == npos) {
-    m_buyCount = 0;
-    auto countChangedResult699 = countChanged();
-    if (!countChangedResult699)
-      return std::unexpected(std::move(countChangedResult699.error()));
-  } else {
-    auto replaceResult700 = m_countTextBox->getText().replace("x", "");
-    if (!replaceResult700)
-      return std::unexpected(std::move(replaceResult700.error()));
-    auto countString = std::move(*replaceResult700);
-    if (!countString.empty()) {
-      auto parsed = lexical_cast<int>(countString);
-      if (!parsed) {
-        if (!parsed.error().is<BadLexicalCast>())
-          return std::unexpected(std::move(parsed.error()));
-        m_buyCount = 1;
-      } else {
-        auto maxBuyCountResult701 = maxBuyCount();
-        if (!maxBuyCountResult701)
-          return std::unexpected(std::move(maxBuyCountResult701.error()));
-        m_buyCount = clamp<int>(*parsed, 1, std::move(*maxBuyCountResult701));
-      }
-      auto countChangedResult702 = countChanged();
-      if (!countChangedResult702)
-        return std::unexpected(std::move(countChangedResult702.error()));
-    }
+std::expected<void, StarException> MerchantPane::count_text_changed() {
+  if (m_selectedIndex == npos || m_max_buy_count == 0) {
+    m_buy_count = 0;
+    return count_changed();
   }
-  return {};
+  auto count = m_countTextBox->getText().replace("x", "");
+  if (!count)
+    return std::unexpected(std::move(count.error()));
+  if (count->empty())
+    return {};
+  auto parsed = lexical_cast<int>(*count);
+  if (!parsed && !parsed.error().is<BadLexicalCast>())
+    return std::unexpected(std::move(parsed.error()));
+  auto maximum = max_buy_count();
+  if (!maximum)
+    return std::unexpected(std::move(maximum.error()));
+  m_buy_count = std::clamp(parsed.value_or(1), 1, std::max(*maximum, 1));
+  return count_changed();
 }
 
 }

@@ -770,7 +770,7 @@ std::expected<std::optional<String>, StarException> Quest::customIndicator(std::
       matches = *result;
     } else if (std::holds_alternative<QuestItemTag>(param.detail)) {
       if (auto drop = as<ItemDrop>(entity)) {
-        auto tags = drop->item()->itemTags();
+        auto tags = drop->item()->item_tags();
         if (!tags) return std::unexpected(std::move(tags.error()));
         matches = tags->contains(std::get<QuestItemTag>(param.detail));
       }

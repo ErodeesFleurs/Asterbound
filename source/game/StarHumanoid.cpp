@@ -1257,7 +1257,7 @@ Wearable& current = checked246->get();
   worn_head.animation_tags.set(Star::format("headCosmetic{}Frameset", slot+1), worn_head.frameset);
   worn_head.animation_tags.set(Star::format("headCosmetic{}Directives", slot+1), worn_head.directives.string());
   {
-auto checked247 = head.instanceValue("humanoidAnimationTags", JsonObject());
+auto checked247 = head.instance_value("humanoidAnimationTags", JsonObject());
 if (!checked247) return std::unexpected(std::move(checked247.error()));
 auto checked248 = std::move(*checked247).iterate_object();
 if (!checked248) return std::unexpected(std::move(checked248.error()));
@@ -1302,7 +1302,7 @@ Wearable& current = checked253->get();
   worn_chest.animation_tags.set(Star::format("backSleeve{}Frameset", slot+1), worn_chest.back_sleeve_frameset);
   worn_chest.animation_tags.set(Star::format("chestCosmetic{}Directives", slot+1), worn_chest.directives.string());
   {
-auto checked254 = chest.instanceValue("humanoidAnimationTags", JsonObject());
+auto checked254 = chest.instance_value("humanoidAnimationTags", JsonObject());
 if (!checked254) return std::unexpected(std::move(checked254.error()));
 auto checked255 = std::move(*checked254).iterate_object();
 if (!checked255) return std::unexpected(std::move(checked255.error()));
@@ -1343,7 +1343,7 @@ Wearable& current = checked260->get();
   worn_legs.animation_tags.set(Star::format("legsCosmetic{}Frameset", slot+1), worn_legs.frameset);
   worn_legs.animation_tags.set(Star::format("legsCosmetic{}Directives", slot+1), worn_legs.directives.string());
   {
-auto checked261 = legs.instanceValue("humanoidAnimationTags", JsonObject());
+auto checked261 = legs.instance_value("humanoidAnimationTags", JsonObject());
 if (!checked261) return std::unexpected(std::move(checked261.error()));
 auto checked262 = std::move(*checked261).iterate_object();
 if (!checked262) return std::unexpected(std::move(checked262.error()));
@@ -1380,7 +1380,7 @@ Wearable& current = checked267->get();
   worn_back.directives = back.directives(m_facing_direction == Direction::Left);
   worn_back.fullbright = back.fullbright();
   worn_back.frameset = back.frameset(gender);
-  auto checked268 = back.instanceValue("rotateWithHead", false);
+  auto checked268 = back.instance_value("rotateWithHead", false);
 if (!checked268) return std::unexpected(std::move(checked268.error()));
 auto checked269 = std::move(*checked268).opt_bool();
 if (!checked269) return std::unexpected(std::move(checked269.error()));
@@ -1389,7 +1389,7 @@ worn_back.rotate_with_head = std::move(*checked269).value_or(false);
   worn_back.animation_tags.set(Star::format("backCosmetic{}Frameset", slot+1), worn_back.frameset);
   worn_back.animation_tags.set(Star::format("backCosmetic{}Directives", slot+1), worn_back.directives.string());
   {
-auto checked270 = back.instanceValue("humanoidAnimationTags", JsonObject());
+auto checked270 = back.instance_value("humanoidAnimationTags", JsonObject());
 if (!checked270) return std::unexpected(std::move(checked270.error()));
 auto checked271 = std::move(*checked270).iterate_object();
 if (!checked271) return std::unexpected(std::move(checked271.error()));

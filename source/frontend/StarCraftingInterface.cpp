@@ -957,7 +957,7 @@ std::expected<void, StarException> CraftingPane::setupWidget(std::shared_ptr<Wid
   bool unavailable = !m_player->isAdmin() && !ItemDatabase::can_make_recipe(recipe, normalizedBag, currencies);
   auto price = recipe.currencyInputs.value("money", 0);
 
-  String name = item->friendlyName();
+  String name = item->friendly_name();
   if (recipe.output.count() > 1)
     name = Star::format("{} (x{})", name, recipe.output.count());
 
@@ -1107,7 +1107,7 @@ std::expected<std::shared_ptr<Pane>, StarException> CraftingPane::setupTooltip(I
       auto fetchChildResult485 = widget->fetchChild<LabelWidget>("itemName");
       if (!fetchChildResult485)
         return std::unexpected(std::move(fetchChildResult485.error()));
-      auto setTextResult486 = std::move(*fetchChildResult485)->setText(item->friendlyName());
+      auto setTextResult486 = std::move(*fetchChildResult485)->setText(item->friendly_name());
       if (!setTextResult486)
         return std::unexpected(std::move(setTextResult486.error()));
       auto fetchChildResult487 = widget->fetchChild<LabelWidget>("count");

@@ -161,17 +161,17 @@ std::expected<std::shared_ptr<ObjectItem>, StarException> ObjectItem::create(Roo
   auto twoHanded = config.get_bool("twoHanded", true);
   if (!twoHanded)
     return std::unexpected(std::move(twoHanded.error()));
-  item->setTwoHanded(*twoHanded);
+  item->set_two_handed(*twoHanded);
   // Retained script storage participates in the existing item stacking contract.
-  auto retain = item->instanceValue("retainObjectParametersInItem", false).and_then([](Json const& value) { return value.to_bool(); });
+  auto retain = item->instance_value("retainObjectParametersInItem", false).and_then([](Json const& value) { return value.to_bool(); });
   if (!retain)
     return std::unexpected(std::move(retain.error()));
   if (*retain) {
-    auto storage = item->instanceValue("scriptStorage");
+    auto storage = item->instance_value("scriptStorage");
     if (!storage)
       return std::unexpected(std::move(storage.error()));
     if (storage->is_null()) {
-      auto stored = item->setInstanceValue("scriptStorage", JsonObject());
+      auto stored = item->set_instance_value("scriptStorage", JsonObject());
       if (!stored)
         return std::unexpected(std::move(stored.error()));
     }
@@ -224,7 +224,7 @@ std::expected<void, StarException> ObjectItem::fire(FireMode mode, bool shifting
 }
 
 std::expected<String, StarException> ObjectItem::objectName() const {
-  return instanceValue("objectName", "<objectName missing>").and_then([](Json const& value) { return value.to_string(); });
+  return instance_value("objectName", "<objectName missing>").and_then([](Json const& value) { return value.to_string(); });
 }
 
 std::expected<Json, StarException> ObjectItem::objectParameters() const {

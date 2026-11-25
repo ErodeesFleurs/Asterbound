@@ -154,15 +154,15 @@ std::expected<std::shared_ptr<MiningTool>, StarException> MiningTool::create(Roo
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto image = item->instanceValue("image").and_then([](Json const& value) { return value.to_string(); });
+  auto image = item->instance_value("image").and_then([](Json const& value) { return value.to_string(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
   item->m_image = AssetPath::relative_to(directory, *image);
-  auto frames = item->instanceValue("frames", 1).and_then([](Json const& value) { return value.to_int(); });
+  auto frames = item->instance_value("frames", 1).and_then([](Json const& value) { return value.to_int(); });
   if (!frames)
     return std::unexpected(std::move(frames.error()));
   item->m_frames = *frames;
-  auto cycle = item->instanceValue("animationCycle", 1.0f).and_then([](Json const& value) { return value.to_float(); });
+  auto cycle = item->instance_value("animationCycle", 1.0f).and_then([](Json const& value) { return value.to_float(); });
   if (!cycle)
     return std::unexpected(std::move(cycle.error()));
   item->m_frameCycle = *cycle;
@@ -177,25 +177,25 @@ std::expected<std::shared_ptr<MiningTool>, StarException> MiningTool::create(Roo
   if (!idle)
     return std::unexpected(std::move(idle.error()));
   item->m_idleFrame = std::move(*idle);
-  auto position = item->instanceValue("handPosition").and_then(json_to_vec2f);
+  auto position = item->instance_value("handPosition").and_then(json_to_vec2f);
   if (!position)
     return std::unexpected(std::move(position.error()));
   item->m_handPosition = *position;
   for (auto const& [key, target] : {std::pair{std::string_view("blockRadius"), std::ref(item->m_blockRadius)}, std::pair{std::string_view("altBlockRadius"), std::ref(item->m_altBlockRadius)}}) {
-    auto value = item->instanceValue(key).and_then([](Json const& value) { return value.to_float(); });
+    auto value = item->instance_value(key).and_then([](Json const& value) { return value.to_float(); });
     if (!value)
       return std::unexpected(std::move(value.error()));
     target.get() = *value;
   }
-  auto sounds = item->instanceValue("strikeSounds").and_then(json_to_string_list);
+  auto sounds = item->instance_value("strikeSounds").and_then(json_to_string_list);
   if (!sounds)
     return std::unexpected(std::move(sounds.error()));
   item->m_strikeSounds = std::move(*sounds);
-  auto breakSound = item->instanceValue("breakSound", "").and_then([](Json const& value) { return value.to_string(); });
+  auto breakSound = item->instance_value("breakSound", "").and_then([](Json const& value) { return value.to_string(); });
   if (!breakSound)
     return std::unexpected(std::move(breakSound.error()));
   item->m_breakSound = std::move(*breakSound);
-  auto pointable = item->instanceValue("pointable", false).and_then([](Json const& value) { return value.to_bool(); });
+  auto pointable = item->instance_value("pointable", false).and_then([](Json const& value) { return value.to_bool(); });
   if (!pointable)
     return std::unexpected(std::move(pointable.error()));
   item->m_pointable = *pointable;
@@ -291,7 +291,7 @@ std::expected<void, StarException> MiningTool::fire(FireMode mode, bool shifting
       }
 
       TileDamage damage;
-      auto damageTypeName = instanceValue("tileDamageType", "blockish").and_then([](Json const& value) { return value.to_string(); });
+      auto damageTypeName = instance_value("tileDamageType", "blockish").and_then([](Json const& value) { return value.to_string(); });
       if (!damageTypeName)
         return std::unexpected(std::move(damageTypeName.error()));
       if (!tile_damage_type_names)
@@ -303,11 +303,11 @@ std::expected<void, StarException> MiningTool::fire(FireMode mode, bool shifting
       auto status = durabilityStatus();
       if (!status)
         return std::unexpected(std::move(status.error()));
-      auto amount = (*status == 0 ? instanceValue("tileDamageBlunted", 0.1f) : instanceValue("tileDamage", 1.0f)).and_then([](Json const& value) { return value.to_float(); });
+      auto amount = (*status == 0 ? instance_value("tileDamageBlunted", 0.1f) : instance_value("tileDamage", 1.0f)).and_then([](Json const& value) { return value.to_float(); });
       if (!amount)
         return std::unexpected(std::move(amount.error()));
       damage.amount = *amount;
-      auto harvest = instanceValue("harvestLevel", 1).and_then([](Json const& value) { return value.to_uint(); });
+      auto harvest = instance_value("harvestLevel", 1).and_then([](Json const& value) { return value.to_uint(); });
       if (!harvest)
         return std::unexpected(std::move(harvest.error()));
       damage.harvest_level = *harvest;
@@ -317,7 +317,7 @@ std::expected<void, StarException> MiningTool::fire(FireMode mode, bool shifting
       if (*damageResult != TileDamageResult::None) {
         used = true;
         if (!itemOwner->get().isAdmin()) {
-          auto perUse = instanceValue("durabilityPerUse", 1.0f).and_then([](Json const& value) { return value.to_float(); });
+          auto perUse = instance_value("durabilityPerUse", 1.0f).and_then([](Json const& value) { return value.to_float(); });
           if (!perUse)
             return std::unexpected(std::move(perUse.error()));
           auto changed = changeDurability(*perUse);
@@ -379,10 +379,10 @@ std::expected<void, StarException> MiningTool::update(float dt, FireMode mode, b
 }
 
 std::expected<float, StarException> MiningTool::durabilityStatus() {
-  auto hit = instanceValue("durabilityHit", 0.0f).and_then([](Json const& value) { return value.to_float(); });
+  auto hit = instance_value("durabilityHit", 0.0f).and_then([](Json const& value) { return value.to_float(); });
   if (!hit)
     return std::unexpected(std::move(hit.error()));
-  auto durability = instanceValue("durability").and_then([](Json const& value) { return value.to_float(); });
+  auto durability = instance_value("durability").and_then([](Json const& value) { return value.to_float(); });
   if (!durability)
     return std::unexpected(std::move(durability.error()));
   return std::clamp(1.0f - *hit / *durability, 0.0f, 1.0f);
@@ -395,20 +395,20 @@ std::expected<float, StarException> MiningTool::getAngle(float aimAngle) {
 }
 
 std::expected<void, StarException> MiningTool::changeDurability(float amount) {
-  auto hit = instanceValue("durabilityHit", 0.0f).and_then([](Json const& value) { return value.to_float(); });
+  auto hit = instance_value("durabilityHit", 0.0f).and_then([](Json const& value) { return value.to_float(); });
   if (!hit)
     return std::unexpected(std::move(hit.error()));
-  auto durability = instanceValue("durability").and_then([](Json const& value) { return value.to_float(); });
+  auto durability = instance_value("durability").and_then([](Json const& value) { return value.to_float(); });
   if (!durability)
     return std::unexpected(std::move(durability.error()));
-  auto stored = setInstanceValue("durabilityHit", clamp(*hit + amount, 0.0f, *durability));
+  auto stored = set_instance_value("durabilityHit", clamp(*hit + amount, 0.0f, *durability));
   if (!stored)
     return std::unexpected(std::move(stored.error()));
   auto status = durabilityStatus();
   if (!status)
     return std::unexpected(std::move(status.error()));
   if (*status == 0.0f) {
-    auto repairable = instanceValue("canBeRepaired", false).and_then([](Json const& value) { return value.to_bool(); });
+    auto repairable = instance_value("canBeRepaired", false).and_then([](Json const& value) { return value.to_bool(); });
     if (!repairable)
       return std::unexpected(std::move(repairable.error()));
     if (!*repairable) {
@@ -435,15 +435,15 @@ std::expected<std::shared_ptr<HarvestingTool>, StarException> HarvestingTool::cr
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto image = item->instanceValue("image").and_then([](Json const& value) { return value.to_string(); });
+  auto image = item->instance_value("image").and_then([](Json const& value) { return value.to_string(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
   item->m_image = AssetPath::relative_to(directory, *image);
-  auto frames = item->instanceValue("frames", 1).and_then([](Json const& value) { return value.to_int(); });
+  auto frames = item->instance_value("frames", 1).and_then([](Json const& value) { return value.to_int(); });
   if (!frames)
     return std::unexpected(std::move(frames.error()));
   item->m_frames = *frames;
-  auto cycle = item->instanceValue("animationCycle", 1.0f).and_then([](Json const& value) { return value.to_float(); });
+  auto cycle = item->instance_value("animationCycle", 1.0f).and_then([](Json const& value) { return value.to_float(); });
   if (!cycle)
     return std::unexpected(std::move(cycle.error()));
   item->m_frameCycle = *cycle;
@@ -457,11 +457,11 @@ std::expected<std::shared_ptr<HarvestingTool>, StarException> HarvestingTool::cr
   if (!idle)
     return std::unexpected(std::move(idle.error()));
   item->m_idleFrame = std::move(*idle);
-  auto position = item->instanceValue("handPosition").and_then(json_to_vec2f);
+  auto position = item->instance_value("handPosition").and_then(json_to_vec2f);
   if (!position)
     return std::unexpected(std::move(position.error()));
   item->m_handPosition = *position;
-  auto sounds = item->instanceValue("strikeSounds").and_then(json_to_string_list);
+  auto sounds = item->instance_value("strikeSounds").and_then(json_to_string_list);
   if (!sounds)
     return std::unexpected(std::move(sounds.error()));
   item->m_strikeSounds = std::move(*sounds);
@@ -469,7 +469,7 @@ std::expected<std::shared_ptr<HarvestingTool>, StarException> HarvestingTool::cr
   if (!volume)
     return std::unexpected(std::move(volume.error()));
   item->m_toolVolume = *volume;
-  auto power = item->instanceValue("harvestPower", 1.0f).and_then([](Json const& value) { return value.to_float(); });
+  auto power = item->instance_value("harvestPower", 1.0f).and_then([](Json const& value) { return value.to_float(); });
   if (!power)
     return std::unexpected(std::move(power.error()));
   item->m_harvestPower = *power;
@@ -577,11 +577,11 @@ std::expected<std::shared_ptr<WireTool>, StarException> WireTool::create(Root& r
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto position = item->instanceValue("handPosition").and_then(json_to_vec2f);
+  auto position = item->instance_value("handPosition").and_then(json_to_vec2f);
   if (!position)
     return std::unexpected(std::move(position.error()));
   item->m_handPosition = *position;
-  auto sounds = item->instanceValue("strikeSounds").and_then(json_to_string_list);
+  auto sounds = item->instance_value("strikeSounds").and_then(json_to_string_list);
   if (!sounds)
     return std::unexpected(std::move(sounds.error()));
   item->m_strikeSounds = std::move(*sounds);
@@ -716,24 +716,24 @@ std::expected<std::shared_ptr<BeamMiningTool>, StarException> BeamMiningTool::cr
   if (!assets)
     return std::unexpected(std::move(assets.error()));
   for (auto const& [key, target] : {std::pair{std::string_view("blockRadius"), std::ref(item->m_blockRadius)}, std::pair{std::string_view("altBlockRadius"), std::ref(item->m_altBlockRadius)}}) {
-    auto value = item->instanceValue(key).and_then([](Json const& value) { return value.to_float(); });
+    auto value = item->instance_value(key).and_then([](Json const& value) { return value.to_float(); });
     if (!value)
       return std::unexpected(std::move(value.error()));
     target.get() = *value;
   }
-  auto damage = item->instanceValue("tileDamage", 1.0f).and_then([](Json const& value) { return value.to_float(); });
+  auto damage = item->instance_value("tileDamage", 1.0f).and_then([](Json const& value) { return value.to_float(); });
   if (!damage)
     return std::unexpected(std::move(damage.error()));
   item->m_tileDamage = *damage;
-  auto harvest = item->instanceValue("harvestLevel", 1).and_then([](Json const& value) { return value.to_uint(); });
+  auto harvest = item->instance_value("harvestLevel", 1).and_then([](Json const& value) { return value.to_uint(); });
   if (!harvest)
     return std::unexpected(std::move(harvest.error()));
   item->m_harvestLevel = *harvest;
-  auto collect = item->instanceValue("canCollectLiquid", false).and_then([](Json const& value) { return value.to_bool(); });
+  auto collect = item->instance_value("canCollectLiquid", false).and_then([](Json const& value) { return value.to_bool(); });
   if (!collect)
     return std::unexpected(std::move(collect.error()));
   item->m_canCollectLiquid = *collect;
-  auto sounds = item->instanceValue("strikeSounds").and_then(json_to_string_list);
+  auto sounds = item->instance_value("strikeSounds").and_then(json_to_string_list);
   if (!sounds)
     return std::unexpected(std::move(sounds.error()));
   item->m_strikeSounds = std::move(*sounds);
@@ -744,7 +744,7 @@ std::expected<std::shared_ptr<BeamMiningTool>, StarException> BeamMiningTool::cr
     target.get() = *volume;
   }
   item->m_endType = EndType::Object;
-  auto rateValue = item->instanceValue("scaleRate");
+  auto rateValue = item->instance_value("scaleRate");
   if (!rateValue)
     return std::unexpected(std::move(rateValue.error()));
   if (*rateValue && rateValue->can_convert(Json::Type::Float)) {
@@ -754,7 +754,7 @@ std::expected<std::shared_ptr<BeamMiningTool>, StarException> BeamMiningTool::cr
     item->m_tileDamage /= *rate;
     item->m_cooldownTime /= *rate;
   }
-  auto effects = item->instanceValue("inhandStatusEffects", JsonArray()).and_then([](Json const& value) { return value.to_array(); });
+  auto effects = item->instance_value("inhandStatusEffects", JsonArray()).and_then([](Json const& value) { return value.to_array(); });
   if (!effects)
     return std::unexpected(std::move(effects.error()));
   for (auto const& value : *effects) {
@@ -1016,12 +1016,12 @@ std::expected<std::shared_ptr<PaintingBeamTool>, StarException> PaintingBeamTool
   if (!assets)
     return std::unexpected(std::move(assets.error()));
   for (auto const& [key, target] : {std::pair{std::string_view("blockRadius"), std::ref(item->m_blockRadius)}, std::pair{std::string_view("altBlockRadius"), std::ref(item->m_altBlockRadius)}}) {
-    auto value = item->instanceValue(key).and_then([](Json const& value) { return value.to_float(); });
+    auto value = item->instance_value(key).and_then([](Json const& value) { return value.to_float(); });
     if (!value)
       return std::unexpected(std::move(value.error()));
     target.get() = *value;
   }
-  auto sounds = item->instanceValue("strikeSounds").and_then(json_to_string_list);
+  auto sounds = item->instance_value("strikeSounds").and_then(json_to_string_list);
   if (!sounds)
     return std::unexpected(std::move(sounds.error()));
   item->m_strikeSounds = std::move(*sounds);
@@ -1032,7 +1032,7 @@ std::expected<std::shared_ptr<PaintingBeamTool>, StarException> PaintingBeamTool
     target.get() = *volume;
   }
   item->m_endType = EndType::Object;
-  auto colors = item->instanceValue("colorNumbers").and_then([](Json const& value) { return value.to_array(); });
+  auto colors = item->instance_value("colorNumbers").and_then([](Json const& value) { return value.to_array(); });
   if (!colors)
     return std::unexpected(std::move(colors.error()));
   for (auto const& color : *colors) {
@@ -1041,11 +1041,11 @@ std::expected<std::shared_ptr<PaintingBeamTool>, StarException> PaintingBeamTool
       return std::unexpected(std::move(value.error()));
     item->m_colors.push_back(*value);
   }
-  auto keys = item->instanceValue("colorKeys").and_then(json_to_string_list);
+  auto keys = item->instance_value("colorKeys").and_then(json_to_string_list);
   if (!keys)
     return std::unexpected(std::move(keys.error()));
   item->m_colorKeys = std::move(*keys);
-  auto index = item->instanceValue("colorIndex", 0).and_then([](Json const& value) { return value.to_int(); });
+  auto index = item->instance_value("colorIndex", 0).and_then([](Json const& value) { return value.to_int(); });
   if (!index)
     return std::unexpected(std::move(index.error()));
   item->m_colorIndex = *index;
@@ -1162,7 +1162,7 @@ std::expected<void, StarException> PaintingBeamTool::fire(FireMode mode, bool sh
   if (mode == FireMode::Alt && edgeTriggered) {
     m_colorIndex = (m_colorIndex + 1) % m_colors.size();
     m_color = m_colors[m_colorIndex];
-    return setInstanceValue("colorIndex", m_colorIndex);
+    return set_instance_value("colorIndex", m_colorIndex);
   }
 
   if (mode == FireMode::Primary) {

@@ -63,30 +63,29 @@ module star.item_lua_bindings;
 namespace Star::LuaBindings::ItemCallbacks {
   String name(Item& item);
   std::size_t count(Item& item);
-  std::size_t setCount(Item& item, std::size_t count);
-  std::size_t maxStack(Item& item);
+  std::size_t set_count(Item& item, std::size_t count);
+  std::size_t max_stack(Item& item);
   [[nodiscard]] std::expected<bool, StarException> matches(Item& item, Json const& descriptor, std::optional<bool> exactMatch);
-  Json matchingDescriptors(Item& item);
   bool consume(Item& item, std::size_t count);
   bool empty(Item& item);
   Json descriptor(Item& item);
   String description(Item& item);
-  String friendlyName(Item& item);
+  String friendly_name(Item& item);
   int rarity(Item& item);
   [[nodiscard]] std::expected<String, StarException> rarityString(Item& item);
   std::size_t price(Item& item);
   [[nodiscard]] std::expected<unsigned, StarException> fuelAmount(Item& item);
   [[nodiscard]] std::expected<Json, StarException> icon_drawables(Item& item);
   [[nodiscard]] std::expected<Json, StarException> drop_drawables(Item& item);
-  String largeImage(Item& item);
-  String tooltipKind(Item& item);
+  String large_image(Item& item);
+  String tooltip_kind(Item& item);
   String category(Item& item);
-  [[nodiscard]] std::expected<String, StarException> pickupSound(Item& item);
-  bool twoHanded(Item& item);
-  float timeToLive(Item& item);
-  [[nodiscard]] std::expected<Json, StarException> learnBlueprintsOnPickup(Item& item);
-  [[nodiscard]] std::expected<bool, StarException> hasItemTag(Item& item, String const& itemTag);
-  [[nodiscard]] std::expected<Json, StarException> pickupQuestTemplates(Item& item);
+  [[nodiscard]] std::expected<String, StarException> pickup_sound(Item& item);
+  bool two_handed(Item& item);
+  float time_to_live(Item& item);
+  [[nodiscard]] std::expected<Json, StarException> learn_blueprints_on_pickup(Item& item);
+  [[nodiscard]] std::expected<bool, StarException> has_item_tag(Item& item, String const& item_tag);
+  [[nodiscard]] std::expected<Json, StarException> pickup_quest_templates(Item& item);
 }
 namespace Star {
 
@@ -102,11 +101,11 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeItemCallbacks(Item& 
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<std::size_t, std::size_t>(
-        "setCount", [&item](std::size_t count) { return ItemCallbacks::setCount(item, count); });
+        "setCount", [&item](std::size_t count) { return ItemCallbacks::set_count(item, count); });
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<std::size_t>(
-        "maxStack", [&item]() { return ItemCallbacks::maxStack(item); });
+        "maxStack", [&item]() { return ItemCallbacks::max_stack(item); });
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<bool, Json, std::optional<bool>>(
@@ -133,7 +132,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeItemCallbacks(Item& 
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<String>(
-        "friendlyName", [&item]() { return ItemCallbacks::friendlyName(item); });
+        "friendlyName", [&item]() { return ItemCallbacks::friendly_name(item); });
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration =
@@ -161,11 +160,11 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeItemCallbacks(Item& 
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<String>(
-        "largeImage", [&item]() { return ItemCallbacks::largeImage(item); });
+        "largeImage", [&item]() { return ItemCallbacks::large_image(item); });
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<String>(
-        "tooltipKind", [&item]() { return ItemCallbacks::tooltipKind(item); });
+        "tooltipKind", [&item]() { return ItemCallbacks::tooltip_kind(item); });
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<String>(
@@ -173,27 +172,27 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeItemCallbacks(Item& 
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<String>(
-        "pickupSound", [&item]() { return ItemCallbacks::pickupSound(item); });
+        "pickupSound", [&item]() { return ItemCallbacks::pickup_sound(item); });
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<bool>(
-        "twoHanded", [&item]() { return ItemCallbacks::twoHanded(item); });
+        "twoHanded", [&item]() { return ItemCallbacks::two_handed(item); });
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<float>(
-        "timeToLive", [&item]() { return ItemCallbacks::timeToLive(item); });
+        "timeToLive", [&item]() { return ItemCallbacks::time_to_live(item); });
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<Json>(
-        "learnBlueprintsOnPickup", [&item]() { return ItemCallbacks::learnBlueprintsOnPickup(item); });
+        "learnBlueprintsOnPickup", [&item]() { return ItemCallbacks::learn_blueprints_on_pickup(item); });
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<bool, String>(
-        "hasItemTag", [&item](String const& tag) { return ItemCallbacks::hasItemTag(item, tag); });
+        "hasItemTag", [&item](String const& tag) { return ItemCallbacks::has_item_tag(item, tag); });
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<Json>(
-        "pickupQuestTemplates", [&item]() { return ItemCallbacks::pickupQuestTemplates(item); });
+        "pickupQuestTemplates", [&item]() { return ItemCallbacks::pickup_quest_templates(item); });
       !registration)
     return std::unexpected(std::move(registration.error()));
 
@@ -219,16 +218,16 @@ std::size_t LuaBindings::ItemCallbacks::count(Item& item) {
 //
 // @param count The desired amount
 // @return An integer containing the number of items that overflowed
-std::size_t LuaBindings::ItemCallbacks::setCount(Item& item, std::size_t count) {
-  return item.setCount(count);
+std::size_t LuaBindings::ItemCallbacks::set_count(Item& item, std::size_t count) {
+  return item.set_count(count);
 }
 
 // Returns the maximum number of items in this item's stack
 //
 // @return An integer containing the number of items in this item's maximum
 // stack
-std::size_t LuaBindings::ItemCallbacks::maxStack(Item& item) {
-  return item.maxStack();
+std::size_t LuaBindings::ItemCallbacks::max_stack(Item& item) {
+  return item.max_stack();
 }
 
 // Returns whether or not the serialized item descriptor passed logically
@@ -281,8 +280,8 @@ String LuaBindings::ItemCallbacks::description(Item& item) {
 // Returns the friendly name of the item
 //
 // @return a string containing the friendly name of the item
-String LuaBindings::ItemCallbacks::friendlyName(Item& item) {
-  return item.friendlyName();
+String LuaBindings::ItemCallbacks::friendly_name(Item& item) {
+  return item.friendly_name();
 }
 
 // Returns the rarity of the item as an integer
@@ -317,7 +316,7 @@ std::size_t LuaBindings::ItemCallbacks::price(Item& item) {
 //
 // @return an integer representing the amount of fuel in the entire stack
 std::expected<unsigned, StarException> LuaBindings::ItemCallbacks::fuelAmount(Item& item) {
-  auto value = item.instanceValue("fuelAmount", 0);
+  auto value = item.instance_value("fuelAmount", 0);
   if (!value)
     return std::unexpected(std::move(value.error()));
   auto amount = value->to_uint();
@@ -352,16 +351,16 @@ std::expected<Json, StarException> LuaBindings::ItemCallbacks::drop_drawables(It
 // tooltip
 //
 // @return String containing a path to the largeImage for this item
-String LuaBindings::ItemCallbacks::largeImage(Item& item) {
-  return item.largeImage();
+String LuaBindings::ItemCallbacks::large_image(Item& item) {
+  return item.large_image();
 }
 
 // Returns the inspection kind of this item (as defined in item config, defaults
 // to empty string)
 //
 // @return String containing the inspection kind
-String LuaBindings::ItemCallbacks::tooltipKind(Item& item) {
-  return item.tooltipKind();
+String LuaBindings::ItemCallbacks::tooltip_kind(Item& item) {
+  return item.tooltip_kind();
 }
 
 // Returns the category of this item (as defined in item config)
@@ -374,22 +373,22 @@ String LuaBindings::ItemCallbacks::category(Item& item) {
 // Returns the pickup sound for the item
 //
 // @return string containing the path to the pickup sound for this item
-std::expected<String, StarException> LuaBindings::ItemCallbacks::pickupSound(Item& item) {
-  return item.pickupSound();
+std::expected<String, StarException> LuaBindings::ItemCallbacks::pickup_sound(Item& item) {
+  return item.pickup_sound();
 }
 
 // Returns whether or not the item is two handed
 //
 // @return bool containing true if the item is twoHanded, false otherwise
-bool LuaBindings::ItemCallbacks::twoHanded(Item& item) {
-  return item.twoHanded();
+bool LuaBindings::ItemCallbacks::two_handed(Item& item) {
+  return item.two_handed();
 }
 
 // Returns the time to live for this item as an item drop
 //
 // @return float containing the time to live for this item
-float LuaBindings::ItemCallbacks::timeToLive(Item& item) {
-  return item.timeToLive();
+float LuaBindings::ItemCallbacks::time_to_live(Item& item) {
+  return item.time_to_live();
 }
 
 // Returns a list of item descriptors representing recipes whose blueprints you
@@ -397,17 +396,17 @@ float LuaBindings::ItemCallbacks::timeToLive(Item& item) {
 // this item up
 //
 // @return a list of tables containing serialize item descriptors
-std::expected<Json, StarException> LuaBindings::ItemCallbacks::learnBlueprintsOnPickup(Item& item) {
+std::expected<Json, StarException> LuaBindings::ItemCallbacks::learn_blueprints_on_pickup(Item& item) {
   return json_from_list<ItemDescriptor>(
-      item.learnBlueprintsOnPickup(), [](ItemDescriptor const& descriptor) { return descriptor.toJson(); });
+      item.learn_blueprints_on_pickup(), [](ItemDescriptor const& descriptor) { return descriptor.toJson(); });
 }
 
 // Returns whether or not this items has a specific item tag
 //
 // @param itemTag a string containing the tag value
 // @return a bool representing whether or not this item contains that tag
-std::expected<bool, StarException> LuaBindings::ItemCallbacks::hasItemTag(Item& item, String const& itemTag) {
-  return item.hasItemTag(itemTag);
+std::expected<bool, StarException> LuaBindings::ItemCallbacks::has_item_tag(Item& item, String const& item_tag) {
+  return item.has_item_tag(item_tag);
 }
 
 // Returns the pickup Quest Templates for this item
@@ -415,8 +414,8 @@ std::expected<bool, StarException> LuaBindings::ItemCallbacks::hasItemTag(Item& 
 // @return a list of string containing the different quest templates triggered
 // by this item on
 // pickup
-std::expected<Json, StarException> LuaBindings::ItemCallbacks::pickupQuestTemplates(Item& item) {
-  auto templates = item.pickupQuestTemplates();
+std::expected<Json, StarException> LuaBindings::ItemCallbacks::pickup_quest_templates(Item& item) {
+  auto templates = item.pickup_quest_templates();
   if (!templates)
     return std::unexpected(std::move(templates.error()));
   return json_from_list<QuestArcDescriptor>(*templates, [](QuestArcDescriptor const& descriptor) { return descriptor.toJson(); });

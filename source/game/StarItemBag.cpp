@@ -198,7 +198,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemBag::putItems(std::size_
     return std::unexpected(std::move(slot.error()));
   auto& storedItem = slot->get();
   if (storedItem) {
-    storedItem->stackWith(optional_ref(items));
+    storedItem->stack_with(optional_ref(items));
     if (!items->empty())
       return items;
   } else {
@@ -236,7 +236,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemBag::swapItems(std::size
   } else if (storedItem) {
     // If something is there, try to stack with it first.  If we can't stack,
     // then swap.
-    if (!tryCombine || !storedItem->stackWith(optional_ref(swapItems)))
+    if (!tryCombine || !storedItem->stack_with(optional_ref(swapItems)))
       std::swap(storedItem, swapItems);
   } else {
     // Otherwise just place the given items in the slot.
@@ -366,7 +366,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemBag::addItems(std::share
     if (storedItem && storedItem->empty())
       storedItem.reset();
     if (storedItem) {
-      storedItem->stackWith(optional_ref(items));
+      storedItem->stack_with(optional_ref(items));
       if (items->empty())
         return std::shared_ptr<Item>();
     } else {
@@ -389,7 +389,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemBag::stackItems(std::sha
     if (storedItem && storedItem->empty())
       storedItem.reset();
     if (storedItem) {
-      storedItem->stackWith(optional_ref(items));
+      storedItem->stack_with(optional_ref(items));
       if (items->empty())
         return std::shared_ptr<Item>();
     } else {
@@ -406,7 +406,7 @@ std::expected<void, StarException> ItemBag::condenseStacks() {
     if (auto& item = m_items[i]) {
       for (std::size_t j = 0; j < i; ++j) {
         if (auto& stackWithItem = m_items[j])
-          item->stackWith(optional_ref(stackWithItem));
+          item->stack_with(optional_ref(stackWithItem));
         if (item->empty())
           break;
       }
@@ -455,7 +455,7 @@ std::expected<void, StarException> ItemBag::write(DataStream& ds) const {
     return std::unexpected(std::move(writtenSize.error()));
   for (std::size_t i = 0; i < setItemsSize; ++i) {
     auto const& item = m_items[i];
-    auto written = ds.write(itemSafeDescriptor(item && !item->empty() ? item : std::shared_ptr<Item>()));
+    auto written = ds.write(item_safe_descriptor(item && !item->empty() ? item : std::shared_ptr<Item>()));
     if (!written)
       return std::unexpected(std::move(written.error()));
   }
@@ -467,10 +467,10 @@ std::uint64_t ItemBag::stackTransfer(std::optional<std::reference_wrapper<Item c
     return 0;
   else if (!to)
     return from->get().count();
-  else if (!to->get().stackableWith(from))
+  else if (!to->get().stackable_with(from))
     return 0;
   else
-    return std::min(to->get().maxStack() - to->get().count(), from->get().count());
+    return std::min(to->get().max_stack() - to->get().count(), from->get().count());
 }
 
 std::size_t ItemBag::bestSlotAvailable(Item const& item, bool stacksOnly, std::function<bool(std::size_t)> test) const {

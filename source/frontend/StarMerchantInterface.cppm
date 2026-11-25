@@ -3,6 +3,7 @@ import std;
 import star.format;
 import star.type_identity;
 import star.json;
+import star.memory;
 
 import star.vector;
 import star.casting;
@@ -81,15 +82,15 @@ private:
   [[nodiscard]] std::expected<void, StarException> buildItemList();
   [[nodiscard]] std::expected<void, StarException> setupWidget(std::shared_ptr<Widget> const& widget, Json const& itemConfig);
   [[nodiscard]] std::expected<void, StarException> updateSelection();
-  [[nodiscard]] std::expected<void, StarException> updateBuyTotal();
+  [[nodiscard]] std::expected<void, StarException> update_buy_total();
   [[nodiscard]] std::expected<void, StarException> buy();
 
   [[nodiscard]] std::expected<void, StarException> updateSellTotal();
   [[nodiscard]] std::expected<void, StarException> sell();
 
-  [[nodiscard]] std::expected<int, StarException> maxBuyCount();
-  [[nodiscard]] std::expected<void, StarException> countChanged();
-  [[nodiscard]] std::expected<void, StarException> countTextChanged();
+  [[nodiscard]] std::expected<int, StarException> max_buy_count();
+  [[nodiscard]] std::expected<void, StarException> count_changed();
+  [[nodiscard]] std::expected<void, StarException> count_text_changed();
 
   std::shared_ptr<WorldClient> m_worldClient;
   std::shared_ptr<Player> m_player;
@@ -99,11 +100,11 @@ private:
   GameTimer m_refresh_timer;
 
   JsonArray m_itemList;
-  std::size_t m_selectedIndex;
+  std::size_t m_selectedIndex = npos;
   std::shared_ptr<Item> m_selectedItem;
 
   float m_buyFactor;
-  int m_buyTotal;
+  std::uint64_t m_buy_total = 0;
   float m_sellFactor;
   int m_sellTotal;
 
@@ -118,8 +119,8 @@ private:
   std::shared_ptr<ItemGridWidget> m_itemGrid;
   std::shared_ptr<ItemBag> m_itemBag;
 
-  int m_buyCount;
-  int m_maxBuyCount;
+  int m_buy_count = 0;
+  int m_max_buy_count = 0;
 };
 
 }

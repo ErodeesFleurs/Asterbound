@@ -243,7 +243,7 @@ ItemDescriptor ToolUser::altHandItemDescriptor() const {
   m_user = std::ref(user);
   auto primary = initPrimaryHandItem();
   if (!primary) return std::unexpected(std::move(primary.error()));
-  if (!itemSafeTwoHanded(m_primaryHandItem.get())) return initAltHandItem();
+  if (!item_safe_two_handed(m_primaryHandItem.get())) return initAltHandItem();
   return {};
 }
 
@@ -400,9 +400,9 @@ void ToolUser::setupHumanoidHandItemPose(Humanoid& humanoid) const {
       humanoid.set_hand_frame_overrides(hand, backFrame, frontFrame);
     };
     if (auto swing = as<SwingableItem>(item)) {
-      setFrames(swing->getArmFrame(), swing->getArmFrame(), item->twoHanded());
+      setFrames(swing->getArmFrame(), swing->getArmFrame(), item->two_handed());
     } else if (as<PointableItem>(item)) {
-      setFrames("", "", item->twoHanded());
+      setFrames("", "", item->two_handed());
     } else if (auto active = as<ActiveItem>(item)) {
       setFrames(active->backArmFrame().value_or(String{}), active->frontArmFrame().value_or(String{}), active->twoHandedGrip());
     } else {
@@ -410,7 +410,7 @@ void ToolUser::setupHumanoidHandItemPose(Humanoid& humanoid) const {
     }
   };
   setupHand(true);
-  if (!itemSafeTwoHanded(m_primaryHandItem.get()))
+  if (!item_safe_two_handed(m_primaryHandItem.get()))
     setupHand(false);
 }
 
@@ -441,14 +441,14 @@ void ToolUser::setupHumanoidHandItemPose(Humanoid& humanoid) const {
       if (!angle) return std::unexpected(std::move(angle.error()));
       auto itemAngle = swingItem->getItemAngle(angleSide.first);
       if (!itemAngle) return std::unexpected(std::move(itemAngle.error()));
-      bool handedness = handItem->twoHanded();
+      bool handedness = handItem->two_handed();
       setRotation(true, *angle, *itemAngle, handedness, false, false);
       overrideFacingDirection = angleSide.second;
 
     } else if (auto pointableItem = as<PointableItem>(handItem)) {
       auto angle = pointableItem->getAngleDir(angleSide.first, angleSide.second);
       if (!angle) return std::unexpected(std::move(angle.error()));
-      setRotation(true, *angle, *angle, handItem->twoHanded(), false, false);
+      setRotation(true, *angle, *angle, handItem->two_handed(), false, false);
       overrideFacingDirection = angleSide.second;
 
     } else if (auto activeItem = as<ActiveItem>(handItem)) {
@@ -473,7 +473,7 @@ void ToolUser::setupHumanoidHandItemPose(Humanoid& humanoid) const {
   auto primaryFacing = inner(true);
   if (!primaryFacing) return std::unexpected(std::move(primaryFacing.error()));
   auto overrideFacingDirection = *primaryFacing;
-  if (itemSafeTwoHanded(m_primaryHandItem.get())) {
+  if (item_safe_two_handed(m_primaryHandItem.get())) {
     humanoid.set_hand_parameters(ToolHand::Alt, false, 0.0f, 0.0f, false, false, false);
   } else {
     auto altFacing = inner(false);
@@ -513,12 +513,12 @@ void ToolUser::setupHumanoidHandItemPose(Humanoid& humanoid) const {
     if (auto swingItem = as<SwingableItem>(handItem)) {
       auto drawables = swingItem->drawables();
       if (!drawables) return std::unexpected(std::move(drawables.error()));
-      setRotated(std::move(*drawables), handItem->twoHanded());
+      setRotated(std::move(*drawables), handItem->two_handed());
 
     } else if (auto pointableItem = as<PointableItem>(handItem)) {
       auto drawables = pointableItem->drawables();
       if (!drawables) return std::unexpected(std::move(drawables.error()));
-      setRotated(std::move(*drawables), handItem->twoHanded());
+      setRotated(std::move(*drawables), handItem->two_handed());
 
     } else if (auto activeItem = as<ActiveItem>(handItem)) {
       auto drawables = activeItem->handDrawables(interpolation);
@@ -544,7 +544,7 @@ void ToolUser::setupHumanoidHandItemPose(Humanoid& humanoid) const {
 
   auto primary = inner(true);
   if (!primary) return std::unexpected(std::move(primary.error()));
-  if (itemSafeTwoHanded(m_primaryHandItem.get())) {
+  if (item_safe_two_handed(m_primaryHandItem.get())) {
     humanoid.set_hand_drawables(ToolHand::Alt, {});
     humanoid.set_hand_non_rotated_drawables(ToolHand::Alt, {});
   } else {
@@ -579,14 +579,14 @@ void ToolUser::setupHumanoidHandItemPose(Humanoid& humanoid) const {
     if (!m_suppress.get()) {
       if (m_fireMain)
         fireMode = FireMode::Primary;
-      else if (m_fireAlt && m_primaryHandItem.get()->twoHanded())
+      else if (m_fireAlt && m_primaryHandItem.get()->two_handed())
         fireMode = FireMode::Alt;
     }
     auto updated = toolUserItem->update(dt, fireMode, shifting, moves);
     if (!updated) return std::unexpected(std::move(updated.error()));
   }
 
-  if (!m_primaryHandItem.get() || !m_primaryHandItem.get()->twoHanded()) {
+  if (!m_primaryHandItem.get() || !m_primaryHandItem.get()->two_handed()) {
     if (auto toolUserItem = as<ToolUserItem>(m_altHandItem.get())) {
       FireMode fireMode = FireMode::None;
       if (!m_suppress.get() && m_fireAlt)
@@ -607,7 +607,7 @@ void ToolUser::setupHumanoidHandItemPose(Humanoid& humanoid) const {
   m_edgeSuppressedAlt = false;
 
   if (!m_suppress.get()) {
-    if (itemSafeTwoHanded(m_primaryHandItem.get()) && (m_fireMain || m_fireAlt)) {
+    if (item_safe_two_handed(m_primaryHandItem.get()) && (m_fireMain || m_fireAlt)) {
       std::shared_ptr<FireableItem> fireableItem = as<FireableItem>(m_primaryHandItem.get());
       if (fireableItem) {
         FireMode mode;
@@ -623,7 +623,7 @@ void ToolUser::setupHumanoidHandItemPose(Humanoid& humanoid) const {
         auto activated = activatableItem->activate();
         if (!activated) return std::unexpected(std::move(activated.error()));
       }
-    } else if (edgeSuppressedMain || (itemSafeTwoHanded(m_primaryHandItem.get()) && edgeSuppressedAlt)) {
+    } else if (edgeSuppressedMain || (item_safe_two_handed(m_primaryHandItem.get()) && edgeSuppressedAlt)) {
       std::shared_ptr<FireableItem> fireableItem = as<FireableItem>(m_primaryHandItem.get());
       if (fireableItem) {
         FireMode mode = FireMode::Primary;
@@ -697,7 +697,7 @@ void ToolUser::setupHumanoidHandItemPose(Humanoid& humanoid) const {
     if (!updated) return std::unexpected(std::move(updated.error()));
   }
   if (auto beam = as_ref<BeamItem>(optional_ref(m_altHandItem.get()))) {
-    auto updated = beam->get().updateBeamEffects(!m_suppress.get() && !itemSafeTwoHanded(m_primaryHandItem.get()));
+    auto updated = beam->get().updateBeamEffects(!m_suppress.get() && !item_safe_two_handed(m_primaryHandItem.get()));
     if (!updated) return std::unexpected(std::move(updated.error()));
   }
   return {};
@@ -817,7 +817,7 @@ bool ToolUser::firingAlt() const {
 }
 
 [[nodiscard]] std::expected<void, StarException> ToolUser::setItems(std::shared_ptr<Item> newPrimaryHandItem, std::shared_ptr<Item> newAltHandItem) {
-  if (itemSafeTwoHanded(newPrimaryHandItem))
+  if (item_safe_two_handed(newPrimaryHandItem))
     newAltHandItem = {};
 
   if (m_suppress.get()) {

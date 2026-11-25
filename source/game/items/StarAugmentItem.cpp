@@ -55,7 +55,7 @@ std::expected<std::shared_ptr<Item>, StarException> AugmentItem::clone() const {
 }
 
 std::expected<StringList, StarException> AugmentItem::augmentScripts() const {
-  auto scriptsValue = instanceValue("scripts");
+  auto scriptsValue = instance_value("scripts");
   if (!scriptsValue)
     return std::unexpected(std::move(scriptsValue.error()));
   auto scripts = json_to_string_list(*scriptsValue);

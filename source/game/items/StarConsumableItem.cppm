@@ -159,11 +159,11 @@ std::expected<std::shared_ptr<ConsumableItem>, StarException> ConsumableItem::cr
   if (!aim)
     return std::unexpected(std::move(aim.error()));
   item->m_swingAimFactor = *aim;
-  auto blocking = item->instanceValue("blockingEffects", JsonArray()).and_then(json_to_string_set);
+  auto blocking = item->instance_value("blockingEffects", JsonArray()).and_then(json_to_string_set);
   if (!blocking)
     return std::unexpected(std::move(blocking.error()));
   item->m_blockingEffects = std::move(*blocking);
-  auto food = item->instanceValue("foodValue");
+  auto food = item->instance_value("foodValue");
   if (!food)
     return std::unexpected(std::move(food.error()));
   if (*food) {
@@ -173,11 +173,11 @@ std::expected<std::shared_ptr<ConsumableItem>, StarException> ConsumableItem::cr
     item->m_foodValue = *foodValue;
     item->m_blockingEffects.add("wellfed");
   }
-  auto emitters = item->instanceValue("emitters", JsonArray{"eating"}).and_then(json_to_string_set);
+  auto emitters = item->instance_value("emitters", JsonArray{"eating"}).and_then(json_to_string_set);
   if (!emitters)
     return std::unexpected(std::move(emitters.error()));
   item->m_emitters = std::move(*emitters);
-  auto emote = item->instanceValue("emote", "eat").and_then([](Json const& value) { return value.to_string(); });
+  auto emote = item->instance_value("emote", "eat").and_then([](Json const& value) { return value.to_string(); });
   if (!emote)
     return std::unexpected(std::move(emote.error()));
   item->m_emote = std::move(*emote);
@@ -263,7 +263,7 @@ std::expected<bool, StarException> ConsumableItem::canUse() const {
 }
 
 std::expected<void, StarException> ConsumableItem::triggerEffects() {
-  auto options = instanceValue("effects", JsonArray()).and_then([](Json const& value) { return value.to_array(); });
+  auto options = instance_value("effects", JsonArray()).and_then([](Json const& value) { return value.to_array(); });
   if (!options)
     return std::unexpected(std::move(options.error()));
   auto itemOwner = owner();
@@ -321,9 +321,9 @@ std::expected<void, StarException> ConsumableItem::maybeConsume() {
     if (!sent)
       return std::unexpected(std::move(sent.error()));
     if (count())
-      setCount(count() - 1);
+      set_count(count() - 1);
     else
-      setCount(0);
+      set_count(0);
   }
   return {};
 }

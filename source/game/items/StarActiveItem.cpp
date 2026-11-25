@@ -131,13 +131,13 @@ std::expected<std::shared_ptr<ActiveItem>, StarException> ActiveItem::create(Roo
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto animationValue = item->instanceValue("animation");
+  auto animationValue = item->instance_value("animation");
   if (!animationValue)
     return std::unexpected(std::move(animationValue.error()));
   auto animationConfig = (*assets)->fetch_json(*animationValue, directory);
   if (!animationConfig)
     return std::unexpected(std::move(animationConfig.error()));
-  auto custom = item->instanceValue("animationCustom");
+  auto custom = item->instance_value("animationCustom");
   if (!custom)
     return std::unexpected(std::move(custom.error()));
   if (*custom)
@@ -146,7 +146,7 @@ std::expected<std::shared_ptr<ActiveItem>, StarException> ActiveItem::create(Roo
   if (!animator)
     return std::unexpected(std::move(animator.error()));
   item->m_itemAnimator = std::move(*animator);
-  auto parts = item->instanceValue("animationParts", JsonObject()).and_then([](Json const& value) {
+  auto parts = item->instance_value("animationParts", JsonObject()).and_then([](Json const& value) {
     return value.iterate_object();
   });
   if (!parts)
@@ -192,19 +192,19 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
   if (!mode)
     return std::unexpected(std::move(mode.error()));
   if (*mode == EntityMode::Master) {
-    auto scripts = instanceValue("scripts").and_then(json_to_string_list);
+    auto scripts = instance_value("scripts").and_then(json_to_string_list);
     if (!scripts)
       return std::unexpected(std::move(scripts.error()));
     auto configured = m_script.set_scripts(scripts->transformed(
       [directory = directory()](String const& script) { return AssetPath::relative_to(directory, script); }));
     if (!configured)
       return std::unexpected(std::move(configured.error()));
-    auto delta = instanceValue("scriptDelta", 1).and_then([](Json const& value) { return value.to_uint(); });
+    auto delta = instance_value("scriptDelta", 1).and_then([](Json const& value) { return value.to_uint(); });
     if (!delta)
       return std::unexpected(std::move(delta.error()));
     m_script.set_update_delta(*delta);
-    m_twoHandedGrip.set(twoHanded());
-    auto previousStorage = instanceValue("scriptStorage");
+    m_twoHandedGrip.set(two_handed());
+    auto previousStorage = instance_value("scriptStorage");
     if (!previousStorage)
       return std::unexpected(std::move(previousStorage.error()));
     if (*previousStorage) {
@@ -221,7 +221,7 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
     auto configCallbacks =
       LuaBindings::makeConfigCallbacks([this](String const& name,
                                               Json const& defaultValue) -> std::expected<Json, StarException> {
-        return instanceValue(name, defaultValue);
+        return instance_value(name, defaultValue);
       }).and_then([&](LuaCallbacks callbacks) { return m_script.add_callbacks("config", std::move(callbacks)); });
     if (!configCallbacks)
       return std::unexpected(std::move(configCallbacks.error()));
@@ -254,7 +254,7 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
   if (!itemWorld)
     return std::unexpected(std::move(itemWorld.error()));
   if (itemWorld->get().isClient()) {
-    auto animationScripts = instanceValue("animationScripts");
+    auto animationScripts = instance_value("animationScripts");
     if (!animationScripts)
       return std::unexpected(std::move(animationScripts.error()));
     if (*animationScripts) {
@@ -265,7 +265,7 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
         [directory = directory()](String const& script) { return AssetPath::relative_to(directory, script); }));
       if (!configured)
         return std::unexpected(std::move(configured.error()));
-      auto delta = instanceValue("animationDelta", 1).and_then([](Json const& value) { return value.to_uint(); });
+      auto delta = instance_value("animationDelta", 1).and_then([](Json const& value) { return value.to_uint(); });
       if (!delta)
         return std::unexpected(std::move(delta.error()));
       m_scriptedAnimator.set_update_delta(*delta);
@@ -280,7 +280,7 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
       auto configCallbacks =
         LuaBindings::makeConfigCallbacks([this](String const& name,
                                                 Json const& defaultValue) -> std::expected<Json, StarException> {
-          return instanceValue(name, defaultValue);
+          return instance_value(name, defaultValue);
         }).and_then([&](LuaCallbacks callbacks) {
           return m_scriptedAnimator.add_callbacks("config", std::move(callbacks));
         });
@@ -319,7 +319,7 @@ std::expected<void, StarException> ActiveItem::uninit() {
   if (!itemWorld) {
     remember(std::move(itemWorld));
   } else if (itemWorld->get().isClient()) {
-    auto animationScripts = instanceValue("animationScripts");
+    auto animationScripts = instance_value("animationScripts");
     if (!animationScripts) {
       remember(std::move(animationScripts));
     } else if (*animationScripts) {
@@ -362,14 +362,14 @@ std::expected<void, StarException> ActiveItem::update(float dt, FireMode fireMod
     auto updated = recover_lua_script_error(m_script.update(m_script.update_dt(dt), *fireModeName, shifting, moveMap));
     if (!updated)
       return std::unexpected(std::move(updated.error()));
-    auto retain = instanceValue("retainScriptStorageInItem", false).and_then([](Json const& value) { return value.to_bool(); });
+    auto retain = instance_value("retainScriptStorageInItem", false).and_then([](Json const& value) { return value.to_bool(); });
     if (!retain)
       return std::unexpected(std::move(retain.error()));
     if (*retain) {
       auto storage = m_script.get_script_storage();
       if (!storage)
         return std::unexpected(std::move(storage.error()));
-      auto stored = setInstanceValue("scriptStorage", *storage);
+      auto stored = set_instance_value("scriptStorage", *storage);
       if (!stored)
         return std::unexpected(std::move(stored.error()));
     }
@@ -664,11 +664,11 @@ MessageResponseResult ActiveItem::receiveMessage(String const& message, bool loc
 }
 
 std::expected<float, StarException> ActiveItem::durabilityStatus() {
-  auto durability = instanceValue("durability").and_then([](Json const& value) { return value.opt_float(); });
+  auto durability = instance_value("durability").and_then([](Json const& value) { return value.opt_float(); });
   if (!durability)
     return std::unexpected(std::move(durability.error()));
   if (*durability) {
-    auto durabilityHit = instanceValue("durabilityHit").and_then([](Json const& value) { return value.opt_float(); });
+    auto durabilityHit = instance_value("durabilityHit").and_then([](Json const& value) { return value.opt_float(); });
     if (!durabilityHit)
       return std::unexpected(std::move(durabilityHit.error()));
     return durabilityHit->value_or(**durability) / **durability;
@@ -907,22 +907,22 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
     return drawables;
   };
   if (auto added = callbacks.register_callback("setInventoryIcon", [this, loadIcon](Json icon) -> std::expected<void, StarException> {
-      auto stored = setInstanceValue("inventoryIcon", icon);
+      auto stored = set_instance_value("inventoryIcon", icon);
       if (!stored)
         return std::unexpected(std::move(stored.error()));
-      return loadIcon(icon).and_then([&](List<Drawable> drawables) { return setIconDrawables(std::move(drawables)); });
+      return loadIcon(icon).and_then([&](List<Drawable> drawables) { return set_icon_drawables(std::move(drawables)); });
     }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("setSecondaryIcon", [this, loadIcon](Json icon) -> std::expected<void, StarException> {
-      auto stored = setInstanceValue("secondaryIcon", icon);
+      auto stored = set_instance_value("secondaryIcon", icon);
       if (!stored)
         return std::unexpected(std::move(stored.error()));
       if (icon.type() == Json::Type::Array || icon.type() == Json::Type::String)
-        return loadIcon(icon).and_then([&](List<Drawable> drawables) { return setSecondaryIconDrawables(std::move(drawables)); });
-      return setSecondaryIconDrawables(std::nullopt);
+        return loadIcon(icon).and_then([&](List<Drawable> drawables) { return set_secondary_icon_drawables(std::move(drawables)); });
+      return set_secondary_icon_drawables(std::nullopt);
     }); !added)
     return std::unexpected(std::move(added.error()));
-  if (auto added = callbacks.register_callback("setInstanceValue", [this](String name, Json value) { return setInstanceValue(std::move(name), std::move(value)); }); !added)
+  if (auto added = callbacks.register_callback("setInstanceValue", [this](String name, Json value) { return set_instance_value(std::move(name), std::move(value)); }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("callOtherHandScript", [this](String const& function, LuaVariadic<LuaValue> const& args) -> std::expected<LuaValue, StarException> {
       auto itemOwner = owner();
@@ -975,18 +975,18 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
     }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("setDescription", [this](String const& value) -> std::expected<void, StarException> {
-      auto stored = setInstanceValue("description", value);
+      auto stored = set_instance_value("description", value);
       if (!stored)
         return std::unexpected(std::move(stored.error()));
-      setDescription(value);
+      set_description(value);
       return {};
     }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("setShortDescription", [this](String const& value) -> std::expected<void, StarException> {
-      auto stored = setInstanceValue("shortdescription", value);
+      auto stored = set_instance_value("shortdescription", value);
       if (!stored)
         return std::unexpected(std::move(stored.error()));
-      setShortDescription(value);
+      set_short_description(value);
       return {};
     }); !added)
     return std::unexpected(std::move(added.error()));

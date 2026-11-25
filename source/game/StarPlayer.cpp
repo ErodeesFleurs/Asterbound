@@ -2485,14 +2485,14 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
           disabled = flag;
         }
         if (!disabled && primary) {
-          auto flagResult = primary->instanceValue(disableFlag);
+          auto flagResult = primary->instance_value(disableFlag);
           if (!flagResult)
             return std::unexpected(std::move(flagResult.error()));
           auto flag = std::move(*flagResult);
           disabled = bool(flag);
         }
         if (!disabled && alt) {
-          auto flagResult = alt->instanceValue(disableFlag);
+          auto flagResult = alt->instance_value(disableFlag);
           if (!flagResult)
             return std::unexpected(std::move(flagResult.error()));
           auto flag = std::move(*flagResult);
@@ -2744,14 +2744,14 @@ std::expected<std::shared_ptr<Item>, StarException> Player::pickupItems(std::sha
   if (auto result = triggerPickupEvents(items); !result)
     return std::unexpected(std::move(result.error()));
   if (!silent) {
-    auto soundResult = items->pickupSound();
+    auto soundResult = items->pickup_sound();
     if (!soundResult)
       return std::unexpected(std::move(soundResult.error()));
     auto sound = std::move(*soundResult);
     if (!sound.empty()) {
       if (auto result = m_effectsAnimator->setSoundPool("pickup", {sound}); !result)
         return std::unexpected(std::move(result.error()));
-      float pitch = 1.f - (static_cast<float>(items->count()) / static_cast<float>(items->maxStack())) * 0.5f;
+      float pitch = 1.f - (static_cast<float>(items->count()) / static_cast<float>(items->max_stack())) * 0.5f;
       auto varianceResult = root().random().uniform_float(0.8f, 1.2f);
       if (!varianceResult)
         return std::unexpected(std::move(varianceResult.error()));
@@ -2794,10 +2794,12 @@ std::expected<void, StarException> Player::giveItem(std::shared_ptr<Item> const&
   return {};
 }
 
-std::expected<void, StarException> Player::triggerPickupEvents(std::shared_ptr<Item> const& item) {
+std::expected<void, StarException> Player::triggerPickupEvents(std::shared_ptr<Item> const& source) {
+  // Blueprint and collection lookups can re-enter item builders; hold the pickup item across them.
+  auto const item = source;
   if (!item)
     return {};
-  for (auto const& blueprint : item->learnBlueprintsOnPickup()) {
+  for (auto const& blueprint : item->learn_blueprints_on_pickup()) {
     if (auto result = addBlueprint(blueprint); !result)
       return std::unexpected(std::move(result.error()));
   }
@@ -2805,7 +2807,7 @@ std::expected<void, StarException> Player::triggerPickupEvents(std::shared_ptr<I
     if (auto result = add_collectable(collectable.first, collectable.second); !result)
       return std::unexpected(std::move(result.error()));
   }
-  auto messagesResult = item->instanceValue("radioMessagesOnPickup", JsonArray());
+  auto messagesResult = item->instance_value("radioMessagesOnPickup", JsonArray());
   if (!messagesResult)
     return std::unexpected(std::move(messagesResult.error()));
   auto messages = std::move(*messagesResult);
@@ -2832,7 +2834,7 @@ std::expected<void, StarException> Player::triggerPickupEvents(std::shared_ptr<I
         return std::unexpected(std::move(result.error()));
     }
   }
-  auto cinematicResult = item->instanceValue("cinematicOnPickup", Json());
+  auto cinematicResult = item->instance_value("cinematicOnPickup", Json());
   if (!cinematicResult)
     return std::unexpected(std::move(cinematicResult.error()));
   auto cinematic = std::move(*cinematicResult);
@@ -2840,7 +2842,7 @@ std::expected<void, StarException> Player::triggerPickupEvents(std::shared_ptr<I
     if (auto result = setPendingCinematic(cinematic, true); !result)
       return std::unexpected(std::move(result.error()));
   }
-  auto questsResult = item->pickupQuestTemplates();
+  auto questsResult = item->pickup_quest_templates();
   if (!questsResult)
     return std::unexpected(std::move(questsResult.error()));
   auto quests = std::move(*questsResult);
@@ -2858,7 +2860,7 @@ std::expected<void, StarException> Player::triggerPickupEvents(std::shared_ptr<I
         return std::unexpected(std::move(result.error()));
     }
   }
-  auto consumeResult = item->instanceValue("consumeOnPickup", Json());
+  auto consumeResult = item->instance_value("consumeOnPickup", Json());
   if (!consumeResult)
     return std::unexpected(std::move(consumeResult.error()));
   auto consume = std::move(*consumeResult);
@@ -2870,7 +2872,7 @@ std::expected<void, StarException> Player::triggerPickupEvents(std::shared_ptr<I
     if (enabled)
       item->consume(item->count());
   }
-  auto categoryResult = item->instanceValue("eventCategory", item->category());
+  auto categoryResult = item->instance_value("eventCategory", item->category());
   if (!categoryResult)
     return std::unexpected(std::move(categoryResult.error()));
   auto category = std::move(*categoryResult);
@@ -3029,7 +3031,7 @@ std::expected<bool, StarException> Player::addBlueprint(ItemDescriptor const& de
     if (!textResult)
       return std::unexpected(std::move(textResult.error()));
     auto text = std::move(*textResult);
-    auto formattedResult = text.replace("<ItemName>", item->friendlyName());
+    auto formattedResult = text.replace("<ItemName>", item->friendly_name());
     if (!formattedResult)
       return std::unexpected(std::move(formattedResult.error()));
     auto formatted = std::move(*formattedResult);
@@ -3046,7 +3048,7 @@ std::expected<bool, StarException> Player::addBlueprint(ItemDescriptor const& de
     if (!textResult)
       return std::unexpected(std::move(textResult.error()));
     auto text = std::move(*textResult);
-    auto formattedResult = text.replace("<ItemName>", item->friendlyName());
+    auto formattedResult = text.replace("<ItemName>", item->friendly_name());
     if (!formattedResult)
       return std::unexpected(std::move(formattedResult.error()));
     auto formatted = std::move(*formattedResult);
@@ -4024,7 +4026,7 @@ std::expected<void, StarException> Player::setNetArmorSecret(EquipmentSlot slot,
   if (!slotNameResult)
     return std::unexpected(std::move(slotNameResult.error()));
   auto const& slotName = *slotNameResult;
-  ItemDescriptor descriptor = visible ? itemSafeDescriptor(armor) : ItemDescriptor();
+  ItemDescriptor descriptor = visible ? item_safe_descriptor(armor) : ItemDescriptor();
   auto versioningResult = root().versioningDatabase();
   if (!versioningResult)
     return std::unexpected(std::move(versioningResult.error()));

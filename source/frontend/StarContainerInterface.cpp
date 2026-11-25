@@ -318,8 +318,8 @@ std::expected<void, StarException> ContainerPane::initialize(std::shared_ptr<Wor
         return std::unexpected(std::move(atResult245.error()));
       if (std::shared_ptr<Item> slotItem = std::move(*atResult245)) {
         auto swapItem = m_player->inventory()->swapSlotItem();
-        if (!swapItem || swapItem->empty() || swapItem->couldStack(optional_ref(slotItem))) {
-          std::size_t count = swapItem ? swapItem->couldStack(optional_ref(slotItem)) : slotItem->maxStack();
+        if (!swapItem || swapItem->empty() || swapItem->could_stack(optional_ref(slotItem))) {
+          std::size_t count = swapItem ? swapItem->could_stack(optional_ref(slotItem)) : slotItem->max_stack();
           if (context().shiftHeld())
             count = std::max<std::uint64_t>(1, std::min<std::uint64_t>(count, slotItem->count() / 2));
           else
@@ -634,7 +634,7 @@ std::expected<bool, StarException> ContainerPane::giveContainerResult(ContainerR
         return std::unexpected(std::move(setSwapSlotItemResult294.error()));
     } else if (m_expectingSwap == ExpectingSwap::SwapSlotStack) {
       auto swapItem = inv->swapSlotItem();
-      if (swapItem && swapItem->stackWith(optional_ref(item))) {
+      if (swapItem && swapItem->stack_with(optional_ref(item))) {
         continue;
       } else {
         auto clearSwapResult295 = inv->clearSwap();
@@ -859,7 +859,7 @@ std::expected<void, StarException> ContainerPane::update(float dt) {
         for (auto& item : container->containerItems()) {
           if (item)
             {
-              auto instanceValueResult329 = item->instanceValue("fuelAmount", 0);
+              auto instanceValueResult329 = item->instance_value("fuelAmount", 0);
               if (!instanceValueResult329)
                 return std::unexpected(std::move(instanceValueResult329.error()));
               auto toUIntResult330 = std::move(*instanceValueResult329).to_uint();

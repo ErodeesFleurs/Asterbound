@@ -297,8 +297,9 @@ PlayerInventory::PlayerInventory(Root& root, Json inventoryConfig, Json currenci
       dest = std::move(*taken);
     }
   } else {
-    if (dest && dest->stackableWith(optional_ref(items))) dest->stackWith(optional_ref(items));
-    if (!dest) {
+    if (dest) {
+      dest->stack_with(optional_ref(items));
+    } else {
       auto taken = items->take(items->count());
       if (!taken) return std::unexpected(std::move(taken.error()));
       dest = std::move(*taken);
@@ -337,9 +338,9 @@ PlayerInventory::PlayerInventory(Root& root, Json inventoryConfig, Json currenci
     if (!allowed) return std::unexpected(std::move(allowed.error()));
     if (!*allowed) return false;
   }
-  if (std::holds_alternative<EquipmentSlot>(first) && (itemSafeCount(secondItems) > 1 || !itemAllowedAsEquipment(secondItems, std::get<EquipmentSlot>(first))))
+  if (std::holds_alternative<EquipmentSlot>(first) && (item_safe_count(secondItems) > 1 || !itemAllowedAsEquipment(secondItems, std::get<EquipmentSlot>(first))))
     return false;
-  if (std::holds_alternative<EquipmentSlot>(second) && (itemSafeCount(firstItems) > 1 || !itemAllowedAsEquipment(firstItems, std::get<EquipmentSlot>(second))))
+  if (std::holds_alternative<EquipmentSlot>(second) && (item_safe_count(firstItems) > 1 || !itemAllowedAsEquipment(firstItems, std::get<EquipmentSlot>(second))))
     return false;
 
   std::swap(firstItems, secondItems);
@@ -433,7 +434,7 @@ bool PlayerInventory::slot_valid(InventorySlot const& slot) const {
     auto primary = primary_held_item();
     if (!primary) return std::unexpected(std::move(primary.error()));
     if (*primary) {
-      (*primary)->stackWith(optional_ref(items));
+      (*primary)->stack_with(optional_ref(items));
       if (items->empty()) return std::shared_ptr<Item>();
     }
   }
@@ -724,10 +725,10 @@ std::shared_ptr<ItemBag const> PlayerInventory::bagContents(String const& type) 
       auto result = retrieveForMutation(slot);
       if (!result) return std::unexpected(std::move(result.error()));
       auto& equipSlot = result->get();
-      if (itemSafeCount(m_swapSlot) <= 1) {
+      if (item_safe_count(m_swapSlot) <= 1) {
         std::swap(m_swapSlot, equipSlot);
         swap_custom_bar_links(SwapSlot(), slot);
-      } else if (itemSafeCount(equipSlot) == 0) {
+      } else if (item_safe_count(equipSlot) == 0) {
         auto taken = m_swapSlot->take(1);
         if (!taken) return std::unexpected(std::move(taken.error()));
         equipSlot = std::move(*taken);
@@ -884,13 +885,13 @@ bool PlayerInventory::consumeCurrency(String const& currencyType, std::uint64_t 
   if (slot) {
     auto item = itemsAt(*slot);
     if (!item) return std::unexpected(std::move(item.error()));
-    if (!*item || itemSafeTwoHanded(*item)) slot.reset();
+    if (!*item || item_safe_two_handed(*item)) slot.reset();
   }
   bool primaryTwoHanded = false;
   if (cbl.primary) {
     auto item = itemsAt(*cbl.primary);
     if (!item) return std::unexpected(std::move(item.error()));
-    primaryTwoHanded = itemSafeTwoHanded(*item);
+    primaryTwoHanded = item_safe_two_handed(*item);
   }
   if (cbl.primary && cbl.primary == slot && !primaryTwoHanded) std::swap(cbl.primary, cbl.secondary);
   else {
@@ -902,7 +903,7 @@ bool PlayerInventory::consumeCurrency(String const& currencyType, std::uint64_t 
 
 std::expected<void, StarException> PlayerInventory::link_custom_bar_swap(std::size_t index, bool primary) {
   if (auto item = swapSlotItem()) {
-    auto linked = primary || item->twoHanded()
+    auto linked = primary || item->two_handed()
       ? set_custom_bar_primary_slot(index, InventorySlot(SwapSlot()))
       : set_custom_bar_secondary_slot(index, InventorySlot(SwapSlot()));
     if (!linked) return std::unexpected(std::move(linked.error()));
@@ -918,7 +919,7 @@ std::expected<void, StarException> PlayerInventory::clear_custom_bar_link(std::s
   if (!primary && link->get().primary) {
     auto item = itemsAt(*link->get().primary);
     if (!item) return std::unexpected(std::move(item.error()));
-    primary = itemSafeTwoHanded(*item);
+    primary = item_safe_two_handed(*item);
   }
   return primary ? set_custom_bar_primary_slot(index, {}) : set_custom_bar_secondary_slot(index, {});
 }
@@ -998,7 +999,7 @@ std::expected<std::optional<std::reference_wrapper<InventorySlot const>>, StarEx
   if (primary) {
     auto item = retrieve(*primary);
     if (!item) return std::unexpected(std::move(item.error()));
-    if (itemSafeTwoHanded(*item)) return {};
+    if (item_safe_two_handed(*item)) return {};
   }
   if (secondary) return std::cref(*secondary);
   return {};
@@ -1287,7 +1288,7 @@ void PlayerInventory::setEquipmentVisibility(EquipmentSlot slot, bool visible) {
         secondary = *item;
       }
       if (!primary) link.primary.reset();
-      if (!secondary || itemSafeTwoHanded(primary) || itemSafeTwoHanded(secondary)) link.secondary.reset();
+      if (!secondary || item_safe_two_handed(primary) || item_safe_two_handed(secondary)) link.secondary.reset();
     }
   }
   return {};
@@ -1326,7 +1327,7 @@ void PlayerInventory::setPlayer(std::optional<std::reference_wrapper<Player>> pl
 
 [[nodiscard]] std::expected<bool, StarException> PlayerInventory::checkInventoryFilter(std::shared_ptr<Item> const& items, String const& filterName) const {
   Json filterConfig;
-  auto filters = items->instanceValue("inventoryFilters");
+  auto filters = items->instance_value("inventoryFilters");
   if (!filters) return std::unexpected(std::move(filters.error()));
   if (filters->is_type(Json::Type::Object)) {
     auto selected = filters->opt(filterName);
@@ -1529,20 +1530,20 @@ void PlayerInventory::swap_custom_bar_links(InventorySlot const& a, InventorySlo
 [[nodiscard]] std::expected<void, StarException> PlayerInventory::net_elements_need_store() {
   auto cleaned = cleanup();
   if (!cleaned) return std::unexpected(std::move(cleaned.error()));
-  for (auto& entry : m_equipmentNetState) entry.second.set(itemSafeDescriptor(m_equipment.value(entry.first)));
+  for (auto& entry : m_equipmentNetState) entry.second.set(item_safe_descriptor(m_equipment.value(entry.first)));
   for (auto& bag : m_bagsNetState) {
     auto& items = m_bags[bag.first]->items();
-    for (std::size_t i = 0; i < bag.second.size(); ++i) bag.second[i].set(itemSafeDescriptor(items[i]));
+    for (std::size_t i = 0; i < bag.second.size(); ++i) bag.second[i].set(item_safe_descriptor(items[i]));
   }
-  m_swapSlotNetState.set(itemSafeDescriptor(m_swapSlot));
-  m_trashSlotNetState.set(itemSafeDescriptor(m_trashSlot));
+  m_swapSlotNetState.set(item_safe_descriptor(m_swapSlot));
+  m_trashSlotNetState.set(item_safe_descriptor(m_trashSlot));
   m_currenciesNetState.set(m_currencies);
   m_custom_bar_group_net_state.set(m_custom_bar_group);
   for (std::size_t i = 0; i < m_custom_bar.extent(0); ++i)
     for (std::size_t j = 0; j < m_custom_bar.extent(1); ++j)
       m_custom_bar_net_state(i, j).set(m_custom_bar(i, j));
   m_selected_action_bar_net_state.set(m_selected_action_bar);
-  for (auto& entry : m_essentialNetState) entry.second.set(itemSafeDescriptor(m_essential.value(entry.first)));
+  for (auto& entry : m_essentialNetState) entry.second.set(item_safe_descriptor(m_essential.value(entry.first)));
   return {};
 }
 

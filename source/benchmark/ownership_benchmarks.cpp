@@ -155,7 +155,7 @@ std::expected<ItemFixture, StarException> prepareItems(Root& root) {
     auto item = (*database)->item(*descriptor);
     if (!item)
       return std::unexpected(std::move(item.error()));
-    if (!*item || (*item)->name() != descriptor->name() || (*item)->count() != 8 || (*item)->maxStack() < 64)
+    if (!*item || (*item)->name() != descriptor->name() || (*item)->count() != 8 || (*item)->max_stack() < 64)
       return std::unexpected(StarException("Real item fixture was substituted, truncated, or is not stackable"));
     fixture.descriptors.push_back((*item)->descriptor().singular());
     fixture.prototypes.push_back(std::move(*item));
@@ -181,7 +181,7 @@ std::expected<BagBatch, StarException> prepareBag(Root& root, ItemFixture const&
   auto incoming = fixture.prototypes[3]->clone();
   if (!incoming)
     return std::unexpected(std::move(incoming.error()));
-  if ((*incoming)->setCount(1) != 0)
+  if ((*incoming)->set_count(1) != 0)
     return std::unexpected(StarException("Incoming item fixture could not hold one item"));
   return BagBatch{std::move(bag), std::move(*incoming)};
 }
@@ -209,7 +209,7 @@ bool validateBag(BagBatch const& batch, std::array<std::uint64_t, 5> const& avai
   }
   std::uint64_t total = 0;
   for (auto const& item : batch.bag.items()) {
-    if (!item || item->count() == 0 || item->count() > item->maxStack())
+    if (!item || item->count() == 0 || item->count() > item->max_stack())
       return false;
     total += item->count();
   }

@@ -45,7 +45,7 @@ public:
   std::expected<std::shared_ptr<Item>, StarException> clone() const override;
 
   [[nodiscard]]
-  std::expected<String, StarException> pickupSound() const override;
+  std::expected<String, StarException> pickup_sound() const override;
 
   String currencyType();
 
@@ -85,8 +85,8 @@ std::expected<std::shared_ptr<Item>, StarException> CurrencyItem::clone() const 
   return std::make_shared<CurrencyItem>(*this);
 }
 
-std::expected<String, StarException> CurrencyItem::pickupSound() const {
-  auto smallLimitValue = instanceValue("smallStackLimit", 100);
+std::expected<String, StarException> CurrencyItem::pickup_sound() const {
+  auto smallLimitValue = instance_value("smallStackLimit", 100);
   if (!smallLimitValue)
     return std::unexpected(std::move(smallLimitValue.error()));
   auto smallLimit = smallLimitValue->to_uint();
@@ -96,7 +96,7 @@ std::expected<String, StarException> CurrencyItem::pickupSound() const {
   if (count() <= *smallLimit) {
     soundsKey = "pickupSoundsSmall";
   } else {
-    auto mediumLimitValue = instanceValue("mediumStackLimit", 10000);
+    auto mediumLimitValue = instance_value("mediumStackLimit", 10000);
     if (!mediumLimitValue)
       return std::unexpected(std::move(mediumLimitValue.error()));
     auto mediumLimit = mediumLimitValue->to_uint();
@@ -104,7 +104,7 @@ std::expected<String, StarException> CurrencyItem::pickupSound() const {
       return std::unexpected(std::move(mediumLimit.error()));
     soundsKey = count() <= *mediumLimit ? std::string_view("pickupSoundsMedium") : std::string_view("pickupSoundsLarge");
   }
-  auto soundsValue = instanceValue(soundsKey, {});
+  auto soundsValue = instance_value(soundsKey, {});
   if (!soundsValue)
     return std::unexpected(std::move(soundsValue.error()));
   if (!soundsValue->is_null()) {
@@ -116,7 +116,7 @@ std::expected<String, StarException> CurrencyItem::pickupSound() const {
       return std::unexpected(std::move(sound.error()));
     return sound->get();
   }
-  return Item::pickupSound();
+  return Item::pickup_sound();
 }
 
 String CurrencyItem::currencyType() {

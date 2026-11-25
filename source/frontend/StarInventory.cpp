@@ -323,8 +323,8 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
         return std::unexpected(std::move(itemsAtResult14.error()));
       if (std::shared_ptr<Item> slotItem = std::move(*itemsAtResult14)) {
         auto swapItem = inventory->swapSlotItem();
-        if (!swapItem || swapItem->empty() || swapItem->couldStack(optional_ref(slotItem))) {
-          std::uint64_t count = swapItem ? swapItem->couldStack(optional_ref(slotItem)) : slotItem->maxStack();
+        if (!swapItem || swapItem->empty() || swapItem->could_stack(optional_ref(slotItem))) {
+          std::uint64_t count = swapItem ? swapItem->could_stack(optional_ref(slotItem)) : slotItem->max_stack();
           if (context().shiftHeld())
             count = std::max<std::uint64_t>(1, std::min<std::uint64_t>(count, slotItem->count() / 2));
           else
@@ -336,7 +336,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
               return std::unexpected(std::move(takeResult15.error()));
             if (auto taken = std::move(*takeResult15)) {
               if (swapItem)
-                swapItem->stackWith(optional_ref(taken));
+                swapItem->stack_with(optional_ref(taken));
               else
                 {
                   auto setSwapSlotItemResult16 = inventory->setSwapSlotItem(taken);
@@ -430,7 +430,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
     if (!selected)
       return std::unexpected(std::move(selected.error()));
     if (auto item = as<ObjectItem>(std::move(*selected))) {
-      auto configured = item->instanceValue("interactAction");
+      auto configured = item->instance_value("interactAction");
       if (!configured)
         return std::unexpected(std::move(configured.error()));
       if (*configured) {
@@ -441,7 +441,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
         if (!type)
           return std::unexpected(std::move(type.error()));
         if (can_open_from_inventory(*type)) {
-          auto data = item->instanceValue("interactData", Json());
+          auto data = item->instance_value("interactData", Json());
           if (!data)
             return std::unexpected(std::move(data.error()));
           if (data->is_type(Json::Type::Object)) {
@@ -1428,7 +1428,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
   }
 
   if (auto item = inventory->swapSlotItem()) {
-    float pitch = 1.f - (static_cast<float>(item->count()) / static_cast<float>(item->maxStack())) * .2f;
+    float pitch = 1.f - (static_cast<float>(item->count()) / static_cast<float>(item->max_stack())) * .2f;
     if (!m_currentSwapSlotItem || !item->matches(*m_currentSwapSlotItem, true))
       {
         auto randFromResult210 = RandomSource(context.root().random().next_u64()).sample_ref(m_pickUpSounds);

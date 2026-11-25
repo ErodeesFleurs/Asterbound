@@ -521,7 +521,7 @@ MessageResponseResult ContainerObject::receiveMessage(ConnectionId sendingConnec
     if (!resultResult)
       return std::unexpected(std::move(resultResult.error()));
     auto result = std::move(*resultResult);
-    return ChainableJsonMessageResponse(itemSafeDescriptor(result).toJson());
+    return ChainableJsonMessageResponse(item_safe_descriptor(result).toJson());
   }
   auto matches4Result = message.equals_ignore_case("putItems");
   if (!matches4Result)
@@ -548,7 +548,7 @@ MessageResponseResult ContainerObject::receiveMessage(ConnectionId sendingConnec
     if (!resultResult)
       return std::unexpected(std::move(resultResult.error()));
     auto result = std::move(*resultResult);
-    return ChainableJsonMessageResponse(itemSafeDescriptor(result).toJson());
+    return ChainableJsonMessageResponse(item_safe_descriptor(result).toJson());
   }
   auto matches5Result = message.equals_ignore_case("takeItems");
   if (!matches5Result)
@@ -575,7 +575,7 @@ MessageResponseResult ContainerObject::receiveMessage(ConnectionId sendingConnec
     if (!resultResult)
       return std::unexpected(std::move(resultResult.error()));
     auto result = std::move(*resultResult);
-    return ChainableJsonMessageResponse(itemSafeDescriptor(result).toJson());
+    return ChainableJsonMessageResponse(item_safe_descriptor(result).toJson());
   }
   auto matches6Result = message.equals_ignore_case("swapItems");
   if (!matches6Result)
@@ -607,7 +607,7 @@ MessageResponseResult ContainerObject::receiveMessage(ConnectionId sendingConnec
     if (!resultResult)
       return std::unexpected(std::move(resultResult.error()));
     auto result = std::move(*resultResult);
-    return ChainableJsonMessageResponse(itemSafeDescriptor(result).toJson());
+    return ChainableJsonMessageResponse(item_safe_descriptor(result).toJson());
   }
   auto matches7Result = message.equals_ignore_case("applyAugment");
   if (!matches7Result)
@@ -634,7 +634,7 @@ MessageResponseResult ContainerObject::receiveMessage(ConnectionId sendingConnec
     if (!resultResult)
       return std::unexpected(std::move(resultResult.error()));
     auto result = std::move(*resultResult);
-    return ChainableJsonMessageResponse(itemSafeDescriptor(result).toJson());
+    return ChainableJsonMessageResponse(item_safe_descriptor(result).toJson());
   }
   auto matches8Result = message.equals_ignore_case("consumeItems");
   if (!matches8Result)
@@ -693,7 +693,7 @@ MessageResponseResult ContainerObject::receiveMessage(ConnectionId sendingConnec
     auto items = std::move(*itemsResult);
     JsonArray result;
     for (auto const& item : items)
-      result.push_back(itemSafeDescriptor(item).toJson());
+      result.push_back(item_safe_descriptor(item).toJson());
     return ChainableJsonMessageResponse(std::move(result));
   }
   return Object::receiveMessage(sendingConnection, message, args);
@@ -800,7 +800,7 @@ std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> ContainerObject:
     if (!currentWorldResult)
       return std::unexpected(std::move(currentWorldResult.error()));
     auto currentWorld = std::move(*currentWorldResult);
-    auto promiseResult = currentWorld.get().sendEntityMessage(entityId(), "addItems", {itemSafeDescriptor(items).toJson()});
+    auto promiseResult = currentWorld.get().sendEntityMessage(entityId(), "addItems", {item_safe_descriptor(items).toJson()});
     if (!promiseResult)
       return std::unexpected(std::move(promiseResult.error()));
     auto promise = std::move(*promiseResult);
@@ -829,7 +829,7 @@ std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> ContainerObject:
     if (!currentWorldResult)
       return std::unexpected(std::move(currentWorldResult.error()));
     auto currentWorld = std::move(*currentWorldResult);
-    auto promiseResult = currentWorld.get().sendEntityMessage(entityId(), "putItems", {itemSafeDescriptor(items).toJson()});
+    auto promiseResult = currentWorld.get().sendEntityMessage(entityId(), "putItems", {item_safe_descriptor(items).toJson()});
     if (!promiseResult)
       return std::unexpected(std::move(promiseResult.error()));
     auto promise = std::move(*promiseResult);
@@ -887,7 +887,7 @@ std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> ContainerObject:
     if (!currentWorldResult)
       return std::unexpected(std::move(currentWorldResult.error()));
     auto currentWorld = std::move(*currentWorldResult);
-    auto promiseResult = currentWorld.get().sendEntityMessage(entityId(), "swapItems", {slot, itemSafeDescriptor(items).toJson(), tryCombine});
+    auto promiseResult = currentWorld.get().sendEntityMessage(entityId(), "swapItems", {slot, item_safe_descriptor(items).toJson(), tryCombine});
     if (!promiseResult)
       return std::unexpected(std::move(promiseResult.error()));
     auto promise = std::move(*promiseResult);
@@ -916,7 +916,7 @@ std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> ContainerObject:
     if (!currentWorldResult)
       return std::unexpected(std::move(currentWorldResult.error()));
     auto currentWorld = std::move(*currentWorldResult);
-    auto promiseResult = currentWorld.get().sendEntityMessage(entityId(), "applyAugment", {slot, itemSafeDescriptor(augment).toJson()});
+    auto promiseResult = currentWorld.get().sendEntityMessage(entityId(), "applyAugment", {slot, item_safe_descriptor(augment).toJson()});
     if (!promiseResult)
       return std::unexpected(std::move(promiseResult.error()));
     auto promise = std::move(*promiseResult);
@@ -1111,7 +1111,7 @@ std::expected<void, StarException> ContainerObject::burnContainerContents() {
         break;
       auto leftToFill = maxLevel - level;
       if (item) {
-        auto itemFuelConfigResult = item->instanceValue("fuelAmount", 0);
+        auto itemFuelConfigResult = item->instance_value("fuelAmount", 0);
         if (!itemFuelConfigResult)
           return std::unexpected(std::move(itemFuelConfigResult.error()));
         auto itemFuelConfig = std::move(*itemFuelConfigResult);
@@ -1292,7 +1292,7 @@ std::expected<void, StarException> ContainerObject::tickCrafting(float dt) {
   if (targetItem) {
     if (!targetItem->matches(m_goalRecipe.output, true))
       craftingFail = true;
-    else if (targetItem->count() + m_goalRecipe.output.count() > targetItem->maxStack())
+    else if (targetItem->count() + m_goalRecipe.output.count() > targetItem->max_stack())
       craftingFail = true;
   }
   if (craftingFail) {

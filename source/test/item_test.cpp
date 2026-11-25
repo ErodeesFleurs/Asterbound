@@ -83,6 +83,9 @@ import star.tools;
 import star.tool_user;
 import star.uuid;
 import star.vector;
+import star.item_drop;
+import star.image_metadata_database;
+import star.rect;
 import star.world_server;
 namespace Star {
 
@@ -202,6 +205,20 @@ TEST(EpochTimerTest, LegacyOptionalAndTruncatedRead) {
     return std::unexpected(std::move(descriptor.error()));
   return database.item(*descriptor);
 }
+
+class MutableItem final : public Item {
+public:
+  explicit MutableItem(Root& root) : Item(root) {}
+
+  using Item::initialize;
+  using Item::set_icon_drawables;
+  using Item::set_instance_value;
+  using Item::set_secondary_icon_drawables;
+
+  std::expected<std::shared_ptr<Item>, StarException> clone() const override {
+    return std::make_shared<MutableItem>(*this);
+  }
+};
 
 }
 
@@ -412,43 +429,212 @@ const GameTestRegistration itemStackingPreservesCountsAndNullSemantics("ItemTest
   ASSERT_TRUE(target);
   ASSERT_TRUE(source);
   ASSERT_TRUE(different);
-  ASSERT_EQ(target->maxStack(), 5u);
+  ASSERT_EQ(target->max_stack(), 5u);
 
-  EXPECT_FALSE(target->stackableWith(std::nullopt));
-  EXPECT_EQ(target->couldStack(std::nullopt), 0u);
-  EXPECT_FALSE(target->stackWith(std::nullopt));
-  EXPECT_TRUE(Item::itemsEqual(std::nullopt, std::nullopt));
-  EXPECT_FALSE(Item::itemsEqual(std::cref(*target), std::nullopt));
-  EXPECT_FALSE(Item::itemsEqual(std::nullopt, std::cref(*target)));
-  EXPECT_TRUE(Item::itemsEqual(std::cref(*target), std::cref(*source)));
+  EXPECT_FALSE(target->stackable_with(std::nullopt));
+  EXPECT_EQ(target->could_stack(std::nullopt), 0u);
+  EXPECT_FALSE(target->stack_with(std::nullopt));
+  EXPECT_TRUE(Item::items_equal(std::nullopt, std::nullopt));
+  EXPECT_FALSE(Item::items_equal(std::cref(*target), std::nullopt));
+  EXPECT_FALSE(Item::items_equal(std::nullopt, std::cref(*target)));
+  EXPECT_TRUE(Item::items_equal(std::cref(*target), std::cref(*source)));
   EXPECT_TRUE(target->matches(*different));
   EXPECT_FALSE(target->matches(*different, true));
-  EXPECT_FALSE(target->stackableWith(std::cref(*different)));
-  EXPECT_EQ(target->couldStack(std::cref(*different)), 0u);
-  EXPECT_FALSE(target->stackWith(std::ref(*different)));
+  EXPECT_FALSE(target->stackable_with(std::cref(*different)));
+  EXPECT_EQ(target->could_stack(std::cref(*different)), 0u);
+  EXPECT_FALSE(target->stack_with(std::ref(*different)));
   EXPECT_EQ(different->count(), 3u);
   EXPECT_EQ(target->count(), 4u);
 
-  EXPECT_EQ(target->couldStack(std::cref(*source)), 1u);
-  EXPECT_TRUE(target->stackWith(std::ref(*source)));
+  EXPECT_EQ(target->could_stack(std::cref(*source)), 1u);
+  EXPECT_TRUE(target->stack_with(std::ref(*source)));
   EXPECT_EQ(target->count(), 5u);
   EXPECT_EQ(source->count(), 2u);
-  EXPECT_EQ(target->couldStack(std::cref(*source)), 0u);
-  EXPECT_FALSE(target->stackWith(std::ref(*source)));
+  EXPECT_EQ(target->could_stack(std::cref(*source)), 0u);
+  EXPECT_FALSE(target->stack_with(std::ref(*source)));
   EXPECT_EQ(source->count(), 2u);
 
   ASSERT_TRUE(target->consume(3));
-  EXPECT_EQ(target->couldStack(std::cref(*source)), 2u);
-  EXPECT_TRUE(target->stackWith(std::ref(*source)));
+  EXPECT_EQ(target->could_stack(std::cref(*source)), 2u);
+  EXPECT_TRUE(target->stack_with(std::ref(*source)));
   EXPECT_EQ(target->count(), 4u);
   EXPECT_TRUE(source->empty());
-  EXPECT_FALSE(target->stackWith(std::ref(*source)));
+  EXPECT_FALSE(target->stack_with(std::ref(*source)));
   EXPECT_EQ(target->count(), 4u);
 
   // The source may alias the destination: consuming and adding must balance.
-  target->setCount(2);
-  EXPECT_TRUE(target->stackWith(std::ref(*target)));
+  target->set_count(2);
+  EXPECT_TRUE(target->stack_with(std::ref(*target)));
   EXPECT_EQ(target->count(), 2u);
+});
+
+const GameTestRegistration item_take_overfill("ItemTest", "TakingOverfilledItemConservesCount", [](GameTest& fixture) {
+  auto source = GenericItem::create(fixture.root(),
+      JsonObject{{"itemName", "takeprobe"}, {"rarity", "common"}, {"maxStack", 5}}, "/", JsonObject{{"marker", 17}});
+  ASSERT_TRUE(source) << source.error().what();
+  ASSERT_EQ((*source)->set_count(12, true), 0u);
+  auto const original = (*source)->descriptor();
+
+  auto zero = (*source)->take(0);
+  ASSERT_TRUE(zero) << zero.error().what();
+  EXPECT_FALSE(*zero);
+  EXPECT_EQ((*source)->descriptor(), original);
+
+  auto first = (*source)->take(8);
+  ASSERT_TRUE(first) << first.error().what();
+  ASSERT_TRUE(*first);
+  EXPECT_EQ((*first)->count(), 5u);
+  EXPECT_EQ((*source)->count(), 7u);
+  EXPECT_TRUE((*first)->matches(original, true));
+  EXPECT_TRUE((*source)->matches(original, true));
+
+  auto second = (*source)->take();
+  ASSERT_TRUE(second) << second.error().what();
+  ASSERT_TRUE(*second);
+  EXPECT_EQ((*second)->count(), 5u);
+  EXPECT_EQ((*source)->count(), 2u);
+
+  auto last = (*source)->take();
+  ASSERT_TRUE(last) << last.error().what();
+  ASSERT_TRUE(*last);
+  EXPECT_EQ((*last)->count(), 2u);
+  EXPECT_TRUE((*source)->empty());
+  EXPECT_EQ((*first)->count() + (*second)->count() + (*last)->count(), original.count());
+});
+
+const GameTestRegistration item_drop_take_overfill("ItemTest", "OverfilledDropStaysTakeableUntilDrained", [](GameTest& fixture) {
+  for (bool take_by : {false, true}) {
+    SCOPED_TRACE(take_by);
+    auto item = GenericItem::create(fixture.root(),
+        JsonObject{{"itemName", "dropprobe"}, {"rarity", "common"}, {"maxStack", 5}}, "/", JsonObject{});
+    ASSERT_TRUE(item) << item.error().what();
+    auto drop = ItemDrop::create(fixture.root(), std::move(*item));
+    ASSERT_TRUE(drop) << drop.error().what();
+    auto source = (*drop)->item();
+    ASSERT_EQ(source->set_count(12, true), 0u);
+
+    auto take = [&] { return take_by ? (*drop)->takeBy(101) : (*drop)->take(); };
+    std::uint64_t remaining = source->count();
+    for (std::uint64_t expected : {5u, 5u, 2u}) {
+      EXPECT_EQ((*drop)->canTake(), true);
+      auto picked_up = take();
+      ASSERT_TRUE(picked_up) << picked_up.error().what();
+      ASSERT_TRUE(*picked_up);
+      EXPECT_EQ((*picked_up)->count(), expected);
+      remaining -= expected;
+      EXPECT_EQ(source->count(), remaining);
+      EXPECT_EQ((*drop)->persistent(), !take_by || remaining != 0);
+    }
+    EXPECT_EQ((*drop)->canTake(), false);
+    auto empty = take();
+    ASSERT_TRUE(empty) << empty.error().what();
+    EXPECT_FALSE(*empty);
+  }
+});
+
+const GameTestRegistration item_base_tags("ItemTest", "TagsReadBaseConfigAndValidateTheEntireArray", [](GameTest& fixture) {
+  Json const config = JsonObject{{"itemName", "tagprobe"}, {"rarity", "common"}};
+  Json const parameters = JsonObject{{"itemTags", JsonArray{"instance"}}};
+  auto valid_config = config.set("itemTags", JsonArray{"base", "base", "other"});
+  ASSERT_TRUE(valid_config) << valid_config.error().what();
+  auto valid = GenericItem::create(fixture.root(), *valid_config, "/", parameters);
+  ASSERT_TRUE(valid) << valid.error().what();
+  EXPECT_EQ((*valid)->has_item_tag("base"), true);
+  EXPECT_EQ((*valid)->has_item_tag("other"), true);
+  EXPECT_EQ((*valid)->has_item_tag("instance"), false);
+  auto tags = (*valid)->item_tags();
+  ASSERT_TRUE(tags) << tags.error().what();
+  EXPECT_EQ(tags->size(), 2u);
+  EXPECT_TRUE(tags->contains("base"));
+  EXPECT_TRUE(tags->contains("other"));
+
+  auto absent = GenericItem::create(fixture.root(), config, "/", parameters);
+  ASSERT_TRUE(absent) << absent.error().what();
+  EXPECT_EQ((*absent)->has_item_tag("instance"), false);
+
+  auto malformed_config = config.set("itemTags", JsonArray{"base", Json(17)});
+  ASSERT_TRUE(malformed_config) << malformed_config.error().what();
+  auto malformed = GenericItem::create(fixture.root(), *malformed_config, "/", parameters);
+  ASSERT_TRUE(malformed) << malformed.error().what();
+  auto has_tag = (*malformed)->has_item_tag("base");
+  auto malformed_tags = (*malformed)->item_tags();
+  ASSERT_FALSE(has_tag);
+  ASSERT_FALSE(malformed_tags);
+  EXPECT_TRUE(has_tag.error().is<JsonException>());
+  EXPECT_TRUE(malformed_tags.error().is<JsonException>());
+});
+
+const GameTestRegistration item_parameter_updates("ItemTest", "InstanceValueUpdatesPreserveMissingNullAndObjectMerge", [](GameTest& fixture) {
+  MutableItem item(fixture.root());
+  Json const base = JsonObject{{"baseOnly", 1}, {"shared", 2}};
+  Json const instance = JsonObject{{"shared", 3}, {"instanceOnly", 4}};
+  Json const merged = JsonObject{{"baseOnly", 1}, {"shared", 3}, {"instanceOnly", 4}};
+  Json const config = JsonObject{{"itemName", "parameterprobe"}, {"rarity", "common"}, {"probe", base}};
+  ASSERT_TRUE(item.initialize(config, "/"));
+
+  auto const initial_storage = item.parameters().object_ptr();
+  ASSERT_TRUE(initial_storage);
+  ASSERT_TRUE(item.set_instance_value("probe", Json()));
+  EXPECT_EQ(item.parameters().object_ptr(), *initial_storage);
+  EXPECT_EQ(item.parameters().contains("probe"), false);
+  EXPECT_EQ(item.instance_value("probe"), base);
+
+  ASSERT_TRUE(item.set_instance_value("probe", instance));
+  auto const saved = item.descriptor();
+  EXPECT_EQ(saved.parameters().get("probe"), instance);
+  EXPECT_EQ(item.instance_value("probe"), merged);
+  auto const saved_storage = saved.parameters().object_ptr();
+  ASSERT_TRUE(saved_storage);
+  ASSERT_TRUE(item.set_instance_value("probe", instance));
+  EXPECT_EQ(item.parameters().object_ptr(), *saved_storage);
+  EXPECT_EQ(item.descriptor(), saved);
+
+  ASSERT_TRUE(item.set_instance_value("probe", Json()));
+  EXPECT_EQ(item.parameters().contains("probe"), true);
+  EXPECT_EQ(item.parameters().get("probe"), Json());
+  EXPECT_EQ(item.instance_value("probe"), base);
+  EXPECT_EQ(item.config(), config);
+});
+
+const GameTestRegistration item_icon_normalization("ItemTest", "AuthoredAndUpdatedIconsShareNormalization", [](GameTest& fixture) {
+  auto metadata = fixture.root().image_metadata_database();
+  ASSERT_TRUE(metadata) << metadata.error().what();
+  Json const layer = JsonObject{{"poly", JsonArray{JsonArray{0, 0}, JsonArray{32, 0}, JsonArray{0, 24}}},
+      {"position", JsonArray{9, -13}}};
+  Json const config = JsonObject{{"itemName", "iconprobe"}, {"rarity", "common"},
+      {"inventoryIcon", JsonArray{layer}}, {"secondaryIcon", JsonArray{layer}}};
+  MutableItem item(fixture.root());
+  ASSERT_TRUE(item.initialize(config, "/"));
+  auto authored = item.icon_drawables();
+  ASSERT_TRUE(authored);
+  ASSERT_EQ(authored->size(), 1u);
+  auto secondary = item.secondary_drawables();
+  ASSERT_TRUE(secondary);
+  ASSERT_TRUE(*secondary);
+  EXPECT_EQ(**secondary, *authored);
+  auto bounds = Drawable::bound_box_all(**metadata, *authored, true);
+  ASSERT_TRUE(bounds) << bounds.error().what();
+  EXPECT_NEAR(bounds->center()[0], 0.0f, 0.0001f);
+  EXPECT_NEAR(bounds->center()[1], 0.0f, 0.0001f);
+  EXPECT_NEAR(std::max(bounds->width(), bounds->height()), 16.0f, 0.0001f);
+
+  auto raw = Drawable::create(**metadata, layer);
+  ASSERT_TRUE(raw) << raw.error().what();
+  ASSERT_TRUE(item.set_icon_drawables({*raw}));
+  EXPECT_EQ(item.icon_drawables(), *authored);
+  ASSERT_TRUE(item.set_secondary_icon_drawables(List<Drawable>{*raw}));
+  auto updated_secondary = item.secondary_drawables();
+  ASSERT_TRUE(updated_secondary);
+  ASSERT_TRUE(*updated_secondary);
+  EXPECT_EQ(**updated_secondary, *authored);
+  ASSERT_TRUE(item.set_secondary_icon_drawables(List<Drawable>{}));
+  EXPECT_TRUE(item.has_secondary_drawables());
+  secondary = item.secondary_drawables();
+  ASSERT_TRUE(secondary);
+  ASSERT_TRUE(*secondary);
+  EXPECT_TRUE((*secondary)->empty());
+  ASSERT_TRUE(item.set_secondary_icon_drawables(std::nullopt));
+  EXPECT_FALSE(item.has_secondary_drawables());
 });
 
 const GameTestRegistration bagStackQueriesAndTransfersPreserveBehavior("ItemTest", "BagStackQueriesAndTransfersPreserveBehavior", [](GameTest& fixture) {
@@ -524,18 +710,18 @@ const GameTestRegistration bagStackQueriesAndTransfersPreserveBehavior("ItemTest
   EXPECT_EQ(bag.itemsCanFit(std::cref(*source)), 2u);
   // A retained empty stack contributes capacity to the existing stacking query.
   EXPECT_EQ(bag.itemsCanStack(std::cref(*source)), 2u);
-  blocker->setCount(1);
+  blocker->set_count(1);
   current = std::as_const(bag).at(1);
   ASSERT_TRUE(current);
   EXPECT_EQ(*current, blocker);
-  blocker->setCount(0);
+  blocker->set_count(0);
   added = bag.addItems(source);
   ASSERT_TRUE(added);
   EXPECT_FALSE(*added);
   current = std::as_const(bag).at(1);
   ASSERT_TRUE(current);
   EXPECT_EQ(*current, source);
-  source->setCount(0);
+  source->set_count(0);
   EXPECT_EQ(bag.itemsCanFit(std::cref(*source)), 0u);
   EXPECT_EQ(bag.itemsCanStack(std::cref(*source)), 0u);
   auto emptyFit = bag.itemsFitWhere(std::cref(*source));
@@ -579,14 +765,14 @@ const GameTestRegistration constBagObservesEmptyStacksWithoutReleasingThem("Item
   ASSERT_TRUE(secondResult);
   auto second = std::move(*secondResult);
   ASSERT_TRUE(second);
-  first->setCount(0);
-  second->setCount(0);
+  first->set_count(0);
+  second->set_count(0);
   auto firstOwners = first.use_count();
   EXPECT_EQ(indexedBag.at(0), nullptr);
   EXPECT_EQ(first.use_count(), firstOwners);
-  first->setCount(1);
+  first->set_count(1);
   EXPECT_EQ(indexedBag.at(0), first);
-  first->setCount(0);
+  first->set_count(0);
   EXPECT_EQ(indexedBag.size(), 2u);
   EXPECT_TRUE(indexedBag.cleanup());
   EXPECT_EQ(indexedBag.at(1), nullptr);
@@ -603,7 +789,7 @@ const GameTestRegistration constBagObservesEmptyStacksWithoutReleasingThem("Item
   ASSERT_TRUE(liveResult);
   auto liveItem = std::move(*liveResult);
   ASSERT_TRUE(liveItem);
-  emptyItem->setCount(0);
+  emptyItem->set_count(0);
   auto const& slots = listedBag.items();
   ASSERT_EQ(slots.size(), 2u);
   EXPECT_FALSE(slots[0]);
@@ -846,7 +1032,7 @@ const GameTestRegistration constInventoryObservesExternallyConsumedItemsWithoutM
   for (std::size_t i = 0; i < items.size(); ++i) {
     auto const& entry = items[i];
     EXPECT_EQ(entry.second.use_count(), owners[i]);
-    entry.second->setCount(1);
+    entry.second->set_count(1);
     EXPECT_EQ(view.itemsAt(entry.first), entry.second);
   }
   {
@@ -995,7 +1181,7 @@ const GameTestRegistration inventoryMutationNormalizesEmptySlots("ItemTest", "In
   });
   EXPECT_FALSE(failed);
   EXPECT_EQ(fail_item->use_count(), 1);
-  (*fail_item)->setCount(1);
+  (*fail_item)->set_count(1);
   EXPECT_EQ(inventory.itemsAt(bagSlot), nullptr);
 
   auto missingRead = std::as_const(inventory).itemsAt(BagSlot("missingInventoryTestBag", 0));
@@ -1552,7 +1738,7 @@ end
     auto const& built = *builtResult;
     ASSERT_TRUE(built);
     EXPECT_EQ(built->name(), "readycatalogbuilt");
-    EXPECT_EQ(built->friendlyName(), "NestedReady_LeafOwner");
+    EXPECT_EQ(built->friendly_name(), "NestedReady_LeafOwner");
     EXPECT_EQ(built->parameters().get_string("nestedCatalog"), "builder");
     auto rebuiltResult = inventoryTestItem(*database, "readycatalogbroken", 3);
     ASSERT_TRUE(rebuiltResult);
@@ -1560,7 +1746,7 @@ end
     ASSERT_TRUE(rebuilt);
     EXPECT_EQ(rebuilt->name(), "readycatalogleaf");
     EXPECT_EQ(rebuilt->count(), 3u);
-    EXPECT_EQ(rebuilt->friendlyName(), "RebuiltReady_LeafOwner");
+    EXPECT_EQ(rebuilt->friendly_name(), "RebuiltReady_LeafOwner");
     EXPECT_EQ(rebuilt->parameters().get_string("nestedCatalog"), "rebuilder");
     auto collections = root.collection_database();
     ASSERT_TRUE(collections);
@@ -1949,15 +2135,15 @@ function uninit() visit("uninit") end
       ASSERT_TRUE((*item)->update(dt, FireMode::Primary, false, {}));
       ASSERT_TRUE((*item)->update(dt, FireMode::Primary, false, {}));
       String expectedHook = failure == "uninit" ? "update" : failure;
-      EXPECT_EQ((*item)->instanceValue("lastHook").and_then([](Json const& value) { return value.to_string(); }), expectedHook);
+      EXPECT_EQ((*item)->instance_value("lastHook").and_then([](Json const& value) { return value.to_string(); }), expectedHook);
       // Storage retention is host work after activate/update. A failed script
       // must not prevent it, and the second tick must not re-enter that script.
-      auto retained = (*item)->instanceValue("scriptStorage");
+      auto retained = (*item)->instance_value("scriptStorage");
       ASSERT_TRUE(retained);
       EXPECT_EQ(retained->get_string("lastHook"), expectedHook);
       ASSERT_TRUE((*item)->uninit());
       EXPECT_FALSE((*item)->initialized());
-      EXPECT_EQ((*item)->instanceValue("lastHook").and_then([](Json const& value) { return value.to_string(); }), failure);
+      EXPECT_EQ((*item)->instance_value("lastHook").and_then([](Json const& value) { return value.to_string(); }), failure);
       std::string marker = "active-item-recovery:" + failure.utf8();
       EXPECT_EQ(std::ranges::count_if(sink->records, [&](std::string const& record) {
         return record.find(marker) != std::string::npos;
@@ -2390,7 +2576,7 @@ end
                                                         {"lifecycleCallback", "installed"}},
                                              "/", JsonObject());
           ASSERT_TRUE(augment) << augment.error().what();
-          ASSERT_EQ((*augment)->setCount(3), 0u);
+          ASSERT_EQ((*augment)->set_count(3), 0u);
           auto result = (*database)->applyAugment(*target, **augment);
           EXPECT_EQ(result.has_value(), !scriptFailed && !test.malformed);
           if (result)

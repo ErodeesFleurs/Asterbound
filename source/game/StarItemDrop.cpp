@@ -209,7 +209,7 @@ std::expected<std::shared_ptr<ItemDrop>, StarException> ItemDrop::throwDrop(Root
 std::expected<void, StarException> ItemDrop::initializeItem(std::shared_ptr<Item> item) {
   if (!item)
     return std::unexpected(ItemException("Cannot construct an item drop without an item"));
-  auto parameters = item->instanceValueOfType("itemDrop", Json::Type::Object, JsonObject{});
+  auto parameters = item->instance_value_of_type("itemDrop", Json::Type::Object, JsonObject{});
   if (!parameters)
     return std::unexpected(std::move(parameters.error()));
   m_item = std::move(item);
@@ -333,7 +333,7 @@ std::expected<Json, StarException> ItemDrop::diskStore() const {
 std::expected<ByteArray, StarException> ItemDrop::net_store(NetCompatibilityRules rules) const {
   DataStreamBuffer ds;
   ds.set_stream_compatibility_version(rules);
-  if (auto written = ds.write(itemSafeDescriptor(m_item)); !written)
+  if (auto written = ds.write(item_safe_descriptor(m_item)); !written)
     return std::unexpected(std::move(written.error()));
   if (auto written = ds.write(m_eternal); !written)
     return std::unexpected(std::move(written.error()));
@@ -505,12 +505,12 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
             if (!*closeTakeable || vmag(position() - closeDrop.position()) >= m_combineRadius || !closeDrop.isMaster())
               return false;
             auto const& closeItem = closeDrop.m_item;
-            if (m_item->couldStack(optional_ref(closeItem)) != closeItem->count())
+            if (m_item->could_stack(optional_ref(closeItem)) != closeItem->count())
               return false;
             auto taken = closeDrop.take();
             if (!taken)
               return std::unexpected(std::move(taken.error()));
-            m_item->stackWith(optional_ref(*taken));
+            m_item->stack_with(optional_ref(*taken));
             m_drop_age.set_elapsed_time(std::min(m_drop_age.elapsed_time(), closeDrop.m_drop_age.elapsed_time()));
             m_movementController->setPosition(
               m_movementController->position()
@@ -535,7 +535,7 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
       m_mode.set(Mode::Dead);
     if (m_mode.get() == Mode::Intangible && m_intangible_timer.ready())
       m_mode.set(Mode::Available);
-    if (!m_eternal && m_mode.get() == Mode::Available && m_drop_age.elapsed_time() > m_item->timeToLive())
+    if (!m_eternal && m_mode.get() == Mode::Available && m_drop_age.elapsed_time() > m_item->time_to_live())
       m_mode.set(Mode::Dead);
     if (m_mode.get() == Mode::Taken && m_drop_age.elapsed_time() > m_after_taken_life)
       m_mode.set(Mode::Dead);
@@ -711,17 +711,11 @@ std::expected<bool, StarException> ItemDrop::canTake() const {
 }
 
 std::expected<std::shared_ptr<Item>, StarException> ItemDrop::takeBy(EntityId entityId, float time_offset) {
-  auto takeable = canTake();
-  if (!takeable)
-    return std::unexpected(std::move(takeable.error()));
-  if (!*takeable)
-    return std::shared_ptr<Item>();
-  auto taken = m_item->take();
-  if (!taken)
-    return std::unexpected(std::move(taken.error()));
+  auto taken = take();
+  if (!taken || !*taken || !m_item->empty())
+    return taken;
   m_owningEntity.set(entityId);
   m_drop_age.set_elapsed_time(time_offset);
-  m_mode.set(Mode::Taken);
   setPersistent(false);
   return taken;
 }
@@ -735,7 +729,12 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDrop::take() {
   auto taken = m_item->take();
   if (!taken)
     return std::unexpected(std::move(taken.error()));
-  m_mode.set(Mode::Taken);
+  if (*taken) {
+    if (m_item->empty())
+      m_mode.set(Mode::Taken);
+    else if (isMaster())
+      m_itemDescriptor.set(m_item->descriptor());
+  }
   return taken;
 }
 

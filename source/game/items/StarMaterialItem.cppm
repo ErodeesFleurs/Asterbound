@@ -275,7 +275,7 @@ std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create
   if (!material)
     return std::unexpected(std::move(material.error()));
   item->m_material = *material;
-  auto hue = item->instanceValue("materialHueShift", 0).and_then([](Json const& value) { return value.to_float(); });
+  auto hue = item->instance_value("materialHueShift", 0).and_then([](Json const& value) { return value.to_float(); });
   if (!hue)
     return std::unexpected(std::move(hue.error()));
   item->m_materialHueShift = materialHueFromDegrees(*hue);
@@ -296,14 +296,14 @@ std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create
           return std::unexpected(std::move(added.error()));
       }
     }
-    auto icons = item->setIconDrawables(std::move(*drawables));
+    auto icons = item->set_icon_drawables(std::move(*drawables));
     if (!icons)
       return std::unexpected(std::move(icons.error()));
   }
   auto twoHanded = config.get_bool("twoHanded", true);
   if (!twoHanded)
     return std::unexpected(std::move(twoHanded.error()));
-  item->setTwoHanded(*twoHanded);
+  item->set_two_handed(*twoHanded);
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
@@ -560,7 +560,7 @@ std::expected<void, StarException> MaterialItem::fire(FireMode mode, bool shifti
   if (!initialized() || !ready())
     return {};
 
-  auto layer = (mode == FireMode::Primary || !twoHanded() ? TileLayer::Foreground : TileLayer::Background);
+  auto layer = (mode == FireMode::Primary || !two_handed() ? TileLayer::Foreground : TileLayer::Background);
   TileModificationList modifications;
 
   float radius = calcRadius(shifting);
@@ -720,17 +720,17 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
 
   TileDamage damage;
   damage.type = TileDamageType::Beamish;
-  auto defaultDamage = beamAxe.instanceValue("primaryAbility.tileDamage", 1.0f);
+  auto defaultDamage = beamAxe.instance_value("primaryAbility.tileDamage", 1.0f);
   if (!defaultDamage)
     return std::unexpected(std::move(defaultDamage.error()));
-  auto amount = beamAxe.instanceValue("tileDamage", *defaultDamage).and_then([](Json const& value) { return value.to_float(); });
+  auto amount = beamAxe.instance_value("tileDamage", *defaultDamage).and_then([](Json const& value) { return value.to_float(); });
   if (!amount)
     return std::unexpected(std::move(amount.error()));
   damage.amount = *amount;
-  auto defaultHarvest = beamAxe.instanceValue("primaryAbility.harvestLevel", 1);
+  auto defaultHarvest = beamAxe.instance_value("primaryAbility.harvestLevel", 1);
   if (!defaultHarvest)
     return std::unexpected(std::move(defaultHarvest.error()));
-  auto harvest = beamAxe.instanceValue("harvestLevel", *defaultHarvest).and_then([](Json const& value) { return value.to_uint(); });
+  auto harvest = beamAxe.instance_value("harvestLevel", *defaultHarvest).and_then([](Json const& value) { return value.to_uint(); });
   if (!harvest)
     return std::unexpected(std::move(harvest.error()));
   damage.harvest_level = *harvest;
@@ -814,7 +814,7 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
   auto played = itemOwner->get().addSound(blockSound, *blockVolume);
   if (!played)
     return std::unexpected(std::move(played.error()));
-  auto strikeSounds = beamAxe.instanceValue("strikeSounds");
+  auto strikeSounds = beamAxe.instance_value("strikeSounds");
   if (!strikeSounds)
     return std::unexpected(std::move(strikeSounds.error()));
   if (!strikeSounds->is_null()) {
@@ -1054,7 +1054,7 @@ std::expected<List<PreviewTile>, StarException> MaterialItem::preview_tiles(bool
         c++;
       } else {
         bool backPlaceable = false;
-        if (twoHanded()) {
+        if (two_handed()) {
           auto background = itemWorld->get().canModifyTile(
             pos, PlaceMaterial{.layer = TileLayer::Background, .material = material, .materialHueShift = *hue}, false);
           if (!background)
@@ -1074,7 +1074,7 @@ std::expected<List<PreviewTile>, StarException> MaterialItem::preview_tiles(bool
 }
 
 std::expected<MaterialHue, StarException> MaterialItem::placementHueShift(Vec2I const& pos) const {
-  auto hue = instanceValue("materialHueShift");
+  auto hue = instance_value("materialHueShift");
   if (!hue)
     return std::unexpected(std::move(hue.error()));
   if (*hue) {

@@ -138,7 +138,7 @@ std::expected<void, StarException> FireableItem::init(ToolUserEntity& owner, Too
       return std::unexpected(std::move(item.error()));
     auto configCallbacks = LuaBindings::makeConfigCallbacks(
       [item = *item](String const& name, Json const& defaultValue) -> std::expected<Json, StarException> {
-        return item.get().instanceValue(name, defaultValue);
+        return item.get().instance_value(name, defaultValue);
       });
     if (!configCallbacks)
       return std::unexpected(std::move(configCallbacks.error()));

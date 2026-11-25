@@ -2788,7 +2788,7 @@ std::expected<std::shared_ptr<Item>, StarException> hudAuthoredItem(
       continue;
     auto item = database.fromJson(name);
     if (!item) return std::unexpected(std::move(item.error()));
-    if (*item && (*item)->twoHanded() == twoHanded)
+    if (*item && (*item)->two_handed() == twoHanded)
       return *item;
   }
   return std::unexpected(ItemException("HUD inventory regression requires an authored item with the requested type and handedness"));

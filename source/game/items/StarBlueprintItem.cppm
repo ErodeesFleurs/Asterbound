@@ -150,7 +150,7 @@ std::expected<std::shared_ptr<BlueprintItem>, StarException> BlueprintItem::crea
   item->setWindupTime(0.2f);
   item->setCooldownTime(0.1f);
   item->m_requireEdgeTrigger = true;
-  auto recipeValue = item->instanceValue("recipe");
+  auto recipeValue = item->instance_value("recipe");
   if (!recipeValue)
     return std::unexpected(std::move(recipeValue.error()));
   auto recipe = ItemDescriptor::create(*recipeValue);
@@ -180,7 +180,7 @@ std::expected<std::shared_ptr<BlueprintItem>, StarException> BlueprintItem::crea
   auto factor = (*assets)->json("/items/defaultParameters.config:blueprintPriceFactor").and_then([](Json const& value) { return value.to_float(); });
   if (!factor)
     return std::unexpected(std::move(factor.error()));
-  item->setPrice(int(item->price() * *factor));
+  item->set_price(int(item->price() * *factor));
   return item;
 }
 
@@ -202,7 +202,7 @@ std::expected<void, StarException> BlueprintItem::fire_triggered() {
       if (!learned)
         return std::unexpected(std::move(learned.error()));
       if (*learned)
-        setCount(count() - 1);
+        set_count(count() - 1);
     }
   }
   return {};

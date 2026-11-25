@@ -148,19 +148,19 @@ std::expected<std::shared_ptr<UnlockItem>, StarException> UnlockItem::create(Roo
   auto swingable = item->initializeSwingable(config);
   if (!swingable)
     return std::unexpected(std::move(swingable.error()));
-  auto recipes = item->instanceValue("tierRecipesUnlock").and_then([](Json const& value) { return value.opt_string(); });
+  auto recipes = item->instance_value("tierRecipesUnlock").and_then([](Json const& value) { return value.opt_string(); });
   if (!recipes)
     return std::unexpected(std::move(recipes.error()));
   item->m_tierRecipesUnlock = std::move(*recipes);
-  auto upgrade = item->instanceValue("shipUpgrade").and_then([](Json const& value) { return value.opt_uint(); });
+  auto upgrade = item->instance_value("shipUpgrade").and_then([](Json const& value) { return value.opt_uint(); });
   if (!upgrade)
     return std::unexpected(std::move(upgrade.error()));
   item->m_shipUpgrade = *upgrade;
-  auto message = item->instanceValue("unlockMessage").and_then([](Json const& value) { return value.opt_string(); });
+  auto message = item->instance_value("unlockMessage").and_then([](Json const& value) { return value.opt_string(); });
   if (!message)
     return std::unexpected(std::move(message.error()));
   item->m_unlockMessage = message->value_or(String{});
-  auto image = item->instanceValue("image").and_then([](Json const& value) { return value.to_string(); });
+  auto image = item->instance_value("image").and_then([](Json const& value) { return value.to_string(); });
   if (!image)
     return std::unexpected(std::move(image.error()));
   auto metadata = root.image_metadata_database();
@@ -194,7 +194,7 @@ std::expected<void, StarException> UnlockItem::fire_triggered() {
     return std::unexpected(std::move(itemOwner.error()));
   // Only players can use unlock items.
   if (auto player = as_ref<Player>(itemOwner->get())) {
-    auto shouldConsume = instanceValue("consume", true).and_then([](Json const& value) { return value.to_bool(); });
+    auto shouldConsume = instance_value("consume", true).and_then([](Json const& value) { return value.to_bool(); });
     if (!shouldConsume)
       return std::unexpected(std::move(shouldConsume.error()));
     if (*shouldConsume && !consume(1))

@@ -122,11 +122,11 @@ std::expected<void, StarException> ArmorItem::initializeArmor(Json const& config
   auto effects = refreshStatusEffects();
   if (!effects)
     return std::unexpected(std::move(effects.error()));
-  auto sources = instanceValue("effectSources", JsonArray()).and_then(json_to_string_set);
+  auto sources = instance_value("effectSources", JsonArray()).and_then(json_to_string_set);
   if (!sources)
     return std::unexpected(std::move(sources.error()));
   m_effectSources = std::move(*sources);
-  auto module = instanceValue("techModule", "").and_then([](Json const& value) { return value.to_string(); });
+  auto module = instance_value("techModule", "").and_then([](Json const& value) { return value.to_string(); });
   if (!module)
     return std::unexpected(std::move(module.error()));
   m_techModule = std::move(*module);
@@ -134,11 +134,11 @@ std::expected<void, StarException> ArmorItem::initializeArmor(Json const& config
     m_techModule = {};
   else
     m_techModule = AssetPath::relative_to(directory, *m_techModule);
-  auto directives = instanceValue("directives", "").and_then([](Json const& value) { return value.to_string(); });
+  auto directives = instance_value("directives", "").and_then([](Json const& value) { return value.to_string(); });
   if (!directives)
     return std::unexpected(std::move(directives.error()));
   m_directives = *directives;
-  auto fullbright = instanceValue("fullbright", false).and_then([](Json const& value) { return value.to_bool(); });
+  auto fullbright = instance_value("fullbright", false).and_then([](Json const& value) { return value.to_bool(); });
   if (!fullbright)
     return std::unexpected(std::move(fullbright.error()));
   m_fullbright = *fullbright;
@@ -147,7 +147,7 @@ std::expected<void, StarException> ArmorItem::initializeArmor(Json const& config
     return std::unexpected(std::move(options.error()));
   m_colorOptions = std::move(*options);
   if (!m_directives) {
-    auto index = instanceValue("colorIndex", 0).and_then([](Json const& value) { return value.to_uint(); });
+    auto index = instance_value("colorIndex", 0).and_then([](Json const& value) { return value.to_uint(); });
     if (!index)
       return std::unexpected(std::move(index.error()));
     auto option = m_colorOptions.wrap(*index);
@@ -158,7 +158,7 @@ std::expected<void, StarException> ArmorItem::initializeArmor(Json const& config
   auto icons = refreshIconDrawables();
   if (!icons)
     return std::unexpected(std::move(icons.error()));
-  auto flipValue = instanceValueOfType("flipDirectives", Json::Type::String);
+  auto flipValue = instance_value_of_type("flipDirectives", Json::Type::String);
   if (!flipValue)
     return std::unexpected(std::move(flipValue.error()));
   if (*flipValue) {
@@ -178,15 +178,15 @@ std::expected<void, StarException> ArmorItem::initializeArmor(Json const& config
       m_flipDirectives = Directives(std::move(*flipDirectives));
     }
   }
-  auto bypass = instanceValueOfType("bypassNude", Json::Type::Bool, false).and_then([](Json const& value) { return value.to_bool(); });
+  auto bypass = instance_value_of_type("bypassNude", Json::Type::Bool, false).and_then([](Json const& value) { return value.to_bool(); });
   if (!bypass)
     return std::unexpected(std::move(bypass.error()));
   m_bypassNude = *bypass;
-  auto hideSlots = instanceValueOfType("hideInVanillaSlots", Json::Type::Bool, false).and_then([](Json const& value) { return value.to_bool(); });
+  auto hideSlots = instance_value_of_type("hideInVanillaSlots", Json::Type::Bool, false).and_then([](Json const& value) { return value.to_bool(); });
   if (!hideSlots)
     return std::unexpected(std::move(hideSlots.error()));
   m_hideInVanillaSlots = *hideSlots;
-  auto hiddenTypes = instanceValueOfType("armorTypesToHide", Json::Type::Array);
+  auto hiddenTypes = instance_value_of_type("armorTypesToHide", Json::Type::Array);
   if (!hiddenTypes)
     return std::unexpected(std::move(hiddenTypes.error()));
   if (*hiddenTypes) {
@@ -311,12 +311,12 @@ std::expected<void, StarException> ArmorItem::refreshIconDrawables() {
         return std::unexpected(std::move(added.error()));
     }
   }
-  return setIconDrawables(std::move(*drawables));
+  return set_icon_drawables(std::move(*drawables));
 }
 
 std::expected<void, StarException> ArmorItem::refreshStatusEffects() {
   for (auto const& [key, target] : {std::pair{std::string_view("statusEffects"), std::ref(m_statusEffects)}, std::pair{std::string_view("cosmeticStatusEffects"), std::ref(m_cosmeticStatusEffects)}}) {
-    auto values = instanceValue(key, JsonArray()).and_then([](Json const& value) { return value.to_array(); });
+    auto values = instance_value(key, JsonArray()).and_then([](Json const& value) { return value.to_array(); });
     if (!values)
       return std::unexpected(std::move(values.error()));
     target.get().clear();
@@ -327,14 +327,14 @@ std::expected<void, StarException> ArmorItem::refreshStatusEffects() {
       target.get().push_back(std::move(*effect));
     }
   }
-  auto leveled = instanceValue("leveledStatusEffects", Json());
+  auto leveled = instance_value("leveledStatusEffects", Json());
   if (!leveled)
     return std::unexpected(std::move(leveled.error()));
   if (*leveled) {
     auto database = root().functionDatabase();
     if (!database)
       return std::unexpected(std::move(database.error()));
-    auto level = instanceValue("level", 1).and_then([](Json const& value) { return value.to_float(); });
+    auto level = instance_value("level", 1).and_then([](Json const& value) { return value.to_float(); });
     if (!level)
       return std::unexpected(std::move(level.error()));
     auto values = leveled->iterate_array();
@@ -365,7 +365,7 @@ std::expected<void, StarException> ArmorItem::refreshStatusEffects() {
       m_statusEffects.push_back(std::move(*statModifier));
     }
   }
-  auto augment = instanceValue("currentAugment", Json());
+  auto augment = instance_value("currentAugment", Json());
   if (!augment)
     return std::unexpected(std::move(augment.error()));
   if (*augment) {
@@ -395,7 +395,7 @@ std::expected<std::shared_ptr<HeadArmor>, StarException> HeadArmor::create(Root&
   if (!female)
     return std::unexpected(std::move(female.error()));
   item->m_femaleImage = AssetPath::relative_to(directory, *female);
-  auto mask = item->instanceValue("mask").and_then([](Json const& value) { return value.to_string(); });
+  auto mask = item->instance_value("mask").and_then([](Json const& value) { return value.to_string(); });
   if (!mask)
     return std::unexpected(std::move(mask.error()));
   if (!mask->empty()) {

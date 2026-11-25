@@ -164,7 +164,7 @@ std::expected<std::shared_ptr<LiquidItem>, StarException> LiquidItem::create(Roo
   auto twoHanded = config.get_bool("twoHanded", true);
   if (!twoHanded)
     return std::unexpected(std::move(twoHanded.error()));
-  item->setTwoHanded(*twoHanded);
+  item->set_two_handed(*twoHanded);
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));

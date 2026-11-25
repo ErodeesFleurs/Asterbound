@@ -295,7 +295,7 @@ std::expected<bool, StarException> ItemDatabase::loadItem(ItemDescriptor const& 
       itemPtr = as<ItemT>(*loaded);
       return true;
     } else if (itemPtr->count() != descriptor.count()) {
-      itemPtr->setCount(descriptor.count());
+      itemPtr->set_count(descriptor.count());
       return true;
     }
   }
