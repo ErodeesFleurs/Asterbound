@@ -126,7 +126,7 @@ std::expected<bool, StarException> TileEntity::anySpacesOccupied(List<Vec2I> con
   Vec2I tp = tilePosition();
   for (auto pos : spaces) {
     pos += tp;
-    if (isConnectableMaterial(currentWorld->get().material(pos, TileLayer::Foreground)))
+    if (is_connectable_material(currentWorld->get().material(pos, TileLayer::Foreground)))
       return true;
   }
 
@@ -140,7 +140,7 @@ std::expected<bool, StarException> TileEntity::allSpacesOccupied(List<Vec2I> con
   Vec2I tp = tilePosition();
   for (auto pos : spaces) {
     pos += tp;
-    if (!isConnectableMaterial(currentWorld->get().material(pos, TileLayer::Foreground)))
+    if (!is_connectable_material(currentWorld->get().material(pos, TileLayer::Foreground)))
       return false;
   }
 

@@ -81,14 +81,14 @@ TEST(EntityRenderingTypes, PreviewDefaultsAndBarSchema) {
   EXPECT_FALSE(blank.foreground);
   EXPECT_FALSE(blank.update_mat_id);
   EXPECT_FALSE(blank.update_light);
-  EXPECT_EQ(blank.mat_id, NullMaterialId);
+  EXPECT_EQ(blank.mat_id, null_material_id);
   EXPECT_EQ(blank.liq_id, empty_liquid_id);
   EXPECT_EQ(blank.hue_shift, 0);
-  EXPECT_EQ(blank.color_variant, DefaultMaterialColorVariant);
+  EXPECT_EQ(blank.color_variant, default_material_color_variant);
   PreviewTile liquid(Vec2I(2, 3), LiquidId{5});
   EXPECT_TRUE(liquid.foreground);
   EXPECT_EQ(liquid.liq_id, 5);
-  EXPECT_EQ(liquid.mat_id, NullMaterialId);
+  EXPECT_EQ(liquid.mat_id, null_material_id);
 
   auto bar = OverheadBar::create(JsonObject{{"percentage", .25f}, {"color", JsonArray{12, 34, 56}},
       {"position", JsonArray{4, 5}}, {"detailOnly", true}});

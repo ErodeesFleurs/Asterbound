@@ -2,6 +2,8 @@ module;
 
 import std;
 
+import star.format;
+import star.json;
 import star.math_common;
 namespace Star {
 
@@ -10,94 +12,113 @@ using MaterialHue = std::uint8_t;
 enum class FallingBehavior : std::uint8_t { Stationary, Falling, Cascading };
 
 // Empty and non-colliding.
-inline constexpr MaterialId EmptyMaterialId = 65535;
+inline constexpr MaterialId empty_material_id = 65535;
 
 // Empty and colliding. Also used as a placeholder in world generation, and to
 // signal a block which has not yet been loaded
-inline constexpr MaterialId NullMaterialId = 65534;
+inline constexpr MaterialId null_material_id = 65534;
 
-// Invisible colliding material used for pre-drawn world strucutres.
-inline constexpr MaterialId StructureMaterialId = 65533;
+// Invisible colliding material used for pre-drawn world structures.
+inline constexpr MaterialId structure_material_id = 65533;
 
 // Placeholder material used in dungeon generation for biome native ground
 // material.
-inline constexpr MaterialId Biome5MaterialId = 65532;
-inline constexpr MaterialId Biome4MaterialId = 65531;
-inline constexpr MaterialId Biome3MaterialId = 65530;
-inline constexpr MaterialId Biome2MaterialId = 65529;
-inline constexpr MaterialId Biome1MaterialId = 65528;
-inline constexpr MaterialId BiomeMaterialId = 65527;
+inline constexpr MaterialId biome5_material_id = 65532;
+inline constexpr MaterialId biome4_material_id = 65531;
+inline constexpr MaterialId biome3_material_id = 65530;
+inline constexpr MaterialId biome2_material_id = 65529;
+inline constexpr MaterialId biome1_material_id = 65528;
+inline constexpr MaterialId biome_material_id = 65527;
 
 // invisible walls that can't be connected to or grappled
-inline constexpr MaterialId BoundaryMaterialId = 65526;
+inline constexpr MaterialId boundary_material_id = 65526;
 
 // default generic object metamaterials
-inline constexpr MaterialId ObjectSolidMaterialId = 65500;
-inline constexpr MaterialId ObjectPlatformMaterialId = 65501;
+inline constexpr MaterialId object_solid_material_id = 65500;
+inline constexpr MaterialId object_platform_material_id = 65501;
 
 // Material IDs 65500 and above are reserved for engine-specified metamaterials
-inline constexpr MaterialId FirstEngineMetaMaterialId = 65500;
+inline constexpr MaterialId first_engine_meta_material_id = 65500;
 
 // Material IDs 65000 - 65499 are reserved for configurable metamaterials
 // to be used by tile entities or scripts
-inline constexpr MaterialId FirstMetaMaterialId = 65000;
+inline constexpr MaterialId first_meta_material_id = 65000;
 
 using MaterialColorVariant = std::uint8_t;
-inline constexpr MaterialColorVariant DefaultMaterialColorVariant = 0;
-inline constexpr MaterialColorVariant MaxMaterialColorVariant = 8;
+inline constexpr MaterialColorVariant default_material_color_variant = 0;
+inline constexpr MaterialColorVariant max_material_color_variant = 8;
 
 using ModId = std::uint16_t;
 
 // Tile has no tilemod
-inline constexpr ModId NoModId = 65535;
+inline constexpr ModId no_mod_id = 65535;
 
 // Placeholder mod used in dungeon generation for biome native ground mod.
-inline constexpr ModId BiomeModId = 65534;
-inline constexpr ModId UndergroundBiomeModId = 65533;
+inline constexpr ModId biome_mod_id = 65534;
+inline constexpr ModId underground_biome_mod_id = 65533;
 
 // The first mod id that is reserved for special hard-coded mod values.
-inline constexpr ModId FirstMetaMod = 65520;
+inline constexpr ModId first_meta_mod = 65520;
 
-float materialHueToDegrees(MaterialHue hue);
-MaterialHue materialHueFromDegrees(float degrees);
+template <typename T>
+concept material_storage_value = std::same_as<T, MaterialId> || std::same_as<T, MaterialHue>;
 
-bool isRealMaterial(MaterialId material);
-bool isConnectableMaterial(MaterialId material);
-bool isBiomeMaterial(MaterialId material);
+// Validate the stored width, not registration: world data may contain sentinel IDs.
+template <material_storage_value T, std::integral I>
+[[nodiscard]] std::expected<T, StarException> checked_material_value(I value, std::string_view field) {
+  if (!std::in_range<T>(+value))
+    return std::unexpected(StarException(Star::format("{} value {} is out of range [0, {}]", field, +value, +std::numeric_limits<T>::max())));
+  return static_cast<T>(value);
+}
 
-bool isRealMod(ModId mod);
-bool isBiomeMod(ModId mod);
+template <material_storage_value T>
+[[nodiscard]] std::expected<T, StarException> checked_material_value(Json const& value, std::string_view field) {
+  // Every representable stored value is exact in double. Check before casting
+  // so fractional inputs cannot become valid IDs, even immediately below zero.
+  auto number = value.to_double();
+  if (!number)
+    return std::unexpected(std::move(number.error()));
+  if (!is_finite(*number) || *number < 0 || *number > std::numeric_limits<T>::max() || std::trunc(*number) != *number)
+    return std::unexpected(StarException(Star::format("{} must be an integer in [0, {}], got {}", field, +std::numeric_limits<T>::max(), *number)));
+  return static_cast<T>(*number);
+}
 
-inline float materialHueToDegrees(MaterialHue hue) {
+[[nodiscard]] inline std::expected<MaterialId, StarException> biome_material_for_variant(std::int64_t variant) {
+  if (variant < 0 || variant > biome5_material_id - biome_material_id)
+    return std::unexpected(StarException(Star::format("surface variant {} is out of range [0, 5]", variant)));
+  return static_cast<MaterialId>(biome_material_id + variant);
+}
+
+[[nodiscard]] constexpr float material_hue_to_degrees(MaterialHue hue) noexcept {
   return hue * 360.0f / 255.0f;
 }
 
-inline MaterialHue materialHueFromDegrees(float degrees) {
+[[nodiscard]] inline std::expected<MaterialHue, StarException> material_hue_from_degrees(float degrees) {
+  if (!is_finite(degrees))
+    return std::unexpected(StarException("Material hue in degrees must be finite"));
   // Truncate while signed; only the integer conversion wraps negative hues.
   return static_cast<MaterialHue>(static_cast<int>(std::fmod(degrees, 360.0f) * 255.0f / 360.0f));
 }
 
-inline bool isRealMaterial(MaterialId material) {
-  return material < FirstMetaMaterialId;
+[[nodiscard]] constexpr bool is_real_material(MaterialId material) noexcept {
+  return material < first_meta_material_id;
 }
 
-// TODO: metamaterials need more flexibility to define whether they're connectable,
-// but this is used in several performance intensive areas, some of which don't
-// and probably shouldn't use the material database
-inline bool isConnectableMaterial(MaterialId material) {
-  return !(material == NullMaterialId || material == EmptyMaterialId || material == BoundaryMaterialId);
+// Connectivity is independent of catalog registration and collision.
+[[nodiscard]] constexpr bool is_connectable_material(MaterialId material) noexcept {
+  return material != null_material_id && material != empty_material_id && material != boundary_material_id;
 }
 
-inline bool isBiomeMaterial(MaterialId material) {
-  return (material == BiomeMaterialId) || ((material >= Biome1MaterialId) && (material <= Biome5MaterialId));
+[[nodiscard]] constexpr bool is_biome_material(MaterialId material) noexcept {
+  return material >= biome_material_id && material <= biome5_material_id;
 }
 
-inline bool isRealMod(ModId mod) {
-  return mod < FirstMetaMod;
+[[nodiscard]] constexpr bool is_real_mod(ModId mod) noexcept {
+  return mod < first_meta_mod;
 }
 
-inline bool isBiomeMod(ModId mod) {
-  return mod == BiomeModId || mod == UndergroundBiomeModId;
+[[nodiscard]] constexpr bool is_biome_mod(ModId mod) noexcept {
+  return mod == biome_mod_id || mod == underground_biome_mod_id;
 }
 }
 
@@ -107,33 +128,36 @@ export namespace Star {
   using ::Star::MaterialId;
   using ::Star::MaterialHue;
   using ::Star::FallingBehavior;
-  using ::Star::EmptyMaterialId;
-  using ::Star::NullMaterialId;
-  using ::Star::StructureMaterialId;
-  using ::Star::Biome5MaterialId;
-  using ::Star::Biome4MaterialId;
-  using ::Star::Biome3MaterialId;
-  using ::Star::Biome2MaterialId;
-  using ::Star::Biome1MaterialId;
-  using ::Star::BiomeMaterialId;
-  using ::Star::BoundaryMaterialId;
-  using ::Star::ObjectSolidMaterialId;
-  using ::Star::ObjectPlatformMaterialId;
-  using ::Star::FirstEngineMetaMaterialId;
-  using ::Star::FirstMetaMaterialId;
+  using ::Star::empty_material_id;
+  using ::Star::null_material_id;
+  using ::Star::structure_material_id;
+  using ::Star::biome5_material_id;
+  using ::Star::biome4_material_id;
+  using ::Star::biome3_material_id;
+  using ::Star::biome2_material_id;
+  using ::Star::biome1_material_id;
+  using ::Star::biome_material_id;
+  using ::Star::boundary_material_id;
+  using ::Star::object_solid_material_id;
+  using ::Star::object_platform_material_id;
+  using ::Star::first_engine_meta_material_id;
+  using ::Star::first_meta_material_id;
   using ::Star::MaterialColorVariant;
-  using ::Star::DefaultMaterialColorVariant;
-  using ::Star::MaxMaterialColorVariant;
+  using ::Star::default_material_color_variant;
+  using ::Star::max_material_color_variant;
   using ::Star::ModId;
-  using ::Star::NoModId;
-  using ::Star::BiomeModId;
-  using ::Star::UndergroundBiomeModId;
-  using ::Star::FirstMetaMod;
-  using ::Star::materialHueToDegrees;
-  using ::Star::materialHueFromDegrees;
-  using ::Star::isRealMaterial;
-  using ::Star::isConnectableMaterial;
-  using ::Star::isBiomeMaterial;
-  using ::Star::isRealMod;
-  using ::Star::isBiomeMod;
+  using ::Star::no_mod_id;
+  using ::Star::biome_mod_id;
+  using ::Star::underground_biome_mod_id;
+  using ::Star::first_meta_mod;
+  using ::Star::material_storage_value;
+  using ::Star::checked_material_value;
+  using ::Star::biome_material_for_variant;
+  using ::Star::material_hue_to_degrees;
+  using ::Star::material_hue_from_degrees;
+  using ::Star::is_real_material;
+  using ::Star::is_connectable_material;
+  using ::Star::is_biome_material;
+  using ::Star::is_real_mod;
+  using ::Star::is_biome_mod;
 }

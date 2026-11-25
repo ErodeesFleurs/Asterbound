@@ -122,7 +122,7 @@ public:
   std::expected<void, StarException> update(float dt, FireMode fireMode, bool shifting, HashSet<MoveControlType> const& moves) override;
 
   [[nodiscard]]
-  std::expected<bool, StarException> beamCanPlace() const override;
+  std::expected<bool, StarException> beam_can_place() const override;
 
   float cooldownTime() const override;
   [[nodiscard]]
@@ -203,7 +203,7 @@ std::expected<void, StarException> ObjectItem::update(float dt, FireMode fireMod
   return {};
 }
 
-std::expected<bool, StarException> ObjectItem::beamCanPlace() const {
+std::expected<bool, StarException> ObjectItem::beam_can_place() const {
   return canPlace(m_shifting);
 }
 

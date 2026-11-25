@@ -354,7 +354,7 @@ std::expected<void, StarException> LiquidWorld::liquid_collision(Vec2I const& li
       target.foreground = interaction->transform_to;
       auto multicolor = m_material_database->is_multi_color(interaction->transform_to);
       if (!multicolor) return std::unexpected(std::move(multicolor.error()));
-      if (!*multicolor) target.foregroundColorVariant = DefaultMaterialColorVariant;
+      if (!*multicolor) target.foregroundColorVariant = default_material_color_variant;
       auto activated = m_world_server.activateLiquidLocation(liquid_pos);
       if (!activated) return std::unexpected(std::move(activated.error()));
     }
@@ -395,7 +395,7 @@ std::expected<FallingBehavior, StarException> FallingBlocksWorld::source_behavio
   if (std::cmp_less(y, geometry.height())) {
     auto tile = m_world_server.getServerTile(location, true);
     if (!tile) return std::unexpected(std::move(tile.error()));
-    if (!tile->get().rootSource && tile->get().foreground != EmptyMaterialId) {
+    if (!tile->get().rootSource && tile->get().foreground != empty_material_id) {
       auto behavior = m_material_database->falling_behavior(tile->get().foreground);
       if (!behavior || *behavior != FallingBehavior::Stationary)
         return behavior;
@@ -417,7 +417,7 @@ std::expected<bool, StarException> FallingBlocksWorld::target_open(Vec2I const& 
   auto location = geometry.xwrap(pos);
   auto tile = m_world_server.getServerTile(location, true);
   if (!tile) return std::unexpected(std::move(tile.error()));
-  if (tile->get().rootSource || tile->get().foreground != EmptyMaterialId) return false;
+  if (tile->get().rootSource || tile->get().foreground != empty_material_id) return false;
   auto occupied = m_world_server.tileIsOccupied(location, TileLayer::Foreground);
   if (!occupied) return std::unexpected(std::move(occupied.error()));
   return !*occupied;
@@ -438,7 +438,7 @@ std::expected<BlockMoveResult, BlockMoveError> FallingBlocksWorld::move_block(Ve
   if (!*source_tile || !*target_tile) return BlockMoveResult::Unchanged;
   auto& source = (*source_tile)->get();
   auto& target = (*target_tile)->get();
-  if (source.foreground == EmptyMaterialId || target.foreground != EmptyMaterialId)
+  if (source.foreground == empty_material_id || target.foreground != empty_material_id)
     return BlockMoveResult::Unchanged;
 
   if (m_world_server.isTileProtected(target_pos)) {
@@ -462,12 +462,12 @@ std::expected<BlockMoveResult, BlockMoveError> FallingBlocksWorld::move_block(Ve
   auto collision = m_material_database->material_collision_kind(source.foreground);
   if (!collision) return std::unexpected(BlockMoveError{std::move(collision.error())});
   target.foreground = source.foreground;
-  target.foregroundMod = NoModId;
+  target.foregroundMod = no_mod_id;
   target.foregroundHueShift = source.foregroundHueShift;
   target.foregroundColorVariant = source.foregroundColorVariant;
   target.update_collision(*collision);
-  source.foreground = EmptyMaterialId;
-  source.foregroundMod = NoModId;
+  source.foreground = empty_material_id;
+  source.foregroundMod = no_mod_id;
   source.update_collision(CollisionKind::None);
   m_world_server.request_global_break_check();
   return BlockMoveResult::Changed;
@@ -540,7 +540,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::setForegroundMaterial(
     tile->get().foreground = material;
     tile->get().foregroundHueShift = hueshift;
     tile->get().foregroundColorVariant = colorVariant;
-    tile->get().foregroundMod = NoModId;
+    tile->get().foregroundMod = no_mod_id;
     tile->get().foregroundModHueShift = MaterialHue();
     auto material_database_result = generationRoot.material_database();
     if (!material_database_result) return std::unexpected(std::move(material_database_result.error()));
@@ -563,7 +563,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::setBackgroundMaterial(
     tile->get().background = material;
     tile->get().backgroundHueShift = hueshift;
     tile->get().backgroundColorVariant = colorVariant;
-    tile->get().backgroundMod = NoModId;
+    tile->get().backgroundMod = no_mod_id;
     tile->get().backgroundModHueShift = MaterialHue();
   }
 
@@ -656,7 +656,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::placePlant(std::shared
   auto autobackgroundResult1 = m_worldServer.getServerTile(position);
   if (!autobackgroundResult1) return std::unexpected(std::move(autobackgroundResult1.error()));
   auto background = std::move(autobackgroundResult1->get().background);
-  bool adjustBackground = background == EmptyMaterialId || background == NullMaterialId;
+  bool adjustBackground = background == empty_material_id || background == null_material_id;
 
   auto withinAdjustment = [=](Vec2I const& pos) {
     return PlantAdjustmentLimit - std::abs(pos[0]) > 0 && PlantAdjustmentLimit - std::abs(pos[1]) > 0;
@@ -670,7 +670,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::placePlant(std::shared
   auto autorootTileResult1 = m_worldServer.getServerTile(position + primaryRoot);
   if (!autorootTileResult1) return std::unexpected(std::move(autorootTileResult1.error()));
   auto rootTile = std::move(autorootTileResult1->get());
-  if (isConnectableMaterial(primaryTile.foreground) || !isConnectableMaterial(rootTile.foreground))
+  if (is_connectable_material(primaryTile.foreground) || !is_connectable_material(rootTile.foreground))
     return {};
 
   // First bail out if we can't fit anything we're not adjusting
@@ -698,7 +698,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::placePlant(std::shared
     auto autotileResult1 = m_worldServer.getServerTile(pspace);
     if (!autotileResult1) return std::unexpected(std::move(autotileResult1.error()));
     auto tile = std::move(autotileResult1->get());
-    if (tile.rootSource || (!withinAdjustment(space) && !(tile.foreground == EmptyMaterialId || tile.foreground == NullMaterialId)))
+    if (tile.rootSource || (!withinAdjustment(space) && !(tile.foreground == empty_material_id || tile.foreground == null_material_id)))
       return {};
   }
 
@@ -713,7 +713,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::placePlant(std::shared
         if (!*left) return false;
                 auto conditionResult1 = m_worldServer.getServerTile(root);
         if (!conditionResult1) return std::unexpected(std::move(conditionResult1.error()));
-        auto condition = std::move(!isConnectableMaterial(conditionResult1->get().foreground));
+        auto condition = std::move(!is_connectable_material(conditionResult1->get().foreground));
         return static_cast<bool>(condition);
       }();
     }(); !condition82)
@@ -731,10 +731,10 @@ std::expected<void, StarException> DungeonGeneratorWorld::placePlant(std::shared
     auto tileCheckedResult1 = m_worldServer.modifyServerTile(space);
     if (!tileCheckedResult1) return std::unexpected(std::move(tileCheckedResult1.error()));
     if (auto tile = std::move((*tileCheckedResult1))) {
-      if (isConnectableMaterial(tile->get().foreground))
+      if (is_connectable_material(tile->get().foreground))
         tile->get() = primaryTile;
       if (adjustBackground)
-        tile->get().background = EmptyMaterialId;
+        tile->get().background = empty_material_id;
       tile->get().collision = CollisionKind::None;
       auto material_database_result = generationRoot.material_database();
       if (!material_database_result) return std::unexpected(std::move(material_database_result.error()));
@@ -752,7 +752,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::placePlant(std::shared
     auto tileCheckedResult1 = m_worldServer.modifyServerTile(root);
     if (!tileCheckedResult1) return std::unexpected(std::move(tileCheckedResult1.error()));
     if (auto tile = std::move((*tileCheckedResult1))) {
-      if (!isRealMaterial(tile->get().foreground)) {
+      if (!is_real_material(tile->get().foreground)) {
         tile->get() = rootTile;
         auto material_database_result = generationRoot.material_database();
         if (!material_database_result) return std::unexpected(std::move(material_database_result.error()));
@@ -1100,14 +1100,14 @@ std::expected<bool, StarException> DungeonGeneratorWorld::checkSolid(Vec2I const
   auto autoconsttileResult1 = m_worldServer.getServerTile(position);
   if (!autoconsttileResult1) return std::unexpected(std::move(autoconsttileResult1.error()));
   auto const& tile = std::move(autoconsttileResult1->get());
-  return tile.material(layer) != EmptyMaterialId && tile.material(layer) != NullMaterialId;
+  return tile.material(layer) != empty_material_id && tile.material(layer) != null_material_id;
 }
 
 std::expected<bool, StarException> DungeonGeneratorWorld::checkOpen(Vec2I const& position, TileLayer layer) {
   auto autoconsttileResult1 = m_worldServer.getServerTile(position);
   if (!autoconsttileResult1) return std::unexpected(std::move(autoconsttileResult1.error()));
   auto const& tile = std::move(autoconsttileResult1->get());
-  return tile.material(layer) == EmptyMaterialId || tile.material(layer) == NullMaterialId;
+  return tile.material(layer) == empty_material_id || tile.material(layer) == null_material_id;
 }
 
 std::expected<bool, StarException> DungeonGeneratorWorld::checkOceanLiquid(Vec2I const& position) {
@@ -1214,7 +1214,7 @@ std::expected<bool, StarException> SpawnerWorld::isBackgroundEmpty(Vec2I const& 
   {
   auto conditionResult1 = m_worldServer.getServerTile(pos);
   if (!conditionResult1) return std::unexpected(std::move(conditionResult1.error()));
-  auto condition = std::move(conditionResult1->get().background == EmptyMaterialId);
+  auto condition = std::move(conditionResult1->get().background == empty_material_id);
   return static_cast<bool>(condition);
 
   }
@@ -1401,69 +1401,44 @@ std::expected<RpcPromise<Vec2I>, StarException> WorldGenerator::enqueuePlacement
 }
 
 std::expected<void, StarException> WorldGenerator::replaceBiomeBlocks(ServerTile& tile) {
-  auto& generationRoot = m_worldServer.root();
-  auto const& worldTemplate = m_worldServer.worldTemplate();
-  auto material_database_result = generationRoot.material_database();
-  if (!material_database_result) return std::unexpected(std::move(material_database_result.error()));
-  MaterialId old_foreground = tile.foreground;
+  auto& root = m_worldServer.root();
+  auto const world_template = m_worldServer.worldTemplate();
+  auto material_database = root.material_database();
+  if (!material_database) return std::unexpected(std::move(material_database.error()));
+  auto const old_foreground = tile.foreground;
 
-  auto biome_result = worldTemplate->biome(tile.blockBiomeIndex);
+  auto biome_result = world_template->biome(tile.blockBiomeIndex);
   if (!biome_result) return std::unexpected(std::move(biome_result.error()));
-  if (auto block_biome = std::move((*biome_result))) {
-    if (tile.foreground == BiomeMaterialId) {
-      tile.foreground = block_biome->main_block;
-      auto tileforegroundHueShiftResult1 = worldTemplate->biomeMaterialHueShift(tile.blockBiomeIndex, tile.foreground);
-      if (!tileforegroundHueShiftResult1) return std::unexpected(std::move(tileforegroundHueShiftResult1.error()));
-      tile.foregroundHueShift = std::move((*tileforegroundHueShiftResult1));
-    } else if ((tile.foreground >= Biome1MaterialId) && (tile.foreground <= Biome5MaterialId)) {
-      auto& subblocks = block_biome->sub_blocks;
-      if (subblocks.size())
-        tile.foreground = subblocks[(tile.foreground - Biome1MaterialId) % subblocks.size()];
-      else
-        tile.foreground = block_biome->main_block;
-      auto tileforegroundHueShiftResult1 = worldTemplate->biomeMaterialHueShift(tile.blockBiomeIndex, tile.foreground);
-      if (!tileforegroundHueShiftResult1) return std::unexpected(std::move(tileforegroundHueShiftResult1.error()));
-      tile.foregroundHueShift = std::move((*tileforegroundHueShiftResult1));
+  auto const& block_biome = *biome_result;
+  auto resolve_layer = [&](MaterialId& material, MaterialHue& hue, ModId& mod, MaterialHue& mod_hue) -> std::expected<void, StarException> {
+    if (!block_biome) {
+      if (is_biome_material(material)) {
+        material = empty_material_id;
+        hue = 0;
+      }
+      if (is_biome_mod(mod)) {
+        mod = no_mod_id;
+        mod_hue = 0;
+      }
+    } else if (is_biome_material(material)) {
+      auto const& sub_blocks = block_biome->sub_blocks;
+      material = material == biome_material_id || sub_blocks.empty()
+          ? block_biome->main_block
+          : sub_blocks[static_cast<std::size_t>(material - biome1_material_id) % sub_blocks.size()];
+      auto resolved_hue = world_template->biomeMaterialHueShift(tile.blockBiomeIndex, material);
+      if (!resolved_hue) return std::unexpected(std::move(resolved_hue.error()));
+      hue = *resolved_hue;
     }
+    return {};
+  };
+  auto foreground = resolve_layer(tile.foreground, tile.foregroundHueShift, tile.foregroundMod, tile.foregroundModHueShift);
+  if (!foreground) return std::unexpected(std::move(foreground.error()));
+  auto background = resolve_layer(tile.background, tile.backgroundHueShift, tile.backgroundMod, tile.backgroundModHueShift);
+  if (!background) return std::unexpected(std::move(background.error()));
 
-    if (tile.background == BiomeMaterialId) {
-      tile.background = block_biome->main_block;
-      auto tilebackgroundHueShiftResult1 = worldTemplate->biomeMaterialHueShift(tile.blockBiomeIndex, tile.background);
-      if (!tilebackgroundHueShiftResult1) return std::unexpected(std::move(tilebackgroundHueShiftResult1.error()));
-      tile.backgroundHueShift = std::move((*tilebackgroundHueShiftResult1));
-    } else if ((tile.background >= Biome1MaterialId) && (tile.background <= Biome5MaterialId)) {
-      auto& subblocks = block_biome->sub_blocks;
-      if (subblocks.size())
-        tile.background = subblocks[(tile.background - Biome1MaterialId) % subblocks.size()];
-      else
-        tile.background = block_biome->main_block;
-      auto tilebackgroundHueShiftResult1 = worldTemplate->biomeMaterialHueShift(tile.blockBiomeIndex, tile.background);
-      if (!tilebackgroundHueShiftResult1) return std::unexpected(std::move(tilebackgroundHueShiftResult1.error()));
-      tile.backgroundHueShift = std::move((*tilebackgroundHueShiftResult1));
-    }
-  } else {
-    if (isBiomeMaterial(tile.foreground)) {
-      tile.foreground = EmptyMaterialId;
-      tile.foregroundHueShift = 0;
-    }
-    if (isBiomeMod(tile.foregroundMod)) {
-      tile.foregroundMod = NoModId;
-      tile.foregroundModHueShift = 0;
-    }
-    if (isBiomeMaterial(tile.background)) {
-      tile.background = EmptyMaterialId;
-      tile.backgroundHueShift = 0;
-    }
-    if (isBiomeMod(tile.backgroundMod)) {
-      tile.backgroundMod = NoModId;
-      tile.backgroundModHueShift = 0;
-    }
-  }
-  {
-    auto collision = biome_foreground_collision(**material_database_result, old_foreground, tile.foreground, tile.collision);
-    if (!collision) return std::unexpected(std::move(collision.error()));
-    tile.update_collision(*collision);
-  }
+  auto collision = biome_foreground_collision(**material_database, old_foreground, tile.foreground, tile.collision);
+  if (!collision) return std::unexpected(std::move(collision.error()));
+  tile.update_collision(*collision);
 
   return {};
 }
@@ -1495,9 +1470,9 @@ std::expected<void, StarException> WorldGenerator::prepareTiles(WorldStorage& wo
       tile->get().environmentBiomeIndex = blockInfo.environmentBiomeIndex;
       tile->get().biomeTransition = blockInfo.biomeTransition;
 
-      if (tile->get().foreground == NullMaterialId) {
+      if (tile->get().foreground == null_material_id) {
         tile->get().foreground = blockInfo.foreground;
-        tile->get().foregroundColorVariant = DefaultMaterialColorVariant;
+        tile->get().foregroundColorVariant = default_material_color_variant;
         auto tileforegroundHueShiftResult1 = planet->biomeMaterialHueShift(tile->get().blockBiomeIndex, tile->get().foreground);
         if (!tileforegroundHueShiftResult1) return std::unexpected(std::move(tileforegroundHueShiftResult1.error()));
         tile->get().foregroundHueShift = std::move((*tileforegroundHueShiftResult1));
@@ -1512,9 +1487,9 @@ std::expected<void, StarException> WorldGenerator::prepareTiles(WorldStorage& wo
         }
       }
 
-      if (tile->get().background == NullMaterialId) {
+      if (tile->get().background == null_material_id) {
         tile->get().background = blockInfo.background;
-        tile->get().backgroundColorVariant = DefaultMaterialColorVariant;
+        tile->get().backgroundColorVariant = default_material_color_variant;
         auto tilebackgroundHueShiftResult1 = planet->biomeMaterialHueShift(tile->get().blockBiomeIndex, tile->get().background);
         if (!tilebackgroundHueShiftResult1) return std::unexpected(std::move(tilebackgroundHueShiftResult1.error()));
         tile->get().backgroundHueShift = std::move((*tilebackgroundHueShiftResult1));
@@ -1529,11 +1504,11 @@ std::expected<void, StarException> WorldGenerator::prepareTiles(WorldStorage& wo
         }
       }
 
-      if (tile->get().foreground != EmptyMaterialId) {
+      if (tile->get().foreground != empty_material_id) {
         tile->get().liquid = LiquidStore();
       } else if (blockInfo.oceanLiquid != empty_liquid_id && pos[1] < blockInfo.oceanLiquidLevel) {
         float pressure = blockInfo.oceanLiquidLevel - pos[1];
-        if (tile->get().background == EmptyMaterialId)
+        if (tile->get().background == empty_material_id)
           tile->get().liquid = LiquidStore::endless(blockInfo.oceanLiquid, pressure);
         else if (blockInfo.encloseLiquids)
           tile->get().liquid = LiquidStore::filled(blockInfo.oceanLiquid, 1.0f, pressure);
@@ -1696,9 +1671,9 @@ std::expected<void, StarException> WorldGenerator::generateCaveLiquid(WorldStora
       return {};
     auto tile = tileArray->tile(wrapCoords(position));
     if constexpr (Star::debug_enabled) {
-      Star::star_assert_failed((tile.foreground != NullMaterialId));
+      Star::star_assert_failed((tile.foreground != null_material_id));
     }
-    if (tile.foreground != EmptyMaterialId) {
+    if (tile.foreground != empty_material_id) {
       // Not sure why this doesn't poison solid materials, but it does (occasionally) encounter that case
       auto collision = material_database->material_collision_kind(tile.foreground);
       if (!collision) return std::unexpected(std::move(collision.error()));
@@ -1707,7 +1682,7 @@ std::expected<void, StarException> WorldGenerator::generateCaveLiquid(WorldStora
       return {};
     }
     if ((tile.dungeonId != no_dungeon_id && (!fillMicrodungeons || tile.dungeonId != biome_micro_dungeon_id))
-        || (!encloseLiquids && tile.background == EmptyMaterialId)
+        || (!encloseLiquids && tile.background == empty_material_id)
         || (tile.liquid.liquid != fillLiquid && tile.liquid.liquid != empty_liquid_id)) {
       badNodes.add(position);
       return {};
@@ -1744,9 +1719,9 @@ std::expected<void, StarException> WorldGenerator::generateCaveLiquid(WorldStora
     visitedNodes.add(position);
     auto tile = tileArray->tile(wrapCoords(position));
     if constexpr (Star::debug_enabled) {
-      Star::star_assert_failed((tile.foreground != NullMaterialId));
+      Star::star_assert_failed((tile.foreground != null_material_id));
     }
-    if (tile.foreground != EmptyMaterialId)
+    if (tile.foreground != empty_material_id)
       return;
     badNodes.add(position);
   };
@@ -1765,9 +1740,9 @@ std::expected<void, StarException> WorldGenerator::generateCaveLiquid(WorldStora
   auto solids = [&](Vec2I position) {
     auto tile = tileArray->tile(wrapCoords(position));
     if constexpr (Star::debug_enabled) {
-      Star::star_assert_failed((tile.foreground != NullMaterialId));
+      Star::star_assert_failed((tile.foreground != null_material_id));
     }
-    if (tile.foreground != EmptyMaterialId)
+    if (tile.foreground != empty_material_id)
       solidSurroundings.add(position);
   };
 
@@ -1790,7 +1765,7 @@ std::expected<void, StarException> WorldGenerator::generateCaveLiquid(WorldStora
       continue;
     if (iter->second)
       tile->get().liquid = LiquidStore::filled(fillLiquid, 1.0f, iter->second);
-    if (encloseLiquids && tile->get().background == EmptyMaterialId)
+    if (encloseLiquids && tile->get().background == empty_material_id)
       tile->get().background = biome_block;
   }
 
@@ -1817,7 +1792,7 @@ std::expected<void, StarException> WorldGenerator::prepareSector(WorldStorage& w
       if (!tile)
         continue;
       if constexpr (Star::debug_enabled) {
-        Star::star_assert_failed((tile->get().foreground != NullMaterialId));
+        Star::star_assert_failed((tile->get().foreground != null_material_id));
       }
 
       if (tile->get().liquid.source) {
@@ -1826,7 +1801,7 @@ std::expected<void, StarException> WorldGenerator::prepareSector(WorldStorage& w
         auto blockInfo = std::move((*autoblockInfoResult1));
         // make sure that ocean liquid never exists on tiles without empty
         // background (except in real dungeons)
-        if (!is_real_dungeon(tile->get().dungeonId) && tile->get().background != EmptyMaterialId)
+        if (!is_real_dungeon(tile->get().dungeonId) && tile->get().background != empty_material_id)
           tile->get().liquid.source = false;
         // pressurize liquid under the ocean
         if (blockInfo.oceanLiquid != empty_liquid_id && position[1] < blockInfo.oceanLiquidLevel) {
@@ -1835,10 +1810,10 @@ std::expected<void, StarException> WorldGenerator::prepareSector(WorldStorage& w
         }
       }
 
-      if (!isRealMaterial(tile->get().foreground))
-        tile->get().foregroundColorVariant = DefaultMaterialColorVariant;
-      if (!isRealMaterial(tile->get().background))
-        tile->get().backgroundColorVariant = DefaultMaterialColorVariant;
+      if (!is_real_material(tile->get().foreground))
+        tile->get().foregroundColorVariant = default_material_color_variant;
+      if (!is_real_material(tile->get().background))
+        tile->get().backgroundColorVariant = default_material_color_variant;
       {
         auto operationResult1 = replaceBiomeBlocks(tile->get());
         if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
@@ -1968,41 +1943,41 @@ std::expected<void, StarException> WorldGenerator::placeBiomeGrass(WorldStorage&
   if (!biome_result) return std::unexpected(std::move(biome_result.error()));
   if (auto block_biome = std::move((*biome_result))) {
     // determine layer for grass mod calculation
-    TileLayer mod_layer = tile.foreground != EmptyMaterialId ? TileLayer::Foreground : TileLayer::Background;
+    TileLayer mod_layer = tile.foreground != empty_material_id ? TileLayer::Foreground : TileLayer::Background;
 
     // don't place mods in dungeons unless explicitly specified, also don't
     // touch non-grass mods
-    if (tile.mod(mod_layer) == BiomeModId || tile.mod(mod_layer) == UndergroundBiomeModId
-        || (tile.dungeonId == no_dungeon_id && tile.mod(mod_layer) == NoModId)) {
+    if (tile.mod(mod_layer) == biome_mod_id || tile.mod(mod_layer) == underground_biome_mod_id
+        || (tile.dungeonId == no_dungeon_id && tile.mod(mod_layer) == no_mod_id)) {
       // check whether we're floor or ceiling
       auto tile_above = worldStorage.tileArray()->tile(position + Vec2I(0, 1));
       auto tile_below = worldStorage.tileArray()->tile(position + Vec2I(0, -1));
-      bool is_floor = (tile.foreground != EmptyMaterialId && tile_above.foreground == EmptyMaterialId) || (tile.background != EmptyMaterialId && tile_above.background == EmptyMaterialId);
-      bool is_ceiling = !is_floor && ((tile.foreground != EmptyMaterialId && tile_below.foreground == EmptyMaterialId) || (tile.background != EmptyMaterialId && tile_below.background == EmptyMaterialId));
+      bool is_floor = (tile.foreground != empty_material_id && tile_above.foreground == empty_material_id) || (tile.background != empty_material_id && tile_above.background == empty_material_id);
+      bool is_ceiling = !is_floor && ((tile.foreground != empty_material_id && tile_below.foreground == empty_material_id) || (tile.background != empty_material_id && tile_below.background == empty_material_id));
 
       // get the appropriate placeables for above/below ground
       BiomePlaceables const& placeables =
-          ((is_floor && tile_above.background != EmptyMaterialId) || (is_ceiling && tile_below.background != EmptyMaterialId))
+          ((is_floor && tile_above.background != empty_material_id) || (is_ceiling && tile_below.background != empty_material_id))
           ? block_biome->underground_placeables : block_biome->surface_placeables;
 
       // determine the proper grass mod or lack thereof
-      ModId grass_mod_id = NoModId;
+      ModId grass_mod_id = no_mod_id;
       if (is_floor) {
         auto grass_chance = static_random_float(worldTemplate->worldSeed(), position[0], position[1]);
-        if (isRealMod(placeables.grass_mod) && grass_chance <= placeables.grass_mod_density)
+        if (is_real_mod(placeables.grass_mod) && grass_chance <= placeables.grass_mod_density)
           grass_mod_id = placeables.grass_mod;
       } else if (is_ceiling) {
         auto grass_chance = static_random_float(worldTemplate->worldSeed(), position[0], position[1]);
-        if (isRealMod(placeables.ceiling_grass_mod) && grass_chance <= placeables.ceiling_grass_mod_density)
+        if (is_real_mod(placeables.ceiling_grass_mod) && grass_chance <= placeables.ceiling_grass_mod_density)
           grass_mod_id = placeables.ceiling_grass_mod;
       }
 
       // set the selected grass mod
       if (mod_layer == TileLayer::Foreground) {
         tile.foregroundMod = grass_mod_id;
-        tile.backgroundMod = NoModId;
+        tile.backgroundMod = no_mod_id;
       } else {
-        tile.foregroundMod = NoModId;
+        tile.foregroundMod = no_mod_id;
         tile.backgroundMod = grass_mod_id;
       }
     }
@@ -2087,66 +2062,66 @@ std::expected<void, StarException> WorldGenerator::reapply_biome(WorldStorage& w
         // replace biome blocks
         if (tile->get().foreground == old_biome->main_block || old_biome->sub_blocks.contains(tile->get().foreground)) {
           tile->get().foreground = block_info.foreground;
-          tile->get().foregroundColorVariant = DefaultMaterialColorVariant;
+          tile->get().foregroundColorVariant = default_material_color_variant;
           if (tile->get().foreground == new_biome->main_block)
             tile->get().foregroundHueShift = new_biome->material_hue_shift;
         }
 
         if (tile->get().background == old_biome->main_block || old_biome->sub_blocks.contains(tile->get().background)) {
           tile->get().background = block_info.background;
-          tile->get().backgroundColorVariant = DefaultMaterialColorVariant;
+          tile->get().backgroundColorVariant = default_material_color_variant;
           if (tile->get().background == new_biome->main_block)
             tile->get().backgroundHueShift = new_biome->material_hue_shift;
         }
 
-        if (tile->get().foreground != EmptyMaterialId || tile->get().background != EmptyMaterialId) {
+        if (tile->get().foreground != empty_material_id || tile->get().background != empty_material_id) {
           // remove old biome mods
           if (tile->get().foregroundMod == old_biome->surface_placeables.grass_mod || tile->get().foregroundMod == old_biome->surface_placeables.ceiling_grass_mod ||
               tile->get().foregroundMod == old_biome->underground_placeables.grass_mod || tile->get().foregroundMod == old_biome->underground_placeables.ceiling_grass_mod) {
 
-            tile->get().foregroundMod = NoModId;
+            tile->get().foregroundMod = no_mod_id;
             tile->get().foregroundModHueShift = 0;
           }
 
           if (tile->get().backgroundMod == old_biome->surface_placeables.grass_mod || tile->get().backgroundMod == old_biome->surface_placeables.ceiling_grass_mod ||
               tile->get().backgroundMod == old_biome->underground_placeables.grass_mod || tile->get().backgroundMod == old_biome->underground_placeables.ceiling_grass_mod) {
 
-            tile->get().backgroundMod = NoModId;
+            tile->get().backgroundMod = no_mod_id;
             tile->get().backgroundModHueShift = 0;
           }
 
           // apply new biome mods
-          TileLayer mod_layer = tile->get().foreground != EmptyMaterialId ? TileLayer::Foreground : TileLayer::Background;
+          TileLayer mod_layer = tile->get().foreground != empty_material_id ? TileLayer::Foreground : TileLayer::Background;
 
-          if (tile->get().mod(mod_layer) == NoModId) {
+          if (tile->get().mod(mod_layer) == no_mod_id) {
             // check whether we're floor or ceiling
             auto tile_above = world_storage.tileArray()->tile(position + Vec2I(0, 1));
             auto tile_below = world_storage.tileArray()->tile(position + Vec2I(0, -1));
-            bool is_floor = tile->get().foreground != EmptyMaterialId && tile_above.foreground == EmptyMaterialId;
-            bool is_ceiling = !is_floor && tile->get().foreground != EmptyMaterialId && tile_below.foreground == EmptyMaterialId;
+            bool is_floor = tile->get().foreground != empty_material_id && tile_above.foreground == empty_material_id;
+            bool is_ceiling = !is_floor && tile->get().foreground != empty_material_id && tile_below.foreground == empty_material_id;
             bool is_mod_floor, is_mod_ceiling;
             if (mod_layer == TileLayer::Foreground) {
               is_mod_floor = is_floor;
               is_mod_ceiling = is_ceiling;
             } else {
-              is_mod_floor = tile->get().background != EmptyMaterialId && tile_above.background == EmptyMaterialId;
-              is_mod_ceiling = !is_mod_floor && tile->get().background != EmptyMaterialId && tile_below.background == EmptyMaterialId;
+              is_mod_floor = tile->get().background != empty_material_id && tile_above.background == empty_material_id;
+              is_mod_ceiling = !is_mod_floor && tile->get().background != empty_material_id && tile_below.background == empty_material_id;
             }
 
             // get the appropriate placeables for above/below ground
             BiomePlaceables const& placeables =
-                ((is_floor && tile_above.background != EmptyMaterialId) || (is_ceiling && tile_below.background != EmptyMaterialId))
+                ((is_floor && tile_above.background != empty_material_id) || (is_ceiling && tile_below.background != empty_material_id))
                 ? new_biome->underground_placeables : new_biome->surface_placeables;
 
             // determine the proper grass mod or lack thereof
-            ModId grass_mod_id = NoModId;
+            ModId grass_mod_id = no_mod_id;
             if (is_mod_floor) {
               auto grass_chance = static_random_float(world_template->worldSeed(), position[0], position[1]);
-              if (isRealMod(placeables.grass_mod) && grass_chance <= placeables.grass_mod_density)
+              if (is_real_mod(placeables.grass_mod) && grass_chance <= placeables.grass_mod_density)
                 grass_mod_id = placeables.grass_mod;
             } else if (is_mod_ceiling) {
               auto grass_chance = static_random_float(world_template->worldSeed(), position[0], position[1]);
-              if (isRealMod(placeables.ceiling_grass_mod) && grass_chance <= placeables.ceiling_grass_mod_density)
+              if (is_real_mod(placeables.ceiling_grass_mod) && grass_chance <= placeables.ceiling_grass_mod_density)
                 grass_mod_id = placeables.ceiling_grass_mod;
             }
 
@@ -2166,7 +2141,7 @@ std::expected<void, StarException> WorldGenerator::reapply_biome(WorldStorage& w
               return std::unexpected(std::move(condition94.error()));
             else if (*condition94) {
               tile->get().foregroundMod = grass_mod_id;
-              tile->get().backgroundMod = NoModId;
+              tile->get().backgroundMod = no_mod_id;
             } else if (auto condition93 = [&]() -> std::expected<bool, StarException> {
               return [&]() -> std::expected<bool, StarException> {
                 auto left = [&]() -> std::expected<bool, StarException> {                   auto condition = std::move(mod_layer == TileLayer::Background);
@@ -2181,13 +2156,13 @@ std::expected<void, StarException> WorldGenerator::reapply_biome(WorldStorage& w
             }(); !condition93)
               return std::unexpected(std::move(condition93.error()));
             else if (*condition93) {
-              tile->get().foregroundMod = NoModId;
+              tile->get().foregroundMod = no_mod_id;
               tile->get().backgroundMod = grass_mod_id;
             }
           }
         } else {
-          tile->get().foregroundMod = NoModId;
-          tile->get().backgroundMod = NoModId;
+          tile->get().foregroundMod = no_mod_id;
+          tile->get().backgroundMod = no_mod_id;
         }
         {
           auto collision = biome_foreground_collision(material_database, old_foreground, tile->get().foreground, tile->get().collision);
@@ -2216,12 +2191,12 @@ std::expected<void, StarException> WorldGenerator::reapply_biome(WorldStorage& w
     auto position_valid = [&](Vec2I const& pos) -> std::expected<bool, StarException> {
       auto const& primary_tile = world_storage.tileArray()->tile(pos);
       auto const& primary_root_tile = world_storage.tileArray()->tile(pos + primary_root);
-      if (isConnectableMaterial(primary_tile.foreground) || !isConnectableMaterial(primary_root_tile.foreground))
+      if (is_connectable_material(primary_tile.foreground) || !is_connectable_material(primary_root_tile.foreground))
         return false;
 
       for (auto const& root : roots) {
         auto const& root_tile = world_storage.tileArray()->tile(root + pos);
-        if (!isConnectableMaterial(root_tile.foreground) || root_tile.blockBiomeIndex != primary_tile.blockBiomeIndex ||
+        if (!is_connectable_material(root_tile.foreground) || root_tile.blockBiomeIndex != primary_tile.blockBiomeIndex ||
             (root_tile.foreground != block_biome->main_block && !block_biome->sub_blocks.contains(root_tile.foreground)))
           return false;
       }
@@ -2229,7 +2204,7 @@ std::expected<void, StarException> WorldGenerator::reapply_biome(WorldStorage& w
         auto tile_pos = space + pos;
         auto occupying = m_worldServer.atTile<TileEntity>(tile_pos);
         if (!occupying) return std::unexpected(std::move(occupying.error()));
-        if (!occupying->empty() || world_storage.tileArray()->tile(tile_pos).foreground != EmptyMaterialId)
+        if (!occupying->empty() || world_storage.tileArray()->tile(tile_pos).foreground != empty_material_id)
           return false;
       }
       return true;
@@ -2310,7 +2285,7 @@ std::expected<void, StarException> WorldGenerator::reapply_biome(WorldStorage& w
       return {};
     };
 
-    if ((*tile)->get().background != EmptyMaterialId) {
+    if ((*tile)->get().background != empty_material_id) {
       auto background = place_mode(block_biome->underground_placeables, BiomePlacementMode::Background);
       if (!background) return std::unexpected(std::move(background.error()));
       if (solid_above) {
@@ -2415,7 +2390,7 @@ std::expected<bool, StarException> WorldGenerator::placePlant(WorldStorage& worl
   auto autobackgroundResult1 = m_worldServer.getServerTile(position);
   if (!autobackgroundResult1) return std::unexpected(std::move(autobackgroundResult1.error()));
   auto background = std::move(autobackgroundResult1->get().background);
-  bool adjustBackground = background == EmptyMaterialId || background == NullMaterialId;
+  bool adjustBackground = background == empty_material_id || background == null_material_id;
 
   auto withinAdjustment = [=](Vec2I const& pos) {
     return PlantAdjustmentLimit - std::abs(pos[0]) > 0 && PlantAdjustmentLimit - std::abs(pos[1]) > 0;
@@ -2427,7 +2402,7 @@ std::expected<bool, StarException> WorldGenerator::placePlant(WorldStorage& worl
   auto rootTile = worldStorage.tileArray()->tile(position + primaryRoot);
   if (primaryTile.dungeonId != no_dungeon_id || rootTile.dungeonId != no_dungeon_id)
     return false;
-  if (isConnectableMaterial(primaryTile.foreground) || !isConnectableMaterial(rootTile.foreground))
+  if (is_connectable_material(primaryTile.foreground) || !is_connectable_material(rootTile.foreground))
     return false;
 
   // First bail out if we can't fit anything we're not adjusting
@@ -2453,14 +2428,14 @@ std::expected<bool, StarException> WorldGenerator::placePlant(WorldStorage& worl
     // Bail out if we hit a different plant's root tile, or if we're not in the
     // adjustment space and we hit a non-empty tile.
     auto tile = worldStorage.tileArray()->tile(pspace);
-    if (tile.rootSource || (!withinAdjustment(space) && tile.foreground != EmptyMaterialId))
+    if (tile.rootSource || (!withinAdjustment(space) && tile.foreground != empty_material_id))
       return false;
   }
 
   // Check all the roots outside of the adjustment limit
   for (auto root : roots) {
     root += position;
-    if (!withinAdjustment(root) && !isConnectableMaterial(worldStorage.tileArray()->tile(root).foreground))
+    if (!withinAdjustment(root) && !is_connectable_material(worldStorage.tileArray()->tile(root).foreground))
       return false;
   }
 
@@ -2472,10 +2447,10 @@ std::expected<bool, StarException> WorldGenerator::placePlant(WorldStorage& worl
     space += position;
     if (auto tile = worldStorage.tileArray()->modify_tile(space)) {
       auto before = tile->get().getCollision();
-      if (isConnectableMaterial(tile->get().foreground))
+      if (is_connectable_material(tile->get().foreground))
         tile->get() = primaryTile;
       if (adjustBackground)
-        tile->get().background = EmptyMaterialId;
+        tile->get().background = empty_material_id;
       tile->get().update_collision(CollisionKind::None);
       if (tile->get().getCollision() != before)
         WorldImpl::invalidate_collision_cache(*worldStorage.tileArray(), RectI::with_size(space, {1, 1}));
@@ -2488,7 +2463,7 @@ std::expected<bool, StarException> WorldGenerator::placePlant(WorldStorage& worl
   for (auto root : roots) {
     root += position;
     if (auto tile = worldStorage.tileArray()->modify_tile(root)) {
-      if (!isRealMaterial(tile->get().foreground)) {
+      if (!is_real_material(tile->get().foreground)) {
         auto material_database_result = generationRoot.material_database();
         if (!material_database_result) return std::unexpected(std::move(material_database_result.error()));
         auto tile_collision_result = (*material_database_result)->material_collision_kind(rootTile.foreground);

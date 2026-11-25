@@ -89,10 +89,10 @@ struct TileFixture {
         int worldX = FixtureMin.x() + x;
         int worldY = FixtureMin.y() + y;
         RenderTile tile{};
-        tile.foreground = worldY < 480 ? dirt : EmptyMaterialId;
-        tile.background = worldY < 484 ? stone : EmptyMaterialId;
-        tile.foregroundMod = worldY == 479 && worldX % 3 == 0 ? grass : NoModId;
-        tile.backgroundMod = NoModId;
+        tile.foreground = worldY < 480 ? dirt : empty_material_id;
+        tile.background = worldY < 484 ? stone : empty_material_id;
+        tile.foregroundMod = worldY == 479 && worldX % 3 == 0 ? grass : no_mod_id;
+        tile.backgroundMod = no_mod_id;
         tile.liquidId = water;
         tile.liquidLevel = worldY >= 480 && worldY < 484 && worldX % 32 < 16 ? 160 : 0;
         data.tiles(x, y) = tile;
@@ -117,7 +117,7 @@ struct TileFixture {
       break;
     case Change::NeighborEdge:
       // On both sides of a chunk boundary, including its padded neighbor.
-      tile({479, 479}).foreground = EmptyMaterialId;
+      tile({479, 479}).foreground = empty_material_id;
       tile({480, 479}).foreground = stone;
       break;
     case Change::Liquid:
@@ -240,7 +240,7 @@ std::expected<void, StarException> validateFixture(Root& root, std::shared_ptr<O
   // Separate consumer-visible regression: a bottom foreground edit changes the
   // geometry of the partial liquid above it, even when liquid bytes do not move.
   fixture->reset();
-  fixture->tile({480, 479}).foreground = EmptyMaterialId;
+  fixture->tile({480, 479}).foreground = empty_material_id;
   fixture->tile({480, 479}).liquidLevel = 0;
   fixture->tile({480, 480}).liquidLevel = 160;
   auto cached = TilePainter::create(root, renderer);
@@ -318,7 +318,7 @@ std::expected<void, StarException> validateFixture(Root& root, std::shared_ptr<O
   if (!normal) return std::unexpected(std::move(normal.error()));
   auto pending = (*recovery)->setup(fixture->camera, fixture->data);
   if (!pending) return std::unexpected(std::move(pending.error()));
-  MaterialId missing = FirstMetaMaterialId - 1;
+  MaterialId missing = first_meta_material_id - 1;
   while ((*materials)->material_collision_kind(missing)) {
     if (missing == 0)
       return std::unexpected(StarException("Tile fixture found no absent real material"));

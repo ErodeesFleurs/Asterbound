@@ -168,7 +168,11 @@ import star.tile_drawer;
 export namespace Star {
 
 class MaterialItem : public Item, public FireableItem, public PreviewTileTool, public RenderableItem, public PreviewableItem, public BeamItem {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
+
 public:
+  MaterialItem(ConstructionKey, Root& root) : Item(root), BeamItem(root) {}
+
   void query_type(TypeQuery& query) const noexcept override {
     query_type_of<MaterialItem, Item, FireableItem, PreviewTileTool, RenderableItem, PreviewableItem, BeamItem>(
       *this, query);
@@ -196,41 +200,44 @@ public:
   [[nodiscard]]
   std::expected<List<Drawable>, StarException> drop_drawables(std::optional<std::reference_wrapper<TileDrawer>> tile_drawer) const override;
   [[nodiscard]]
-  std::expected<bool, StarException> beamCanPlace() const override;
+  std::expected<bool, StarException> beam_can_place() const override;
 
   [[nodiscard]]
-  std::expected<void, StarException> fire(FireMode mode, bool shifting, bool edgeTriggered) override;
+  std::expected<void, StarException> fire(FireMode mode, bool shifting, bool edge_triggered) override;
   [[nodiscard]]
   std::expected<void, StarException> endFire(FireMode mode, bool shifting) override;
 
-  MaterialId materialId() const;
-  MaterialHue materialHueShift() const;
+  MaterialId material_id() const;
+  MaterialHue material_hue_shift() const;
 
   [[nodiscard]]
-  std::expected<bool, StarException> canPlace(bool shifting) const;
-  bool multiplaceEnabled() const;
+  std::expected<bool, StarException> can_place(bool shifting) const;
+  bool multiplace_enabled() const;
 
-  float& blockRadius();
-  float& altBlockRadius();
-  TileCollisionOverride& collisionOverride();
+  float& block_radius();
+  float& alt_block_radius();
+  TileCollisionOverride& collision_override();
 
   [[nodiscard]]
   std::expected<List<PreviewTile>, StarException> preview_tiles(bool shifting) const override;
   [[nodiscard]]
   std::expected<std::reference_wrapper<List<Drawable> const>, StarException> generated_preview(std::optional<std::reference_wrapper<TileDrawer>> tile_drawer, Vec2I position = {}) const;
 private:
-  explicit MaterialItem(Root& root) : Item(root), BeamItem(root) {}
+  using PlacementHue = std::variant<MaterialHue, std::shared_ptr<WorldTemplate const>>;
+
   [[nodiscard]]
-  std::expected<std::size_t, StarException> blockSwap(float radius, TileLayer layer);
+  std::expected<std::size_t, StarException> block_swap(float radius, TileLayer layer, std::optional<PlacementHue>& placement_hue);
   [[nodiscard]]
   std::expected<void, StarException> updatePropertiesFromPlayer(Player& player);
-  float calcRadius(bool shifting) const;
-  List<Vec2I>& tileArea(float radius, Vec2F const& position) const;
+  float calc_radius(bool shifting) const;
+  List<Vec2I> const& tile_area(float radius, Vec2F const& position) const;
   [[nodiscard]]
-  std::expected<MaterialHue, StarException> placementHueShift(Vec2I const& position) const;
+  std::expected<void, StarException> prepare_placement_hue(std::optional<PlacementHue>& placement_hue, World const& world) const;
+  [[nodiscard]]
+  std::expected<MaterialHue, StarException> placement_hue_at(PlacementHue const& placement_hue, Vec2I const& position) const;
 
   MaterialId m_material;
-  MaterialHue m_materialHueShift;
+  MaterialHue m_material_hue_shift;
 
   float m_blockRadius;
   float m_altBlockRadius;
@@ -238,7 +245,7 @@ private:
   bool m_shifting;
   bool m_multiplace;
   StringList m_placeSounds;
-  std::optional<Vec2F> m_lastAimPosition;
+  std::optional<Vec2F> m_last_aim_position;
   TileCollisionOverride m_collisionOverride;
 
   mutable Vec2F m_lastTileAreaOriginCache;
@@ -261,7 +268,7 @@ const String CollisionOverridePropertyKey = "building.collisionOverride";
 const String BlockSwapPropertyKey = "building.blockSwap";
 
 std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create(Root& root, Json const& config, String const& directory, Json const& settings) {
-  auto item = std::shared_ptr<MaterialItem>(new MaterialItem(root));
+  auto item = std::make_shared<MaterialItem>(ConstructionKey{}, root);
   auto initialized = item->initialize(config, directory, settings);
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
@@ -271,18 +278,22 @@ std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create
   auto beam = item->initializeBeam(config);
   if (!beam)
     return std::unexpected(std::move(beam.error()));
-  auto material = config.get_int("materialId");
+  auto material = config.get("materialId").and_then([](Json const& value) -> std::expected<MaterialId, StarException> {
+    return checked_material_value<MaterialId>(value, "materialId");
+  });
   if (!material)
     return std::unexpected(std::move(material.error()));
   item->m_material = *material;
-  auto hue = item->instance_value("materialHueShift", 0).and_then([](Json const& value) { return value.to_float(); });
+  auto hue = item->instance_value("materialHueShift", 0)
+    .and_then([](Json const& value) { return value.to_float(); })
+    .and_then(material_hue_from_degrees);
   if (!hue)
     return std::unexpected(std::move(hue.error()));
-  item->m_materialHueShift = materialHueFromDegrees(*hue);
+  item->m_material_hue_shift = *hue;
   auto database = root.material_database();
   if (!database)
     return std::unexpected(std::move(database.error()));
-  if (item->materialHueShift() != MaterialHue()) {
+  if (item->material_hue_shift() != MaterialHue()) {
     auto drawables = item->icon_drawables();
     if (!drawables)
       return std::unexpected(std::move(drawables.error()));
@@ -291,7 +302,7 @@ std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create
         auto metadata = root.image_metadata_database();
         if (!metadata)
           return std::unexpected(std::move(metadata.error()));
-        auto added = drawable.image_part().add_directives(**metadata, Directives(String(Star::format("?hueshift={}", materialHueToDegrees(item->m_materialHueShift)))), false);
+        auto added = drawable.image_part().add_directives(**metadata, Directives(String(Star::format("?hueshift={}", material_hue_to_degrees(item->m_material_hue_shift)))), false);
         if (!added)
           return std::unexpected(std::move(added.error()));
       }
@@ -395,7 +406,7 @@ std::expected<void, StarException> MaterialItem::uninit() {
   auto uninitialized = FireableItem::uninit();
   if (!uninitialized)
     return std::unexpected(std::move(uninitialized.error()));
-  m_lastAimPosition.reset();
+  m_last_aim_position.reset();
   return {};
 }
 
@@ -403,7 +414,7 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
   auto fireable = FireableItem::update(dt, fireMode, shifting, moves);
   if (!fireable)
     return std::unexpected(std::move(fireable.error()));
-  float radius = calcRadius(shifting);
+  float radius = calc_radius(shifting);
   if (radius == 1)
     setEnd(BeamItem::EndType::Tile);
   else
@@ -515,8 +526,8 @@ std::expected<void, StarException> MaterialItem::render(RenderCallback& render_c
       auto aimPosition = itemOwner->get().aimPosition();
       if (!aimPosition)
         return std::unexpected(std::move(aimPosition.error()));
-      for (auto& tilePos : tileArea(calcRadius(m_shifting), *aimPosition)) {
-        indicator->position = basePosition + Vec2F(tilePos);
+      for (auto const& tile_pos : tile_area(calc_radius(m_shifting), *aimPosition)) {
+        indicator->position = basePosition + Vec2F(tile_pos);
         auto added = render_callback.add_drawable(*indicator, render_layer_foreground_tile);
         if (!added)
           return std::unexpected(std::move(added.error()));
@@ -552,38 +563,38 @@ std::expected<List<Drawable>, StarException> MaterialItem::drop_drawables(std::o
   return generated_preview(tile_drawer).transform([](std::reference_wrapper<List<Drawable> const> drawables) { return drawables.get(); });
 }
 
-std::expected<bool, StarException> MaterialItem::beamCanPlace() const {
-  return canPlace(m_shifting);
+std::expected<bool, StarException> MaterialItem::beam_can_place() const {
+  return can_place(m_shifting);
 }
 
-std::expected<void, StarException> MaterialItem::fire(FireMode mode, bool shifting, bool edgeTriggered) {
+std::expected<void, StarException> MaterialItem::fire(FireMode mode, bool shifting, bool edge_triggered) {
   if (!initialized() || !ready())
     return {};
 
   auto layer = (mode == FireMode::Primary || !two_handed() ? TileLayer::Foreground : TileLayer::Background);
   TileModificationList modifications;
 
-  float radius = calcRadius(shifting);
+  float radius = calc_radius(shifting);
 
-  auto itemWorld = world();
-  if (!itemWorld)
-    return std::unexpected(std::move(itemWorld.error()));
-  auto itemOwner = owner();
-  if (!itemOwner)
-    return std::unexpected(std::move(itemOwner.error()));
-  auto geo = itemWorld->get().geometry();
-  auto aim = itemOwner->get().aimPosition();
+  auto item_world = world();
+  if (!item_world)
+    return std::unexpected(std::move(item_world.error()));
+  auto item_owner = owner();
+  if (!item_owner)
+    return std::unexpected(std::move(item_owner.error()));
+  auto geo = item_world->get().geometry();
+  auto aim = item_owner->get().aimPosition();
   if (!aim)
     return std::unexpected(std::move(aim.error()));
-  auto aimPosition = *aim;
+  auto aim_position = *aim;
 
-  if (!m_lastAimPosition)
-    m_lastAimPosition = aimPosition;
+  if (!m_last_aim_position)
+    m_last_aim_position = aim_position;
 
   unsigned steps = 1;
   Vec2F diff = {};
-  if (*m_lastAimPosition != aimPosition) {
-    diff = geo.diff(*m_lastAimPosition, aimPosition);
+  if (*m_last_aim_position != aim_position) {
+    diff = geo.diff(*m_last_aim_position, aim_position);
     float magnitude = diff.magnitude();
     float limit = std::max(4.f, 64.f / radius);
     if (magnitude > limit) {
@@ -594,9 +605,9 @@ std::expected<void, StarException> MaterialItem::fire(FireMode mode, bool shifti
     steps = static_cast<unsigned>(std::ceil(magnitude * (std::numbers::pi / 2)));
   }
 
-  CollisionKind collisionKind;
+  CollisionKind collision_kind;
   if (m_collisionOverride != TileCollisionOverride::None) {
-    collisionKind = collisionKindFromOverride(m_collisionOverride);
+    collision_kind = collisionKindFromOverride(m_collisionOverride);
   } else {
     auto database = root().material_database();
     if (!database)
@@ -604,17 +615,18 @@ std::expected<void, StarException> MaterialItem::fire(FireMode mode, bool shifti
     auto kind = (*database)->material_collision_kind(m_material);
     if (!kind)
       return std::unexpected(std::move(kind.error()));
-    collisionKind = *kind;
+    collision_kind = *kind;
   }
 
   std::size_t total = 0;
+  std::optional<PlacementHue> placement_hue;
 
   if (m_blockSwap) {
-    auto range = itemOwner->get().inToolRange(aimPosition);
+    auto range = item_owner->get().inToolRange(aim_position);
     if (!range)
       return std::unexpected(std::move(range.error()));
     if (*range) {
-      auto swapped = blockSwap(radius, layer);
+      auto swapped = block_swap(radius, layer, placement_hue);
       if (!swapped)
         return std::unexpected(std::move(swapped.error()));
       total += *swapped;
@@ -622,20 +634,26 @@ std::expected<void, StarException> MaterialItem::fire(FireMode mode, bool shifti
   }
   
   for (unsigned i = 0; i != steps; ++i) {
-    auto placementOrigin = aimPosition + diff * (1.0f - (static_cast<float>(i) / steps));
-    auto range = itemOwner->get().inToolRange(placementOrigin);
+    auto placement_origin = aim_position + diff * (1.0f - (static_cast<float>(i) / steps));
+    auto range = item_owner->get().inToolRange(placement_origin);
     if (!range)
       return std::unexpected(std::move(range.error()));
     if (!*range)
       continue;
 
-    for (Vec2I& pos : tileArea(radius, placementOrigin)) {
-      auto hue = placementHueShift(pos);
+    auto const& positions = tile_area(radius, placement_origin);
+    if (!placement_hue && !positions.empty()) {
+      auto prepared = prepare_placement_hue(placement_hue, item_world->get());
+      if (!prepared)
+        return std::unexpected(std::move(prepared.error()));
+    }
+    for (auto const& pos : positions) {
+      auto hue = placement_hue_at(*placement_hue, pos);
       if (!hue)
         return std::unexpected(std::move(hue.error()));
       modifications.emplace_back(pos,
                                  PlaceMaterial{.layer = layer,
-                                               .material = materialId(),
+                                               .material = material_id(),
                                                .materialHueShift = *hue,
                                                .collisionOverride = m_collisionOverride});
     }
@@ -643,7 +661,7 @@ std::expected<void, StarException> MaterialItem::fire(FireMode mode, bool shifti
     // Make sure not to make any more modifications than we have consumables.
     if (modifications.size() > count())
       modifications.resize(count());
-    auto failed = itemWorld->get().applyTileModifications(modifications, collisionKind <= CollisionKind::Platform);
+    auto failed = item_world->get().applyTileModifications(modifications, collision_kind <= CollisionKind::Platform);
     if (!failed)
       return std::unexpected(std::move(failed.error()));
     if (failed->size() < modifications.size()) {
@@ -655,35 +673,35 @@ std::expected<void, StarException> MaterialItem::fire(FireMode mode, bool shifti
 
   if (total) {
     float intensity = std::clamp(std::sqrt(static_cast<float>(total)) / 16, 0.0f, 1.0f);
-    auto soundResult = root().random().sample_value(m_placeSounds);
-    if (!soundResult)
-      return std::unexpected(std::move(soundResult.error()));
-    auto sound = std::move(*soundResult);
+    auto sound_result = root().random().sample_value(m_placeSounds);
+    if (!sound_result)
+      return std::unexpected(std::move(sound_result.error()));
+    auto sound = std::move(*sound_result);
     auto pitch = root().random().uniform_float(0.9f, 1.1f);
     if (!pitch)
       return std::unexpected(std::move(pitch.error()));
-    auto played = itemOwner->get().addSound(sound, 1.0f + intensity, (1.125f - intensity * 0.75f) * *pitch);
+    auto played = item_owner->get().addSound(sound, 1.0f + intensity, (1.125f - intensity * 0.75f) * *pitch);
     if (!played)
       return std::unexpected(std::move(played.error()));
-    auto fired = FireableItem::fire(mode, shifting, edgeTriggered);
+    auto fired = FireableItem::fire(mode, shifting, edge_triggered);
     if (!fired)
       return std::unexpected(std::move(fired.error()));
   }
 
-  m_lastAimPosition = aimPosition;
+  m_last_aim_position = aim_position;
   return {};
 }
 
 std::expected<void, StarException> MaterialItem::endFire(FireMode, bool) {
-  m_lastAimPosition.reset();
+  m_last_aim_position.reset();
   return {};
 }
 
-std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, TileLayer layer) {
-  auto itemOwner = owner();
-  if (!itemOwner)
-    return std::unexpected(std::move(itemOwner.error()));
-  auto player = as_ref<Player>(itemOwner->get());
+std::expected<std::size_t, StarException> MaterialItem::block_swap(float radius, TileLayer layer, std::optional<PlacementHue>& placement_hue) {
+  auto item_owner = owner();
+  if (!item_owner)
+    return std::unexpected(std::move(item_owner.error()));
+  auto player = as_ref<Player>(item_owner->get());
   if (!player)
     return 0;
   
@@ -692,31 +710,31 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
     return 0;
   
   Item& beamAxe = *beamAxePtr;
-  auto itemWorld = world();
-  if (!itemWorld)
-    return std::unexpected(std::move(itemWorld.error()));
+  auto item_world = world();
+  if (!item_world)
+    return std::unexpected(std::move(item_world.error()));
 
-  List<Vec2I> swapPositions;
-  auto aimPosition = itemOwner->get().aimPosition();
-  if (!aimPosition)
-    return std::unexpected(std::move(aimPosition.error()));
-  for (Vec2I& pos : tileArea(radius, *aimPosition)) {
-    auto connectable = itemWorld->get().isTileConnectable(pos, layer, true);
+  List<Vec2I> swap_positions;
+  auto aim_position = item_owner->get().aimPosition();
+  if (!aim_position)
+    return std::unexpected(std::move(aim_position.error()));
+  for (auto const& pos : tile_area(radius, *aim_position)) {
+    auto connectable = item_world->get().isTileConnectable(pos, layer, true);
     if (!connectable)
       return std::unexpected(std::move(connectable.error()));
     if (!*connectable)
       continue;
-    if (itemWorld->get().isTileProtected(pos))
+    if (item_world->get().isTileProtected(pos))
       continue;
-    if (itemWorld->get().material(pos, layer) == materialId())
+    if (item_world->get().material(pos, layer) == material_id())
       continue;
-    swapPositions.push_back(pos);
+    swap_positions.push_back(pos);
   }
 
-  if (swapPositions.empty())
+  if (swap_positions.empty())
     return 0;
-  if (swapPositions.size() > count())
-    swapPositions.resize(count());
+  if (swap_positions.size() > count())
+    swap_positions.resize(count());
 
   TileDamage damage;
   damage.type = TileDamageType::Beamish;
@@ -735,39 +753,45 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
     return std::unexpected(std::move(harvest.error()));
   damage.harvest_level = *harvest;
 
-  TileModificationList toSwap;
+  if (!placement_hue && !swap_positions.empty()) {
+    auto prepared = prepare_placement_hue(placement_hue, item_world->get());
+    if (!prepared)
+      return std::unexpected(std::move(prepared.error()));
+  }
+
+  TileModificationList to_swap;
   List<Vec2I> willDamage;
-  for (auto pos : swapPositions) {
-    auto hue = placementHueShift(pos);
+  for (auto const& pos : swap_positions) {
+    auto hue = placement_hue_at(*placement_hue, pos);
     if (!hue)
       return std::unexpected(std::move(hue.error()));
-    toSwap.emplace_back(pos,
-                        PlaceMaterial{.layer = layer,
-                                      .material = materialId(),
-                                      .materialHueShift = *hue,
-                                      .collisionOverride = m_collisionOverride});
-    auto destroys = itemWorld->get().damageWouldDestroy(pos, layer, damage);
+    to_swap.emplace_back(pos,
+                         PlaceMaterial{.layer = layer,
+                                       .material = material_id(),
+                                       .materialHueShift = *hue,
+                                       .collisionOverride = m_collisionOverride});
+    auto destroys = item_world->get().damageWouldDestroy(pos, layer, damage);
     if (!destroys)
       return std::unexpected(std::move(destroys.error()));
     if (!*destroys)
       willDamage.push_back(pos);
   }
   
-  std::size_t success;
-  auto failed = itemWorld->get().replaceTiles(toSwap, damage, true);
+  std::size_t success = 0;
+  auto failed = item_world->get().replaceTiles(to_swap, damage, true);
   if (!failed)
     return std::unexpected(std::move(failed.error()));
 
-  if (failed->size() < toSwap.size()) {
-    success = toSwap.size() - failed->size();
+  if (failed->size() < to_swap.size()) {
+    success = to_swap.size() - failed->size();
     consume(success);
   } else {
-    List<Vec2I> toDamage;
+    List<Vec2I> to_damage;
 
-    for (auto pair : toSwap)
-      toDamage.push_back(pair.first);
+    for (auto const& pair : to_swap)
+      to_damage.push_back(pair.first);
 
-    auto damaged = itemWorld->get().damageTiles(toDamage, layer, itemOwner->get().position(), damage, itemOwner->get().entityId());
+    auto damaged = item_world->get().damageTiles(to_damage, layer, item_owner->get().position(), damage, item_owner->get().entityId());
     if (!damaged)
       return std::unexpected(std::move(damaged.error()));
   }
@@ -784,7 +808,7 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
   String blockSound;
 
   for (auto pos : willDamage) {
-    auto sound = (*material_database)->mining_sound(itemWorld->get().material(pos, layer), itemWorld->get().mod(pos, layer));
+    auto sound = (*material_database)->mining_sound(item_world->get().material(pos, layer), item_world->get().mod(pos, layer));
     if (!sound)
       return std::unexpected(std::move(sound.error()));
     blockSound = std::move(*sound);
@@ -794,7 +818,7 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
 
   if (blockSound.empty()) {
     for (auto pos : willDamage) {
-      auto sound = (*material_database)->footstep_sound(itemWorld->get().material(pos, layer), itemWorld->get().mod(pos, layer));
+      auto sound = (*material_database)->footstep_sound(item_world->get().material(pos, layer), item_world->get().mod(pos, layer));
       if (!sound)
         return std::unexpected(std::move(sound.error()));
       blockSound = std::move(*sound);
@@ -811,7 +835,7 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
   auto blockVolume = (*assets)->json("/sfx.config:miningBlockVolume").and_then([](Json const& value) { return value.to_float(); });
   if (!blockVolume)
     return std::unexpected(std::move(blockVolume.error()));
-  auto played = itemOwner->get().addSound(blockSound, *blockVolume);
+  auto played = item_owner->get().addSound(blockSound, *blockVolume);
   if (!played)
     return std::unexpected(std::move(played.error()));
   auto strikeSounds = beamAxe.instance_value("strikeSounds");
@@ -828,7 +852,7 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
     auto toolVolume = (*assets)->json("/sfx.config:miningToolVolume").and_then([](Json const& value) { return value.to_float(); });
     if (!toolVolume)
       return std::unexpected(std::move(toolVolume.error()));
-    auto played = itemOwner->get().addSound(sound, *toolVolume);
+    auto played = item_owner->get().addSound(sound, *toolVolume);
     if (!played)
       return std::unexpected(std::move(played.error()));
   }
@@ -839,7 +863,7 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
   return success;
 }
 
-MaterialId MaterialItem::materialId() const {
+MaterialId MaterialItem::material_id() const {
   return m_material;
 }
 
@@ -857,7 +881,7 @@ std::expected<std::reference_wrapper<List<Drawable> const>, StarException> Mater
       if (!tile)
         return std::unexpected(std::move(tile.error()));
       tile->get().foreground = m_material;
-      tile->get().foregroundHueShift = m_materialHueShift;
+      tile->get().foregroundHueShift = m_material_hue_shift;
       tile->get().foregroundColorVariant = 0;
 
       List<Drawable> drawables;
@@ -952,14 +976,14 @@ std::expected<void, StarException> MaterialItem::updatePropertiesFromPlayer(Play
   return {};
 }
 
-float MaterialItem::calcRadius(bool shifting) const {
-  if (!multiplaceEnabled())
+float MaterialItem::calc_radius(bool shifting) const {
+  if (!multiplace_enabled())
     return 1;
   else
     return !shifting ? m_blockRadius : m_altBlockRadius;
 }
 
-List<Vec2I>& MaterialItem::tileArea(float radius, Vec2F const& position) const {
+List<Vec2I> const& MaterialItem::tile_area(float radius, Vec2F const& position) const {
   if (m_lastTileAreaOriginCache != position || m_lastTileAreaRadiusCache != radius) {
     m_lastTileAreaOriginCache = position;
     m_lastTileAreaRadiusCache = radius;
@@ -968,34 +992,41 @@ List<Vec2I>& MaterialItem::tileArea(float radius, Vec2F const& position) const {
   return m_tileAreasCache;
 }
 
-MaterialHue MaterialItem::materialHueShift() const {
-  return m_materialHueShift;
+MaterialHue MaterialItem::material_hue_shift() const {
+  return m_material_hue_shift;
 }
 
-std::expected<bool, StarException> MaterialItem::canPlace(bool shifting) const {
+std::expected<bool, StarException> MaterialItem::can_place(bool shifting) const {
   if (initialized()) {
-    auto itemOwner = owner();
-    if (!itemOwner)
-      return std::unexpected(std::move(itemOwner.error()));
-    auto itemWorld = world();
-    if (!itemWorld)
-      return std::unexpected(std::move(itemWorld.error()));
-    MaterialId material = materialId();
-    float radius = calcRadius(shifting);
-    auto aimPosition = itemOwner->get().aimPosition();
-    if (!aimPosition)
-      return std::unexpected(std::move(aimPosition.error()));
-    for (auto& pos : tileArea(radius, *aimPosition)) {
-      auto hue = placementHueShift(pos);
+    auto item_owner = owner();
+    if (!item_owner)
+      return std::unexpected(std::move(item_owner.error()));
+    auto item_world = world();
+    if (!item_world)
+      return std::unexpected(std::move(item_world.error()));
+    MaterialId material = material_id();
+    float radius = calc_radius(shifting);
+    auto aim_position = item_owner->get().aimPosition();
+    if (!aim_position)
+      return std::unexpected(std::move(aim_position.error()));
+    auto const& positions = tile_area(radius, *aim_position);
+    if (positions.empty())
+      return false;
+    std::optional<PlacementHue> placement_hue;
+    auto prepared = prepare_placement_hue(placement_hue, item_world->get());
+    if (!prepared)
+      return std::unexpected(std::move(prepared.error()));
+    for (auto const& pos : positions) {
+      auto hue = placement_hue_at(*placement_hue, pos);
       if (!hue)
         return std::unexpected(std::move(hue.error()));
-      auto foreground = itemWorld->get().canModifyTile(
+      auto foreground = item_world->get().canModifyTile(
         pos, PlaceMaterial{.layer = TileLayer::Foreground, .material = material, .materialHueShift = *hue}, false);
       if (!foreground)
         return std::unexpected(std::move(foreground.error()));
       if (*foreground)
         return true;
-      auto background = itemWorld->get().canModifyTile(
+      auto background = item_world->get().canModifyTile(
         pos, PlaceMaterial{.layer = TileLayer::Background, .material = material, .materialHueShift = *hue}, false);
       if (!background)
         return std::unexpected(std::move(background.error()));
@@ -1006,64 +1037,70 @@ std::expected<bool, StarException> MaterialItem::canPlace(bool shifting) const {
   return false;
 }
 
-bool MaterialItem::multiplaceEnabled() const {
+bool MaterialItem::multiplace_enabled() const {
   return m_multiplace && count() > 1;
 }
 
-float& MaterialItem::blockRadius() {
+float& MaterialItem::block_radius() {
   return m_blockRadius;
 }
 
-float& MaterialItem::altBlockRadius() {
+float& MaterialItem::alt_block_radius() {
   return m_altBlockRadius;
 }
 
-TileCollisionOverride& MaterialItem::collisionOverride() {
+TileCollisionOverride& MaterialItem::collision_override() {
   return m_collisionOverride;
 }
 
 std::expected<List<PreviewTile>, StarException> MaterialItem::preview_tiles(bool shifting) const {
   List<PreviewTile> result;
   if (initialized()) {
-    auto itemOwner = owner();
-    if (!itemOwner)
-      return std::unexpected(std::move(itemOwner.error()));
-    auto itemWorld = world();
-    if (!itemWorld)
-      return std::unexpected(std::move(itemWorld.error()));
-    Color lightColor = itemOwner->get().favoriteColor();
-    Vec3B light = lightColor.to_rgb();
-    auto material = materialId();
-    auto color = DefaultMaterialColorVariant;
-    std::size_t c = 0;
-    auto aimPosition = itemOwner->get().aimPosition();
-    if (!aimPosition)
-      return std::unexpected(std::move(aimPosition.error()));
-    for (auto& pos : tileArea(calcRadius(shifting), *aimPosition)) {
-      auto hue = placementHueShift(pos);
+    auto item_owner = owner();
+    if (!item_owner)
+      return std::unexpected(std::move(item_owner.error()));
+    auto item_world = world();
+    if (!item_world)
+      return std::unexpected(std::move(item_world.error()));
+    Vec3B light = item_owner->get().favoriteColor().to_rgb();
+    auto material = material_id();
+    auto color = default_material_color_variant;
+    std::size_t placeable_count = 0;
+    auto aim_position = item_owner->get().aimPosition();
+    if (!aim_position)
+      return std::unexpected(std::move(aim_position.error()));
+    auto const& positions = tile_area(calc_radius(shifting), *aim_position);
+    if (positions.empty())
+      return result;
+    std::optional<PlacementHue> placement_hue;
+    auto prepared = prepare_placement_hue(placement_hue, item_world->get());
+    if (!prepared)
+      return std::unexpected(std::move(prepared.error()));
+    for (auto const& pos : positions) {
+      auto hue = placement_hue_at(*placement_hue, pos);
       if (!hue)
         return std::unexpected(std::move(hue.error()));
-      if (c >= count())
+      if (placeable_count >= count())
         break;
-      auto foreground = itemWorld->get().canModifyTile(
+      auto foreground = item_world->get().canModifyTile(
         pos, PlaceMaterial{.layer = TileLayer::Foreground, .material = material, .materialHueShift = *hue}, false);
       if (!foreground)
         return std::unexpected(std::move(foreground.error()));
       if (*foreground) {
         result.push_back({pos, true, material, *hue, true});
-        c++;
+        ++placeable_count;
       } else {
-        bool backPlaceable = false;
+        bool back_placeable = false;
         if (two_handed()) {
-          auto background = itemWorld->get().canModifyTile(
+          auto background = item_world->get().canModifyTile(
             pos, PlaceMaterial{.layer = TileLayer::Background, .material = material, .materialHueShift = *hue}, false);
           if (!background)
             return std::unexpected(std::move(background.error()));
-          backPlaceable = *background;
+          back_placeable = *background;
         }
-        if (backPlaceable) {
+        if (back_placeable) {
           result.push_back({pos, true, material, *hue, true, light, true, color});
-          c++;
+          ++placeable_count;
         } else {
           result.push_back({pos, true, material, *hue, true});
         }
@@ -1073,24 +1110,31 @@ std::expected<List<PreviewTile>, StarException> MaterialItem::preview_tiles(bool
   return result;
 }
 
-std::expected<MaterialHue, StarException> MaterialItem::placementHueShift(Vec2I const& pos) const {
+std::expected<void, StarException> MaterialItem::prepare_placement_hue(std::optional<PlacementHue>& placement_hue, World const& world) const {
   auto hue = instance_value("materialHueShift");
   if (!hue)
     return std::unexpected(std::move(hue.error()));
-  if (*hue) {
-    return hue->to_float().transform(materialHueFromDegrees);
+  if (!hue->is_null()) {
+    auto explicit_hue = hue->to_float().and_then(material_hue_from_degrees);
+    if (!explicit_hue)
+      return std::unexpected(std::move(explicit_hue.error()));
+    placement_hue.emplace(*explicit_hue);
+  } else if (auto world_client = as_ref<WorldClient>(world)) {
+    placement_hue.emplace(world_client->get().currentTemplate());
+  } else {
+    placement_hue.emplace(material_hue_shift());
   }
-  auto itemWorld = world();
-  if (!itemWorld)
-    return std::unexpected(std::move(itemWorld.error()));
-  if (auto worldClient = as_ref<WorldClient>(itemWorld->get())) {
-    auto worldTemplate = worldClient->get().currentTemplate();
-    auto biomeIndex = worldTemplate->blockBiomeIndex(pos[0], pos[1]);
-    if (!biomeIndex)
-      return std::unexpected(std::move(biomeIndex.error()));
-    return worldTemplate->biomeMaterialHueShift(*biomeIndex, m_material);
-  }
-  return materialHueShift();
+  return {};
+}
+
+std::expected<MaterialHue, StarException> MaterialItem::placement_hue_at(PlacementHue const& placement_hue, Vec2I const& position) const {
+  if (std::holds_alternative<MaterialHue>(placement_hue))
+    return std::get<MaterialHue>(placement_hue);
+  auto const& world_template = *std::get<std::shared_ptr<WorldTemplate const>>(placement_hue);
+  auto biome_index = world_template.blockBiomeIndex(position[0], position[1]);
+  if (!biome_index)
+    return std::unexpected(std::move(biome_index.error()));
+  return world_template.biomeMaterialHueShift(*biome_index, m_material);
 }
 
 }

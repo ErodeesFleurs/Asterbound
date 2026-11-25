@@ -213,7 +213,7 @@ const GameTestRegistration server_break_clock("GameTimers", "GlobalBreakRequests
   world->generateRegion(RectI::with_size(pos - Vec2I(40, 40), {80, 80})).value();
   for (int x = -3; x <= 3; ++x) {
     auto& floor = world->modifyServerTile(pos + Vec2I(x, -1)).value().value().get();
-    floor.foreground = StructureMaterialId;
+    floor.foreground = structure_material_id;
     floor.update_collision(CollisionKind::Block);
   }
   auto chair = std::make_shared<BreakCountingChair>(root);
@@ -267,7 +267,7 @@ const GameTestRegistration falling_block_world_edges("FallingBlocksWorld", "Unlo
   source.foregroundHueShift = 29;
   source.foregroundColorVariant = 3;
   source.update_collision(CollisionKind::Block);
-  target.foreground = EmptyMaterialId;
+  target.foreground = empty_material_id;
   target.update_collision(CollisionKind::None);
   source.rootSource = source_pos;
   EXPECT_EQ(blocks.source_behavior(source_pos), FallingBehavior::Stationary);
@@ -287,8 +287,8 @@ const GameTestRegistration falling_block_world_edges("FallingBlocksWorld", "Unlo
   EXPECT_EQ(*unavailable, BlockMoveResult::Unchanged);
   EXPECT_EQ(source.foreground, *sand);
   MaterialId missing = 0;
-  while (missing < FirstMetaMaterialId && (*materials)->is_valid_material_id(missing)) ++missing;
-  ASSERT_LT(missing, FirstMetaMaterialId);
+  while (missing < first_meta_material_id && (*materials)->is_valid_material_id(missing)) ++missing;
+  ASSERT_LT(missing, first_meta_material_id);
   source.foreground = missing;
   target.foregroundHueShift = 18;
   target.foregroundColorVariant = 1;
@@ -296,7 +296,7 @@ const GameTestRegistration falling_block_world_edges("FallingBlocksWorld", "Unlo
   ASSERT_FALSE(failed);
   EXPECT_EQ(failed.error().result, BlockMoveResult::Unchanged);
   EXPECT_EQ(source.foreground, missing);
-  EXPECT_EQ(target.foreground, EmptyMaterialId);
+  EXPECT_EQ(target.foreground, empty_material_id);
   EXPECT_EQ(target.foregroundHueShift, 18);
   EXPECT_EQ(target.foregroundColorVariant, 1);
   EXPECT_EQ(target.getCollision(), CollisionKind::None);
@@ -305,7 +305,7 @@ const GameTestRegistration falling_block_world_edges("FallingBlocksWorld", "Unlo
   auto moved = blocks.move_block(source_pos, target_pos);
   ASSERT_TRUE(moved) << moved.error().cause.what();
   EXPECT_EQ(*moved, BlockMoveResult::Changed);
-  EXPECT_EQ(source.foreground, EmptyMaterialId);
+  EXPECT_EQ(source.foreground, empty_material_id);
   EXPECT_EQ(source.getCollision(), CollisionKind::None);
   EXPECT_EQ(target.foreground, *sand);
   EXPECT_EQ(target.foregroundHueShift, 29);
@@ -330,7 +330,7 @@ const GameTestRegistration falling_block_protection("FallingBlocksWorld", "Prote
   auto& source = (*source_tile)->get();
   auto& target = (*target_tile)->get();
   target.dungeonId = 17;
-  target.foreground = EmptyMaterialId;
+  target.foreground = empty_material_id;
   world.setTileProtectionEnabled(true);
   ASSERT_TRUE(world.setTileProtection(17, true));
   auto materials = fixture.root().material_database();
@@ -355,9 +355,9 @@ const GameTestRegistration falling_block_protection("FallingBlocksWorld", "Prote
   ASSERT_TRUE(stripped) << stripped.error().cause.what();
   EXPECT_EQ(*stripped, BlockMoveResult::Changed);
   EXPECT_EQ(source.foreground, *sand);
-  EXPECT_EQ(source.foregroundMod, NoModId);
+  EXPECT_EQ(source.foregroundMod, no_mod_id);
   EXPECT_EQ(source.getCollision(), CollisionKind::Block);
-  EXPECT_EQ(target.foreground, EmptyMaterialId);
+  EXPECT_EQ(target.foreground, empty_material_id);
   EXPECT_EQ(drops(), initial);
 
   // A co-breaking mod and its material emit two distinct item entities.
@@ -365,10 +365,10 @@ const GameTestRegistration falling_block_protection("FallingBlocksWorld", "Prote
   auto broken = blocks.move_block(source_pos, target_pos);
   ASSERT_TRUE(broken) << broken.error().cause.what();
   EXPECT_EQ(*broken, BlockMoveResult::Changed);
-  EXPECT_EQ(source.foreground, EmptyMaterialId);
-  EXPECT_EQ(source.foregroundMod, NoModId);
+  EXPECT_EQ(source.foreground, empty_material_id);
+  EXPECT_EQ(source.foregroundMod, no_mod_id);
   EXPECT_EQ(source.getCollision(), CollisionKind::None);
-  EXPECT_EQ(target.foreground, EmptyMaterialId);
+  EXPECT_EQ(target.foreground, empty_material_id);
   EXPECT_EQ(target.dungeonId, 17);
   initial.insert("sand");
   initial.insert("copperore");
@@ -385,7 +385,7 @@ const GameTestRegistration falling_block_protection("FallingBlocksWorld", "Prote
   for (int x = -3; x <= 3; ++x) {
     auto floor = world.modifyServerTile(chair_pos + Vec2I(x, -1));
     ASSERT_TRUE(floor && *floor);
-    (*floor)->get().foreground = StructureMaterialId;
+    (*floor)->get().foreground = structure_material_id;
     (*floor)->get().update_collision(CollisionKind::Block);
   }
   auto objects = fixture.root().objectDatabase();
@@ -398,7 +398,7 @@ const GameTestRegistration falling_block_protection("FallingBlocksWorld", "Prote
   auto occupied_pos = chair_pos + spaces.front();
   auto occupied = world.getServerTile(occupied_pos);
   ASSERT_TRUE(occupied);
-  ASSERT_EQ(occupied->get().foreground, EmptyMaterialId);
+  ASSERT_EQ(occupied->get().foreground, empty_material_id);
   ASSERT_FALSE(occupied->get().rootSource);
   EXPECT_EQ(blocks.target_open(occupied_pos), false);
   EXPECT_EQ(blocks.source_behavior(occupied_pos), FallingBehavior::Stationary);
@@ -440,7 +440,7 @@ const GameTestRegistration falling_block_partial_drop("FallingBlocksWorld", "Ret
   auto& source = (*source_tile)->get();
   auto& target = (*target_tile)->get();
   target.dungeonId = 17;
-  target.foreground = EmptyMaterialId;
+  target.foreground = empty_material_id;
   world.setTileProtectionEnabled(true);
   ASSERT_TRUE(world.setTileProtection(17, true));
   auto materials = (*root)->material_database();
@@ -455,9 +455,9 @@ const GameTestRegistration falling_block_partial_drop("FallingBlocksWorld", "Ret
   (*agent)->visit_location(source_pos);
   auto failed = (*agent)->update();
   ASSERT_FALSE(failed);
-  EXPECT_EQ(source.foreground, EmptyMaterialId);
-  EXPECT_EQ(source.foregroundMod, NoModId);
-  EXPECT_EQ(target.foreground, EmptyMaterialId);
+  EXPECT_EQ(source.foreground, empty_material_id);
+  EXPECT_EQ(source.foregroundMod, no_mod_id);
+  EXPECT_EQ(target.foreground, empty_material_id);
   ASSERT_EQ(world.entity_ids().size(), initial + 1);
   unsigned sand_drops = 0;
   for (auto id : world.entity_ids()) {

@@ -137,7 +137,7 @@ std::expected<Fixture, StarException> prepare_fixture(Root& root, std::shared_pt
     if (!gravity)
       return std::unexpected(std::move(gravity.error()));
   }
-  MaterialId floor_material = EmptyMaterialId;
+  MaterialId floor_material = empty_material_id;
   if (!flying) {
     auto materials = root.material_database();
     if (!materials)
@@ -153,7 +153,7 @@ std::expected<Fixture, StarException> prepare_fixture(Root& root, std::shared_pt
         return std::unexpected(std::move(tile.error()));
       if (!*tile)
         return std::unexpected(StarException("Platformer benchmark floor tile is unavailable"));
-      (*tile)->get().background = StructureMaterialId;
+      (*tile)->get().background = structure_material_id;
       auto placed = world->forceModifyTile(
         position, PlaceMaterial{TileLayer::Foreground, floor_material, MaterialHue(0), TileCollisionOverride::Block},
         true);

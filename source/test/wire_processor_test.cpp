@@ -69,7 +69,7 @@ void exerciseNetwork(GameTest& fixture, bool cycle) {
       auto tile = world->modifyServerTile(Vec2I(x, y), true);
       ASSERT_TRUE(tile) << tile.error().what();
       ASSERT_TRUE(*tile);
-      (*tile)->get().background = StructureMaterialId;
+      (*tile)->get().background = structure_material_id;
     }
   }
   auto database = fixture.root().objectDatabase();

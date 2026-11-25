@@ -59,7 +59,7 @@ template <platform_world_callback Callback> void with_platform_world(GameTest& f
       return std::unexpected(std::move(tile.error()));
     if (!*tile)
       return std::unexpected(StarException("Platform fixture tile is unavailable"));
-    (*tile)->get().background = StructureMaterialId;
+    (*tile)->get().background = structure_material_id;
     auto placed = world->forceModifyTile(
       position, PlaceMaterial{TileLayer::Foreground, *dirt, MaterialHue(0), TileCollisionOverride::Block}, true);
     if (!placed)
@@ -151,7 +151,7 @@ std::expected<void, StarException> place_ledge(Root& root, WorldServer& world, V
       return std::unexpected(std::move(tile.error()));
     if (!*tile)
       return std::unexpected(StarException("Platform fixture ledge tile is unavailable"));
-    (*tile)->get().background = StructureMaterialId;
+    (*tile)->get().background = structure_material_id;
     auto placed =
       world.forceModifyTile(position, PlaceMaterial{TileLayer::Foreground, *dirt, MaterialHue(0), collision}, true);
     if (!placed)

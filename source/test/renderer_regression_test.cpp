@@ -495,8 +495,8 @@ class OpenGlTileDirectiveRegression : public RendererRegression {
     checked(data.tiles.set_size({48, 48}));
     for (unsigned x = 0; x != 48; ++x)
       for (unsigned y = 0; y != 48; ++y)
-        data.tiles(x, y) = RenderTile{.foreground = EmptyMaterialId, .foregroundMod = NoModId,
-                                    .background = EmptyMaterialId, .backgroundMod = NoModId};
+        data.tiles(x, y) = RenderTile{.foreground = empty_material_id, .foregroundMod = no_mod_id,
+                                    .background = empty_material_id, .backgroundMod = no_mod_id};
     auto& tile = data.tiles(24, 24);
     tile.foreground = 1;
     tile.foregroundMod = 1;

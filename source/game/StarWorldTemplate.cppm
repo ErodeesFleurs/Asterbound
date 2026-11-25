@@ -103,11 +103,11 @@ public:
     bool foregroundCave = false;
     bool backgroundCave = false;
 
-    MaterialId foreground = EmptyMaterialId;
-    ModId foregroundMod = NoModId;
+    MaterialId foreground = empty_material_id;
+    ModId foregroundMod = no_mod_id;
 
-    MaterialId background = EmptyMaterialId;
-    ModId backgroundMod = NoModId;
+    MaterialId background = empty_material_id;
+    ModId backgroundMod = no_mod_id;
 
     LiquidId caveLiquid = empty_liquid_id;
     float caveLiquidSeedDensity = 0.0f;

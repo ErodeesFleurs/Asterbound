@@ -8,11 +8,13 @@ import star.format;
 import star.game_test;
 import star.game_types;
 import star.image_metadata_database;
+import star.item_database;
 import star.json;
 import star.liquid_types;
 import star.logging;
 import star.map;
 import star.material_database;
+import star.material_item;
 import star.material_render_profile;
 import star.material_types;
 import star.particle_database;
@@ -27,7 +29,9 @@ import star.vector;
 
 using namespace Star;
 
-TEST(MaterialHueTest, FiniteDegreesTruncateAndWrap) {
+namespace {
+
+const GameTestRegistration hue_conversion("MaterialHueTest", "FiniteDegreesTruncateAndWrap", [](GameTest& fixture) {
   struct HueCase {
     float degrees;
     unsigned hue;
@@ -37,11 +41,56 @@ TEST(MaterialHueTest, FiniteDegreesTruncateAndWrap) {
     {360.0f, 0}, {-360.0f, 0}, {405.0f, 31}, {-405.0f, 225},
     {359.0f, 254}, {-359.0f, 2}, {0.5f, 0}, {-0.5f, 0}
   };
-  for (auto const& test : cases)
-    EXPECT_EQ(static_cast<unsigned>(materialHueFromDegrees(test.degrees)), test.hue) << test.degrees;
-}
+  for (auto const& test : cases) {
+    if (!fixture.check(material_hue_from_degrees(test.degrees) == test.hue, "truncate signed degrees before wrapping to a byte"))
+      return;
+  }
+  constexpr std::array invalid{std::numeric_limits<float>::quiet_NaN(),
+      std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity()};
+  for (float const& angle : invalid) {
+    if (!fixture.check(!material_hue_from_degrees(angle), "reject nonfinite degrees before integer conversion"))
+      return;
+  }
+  for (unsigned byte = 0; byte <= 255; ++byte) {
+    auto decoded = material_hue_to_degrees(static_cast<MaterialHue>(byte));
+    if (!fixture.check(std::abs(static_cast<double>(decoded) - byte * 360.0 / 255.0) < 0.00004, "decode all hue bytes on the 255-step scale"))
+      return;
+  }
+  fixture.check(material_hue_from_degrees(material_hue_to_degrees(255)) == 0, "the final byte decodes to a full turn");
+});
 
-namespace {
+const GameTestRegistration material_id_classes("MaterialTypesTest", "LegacyIdRangesAndConnectivity", [](GameTest& fixture) {
+  for (unsigned word = 0; word < 65536; ++word) {
+    auto id = static_cast<MaterialId>(word);
+    if (is_real_material(id) != (word < 65000) || is_real_mod(id) != (word < 65520) ||
+        is_connectable_material(id) != (word != 65526 && word < 65534) ||
+        is_biome_material(id) != (word >= 65527 && word <= 65532) ||
+        is_biome_mod(id) != (word == 65533 || word == 65534)) {
+      fixture.check(false, Star::format("classification changed for stored ID {}", word));
+      return;
+    }
+  }
+});
+
+const GameTestRegistration material_item_width("MaterialTypesTest", "ItemIdCannotAliasAnotherBlock", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  auto items = root.itemDatabase();
+  if (!fixture.check(bool(items), "load item definitions")) return;
+  auto dirt = (*items)->item_config("dirtmaterial", JsonObject{});
+  if (!fixture.check(bool(dirt), "load stock material item")) return;
+  auto dirt_id = dirt->config.get_int("materialId");
+  if (!fixture.check(bool(dirt_id), "read registered dirt ID")) return;
+  auto make = [&](Json id) -> std::expected<std::shared_ptr<MaterialItem>, StarException> {
+    auto config = dirt->config.set("materialId", std::move(id));
+    if (!config) return std::unexpected(std::move(config.error()));
+    return MaterialItem::create(root, *config, dirt->directory, dirt->parameters);
+  };
+  if (!fixture.check(bool(make(static_cast<double>(*dirt_id))), "a whole-valued JSON number still selects dirt")) return;
+  for (Json id : {Json{*dirt_id + 65536}, Json{*dirt_id - 65536}, Json{*dirt_id + 0.5}}) {
+    auto item = make(std::move(id));
+    if (!fixture.check(!item, "reject a value that would alias dirt when truncated")) return;
+  }
+});
 
 const GameTestRegistration material_falling_behavior("MaterialDatabaseTest", "FallingBehavior", [](GameTest& fixture) {
   auto materials = fixture.root().material_database();
@@ -55,15 +104,15 @@ const GameTestRegistration material_falling_behavior("MaterialDatabaseTest", "Fa
     ASSERT_TRUE(behavior) << behavior.error().what();
     EXPECT_EQ(*behavior, expected);
   }
-  for (auto id : {FirstMetaMaterialId, StructureMaterialId, EmptyMaterialId, NullMaterialId}) {
+  for (auto id : {first_meta_material_id, structure_material_id, empty_material_id, null_material_id}) {
     auto behavior = (*materials)->falling_behavior(id);
     ASSERT_TRUE(behavior) << behavior.error().what();
     EXPECT_EQ(*behavior, FallingBehavior::Stationary);
   }
   MaterialId missing = 0;
-  while (isRealMaterial(missing) && (*materials)->is_valid_material_id(missing))
+  while (is_real_material(missing) && (*materials)->is_valid_material_id(missing))
     ++missing;
-  ASSERT_TRUE(isRealMaterial(missing));
+  ASSERT_TRUE(is_real_material(missing));
   EXPECT_FALSE((*materials)->falling_behavior(missing));
 });
 
@@ -249,9 +298,9 @@ const GameTestRegistration material_catalog_guards("MaterialDatabaseTest", "Reje
   constexpr auto id_overflow = std::int64_t{std::numeric_limits<MaterialId>::max()} + 1;
   constexpr auto liquid_overflow = std::int64_t{std::numeric_limits<LiquidId>::max()} + 1;
   constexpr auto harvest_overflow = std::int64_t{std::numeric_limits<unsigned>::max()} + 1;
-  for (auto id : {std::int64_t{-1}, std::int64_t{FirstMetaMaterialId}, id_overflow + 1})
+  for (auto id : {std::int64_t{-1}, std::int64_t{first_meta_material_id}, id_overflow + 1})
     reject("fixture.material", material_fixture(id), "materialId");
-  for (auto id : {std::int64_t{-1}, std::int64_t{FirstMetaMod}, id_overflow + 1})
+  for (auto id : {std::int64_t{-1}, std::int64_t{first_meta_mod}, id_overflow + 1})
     reject("fixture.matmod", mod_fixture(id), "modId");
 
   constexpr std::pair<std::string_view, std::int64_t> material_limits[] = {
@@ -324,14 +373,14 @@ const GameTestRegistration material_meta_catalog("MaterialDatabaseTest", "LogsAn
   Logger logger;
   auto sink = std::make_shared<MetamaterialLog>();
   logger.add_sink(sink);
-  constexpr auto meta_id = FirstMetaMaterialId;
+  constexpr auto meta_id = first_meta_material_id;
   constexpr auto wrapped_id = std::int64_t{std::numeric_limits<MaterialId>::max()} + 1 + meta_id;
   auto meta = [](String name, std::int64_t id) -> Json {
     return JsonObject{{"name", std::move(name)}, {"materialId", id}, {"collisionKind", "platform"}};
   };
   auto loaded = load_material_fixtures(fixture, *directory, logger, {}, JsonArray{
     meta("negative", -1), meta("wrapped", wrapped_id), meta("real", meta_id - 1),
-    meta("engine", FirstEngineMetaMaterialId), meta("fixture", meta_id), meta("collision", meta_id),
+    meta("engine", first_engine_meta_material_id), meta("fixture", meta_id), meta("collision", meta_id),
     meta("fixture", meta_id + 1), meta("next", meta_id + 2)});
   if (!fixture.check(bool(loaded), loaded ? "load catalog after logging invalid metamaterials" : loaded.error().what())) return;
   auto const& catalog = **loaded;
@@ -381,10 +430,10 @@ const GameTestRegistration material_catalog_lookup("MaterialDatabaseTest", "Pres
   material["liquidInteractions"] = JsonArray{
     JsonObject{{"liquidId", std::numeric_limits<LiquidId>::max()}, {"transformMaterialId", next_material_id},
                {"consumeLiquid", 0.25}, {"topOnly", true}},
-    JsonObject{{"liquidId", 0}, {"transformMaterialId", NullMaterialId}},
-    JsonObject{{"liquidId", 1}, {"transformMaterialId", FirstMetaMaterialId}}};
+    JsonObject{{"liquidId", 0}, {"transformMaterialId", null_material_id}},
+    JsonObject{{"liquidId", 1}, {"transformMaterialId", first_meta_material_id}}};
   auto next_material = material_fixture(next_material_id, "second");
-  next_material["tillableMod"] = NoModId;
+  next_material["tillableMod"] = no_mod_id;
   next_material["liquidInteractions"] = JsonArray{
     JsonObject{{"liquidId", std::numeric_limits<LiquidId>::max()}, {"transformMaterialId", material_id}},
     JsonObject{{"liquidId", 1}}};
@@ -403,8 +452,8 @@ const GameTestRegistration material_catalog_lookup("MaterialDatabaseTest", "Pres
   mod["liquidInteractions"] = JsonArray{
     JsonObject{{"liquidId", std::numeric_limits<LiquidId>::max()}, {"transformModId", next_mod_id},
                {"consumeLiquid", 0.5}, {"topOnly", true}},
-    JsonObject{{"liquidId", 0}, {"transformModId", NoModId}},
-    JsonObject{{"liquidId", 1}, {"transformModId", BiomeModId}}};
+    JsonObject{{"liquidId", 0}, {"transformModId", no_mod_id}},
+    JsonObject{{"liquidId", 1}, {"transformModId", biome_mod_id}}};
   auto next_mod = mod_fixture(next_mod_id, "second");
   next_mod["shortdescription"] = Json{};
   next_mod["harvestLevel"] = std::numeric_limits<unsigned>::max();
@@ -428,8 +477,8 @@ const GameTestRegistration material_catalog_lookup("MaterialDatabaseTest", "Pres
                   catalog.is_valid_material_id(material_id) && catalog.is_valid_mod_id(mod_id),
                 "register real materials and mods with independent names");
   fixture.check(catalog.is_material_name("metamaterial:empty") && catalog.is_meta_material_name("metamaterial:empty") &&
-                  catalog.is_valid_material_id(EmptyMaterialId) && catalog.is_valid_mod_id(NoModId) &&
-                  catalog.is_mod_name("metamod:none") && catalog.mod_id("metamod:none") == NoModId,
+                  catalog.is_valid_material_id(empty_material_id) && catalog.is_valid_mod_id(no_mod_id) &&
+                  catalog.is_mod_name("metamod:none") && catalog.mod_id("metamod:none") == no_mod_id,
                 "built-in meta names and IDs are registered too");
   fixture.check(catalog.is_soil(material_id) == true && catalog.blocks_liquid_flow(material_id) == true &&
                   catalog.supports_mod(material_id, mod_id) == true && catalog.is_tilled_mod(mod_id) == true &&
@@ -437,11 +486,11 @@ const GameTestRegistration material_catalog_lookup("MaterialDatabaseTest", "Pres
                   catalog.can_place_in_layer(material_id, TileLayer::Foreground) == true &&
                   catalog.can_place_in_layer(material_id, TileLayer::Background) == false,
                 "real records retain configured flags and block defaults");
-  fixture.check(catalog.is_soil(StructureMaterialId) == false && catalog.blocks_liquid_flow(StructureMaterialId) == true &&
-                  catalog.blocks_liquid_flow(EmptyMaterialId) == false && catalog.is_tilled_mod(NoModId) == false &&
-                  catalog.mod_breaks_with_tile(NoModId) == false &&
-                  catalog.supports_mod(StructureMaterialId, mod_id) == false &&
-                  catalog.supports_mod(StructureMaterialId, NoModId) == true,
+  fixture.check(catalog.is_soil(structure_material_id) == false && catalog.blocks_liquid_flow(structure_material_id) == true &&
+                  catalog.blocks_liquid_flow(empty_material_id) == false && catalog.is_tilled_mod(no_mod_id) == false &&
+                  catalog.mod_breaks_with_tile(no_mod_id) == false &&
+                  catalog.supports_mod(structure_material_id, mod_id) == false &&
+                  catalog.supports_mod(structure_material_id, no_mod_id) == true,
                 "meta properties and explicit NoMod support preserve their defaults");
 
   constexpr auto max_liquid = std::numeric_limits<LiquidId>::max();
@@ -460,20 +509,20 @@ const GameTestRegistration material_catalog_lookup("MaterialDatabaseTest", "Pres
   auto material_sentinel = catalog.liquid_material_interaction(0, material_id);
   auto material_meta = catalog.liquid_material_interaction(1, material_id);
   auto material_default = catalog.liquid_material_interaction(1, next_material_id);
-  fixture.check(material_sentinel && material_sentinel->transform_to == NullMaterialId &&
-                  material_meta && material_meta->transform_to == FirstMetaMaterialId &&
-                  material_default && material_default->transform_to == NullMaterialId &&
+  fixture.check(material_sentinel && material_sentinel->transform_to == null_material_id &&
+                  material_meta && material_meta->transform_to == first_meta_material_id &&
+                  material_default && material_default->transform_to == null_material_id &&
                   !material_default->top_only && material_default->consume_liquid == 0 &&
-                  !catalog.is_valid_material_id(FirstMetaMaterialId),
+                  !catalog.is_valid_material_id(first_meta_material_id),
                 "stored material transforms may reference sentinels or unregistered meta-range IDs");
   auto mod_sentinel = catalog.liquid_mod_interaction(0, mod_id);
   auto mod_meta = catalog.liquid_mod_interaction(1, mod_id);
   auto mod_default = catalog.liquid_mod_interaction(1, next_mod_id);
-  fixture.check(mod_sentinel && mod_sentinel->transform_to == NoModId &&
-                  mod_meta && mod_meta->transform_to == BiomeModId &&
-                  mod_default && mod_default->transform_to == NoModId &&
+  fixture.check(mod_sentinel && mod_sentinel->transform_to == no_mod_id &&
+                  mod_meta && mod_meta->transform_to == biome_mod_id &&
+                  mod_default && mod_default->transform_to == no_mod_id &&
                   !mod_default->top_only && mod_default->consume_liquid == 0 &&
-                  catalog.tilled_mod_for(material_id) == next_mod_id && catalog.tilled_mod_for(next_material_id) == NoModId,
+                  catalog.tilled_mod_for(material_id) == next_mod_id && catalog.tilled_mod_for(next_material_id) == no_mod_id,
                 "preserve sentinel and forward mod IDs in reactions and tillableMod");
 
   fixture.check(catalog.material_description(material_id) == String("material fallback") &&
@@ -503,8 +552,8 @@ const GameTestRegistration material_catalog_lookup("MaterialDatabaseTest", "Pres
                   mod_asset && *mod_asset && (**mod_asset).get().path == String("/nested/a.matmod") &&
                   (**mod_asset).get().config.get_string("modName") == String("fixture"),
                 "each real asset supplies its original path and config together");
-  auto meta_material_asset = catalog.material_asset(FirstMetaMaterialId);
-  auto meta_mod_asset = catalog.mod_asset(FirstMetaMod);
+  auto meta_material_asset = catalog.material_asset(first_meta_material_id);
+  auto meta_mod_asset = catalog.mod_asset(first_meta_mod);
   fixture.check(meta_material_asset && !*meta_material_asset && meta_mod_asset && !*meta_mod_asset &&
                   !catalog.material_asset(0) && !catalog.mod_asset(0),
                 "reserved-range asset lookups are empty, but real holes are errors");
@@ -519,9 +568,9 @@ const GameTestRegistration material_catalog_lookup("MaterialDatabaseTest", "Pres
                 "material resolves its template relative to the asset, while mod resolves from the asset root");
   fixture.check(!catalog.material_render_profile(0) && !catalog.mod_render_profile(0) &&
                   !catalog.material_render_profile(next_material_id) && !catalog.mod_render_profile(next_mod_id) &&
-                  !catalog.material_render_profile(StructureMaterialId) && !catalog.mod_render_profile(NoModId) &&
+                  !catalog.material_render_profile(structure_material_id) && !catalog.mod_render_profile(no_mod_id) &&
                   catalog.foreground_light_transparent(next_material_id) == true &&
-                  catalog.foreground_light_transparent(StructureMaterialId) == false,
+                  catalog.foreground_light_transparent(structure_material_id) == false,
                 "render profile absence covers holes, unrendered real records, and meta IDs");
 
   auto material_damage = catalog.material_damage_parameters(material_id);
@@ -536,8 +585,8 @@ const GameTestRegistration material_catalog_lookup("MaterialDatabaseTest", "Pres
   auto maximum_harvest = catalog.mod_damage_parameters(next_mod_id);
   fixture.check(maximum_harvest && maximum_harvest->get().required_harvest_level() == std::numeric_limits<unsigned>::max(),
                 "harvest level accepts the largest representable value");
-  auto meta_material_damage = catalog.material_damage_parameters(FirstMetaMaterialId);
-  auto meta_mod_damage = catalog.mod_damage_parameters(NoModId);
+  auto meta_material_damage = catalog.material_damage_parameters(first_meta_material_id);
+  auto meta_mod_damage = catalog.mod_damage_parameters(no_mod_id);
   fixture.check(real_default && real_default->get().required_harvest_level() == 1 && real_default->get().total_health() == 1 &&
                   meta_material_damage && meta_material_damage->get().required_harvest_level() == 0 &&
                   meta_material_damage->get().total_health() == 0 &&

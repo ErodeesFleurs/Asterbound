@@ -624,7 +624,7 @@ const GameTestRegistration shipWorldIsDeterministic("WorldSnapshot", "ShipWorldI
       auto secondSample = tileHash(position, secondTile->get());
       ASSERT_TRUE(secondSample) << secondSample.error().what();
       secondHash ^= *secondSample;
-      if (firstTile->get().foreground != EmptyMaterialId)
+      if (firstTile->get().foreground != empty_material_id)
         ++nonEmptyTiles;
     }
   }
@@ -775,9 +775,9 @@ const GameTestRegistration delayedExplosionOutlivesProjectile("ProjectileActions
   auto damagedTile = world->getServerTile(tilePosition);
   ASSERT_TRUE(damagedTile) << damagedTile.error().what();
   EXPECT_FALSE(damagedTile->get().foregroundDamage.dead());
-  for (unsigned step = 0; step < 10 && world->material(tilePosition, TileLayer::Foreground) != EmptyMaterialId; ++step)
+  for (unsigned step = 0; step < 10 && world->material(tilePosition, TileLayer::Foreground) != empty_material_id; ++step)
     ASSERT_TRUE(world->update(0.2f));
-  EXPECT_EQ(world->material(tilePosition, TileLayer::Foreground), EmptyMaterialId);
+  EXPECT_EQ(world->material(tilePosition, TileLayer::Foreground), empty_material_id);
 });
 
 const GameTestRegistration firstContactTriggersCollisionActionOnce("ProjectileActions", "FirstContactTriggersCollisionActionOnce", [](GameTest& fixture) {
@@ -799,10 +799,10 @@ const GameTestRegistration firstContactTriggersCollisionActionOnce("ProjectileAc
   auto attachment = world->modifyServerTile(ground, true);
   ASSERT_TRUE(attachment) << attachment.error().what();
   ASSERT_TRUE(*attachment);
-  ASSERT_EQ((*attachment)->get().foreground, EmptyMaterialId);
+  ASSERT_EQ((*attachment)->get().foreground, empty_material_id);
   // As in the real material-isolation fixture, supply a background attachment:
   // forceModifyTile bypasses protection, not the normal adjacency requirement.
-  (*attachment)->get().background = StructureMaterialId;
+  (*attachment)->get().background = structure_material_id;
   // Production placement derives foreground collision from the material.
   auto placed = world->forceModifyTile(ground, PlaceMaterial{TileLayer::Foreground, *dirt, MaterialHue(0)}, true);
   ASSERT_TRUE(placed) << placed.error().what();

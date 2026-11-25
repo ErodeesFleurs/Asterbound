@@ -217,7 +217,7 @@ std::expected<void, StarException> MaterialProfileCompiler::compile_settings(Jso
     return std::unexpected(std::move(multi_colored.error()));
   if (*multi_colored) {
     auto count = checked_unsigned<std::uint8_t>(
-        spec.get_uint("colorVariants", MaxMaterialColorVariant + 1), "colorVariants");
+        spec.get_uint("colorVariants", max_material_color_variant + 1), "colorVariants");
     if (!count)
       return std::unexpected(std::move(count.error()));
     m_profile.color_variants = *count;
@@ -569,7 +569,7 @@ std::expected<String, StarException> MaterialRenderProfile::piece_image(
         "Piece '{}' has no texture variants for color {}", piece_name, color_variant));
   auto const& rect = selected->get();
   if (hue_shift != MaterialHue())
-    return Star::format("{}?hueshift={}?crop={};{};{};{}", piece.texture, materialHueToDegrees(hue_shift),
+    return Star::format("{}?hueshift={}?crop={};{};{};{}", piece.texture, material_hue_to_degrees(hue_shift),
         rect.x_min(), rect.y_min(), rect.x_max(), rect.y_max());
   return Star::format("{}?crop={};{};{};{}", piece.texture, rect.x_min(), rect.y_min(), rect.x_max(), rect.y_max());
 }

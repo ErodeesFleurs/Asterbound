@@ -65,7 +65,7 @@ protected:
   std::expected<List<Drawable>, StarException> beamDrawables() const;
   virtual bool beamActive() const;
   [[nodiscard]]
-  virtual std::expected<bool, StarException> beamCanPlace() const;
+  virtual std::expected<bool, StarException> beam_can_place() const;
 
   String m_image;
   StringList m_endImages;

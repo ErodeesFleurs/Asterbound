@@ -2573,7 +2573,7 @@ std::uint64_t WorldClient::currentStep() const {
 
 MaterialId WorldClient::material(Vec2I const& pos, TileLayer layer) const {
   if (!inWorld())
-    return NullMaterialId;
+    return null_material_id;
   return m_tileArray->tile(pos).material(layer);
 }
 
@@ -2586,7 +2586,7 @@ MaterialHue WorldClient::materialHueShift(Vec2I const& position, TileLayer layer
 
 ModId WorldClient::mod(Vec2I const& pos, TileLayer layer) const {
   if (!inWorld())
-    return NoModId;
+    return no_mod_id;
   return m_tileArray->tile(pos).mod(layer);
 }
 
@@ -3004,7 +3004,7 @@ std::expected<void, StarException> WorldClient::sparkDamagedBlocks() {
         m_damagedBlocks.remove(pos);
       }
       
-      if (isRealMaterial(tile->get().foreground) && tile->get().foregroundDamage.damage_effect_percentage() - this->root().random().uniform_float() > 0.0f
+      if (is_real_material(tile->get().foreground) && tile->get().foregroundDamage.damage_effect_percentage() - this->root().random().uniform_float() > 0.0f
                 && (this->root().random().uniform_float() < m_blockDamageParticleProbability)) {
         auto particle = m_blockDamageParticle;
         auto result230 = material_database->material_particle_color(tile->get().foreground, tile->get().foregroundHueShift);
@@ -3022,7 +3022,7 @@ std::expected<void, StarException> WorldClient::sparkDamagedBlocks() {
         m_particles->add(particle);
       }
       
-      if (isRealMaterial(tile->get().background) && tile->get().backgroundDamage.damage_effect_percentage() - this->root().random().uniform_float() > 0.0f
+      if (is_real_material(tile->get().background) && tile->get().backgroundDamage.damage_effect_percentage() - this->root().random().uniform_float() > 0.0f
                 && (this->root().random().uniform_float() < m_blockDamageParticleProbability)) {
         auto particle = m_blockDamageParticle;
         auto result232 = material_database->material_particle_color(tile->get().background, tile->get().backgroundHueShift);
@@ -3091,12 +3091,12 @@ std::expected<void, StarException> gatherClientLightingTiles(CellularLightingCal
     for (std::size_t y = 0; y < column.size(); ++y) {
       auto& tile = column[y];
       Vec3F light;
-      if (tile.foreground != EmptyMaterialId || tile.foregroundMod != NoModId)
+      if (tile.foreground != empty_material_id || tile.foregroundMod != no_mod_id)
         light += materials.radiant_light(tile.foreground, tile.foregroundMod);
       if (tile.liquid.liquid != empty_liquid_id && tile.liquid.level != 0.0f)
         light += liquids.radiant_light(tile.liquid);
       if (tile.foregroundLightTransparent) {
-        if (tile.background != EmptyMaterialId || tile.backgroundMod != NoModId)
+        if (tile.background != empty_material_id || tile.backgroundMod != no_mod_id)
           light += materials.radiant_light(tile.background, tile.backgroundMod);
         if (tile.backgroundLightTransparent && pos[1] + y > undergroundLevel)
           light += environmentLight;
@@ -3338,7 +3338,7 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
     
     m_weather->setup(m_geometry, [&self = *this](Vec2I const& pos)  -> std::expected<bool, StarException> {
       auto const& tile = self.m_tileArray->tile(pos);
-      return !isRealMaterial(tile.background) && !isSolidColliding(tile.getCollision());
+      return !is_real_material(tile.background) && !isSolidColliding(tile.getCollision());
     });
     {
       auto result263 = m_worldTemplate->weatherLayerAt(Vec2I::floor(startPacket.playerStart));
@@ -3704,7 +3704,7 @@ std::expected<bool, StarException> WorldClient::read_net_tile(Vec2I const& pos, 
       if (p.collision && *p.collision == net_tile.collision) {
         p.collision.reset();
       }
-      if (p.foreground && (*p.foreground == StructureMaterialId || *p.foreground == net_tile.foreground)) {
+      if (p.foreground && (*p.foreground == structure_material_id || *p.foreground == net_tile.foreground)) {
         p.foreground.reset();
       }
       if (p.foregroundMod && *p.foregroundMod == net_tile.foregroundMod) {
@@ -4269,7 +4269,7 @@ std::expected<void, StarException> WorldClient::inform_tile_prediction(Vec2I con
     auto& prediction = m_predicted_tiles[pos];
     auto previous = prediction.collision;
     bool stationary = *behavior == FallingBehavior::Stationary;
-    prediction.foreground = stationary ? placement.material : StructureMaterialId;
+    prediction.foreground = stationary ? placement.material : structure_material_id;
     prediction.foregroundHueShift = stationary ? placement.materialHueShift : std::nullopt;
     prediction.collision = collision;
     prediction.time = now;

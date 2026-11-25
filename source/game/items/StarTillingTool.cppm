@@ -222,13 +222,13 @@ std::expected<void, StarException> TillingTool::fire(FireMode mode, bool shiftin
   if (!aimPosition)
     return std::unexpected(std::move(aimPosition.error()));
   Vec2I pos(aimPosition->floor());
-  if (itemWorld->get().material(pos + Vec2I(0, 1), TileLayer::Foreground) != EmptyMaterialId)
+  if (itemWorld->get().material(pos + Vec2I(0, 1), TileLayer::Foreground) != empty_material_id)
     return {};
   bool used = false;
   for (auto layer : {TileLayer::Foreground, TileLayer::Background}) {
-    if (itemWorld->get().material(pos, layer) == EmptyMaterialId)
+    if (itemWorld->get().material(pos, layer) == empty_material_id)
       pos = pos - Vec2I(0, 1);
-    if (layer == TileLayer::Background && itemWorld->get().material(pos + Vec2I(0, 1), TileLayer::Background) != EmptyMaterialId)
+    if (layer == TileLayer::Background && itemWorld->get().material(pos + Vec2I(0, 1), TileLayer::Background) != empty_material_id)
       continue;
     bool inRange = itemOwner->get().isAdmin();
     if (!inRange) {
@@ -243,7 +243,7 @@ std::expected<void, StarException> TillingTool::fire(FireMode mode, bool shiftin
       auto tilled_mod = (*database)->tilled_mod_for(material);
       if (!tilled_mod)
         return std::unexpected(std::move(tilled_mod.error()));
-      if (*tilled_mod != NoModId && current_mod == NoModId) {
+      if (*tilled_mod != no_mod_id && current_mod == no_mod_id) {
         auto modified = itemWorld->get().modifyTile(
           pos, PlaceMod{.layer = layer, .mod = *tilled_mod, .modHueShift = MaterialHue()}, true);
         if (!modified)

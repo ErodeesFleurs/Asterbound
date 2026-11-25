@@ -305,7 +305,7 @@ TilePainter::chunkHashes(WorldRenderData const& renderData, Vec2I chunkIndex) {
       liquidOffset += liquidBytes;
       // Liquid geometry depends on whether the tile immediately below is empty.
       // Include only that foreground property, not material identity/mod/hue.
-      liquidBuffer[liquidOffset++] = tile.foreground == EmptyMaterialId;
+      liquidBuffer[liquidOffset++] = tile.foreground == empty_material_id;
       return {};
     });
   if (!traversed)
@@ -442,10 +442,10 @@ std::expected<bool, StarException> TilePainter::produceTerrainPrimitives(HashMap
 
   RenderTile const& tile = get_render_tile(render_data, pos);
 
-  MaterialId material = EmptyMaterialId;
+  MaterialId material = empty_material_id;
   MaterialHue material_hue = 0;
   MaterialColorVariant color_variant = 0;
-  ModId mod = NoModId;
+  ModId mod = no_mod_id;
   MaterialHue mod_hue = 0;
   float damage_level = 0.0f;
   TileDamageType damage_type = TileDamageType::Protected;
@@ -500,7 +500,7 @@ std::expected<bool, StarException> TilePainter::produceTerrainPrimitives(HashMap
       auto const& piece = piece_ref.get();
       auto cached = m_textureCache.get(MaterialPieceTextureKey(piece.piece_id, id, hue, directive_slot, is_mod),
           [&](auto const&) -> std::expected<TexturePtr, StarException> {
-            AssetPath path = hue == 0 ? piece.texture : Star::format("{}?hueshift={}", piece.texture, materialHueToDegrees(hue));
+            AssetPath path = hue == 0 ? piece.texture : Star::format("{}?hueshift={}", piece.texture, material_hue_to_degrees(hue));
             if (!profile.color_directives.empty())
               path.directives += profile.color_directives[directive_slot];
             auto image = assets->image(path);
@@ -585,7 +585,7 @@ std::expected<void, StarException> TilePainter::produceLiquidPrimitives(HashMap<
   float bottomDrawLevel = liquidDrawLevel(byte_to_float(tileBottom.liquidLevel));
 
   RectF worldRect;
-  if (tileBottom.foreground == EmptyMaterialId && bottomDrawLevel < 1.0f)
+  if (tileBottom.foreground == empty_material_id && bottomDrawLevel < 1.0f)
     worldRect = RectF::with_size(Vec2F(pos), Vec2F::filled(1.0f)).expanded(drawLevel);
   else
     worldRect = RectF::with_size(Vec2F(pos), Vec2F(1.0f, drawLevel));

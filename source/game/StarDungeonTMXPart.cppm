@@ -49,11 +49,11 @@ namespace Dungeon {
 
     // The default empty background tile has clear=true.  (If you use the pink
     // tile in the background, clear will be false instead.) Analogous to
-    // EmptyMaterialId.
+    // empty_material_id.
     std::shared_ptr<Tiled::Tile const> m_emptyBackTile;
     // The default foreground tile doesn't have a 'clear' property.  Also
     // returned by tile layers when given coordinates outside the bounds of the
-    // layer.  Analogous to the NullMaterialId that mission maps are initially
+    // layer.  Analogous to the null_material_id that mission maps are initially
     // filled with.
     std::shared_ptr<Tiled::Tile const> m_nullTile;
 

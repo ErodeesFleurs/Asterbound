@@ -276,8 +276,8 @@ const GameTestRegistration client_liquid_prediction("SpawnTest", "LiquidCollecti
   // the server: every acknowledgement below is applied explicitly.
   auto patch = std::make_shared<TileArrayUpdatePacket>();
   NetTile air;
-  air.foreground = EmptyMaterialId;
-  air.background = EmptyMaterialId;
+  air.foreground = empty_material_id;
+  air.background = empty_material_id;
   air.collision = CollisionKind::None;
   air.dungeonId = no_dungeon_id;
   patch->min = {8, 8};

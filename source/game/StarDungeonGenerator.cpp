@@ -64,23 +64,6 @@ namespace Dungeon {
     return std::unexpected(DungeonException("Invalid direction"));
   }
 
-  MaterialId biomeMaterialForJson(int variant) {
-    if (variant == 0)
-      return BiomeMaterialId;
-    if (variant == 1)
-      return Biome1MaterialId;
-    if (variant == 2)
-      return Biome2MaterialId;
-    if (variant == 3)
-      return Biome3MaterialId;
-    if (variant == 4)
-      return Biome4MaterialId;
-    if constexpr (Star::debug_enabled) {
-      Star::star_assert_failed((variant == 5));
-    }
-    return Biome5MaterialId;
-  }
-
   [[nodiscard]] std::expected<std::reference_wrapper<Connector const>, StarException> choose_option(ConnectorCandidates& options, RandomSource& rnd) {
     float distribution = 0;
     for (std::size_t i = 0; i < options.size(); i++)
@@ -220,76 +203,19 @@ namespace Dungeon {
     return false;
   }
 
-  [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> parseFrontBrush(Json const& brush) {
-    String material;
+  template <typename MaterialBrush>
+  [[nodiscard]] static std::expected<std::shared_ptr<Brush const>, StarException> parse_material_brush(Json const& brush) {
+    auto material = brush.get_string(1);
+    if (!material) return std::unexpected(std::move(material.error()));
     std::optional<String> mod;
-    std::optional<float> hueshift, modhueshift;
-    std::optional<MaterialColorVariant> colorVariant;
-    if (brush.is_type(Json::Type::Object)) {
-      auto m = brush.get_string("material");
-      if (!m) return std::unexpected(std::move(m.error()));
-      material = std::move(*m);
-      auto md = brush.opt_string("mod");
-      if (!md) return std::unexpected(std::move(md.error()));
-      mod = std::move(*md);
-      auto hue = brush.opt_float("hueshift");
-      if (!hue) return std::unexpected(std::move(hue.error()));
-      hueshift = *hue;
-      auto modHue = brush.opt_float("modhueshift");
-      if (!modHue) return std::unexpected(std::move(modHue.error()));
-      modhueshift = *modHue;
-      auto color = brush.opt_float("colorVariant");
-      if (!color) return std::unexpected(std::move(color.error()));
-      colorVariant = *color;
-    } else {
-      auto m = brush.get_string(1);
-      if (!m) return std::unexpected(std::move(m.error()));
-      material = std::move(*m);
-      auto size = brush.size();
-      if (!size) return std::unexpected(std::move(size.error()));
-      if (*size > 2) {
-        auto md = brush.get_string(2);
-        if (!md) return std::unexpected(std::move(md.error()));
-        mod = std::move(*md);
-      }
+    auto size = brush.size();
+    if (!size) return std::unexpected(std::move(size.error()));
+    if (*size > 2) {
+      auto name = brush.get_string(2);
+      if (!name) return std::unexpected(std::move(name.error()));
+      mod = std::move(*name);
     }
-    return std::make_shared<const FrontBrush>(material, mod, hueshift, modhueshift, colorVariant);
-  }
-
-  [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> parseBackBrush(Json const& brush) {
-    String material;
-    std::optional<String> mod;
-    std::optional<float> hueshift, modhueshift;
-    std::optional<MaterialColorVariant> colorVariant;
-    if (brush.is_type(Json::Type::Object)) {
-      auto m = brush.get_string("material");
-      if (!m) return std::unexpected(std::move(m.error()));
-      material = std::move(*m);
-      auto md = brush.opt_string("mod");
-      if (!md) return std::unexpected(std::move(md.error()));
-      mod = std::move(*md);
-      auto hue = brush.opt_float("hueshift");
-      if (!hue) return std::unexpected(std::move(hue.error()));
-      hueshift = *hue;
-      auto modHue = brush.opt_float("modhueshift");
-      if (!modHue) return std::unexpected(std::move(modHue.error()));
-      modhueshift = *modHue;
-      auto color = brush.opt_float("colorVariant");
-      if (!color) return std::unexpected(std::move(color.error()));
-      colorVariant = *color;
-    } else {
-      auto m = brush.get_string(1);
-      if (!m) return std::unexpected(std::move(m.error()));
-      material = std::move(*m);
-      auto size = brush.size();
-      if (!size) return std::unexpected(std::move(size.error()));
-      if (*size > 2) {
-        auto md = brush.get_string(2);
-        if (!md) return std::unexpected(std::move(md.error()));
-        mod = std::move(*md);
-      }
-    }
-    return std::make_shared<const BackBrush>(material, mod, hueshift, modhueshift, colorVariant);
+    return std::make_shared<const MaterialBrush>(std::move(*material), std::move(mod), 0, 0, default_material_color_variant);
   }
 
   [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> parseObjectBrush(Json const& brush) {
@@ -315,36 +241,20 @@ namespace Dungeon {
     return std::make_shared<const ObjectBrush>(*object, direction, parameters);
   }
 
-  [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> parseSurfaceBrush(Json const& brush) {
-    Json settings = JsonObject{};
-    auto size = brush.size();
-    if (!size) return std::unexpected(std::move(size.error()));
-    if (*size > 1) {
-      auto value = brush.get(1);
-      if (!value) return std::unexpected(std::move(value.error()));
-      settings = std::move(*value);
-    }
-    auto variant = settings.opt_int("variant");
+  template <typename BiomeBrush>
+  [[nodiscard]] static std::expected<std::shared_ptr<Brush const>, StarException> parse_surface_brush(Json const& brush) {
+    auto settings = brush.get(1, JsonObject{});
+    if (!settings) return std::unexpected(std::move(settings.error()));
+    auto variant = settings->opt_double("variant");
     if (!variant) return std::unexpected(std::move(variant.error()));
-    auto mod = settings.opt_string("mod");
+    auto configured_variant = variant->value_or(0);
+    if (!is_finite(configured_variant) || configured_variant < 0 || configured_variant > 5 || std::trunc(configured_variant) != configured_variant)
+      return std::unexpected(DungeonException::format("Biome surface variant must be an integer in 0..5, got {}", configured_variant));
+    auto material = biome_material_for_variant(static_cast<std::int64_t>(configured_variant));
+    if (!material) return std::unexpected(std::move(material.error()));
+    auto mod = settings->opt_string("mod");
     if (!mod) return std::unexpected(std::move(mod.error()));
-    return std::make_shared<const SurfaceBrush>(*variant, *mod);
-  }
-
-  [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> parseSurfaceBackgroundBrush(Json const& brush) {
-    Json settings = JsonObject{};
-    auto size = brush.size();
-    if (!size) return std::unexpected(std::move(size.error()));
-    if (*size > 1) {
-      auto value = brush.get(1);
-      if (!value) return std::unexpected(std::move(value.error()));
-      settings = std::move(*value);
-    }
-    auto variant = settings.opt_int("variant");
-    if (!variant) return std::unexpected(std::move(variant.error()));
-    auto mod = settings.opt_string("mod");
-    if (!mod) return std::unexpected(std::move(mod.error()));
-    return std::make_shared<const SurfaceBackgroundBrush>(*variant, *mod);
+    return std::make_shared<const BiomeBrush>(*material, std::move(*mod));
   }
 
   [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> parseWireBrush(Json const& brush) {
@@ -369,8 +279,8 @@ namespace Dungeon {
     auto key = brush.get_string(0);
     if (!key) return std::unexpected(std::move(key.error()));
     if (*key == "clear") return std::make_shared<ClearBrush>();
-    if (*key == "front") return parseFrontBrush(brush);
-    if (*key == "back") return parseBackBrush(brush);
+    if (*key == "front") return parse_material_brush<FrontBrush>(brush);
+    if (*key == "back") return parse_material_brush<BackBrush>(brush);
     if (*key == "object") return parseObjectBrush(brush);
     if (*key == "biomeitems") return std::make_shared<BiomeItemsBrush>();
     if (*key == "biometree") return std::make_shared<BiomeTreeBrush>();
@@ -392,8 +302,8 @@ namespace Dungeon {
       if (!result) return std::unexpected(std::move(result.error()));
       return std::shared_ptr<Brush const>(std::move(*result));
     }
-    if (*key == "surface") return parseSurfaceBrush(brush);
-    if (*key == "surfacebackground") return parseSurfaceBackgroundBrush(brush);
+    if (*key == "surface") return parse_surface_brush<SurfaceBrush>(brush);
+    if (*key == "surfacebackground") return parse_surface_brush<SurfaceBackgroundBrush>(brush);
     if (*key == "liquid") {
       auto name = brush.get_string(1);
       if (!name) return std::unexpected(std::move(name.error()));
@@ -431,20 +341,16 @@ namespace Dungeon {
 
     // TODO: delete objects too?
     writer.setLiquid(position, {});
-    writer.setForegroundMaterial(position, EmptyMaterialId, 0, DefaultMaterialColorVariant);
-    writer.setBackgroundMaterial(position, EmptyMaterialId, 0, DefaultMaterialColorVariant);
-    writer.setForegroundMod(position, NoModId, 0);
-    writer.setBackgroundMod(position, NoModId, 0);
+    writer.setForegroundMaterial(position, empty_material_id, 0, default_material_color_variant);
+    writer.setBackgroundMaterial(position, empty_material_id, 0, default_material_color_variant);
+    writer.setForegroundMod(position, no_mod_id, 0);
+    writer.setBackgroundMod(position, no_mod_id, 0);
     return {};
   }
 
-  FrontBrush::FrontBrush(String const& material, std::optional<String> mod, std::optional<float> hueshift, std::optional<float> modhueshift, std::optional<MaterialColorVariant> colorVariant) {
-    m_material = material;
-    m_mod = std::move(mod);
-    m_materialHue = hueshift.transform(materialHueFromDegrees).value_or(0);
-    m_modHue = modhueshift.transform(materialHueFromDegrees).value_or(0);
-    m_materialColorVariant = colorVariant.value_or(DefaultMaterialColorVariant);
-  }
+  FrontBrush::FrontBrush(String material, std::optional<String> mod, MaterialHue material_hue, MaterialHue mod_hue, MaterialColorVariant color_variant)
+    : m_material(std::move(material)), m_material_hue(material_hue), m_color_variant(color_variant),
+      m_mod(std::move(mod)), m_mod_hue(mod_hue) {}
 
   std::expected<void, StarException> FrontBrush::paint(Vec2I position, Phase phase, DungeonGeneratorWriter& writer) const {
     if (phase != Phase::WallPhase) return {};
@@ -452,7 +358,7 @@ namespace Dungeon {
     if (!database) return std::unexpected(std::move(database.error()));
     auto material = (*database)->material_id(m_material);
     if (!material) return std::unexpected(std::move(material.error()));
-    ModId mod = NoModId;
+    ModId mod = no_mod_id;
     if (m_mod) {
       auto id = (*database)->mod_id(*m_mod);
       if (!id) return std::unexpected(std::move(id.error()));
@@ -461,18 +367,14 @@ namespace Dungeon {
     auto collision = (*database)->material_collision_kind(*material);
     if (!collision) return std::unexpected(std::move(collision.error()));
     if (isSolidColliding(*collision)) writer.setLiquid(position, {});
-    writer.setForegroundMaterial(position, *material, m_materialHue, m_materialColorVariant);
-    if (isRealMod(mod)) writer.setForegroundMod(position, mod, m_modHue);
+    writer.setForegroundMaterial(position, *material, m_material_hue, m_color_variant);
+    if (is_real_mod(mod)) writer.setForegroundMod(position, mod, m_mod_hue);
     return {};
   }
 
-  BackBrush::BackBrush(String const& material, std::optional<String> mod, std::optional<float> hueshift, std::optional<float> modhueshift, std::optional<MaterialColorVariant> colorVariant) {
-    m_material = material;
-    m_mod = std::move(mod);
-    m_materialHue = hueshift.transform(materialHueFromDegrees).value_or(0);
-    m_modHue = modhueshift.transform(materialHueFromDegrees).value_or(0);
-    m_materialColorVariant = colorVariant.value_or(DefaultMaterialColorVariant);
-  }
+  BackBrush::BackBrush(String material, std::optional<String> mod, MaterialHue material_hue, MaterialHue mod_hue, MaterialColorVariant color_variant)
+    : m_material(std::move(material)), m_material_hue(material_hue), m_color_variant(color_variant),
+      m_mod(std::move(mod)), m_mod_hue(mod_hue) {}
 
   std::expected<void, StarException> BackBrush::paint(Vec2I position, Phase phase, DungeonGeneratorWriter& writer) const {
     if (phase != Phase::WallPhase) return {};
@@ -480,14 +382,14 @@ namespace Dungeon {
     if (!database) return std::unexpected(std::move(database.error()));
     auto material = (*database)->material_id(m_material);
     if (!material) return std::unexpected(std::move(material.error()));
-    ModId mod = NoModId;
+    ModId mod = no_mod_id;
     if (m_mod) {
       auto id = (*database)->mod_id(*m_mod);
       if (!id) return std::unexpected(std::move(id.error()));
       mod = *id;
     }
-    writer.setBackgroundMaterial(position, *material, m_materialHue, m_materialColorVariant);
-    if (isRealMod(mod)) writer.setBackgroundMod(position, mod, m_modHue);
+    writer.setBackgroundMaterial(position, *material, m_material_hue, m_color_variant);
+    if (is_real_mod(mod)) writer.setBackgroundMod(position, mod, m_mod_hue);
     return {};
   }
 
@@ -593,15 +495,13 @@ namespace Dungeon {
     return {};
   }
 
-  SurfaceBrush::SurfaceBrush(std::optional<int> variant, std::optional<String> mod) {
-    m_variant = variant.value_or(0);
-    m_mod = std::move(mod);
-  }
+  SurfaceBrush::SurfaceBrush(MaterialId material, std::optional<String> mod)
+    : m_material(material), m_mod(std::move(mod)) {}
 
   std::expected<void, StarException> SurfaceBrush::paint(Vec2I position, Phase phase, DungeonGeneratorWriter& writer) const {
     if (phase == Phase::WallPhase) {
-      writer.setForegroundMaterial(position, biomeMaterialForJson(m_variant), 0, DefaultMaterialColorVariant);
-      writer.setBackgroundMaterial(position, biomeMaterialForJson(m_variant), 0, DefaultMaterialColorVariant);
+      writer.setForegroundMaterial(position, m_material, 0, default_material_color_variant);
+      writer.setBackgroundMaterial(position, m_material, 0, default_material_color_variant);
     }
     if (phase == Phase::ModsPhase) {
       if (m_mod) {
@@ -611,20 +511,18 @@ namespace Dungeon {
         if (!mod) return std::unexpected(std::move(mod.error()));
         writer.setForegroundMod(position, *mod, 0);
       } else if (writer.needsForegroundBiomeMod(position)) {
-        writer.setForegroundMod(position, BiomeModId, 0);
+        writer.setForegroundMod(position, biome_mod_id, 0);
       }
     }
     return {};
   }
 
-  SurfaceBackgroundBrush::SurfaceBackgroundBrush(std::optional<int> variant, std::optional<String> mod) {
-    m_variant = variant.value_or(0);
-    m_mod = std::move(mod);
-  }
+  SurfaceBackgroundBrush::SurfaceBackgroundBrush(MaterialId material, std::optional<String> mod)
+    : m_material(material), m_mod(std::move(mod)) {}
 
   std::expected<void, StarException> SurfaceBackgroundBrush::paint(Vec2I position, Phase phase, DungeonGeneratorWriter& writer) const {
     if (phase == Phase::WallPhase) {
-      writer.setBackgroundMaterial(position, biomeMaterialForJson(m_variant), 0, DefaultMaterialColorVariant);
+      writer.setBackgroundMaterial(position, m_material, 0, default_material_color_variant);
     }
     if (phase == Phase::ModsPhase) {
       if (m_mod) {
@@ -634,7 +532,7 @@ namespace Dungeon {
         if (!mod) return std::unexpected(std::move(mod.error()));
         writer.setBackgroundMod(position, *mod, 0);
       } else if (writer.needsBackgroundBiomeMod(position)) {
-        writer.setBackgroundMod(position, BiomeModId, 0);
+        writer.setBackgroundMod(position, biome_mod_id, 0);
       }
     }
     return {};
@@ -1196,11 +1094,11 @@ namespace Dungeon {
   bool DungeonGeneratorWriter::needsForegroundBiomeMod(Vec2I const& position) {
     if (!m_foregroundMaterial.contains(position))
       return false;
-    if (!isBiomeMaterial(m_foregroundMaterial[position].material))
+    if (!is_biome_material(m_foregroundMaterial[position].material))
       return false;
     Vec2I abovePosition(position.x(), position.y() + 1);
     if (m_foregroundMaterial.contains(abovePosition))
-      if (m_foregroundMaterial[abovePosition].material != EmptyMaterialId)
+      if (m_foregroundMaterial[abovePosition].material != empty_material_id)
         return false;
     return true;
   }
@@ -1208,14 +1106,14 @@ namespace Dungeon {
   bool DungeonGeneratorWriter::needsBackgroundBiomeMod(Vec2I const& position) {
     if (!m_backgroundMaterial.contains(position))
       return false;
-    if (!isBiomeMaterial(m_backgroundMaterial[position].material))
+    if (!is_biome_material(m_backgroundMaterial[position].material))
       return false;
     Vec2I abovePosition(position.x(), position.y() + 1);
     if (m_backgroundMaterial.contains(abovePosition))
-      if (m_backgroundMaterial[abovePosition].material != EmptyMaterialId)
+      if (m_backgroundMaterial[abovePosition].material != empty_material_id)
         return false;
     if (m_foregroundMaterial.contains(abovePosition))
-      if (m_foregroundMaterial[abovePosition].material != EmptyMaterialId)
+      if (m_foregroundMaterial[abovePosition].material != empty_material_id)
         return false;
     return true;
   }

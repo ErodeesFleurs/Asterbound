@@ -400,32 +400,32 @@ namespace Dungeon {
 
   class FrontBrush : public Brush {
   public:
-    FrontBrush(String const& material, std::optional<String> mod, std::optional<float> hueshift, std::optional<float> modhueshift, std::optional<MaterialColorVariant> colorVariant);
+    FrontBrush(String material, std::optional<String> mod, MaterialHue material_hue, MaterialHue mod_hue, MaterialColorVariant color_variant);
 
     [[nodiscard]] std::expected<void, StarException> paint(Vec2I position, Phase phase,
                                                            DungeonGeneratorWriter& writer) const override;
 
   private:
     String m_material;
-    MaterialHue m_materialHue;
-    MaterialColorVariant m_materialColorVariant;
+    MaterialHue m_material_hue;
+    MaterialColorVariant m_color_variant;
     std::optional<String> m_mod;
-    MaterialHue m_modHue;
+    MaterialHue m_mod_hue;
   };
 
   class BackBrush : public Brush {
   public:
-    BackBrush(String const& material, std::optional<String> mod, std::optional<float> hueshift, std::optional<float> modhueshift, std::optional<MaterialColorVariant> colorVariant);
+    BackBrush(String material, std::optional<String> mod, MaterialHue material_hue, MaterialHue mod_hue, MaterialColorVariant color_variant);
 
     [[nodiscard]] std::expected<void, StarException> paint(Vec2I position, Phase phase,
                                                            DungeonGeneratorWriter& writer) const override;
 
   private:
     String m_material;
-    MaterialHue m_materialHue;
-    MaterialColorVariant m_materialColorVariant;
+    MaterialHue m_material_hue;
+    MaterialColorVariant m_color_variant;
     std::optional<String> m_mod;
-    MaterialHue m_modHue;
+    MaterialHue m_mod_hue;
   };
 
   class ObjectBrush : public Brush {
@@ -516,25 +516,25 @@ namespace Dungeon {
 
   class SurfaceBrush : public Brush {
   public:
-    SurfaceBrush(std::optional<int> variant, std::optional<String> mod);
+    SurfaceBrush(MaterialId material, std::optional<String> mod);
 
     [[nodiscard]] std::expected<void, StarException> paint(Vec2I position, Phase phase,
                                                            DungeonGeneratorWriter& writer) const override;
 
   private:
-    int m_variant;
+    MaterialId m_material;
     std::optional<String> m_mod;
   };
 
   class SurfaceBackgroundBrush : public Brush {
   public:
-    SurfaceBackgroundBrush(std::optional<int> variant, std::optional<String> mod);
+    SurfaceBackgroundBrush(MaterialId material, std::optional<String> mod);
 
     [[nodiscard]] std::expected<void, StarException> paint(Vec2I position, Phase phase,
                                                            DungeonGeneratorWriter& writer) const override;
 
   private:
-    int m_variant;
+    MaterialId m_material;
     std::optional<String> m_mod;
   };
 

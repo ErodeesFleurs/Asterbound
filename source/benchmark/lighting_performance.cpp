@@ -68,7 +68,7 @@ std::expected<std::shared_ptr<LightingFixture>, StarException> prepareLighting(R
     auto id = fixture->materials->material_id(name);
     if (!id)
       return std::unexpected(std::move(id.error()));
-    if (!isRealMaterial(*id))
+    if (!is_real_material(*id))
       continue;
     auto foreground = fixture->materials->foreground_light_transparent(*id);
     if (!foreground)
@@ -78,10 +78,10 @@ std::expected<std::shared_ptr<LightingFixture>, StarException> prepareLighting(R
       return std::unexpected(std::move(background.error()));
     MaterialSample sample{*id, *foreground, *background};
     samples.push_back(sample);
-    if (fixture->materials->radiant_light(*id, NoModId).max() > 0.0f)
+    if (fixture->materials->radiant_light(*id, no_mod_id).max() > 0.0f)
       radiantSamples.push_back(sample);
   }
-  std::vector<ModId> mods{NoModId};
+  std::vector<ModId> mods{no_mod_id};
   auto mod_names = fixture->materials->mod_names();
   std::ranges::sort(mod_names);
   for (auto const& name : mod_names) {
@@ -117,12 +117,12 @@ std::expected<std::shared_ptr<LightingFixture>, StarException> prepareLighting(R
       auto const& foreground =
         key % 17 == 0 ? radiantSamples[(key / 17) % radiantSamples.size()] : samples[key % samples.size()];
       auto const& background = samples[(key / 7) % samples.size()];
-      tile.foreground = key % 5 < 2 ? foreground.id : EmptyMaterialId;
-      tile.foregroundMod = key % 7 == 0 ? mods[(key / 7) % mods.size()] : NoModId;
-      tile.background = key % 3 == 0 ? background.id : EmptyMaterialId;
-      tile.backgroundMod = key % 13 == 0 ? mods[(key / 13) % mods.size()] : NoModId;
-      tile.foregroundLightTransparent = tile.foreground == EmptyMaterialId || foreground.foregroundTransparent;
-      tile.backgroundLightTransparent = tile.background == EmptyMaterialId || background.backgroundTransparent;
+      tile.foreground = key % 5 < 2 ? foreground.id : empty_material_id;
+      tile.foregroundMod = key % 7 == 0 ? mods[(key / 7) % mods.size()] : no_mod_id;
+      tile.background = key % 3 == 0 ? background.id : empty_material_id;
+      tile.backgroundMod = key % 13 == 0 ? mods[(key / 13) % mods.size()] : no_mod_id;
+      tile.foregroundLightTransparent = tile.foreground == empty_material_id || foreground.foregroundTransparent;
+      tile.backgroundLightTransparent = tile.background == empty_material_id || background.backgroundTransparent;
       // Dynamic object collision can make otherwise transparent foreground opaque.
       if (pos[0] % 31 == 0 && pos[1] % 13 != 0)
         tile.foregroundLightTransparent = false;
@@ -149,12 +149,12 @@ std::expected<void, StarException> gatherReference(LightingFixture const& fixtur
         continue;
       auto const& tile = fixture.tiles.tile(position);
       Vec3F light;
-      if (tile.foreground != EmptyMaterialId || tile.foregroundMod != NoModId)
+      if (tile.foreground != empty_material_id || tile.foregroundMod != no_mod_id)
         light += fixture.materials->radiant_light(tile.foreground, tile.foregroundMod);
       if (tile.liquid.liquid != empty_liquid_id && tile.liquid.level != 0.0f)
         light += fixture.liquids->radiant_light(tile.liquid);
       if (tile.foregroundLightTransparent) {
-        if (tile.background != EmptyMaterialId || tile.backgroundMod != NoModId)
+        if (tile.background != empty_material_id || tile.backgroundMod != no_mod_id)
           light += fixture.materials->radiant_light(tile.background, tile.backgroundMod);
         if (tile.backgroundLightTransparent && y > fixture.underground)
           light += fixture.environment;

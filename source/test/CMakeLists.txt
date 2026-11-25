@@ -270,6 +270,7 @@ set (star_game_tests_SOURCES
       item_test.cpp
       liquid_types_test.cpp
       lua_component_test.cpp
+      material_input_consumers_test.cpp
       material_types_test.cpp
       movement_controller_test.cpp
       mod_storage_test.cpp

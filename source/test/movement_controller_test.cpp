@@ -112,7 +112,7 @@ const GameTestRegistration movementTerrainContactPreservesPositionAndVelocity(
         return std::unexpected(std::move(tile.error()));
       if (!*tile)
         return std::unexpected(StarException("Movement fixture tile is unavailable"));
-      (*tile)->get().background = StructureMaterialId;
+      (*tile)->get().background = structure_material_id;
       auto placed =
         world->forceModifyTile(position, PlaceMaterial{TileLayer::Foreground, *dirt, MaterialHue(0), collision}, true);
       if (!placed)

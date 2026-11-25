@@ -137,11 +137,11 @@ public:
   std::expected<bool, StarException> occludes_behind(MaterialId id) const;
 
   [[nodiscard]]
-  std::expected<std::shared_ptr<ParticleConfig>, StarException> mining_particle(MaterialId material_id, ModId mod_id = NoModId) const;
+  std::expected<std::shared_ptr<ParticleConfig>, StarException> mining_particle(MaterialId material_id, ModId mod_id = no_mod_id) const;
   [[nodiscard]]
-  std::expected<String, StarException> mining_sound(MaterialId material_id, ModId mod_id = NoModId) const;
+  std::expected<String, StarException> mining_sound(MaterialId material_id, ModId mod_id = no_mod_id) const;
   [[nodiscard]]
-  std::expected<String, StarException> footstep_sound(MaterialId material_id, ModId mod_id = NoModId) const;
+  std::expected<String, StarException> footstep_sound(MaterialId material_id, ModId mod_id = no_mod_id) const;
   String default_footstep_sound() const;
 
   [[nodiscard]]
@@ -162,7 +162,7 @@ public:
   [[nodiscard]]
   std::expected<bool, StarException> blocks_liquid_flow(MaterialId id) const;
 
-  // A transform target may be NullMaterialId or NoModId.
+  // A transform target may be null_material_id or no_mod_id.
   std::optional<LiquidMaterialInteraction> liquid_material_interaction(LiquidId liquid, MaterialId id) const;
   std::optional<LiquidModInteraction> liquid_mod_interaction(LiquidId liquid, ModId id) const;
 
@@ -275,29 +275,29 @@ inline std::optional<std::reference_wrapper<MaterialRenderProfile const>> Materi
 
 [[nodiscard]]
 inline std::expected<bool, StarException> MaterialDatabase::foreground_light_transparent(MaterialId id) const {
-  if (isRealMaterial(id)) {
+  if (is_real_material(id)) {
     auto info = get_material_info(id);
     if (!info) return std::unexpected(std::move(info.error()));
     if (auto const& profile = info->get().render_profile)
       return profile->foreground_light_transparent;
   }
-  return id != StructureMaterialId;
+  return id != structure_material_id;
 }
 
 [[nodiscard]]
 inline std::expected<bool, StarException> MaterialDatabase::background_light_transparent(MaterialId id) const {
-  if (isRealMaterial(id)) {
+  if (is_real_material(id)) {
     auto info = get_material_info(id);
     if (!info) return std::unexpected(std::move(info.error()));
     if (auto const& profile = info->get().render_profile)
       return profile->background_light_transparent;
   }
-  return id != StructureMaterialId;
+  return id != structure_material_id;
 }
 
 [[nodiscard]]
 inline std::expected<bool, StarException> MaterialDatabase::occludes_behind(MaterialId id) const {
-  if (isRealMaterial(id)) {
+  if (is_real_material(id)) {
     auto info = get_material_info(id);
     if (!info) return std::unexpected(std::move(info.error()));
     if (auto const& profile = info->get().render_profile)
@@ -317,7 +317,7 @@ inline Vec3F MaterialDatabase::radiant_light(MaterialId material_id, ModId mod_i
 
 [[nodiscard]]
 inline std::expected<bool, StarException> MaterialDatabase::blocks_liquid_flow(MaterialId id) const {
-  if (isRealMaterial(id)) {
+  if (is_real_material(id)) {
     auto info = get_material_info(id);
     if (!info) return std::unexpected(std::move(info.error()));
     return info->get().blocks_liquid_flow;

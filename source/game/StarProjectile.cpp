@@ -607,7 +607,7 @@ if (!result909) return std::unexpected(std::move(result909.error()));
           auto pos = Vec2I::floor(m_movement_controller->position() + m_travelLine.direction() * -i);
           auto result910 = world();
 if (!result910) return std::unexpected(std::move(result910.error()));
-if (result910->get().material(pos, TileLayer::Foreground) == EmptyMaterialId) {
+if (result910->get().material(pos, TileLayer::Foreground) == empty_material_id) {
             m_lastNonCollidingTile = pos;
             break;
           }
@@ -840,7 +840,7 @@ auto blockDamageVariance = std::move(*result890);
   for (auto layer : {TileLayer::Background, TileLayer::Foreground}) {
     auto material = world.material(position, layer);
     auto hueShift = world.materialHueShift(position, layer);
-    if (isRealMaterial(material)) {
+    if (is_real_material(material)) {
       auto particle = blockDamageParticle;
       particle.position += center_of_tile(position);
       particle.velocity = particle.velocity.magnitude() * vnorm(world.geometry().diff(damageSource, particle.position));
@@ -1047,13 +1047,13 @@ if (std::move(*result761))
       for (int x = m_collisionTile[0] - radius; x <= m_collisionTile[0] + radius; ++x) {
         auto result762 = world();
 if (!result762) return std::unexpected(std::move(result762.error()));
-if (result762->get().material({x, m_collisionTile[1] + radius + 1}, layer) == EmptyMaterialId) {
+if (result762->get().material({x, m_collisionTile[1] + radius + 1}, layer) == empty_material_id) {
           for (int y = m_collisionTile[1] + radius; y >= m_collisionTile[1] - radius; --y) {
             auto result763 = world();
 if (!result763) return std::unexpected(std::move(result763.error()));
 auto mat = result763->get().material({x, y}, layer);
             if (this->root().random().uniform_float() <= chance) {
-              if (isRealMaterial(mat)) {
+              if (is_real_material(mat)) {
                 auto result764 = world();
 if (!result764) return std::unexpected(std::move(result764.error()));
 auto mod = result764->get().mod({x, y}, layer);
@@ -1066,7 +1066,7 @@ if (!result766) return std::unexpected(std::move(result766.error()));
 }
               }
             }
-            if (mat != EmptyMaterialId)
+            if (mat != empty_material_id)
               break;
           }
         }
@@ -1301,7 +1301,7 @@ if (!result821->get().isClient())
     auto result822 = world();
 if (!result822) return std::unexpected(std::move(result822.error()));
 auto collisionMaterial = result822->get().material(m_collisionTile, TileLayer::Foreground);
-    if (!m_collision || collisionMaterial == EmptyMaterialId)
+    if (!m_collision || collisionMaterial == empty_material_id)
       return {};
 
     auto result823 = world();

@@ -44,10 +44,10 @@ namespace Star {
 
 bool WorldTile::isConnectable(TileLayer layer, bool materialOnly) const {
   if (layer == TileLayer::Foreground) {
-    if (isConnectableMaterial(foreground))
+    if (is_connectable_material(foreground))
       return true;
   } else {
-    if (isConnectableMaterial(background))
+    if (is_connectable_material(background))
       return true;
   }
   if (materialOnly)
@@ -168,17 +168,17 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
   if (!background)
     return std::unexpected(std::move(background.error()));
   if (tile.background == 0) {
-    tile.background = EmptyMaterialId;
+    tile.background = empty_material_id;
     tile.backgroundHueShift = MaterialHue();
-    tile.backgroundColorVariant = DefaultMaterialColorVariant;
-    tile.backgroundMod = NoModId;
+    tile.backgroundColorVariant = default_material_color_variant;
+    tile.backgroundMod = no_mod_id;
     tile.backgroundModHueShift = MaterialHue();
   } else {
     auto appearance = ds >> tile.backgroundHueShift >> tile.backgroundColorVariant >> tile.backgroundMod;
     if (!appearance)
       return std::unexpected(std::move(appearance.error()));
     if (tile.backgroundMod == 0) {
-      tile.backgroundMod = NoModId;
+      tile.backgroundMod = no_mod_id;
       tile.backgroundModHueShift = MaterialHue();
     } else {
       auto hue = ds.read(tile.backgroundModHueShift);
@@ -190,17 +190,17 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
   if (!foreground)
     return std::unexpected(std::move(foreground.error()));
   if (tile.foreground == 0) {
-    tile.foreground = EmptyMaterialId;
+    tile.foreground = empty_material_id;
     tile.foregroundHueShift = MaterialHue();
-    tile.foregroundColorVariant = DefaultMaterialColorVariant;
-    tile.foregroundMod = NoModId;
+    tile.foregroundColorVariant = default_material_color_variant;
+    tile.foregroundMod = no_mod_id;
     tile.foregroundModHueShift = MaterialHue();
   } else {
     auto appearance = ds >> tile.foregroundHueShift >> tile.foregroundColorVariant >> tile.foregroundMod;
     if (!appearance)
       return std::unexpected(std::move(appearance.error()));
     if (tile.foregroundMod == 0) {
-      tile.foregroundMod = NoModId;
+      tile.foregroundMod = no_mod_id;
       tile.foregroundModHueShift = MaterialHue();
     } else {
       auto hue = ds.read(tile.foregroundModHueShift);
@@ -225,7 +225,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, NetTile const& tile) {
-  if (tile.background == EmptyMaterialId) {
+  if (tile.background == empty_material_id) {
     auto empty = ds.cwrite<MaterialId>(0);
     if (!empty)
       return std::unexpected(std::move(empty.error()));
@@ -233,7 +233,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
     auto appearance = ds << tile.background << tile.backgroundHueShift << tile.backgroundColorVariant;
     if (!appearance)
       return std::unexpected(std::move(appearance.error()));
-    if (tile.backgroundMod == NoModId) {
+    if (tile.backgroundMod == no_mod_id) {
       auto empty = ds.write<ModId>(0);
       if (!empty)
         return std::unexpected(std::move(empty.error()));
@@ -243,7 +243,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
         return std::unexpected(std::move(mod.error()));
     }
   }
-  if (tile.foreground == EmptyMaterialId) {
+  if (tile.foreground == empty_material_id) {
     auto empty = ds.cwrite<MaterialId>(0);
     if (!empty)
       return std::unexpected(std::move(empty.error()));
@@ -251,7 +251,7 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
     auto appearance = ds << tile.foreground << tile.foregroundHueShift << tile.foregroundColorVariant;
     if (!appearance)
       return std::unexpected(std::move(appearance.error()));
-    if (tile.foregroundMod == NoModId) {
+    if (tile.foregroundMod == no_mod_id) {
       auto empty = ds.write<ModId>(0);
       if (!empty)
         return std::unexpected(std::move(empty.error()));

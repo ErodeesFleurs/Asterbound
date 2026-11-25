@@ -28,18 +28,18 @@ import star.world_tiles;
 namespace Star {
 
 RenderTile const TileDrawer::default_render_tile{
-    NullMaterialId,
-    NoModId,
-    NullMaterialId,
-    NoModId,
+    null_material_id,
+    no_mod_id,
+    null_material_id,
+    no_mod_id,
     0,
     0,
-    DefaultMaterialColorVariant,
+    default_material_color_variant,
     TileDamageType::Protected,
     0,
     0,
     0,
-    DefaultMaterialColorVariant,
+    default_material_color_variant,
     TileDamageType::Protected,
     0,
     empty_liquid_id,
@@ -148,7 +148,7 @@ std::expected<bool, StarException> TileDrawer::produce_terrain_drawables(Drawabl
       auto path = hue == 0
           ? Star::format("{}?crop={};{};{};{}", piece.get().texture, box.x_min(), box.y_min(), box.x_max(), box.y_max())
           : Star::format("{}?crop={};{};{};{}?hueshift={}", piece.get().texture, box.x_min(), box.y_min(), box.x_max(), box.y_max(),
-                materialHueToDegrees(hue));
+                material_hue_to_degrees(hue));
       AssetPath image{std::string_view(path)};
       if (directives)
         image.directives += directives->get();
@@ -284,7 +284,7 @@ struct TileDrawer::MatchEvaluator {
             matches = neighbor_layer.id == base_layer.id && (!equals.match_hue || neighbor_layer.hue == base_layer.hue);
           } else if (std::holds_alternative<MaterialRule::RuleConnects>(entry.rule)) {
             // A mod connects based on its supporting material, not the neighbor mod.
-            matches = isConnectableMaterial(neighbor_material);
+            matches = is_connectable_material(neighbor_material);
           } else if (std::holds_alternative<MaterialRule::RuleEqualsId>(entry.rule)) {
             matches = neighbor_layer.id == std::get<MaterialRule::RuleEqualsId>(entry.rule).id;
           } else if (std::holds_alternative<MaterialRule::RuleShadows>(entry.rule)) {

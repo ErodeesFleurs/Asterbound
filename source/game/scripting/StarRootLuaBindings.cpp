@@ -1164,7 +1164,7 @@ std::expected<std::optional<String>, StarException> LuaBindings::RootCallbacks::
   if (!database) return std::unexpected(std::move(database.error()));
   auto material_id = (*database)->material_id(material_name);
   if (!material_id) return std::unexpected(std::move(material_id.error()));
-  ModId mod_id = NoModId;
+  ModId mod_id = no_mod_id;
   if (mod_name) {
     auto id = (*database)->mod_id(*mod_name);
     if (!id) return std::unexpected(std::move(id.error()));

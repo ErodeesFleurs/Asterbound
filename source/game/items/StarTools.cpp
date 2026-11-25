@@ -925,7 +925,7 @@ std::expected<void, StarException> BeamMiningTool::fire(FireMode mode, bool shif
         blockSound = std::move(*ding);
       }
 
-      if (!used && m_canCollectLiquid && layer == TileLayer::Foreground && worldp.material(aimPosition, TileLayer::Foreground) == EmptyMaterialId) {
+      if (!used && m_canCollectLiquid && layer == TileLayer::Foreground && worldp.material(aimPosition, TileLayer::Foreground) == empty_material_id) {
         auto targetLiquid = worldp.liquidLevel(aimPosition).liquid;
         List<Vec2I> drainTiles;
         float totalLiquid = 0;
@@ -1125,14 +1125,14 @@ std::expected<List<PreviewTile>, StarException> PaintingBeamTool::preview_tiles(
       for (auto const& [layer, color] :
            {std::pair{TileLayer::Foreground, static_cast<MaterialColorVariant>(m_colorIndex)},
             std::pair{TileLayer::Background, static_cast<MaterialColorVariant>(m_colorIndex)},
-            std::pair{TileLayer::Foreground, DefaultMaterialColorVariant},
-            std::pair{TileLayer::Background, DefaultMaterialColorVariant}}) {
+            std::pair{TileLayer::Foreground, default_material_color_variant},
+            std::pair{TileLayer::Background, default_material_color_variant}}) {
         auto placeable = worldp.canModifyTile(pos, PlaceMaterialColor{.layer = layer, .color = color}, true);
         if (!placeable)
           return std::unexpected(std::move(placeable.error()));
         if (*placeable) {
           result.push_back(
-            {pos, layer == TileLayer::Foreground, NullMaterialId, MaterialHue(), false, light, true, color});
+            {pos, layer == TileLayer::Foreground, null_material_id, MaterialHue(), false, light, true, color});
           break;
         }
       }

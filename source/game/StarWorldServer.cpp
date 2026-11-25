@@ -370,7 +370,7 @@ std::expected<void, StarException> WorldServer::setupWeatherDomains(bool preserv
 
   auto effectsActive = [&world = *this](Vec2I const& pos) -> std::expected<bool, StarException> {
   auto const& tile = world.m_tileArray->tile(pos);
-  return !isRealMaterial(tile.background);
+  return !is_real_material(tile.background);
   };
 
   for (auto const& domain : m_worldTemplate->weatherDomains()) {
@@ -496,7 +496,7 @@ std::expected<WorldStructure, StarException> WorldServer::setCentralStructure(Wo
     if (!result17)
       return std::unexpected(std::move(result17.error()));
     if (auto tile = m_tileArray->modify_tile(foregroundBlock.position)) {
-      if (tile->get().foreground == EmptyMaterialId) {
+      if (tile->get().foreground == empty_material_id) {
         tile->get().foreground = foregroundBlock.materialId;
         tile->get().foregroundColorVariant = foregroundBlock.materialColor;
         tile->get().foregroundHueShift = foregroundBlock.materialHue;
@@ -518,7 +518,7 @@ std::expected<WorldStructure, StarException> WorldServer::setCentralStructure(Wo
     if (!result21)
       return std::unexpected(std::move(result21.error()));
     if (auto tile = m_tileArray->modify_tile(backgroundBlock.position)) {
-      if (tile->get().background == EmptyMaterialId) {
+      if (tile->get().background == empty_material_id) {
         tile->get().background = backgroundBlock.materialId;
         tile->get().backgroundColorVariant = backgroundBlock.materialColor;
         tile->get().backgroundHueShift = backgroundBlock.materialHue;
@@ -595,8 +595,8 @@ std::expected<void, StarException> WorldServer::removeCentralStructure() {
         return std::unexpected(std::move(result33.error()));
       if (auto tile = m_tileArray->modify_tile(backgroundBlock.position)) {
         if (tile->get().background == backgroundBlock.materialId) {
-          tile->get().background = EmptyMaterialId;
-          tile->get().backgroundMod = NoModId;
+          tile->get().background = empty_material_id;
+          tile->get().backgroundMod = no_mod_id;
           auto result34 = queueTileUpdates(backgroundBlock.position);
           if (!result34)
             return std::unexpected(std::move(result34.error()));
@@ -612,8 +612,8 @@ std::expected<void, StarException> WorldServer::removeCentralStructure() {
         return std::unexpected(std::move(result35.error()));
       if (auto tile = m_tileArray->modify_tile(foregroundBlock.position)) {
         if (tile->get().foreground == foregroundBlock.materialId) {
-          tile->get().foreground = EmptyMaterialId;
-          tile->get().foregroundMod = NoModId;
+          tile->get().foreground = empty_material_id;
+          tile->get().foregroundMod = no_mod_id;
           if (tile->get().update_collision(CollisionKind::None))
             WorldImpl::invalidate_collision_cache(*m_tileArray, RectI::with_size(foregroundBlock.position, {1, 1}));
           auto result37 = queueTileUpdates(foregroundBlock.position);
@@ -2198,7 +2198,7 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
         if (!damage_parameters)
           return std::unexpected(std::move(damage_parameters.error()));
 
-        if (layer == TileLayer::Foreground && isRealMaterial(tile->get().foreground)) {
+        if (layer == TileLayer::Foreground && is_real_material(tile->get().foreground)) {
           if (!tile->get().rootSource || damagedEntities.empty()) {
             tile->get().foregroundDamage.damage(damage_parameters->get(), sourcePosition, tileDamage);
 
@@ -2229,7 +2229,7 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
               tileRes = TileDamageResult::Normal;
             }
           }
-        } else if (layer == TileLayer::Background && isRealMaterial(tile->get().background)) {
+        } else if (layer == TileLayer::Background && is_real_material(tile->get().background)) {
           tile->get().backgroundDamage.damage(damage_parameters->get(), sourcePosition, tileDamage);
 
           // if the tile is broken, send a message back to the source entity with position and whether the tile was harvested
@@ -3003,10 +3003,10 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
           tile->get().backgroundHueShift = std::move(*result337);
         }
 
-        tile->get().backgroundColorVariant = DefaultMaterialColorVariant;
-        if (tile->get().background == EmptyMaterialId) {
+        tile->get().backgroundColorVariant = default_material_color_variant;
+        if (tile->get().background == empty_material_id) {
           // Remove the background mod if removing the background.
-          tile->get().backgroundMod = NoModId;
+          tile->get().backgroundMod = no_mod_id;
         } else if (tile->get().liquid.source) {
           tile->get().liquid.pressure = 1.0f;
           tile->get().liquid.source = false;
@@ -3021,7 +3021,7 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
           tile->get().foregroundHueShift = std::move(*result338);
         }
 
-        tile->get().foregroundColorVariant = DefaultMaterialColorVariant;
+        tile->get().foregroundColorVariant = default_material_color_variant;
         CollisionKind kind;
         if (placeMaterial.collisionOverride != TileCollisionOverride::None) {
           kind = collisionKindFromOverride(placeMaterial.collisionOverride);
@@ -3032,9 +3032,9 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
         }
         if (tile->get().update_collision(kind))
           WorldImpl::invalidate_collision_cache(*m_tileArray, RectI::with_size(pos, {1, 1}));
-        if (tile->get().foreground == EmptyMaterialId) {
+        if (tile->get().foreground == empty_material_id) {
           // Remove the foreground mod if removing the foreground.
-          tile->get().foregroundMod = NoModId;
+          tile->get().foregroundMod = no_mod_id;
         }
         auto result340 = material_database->blocks_liquid_flow(tile->get().foreground);
         if (!result340)
@@ -3199,10 +3199,10 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
       tile->get().rootSource = {};
       bool updatedTile = false;
       bool collision_changed = false;
-      if (isBiomeMaterial(materialSpace.material) || tile->get().foreground == materialSpace.material) {
+      if (is_biome_material(materialSpace.material) || tile->get().foreground == materialSpace.material) {
         // if the world is old, the materialSpace's collision may still be in the tile
-        tile->get().foreground = EmptyMaterialId;
-        tile->get().foregroundMod = NoModId;
+        tile->get().foreground = empty_material_id;
+        tile->get().foregroundMod = no_mod_id;
         updatedTile = true;
         collision_changed = tile->get().update_collision(CollisionKind::None);
       }
@@ -3233,12 +3233,12 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
       bool collision_changed = false;
       auto tile = m_tileArray->modify_tile(pos);
       if (tile) {
-        if (tile->get().foreground == EmptyMaterialId) {
+        if (tile->get().foreground == empty_material_id) {
           tile->get().foreground = materialSpace.material;
-          tile->get().foregroundMod = NoModId;
+          tile->get().foregroundMod = no_mod_id;
           updatedTile = true;
         }
-        if (isRealMaterial(materialSpace.material))
+        if (is_real_material(materialSpace.material))
           tile->get().rootSource = entity->tilePosition();
         passedSpaces.emplace_back(materialSpace);
         auto result358 = material_database->material_collision_kind(materialSpace.material);
@@ -3396,7 +3396,7 @@ std::expected<void, StarException> WorldServer::modifyLiquid(Vec2I const& pos, L
     if (!result373)
       return std::unexpected(std::move(result373.error()));
     auto material_database = std::move(*result373);
-    bool condition375 = static_cast<bool>(tile->get().foreground == EmptyMaterialId);
+    bool condition375 = static_cast<bool>(tile->get().foreground == empty_material_id);
     if (!condition375) {
       auto result374 = material_database->material_collision_kind(tile->get().foreground);
       if (!result374)
@@ -3445,7 +3445,7 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
   List<ItemDescriptor> drops;
 
   if (layer == TileLayer::Background) {
-    bool condition380 = static_cast<bool>(isRealMod(tile->get().backgroundMod) && destroyModFirst);
+    bool condition380 = static_cast<bool>(is_real_mod(tile->get().backgroundMod) && destroyModFirst);
     if (condition380) {
       auto result379 = material_database->mod_breaks_with_tile(tile->get().backgroundMod);
       if (!result379)
@@ -3460,7 +3460,7 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
         if (auto drop = std::move(*result381))
           drops.push_back(drop);
       }
-      tile->get().backgroundMod = NoModId;
+      tile->get().backgroundMod = no_mod_id;
     } else {
       if (genItems) {
         auto result382 = material_database->material_item_drop(tile->get().background);
@@ -3474,15 +3474,15 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
         if (auto drop = std::move(*result383))
           drops.push_back(drop);
       }
-      tile->get().background = EmptyMaterialId;
-      tile->get().backgroundColorVariant = DefaultMaterialColorVariant;
+      tile->get().background = empty_material_id;
+      tile->get().backgroundColorVariant = default_material_color_variant;
       tile->get().backgroundHueShift = 0;
-      tile->get().backgroundMod = NoModId;
+      tile->get().backgroundMod = no_mod_id;
     }
 
     tile->get().backgroundDamage.reset();
   } else {
-    bool condition385 = static_cast<bool>(isRealMod(tile->get().foregroundMod) && destroyModFirst);
+    bool condition385 = static_cast<bool>(is_real_mod(tile->get().foregroundMod) && destroyModFirst);
     if (condition385) {
       auto result384 = material_database->mod_breaks_with_tile(tile->get().foregroundMod);
       if (!result384)
@@ -3497,7 +3497,7 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
         if (auto drop = std::move(*result386))
           drops.push_back(drop);
       }
-      tile->get().foregroundMod = NoModId;
+      tile->get().foregroundMod = no_mod_id;
     } else {
       if (genItems) {
         auto result387 = material_database->material_item_drop(tile->get().foreground);
@@ -3511,10 +3511,10 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
         if (auto drop = std::move(*result388))
           drops.push_back(drop);
       }
-      tile->get().foreground = EmptyMaterialId;
-      tile->get().foregroundColorVariant = DefaultMaterialColorVariant;
+      tile->get().foreground = empty_material_id;
+      tile->get().foregroundColorVariant = default_material_color_variant;
       tile->get().foregroundHueShift = 0;
-      tile->get().foregroundMod = NoModId;
+      tile->get().foregroundMod = no_mod_id;
       if (tile->get().update_collision(CollisionKind::None))
         WorldImpl::invalidate_collision_cache(*m_tileArray, RectI::with_size(pos, {1, 1}));
     }
@@ -3522,7 +3522,7 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
     tile->get().foregroundDamage.reset();
   }
 
-  if (tile->get().background == EmptyMaterialId && tile->get().foreground == EmptyMaterialId) {
+  if (tile->get().background == empty_material_id && tile->get().foreground == empty_material_id) {
     auto result390 = m_worldTemplate->blockInfo(pos[0], pos[1]);
     if (!result390)
       return std::unexpected(std::move(result390.error()));
@@ -3800,7 +3800,7 @@ std::expected<void, StarException> WorldServer::updateDamagedBlocks(float dt) {
     return std::unexpected(std::move(materials.error()));
 
   auto recover_damage = [&materials, dt](WorldTile const& tile, TileLayer layer, TileDamageStatus& damage) -> std::expected<void, StarException> {
-    if (!isRealMaterial(tile.material(layer))) {
+    if (!is_real_material(tile.material(layer))) {
       damage.reset();
       return {};
     }

@@ -214,10 +214,10 @@ std::expected<void, StarException> BeamItem::updateBeamEffects(bool visible) {
   float const curve_length = m_beam_arc.total_length();
   m_beamInRange = m_target_distance <= m_range && curve_length <= m_range;
   if (m_beamInRange) {
-    auto canPlace = beamCanPlace();
-    if (!canPlace)
-      return std::unexpected(std::move(canPlace.error()));
-    m_beamCanPlace = *canPlace;
+    auto can_place = beam_can_place();
+    if (!can_place)
+      return std::unexpected(std::move(can_place.error()));
+    m_beamCanPlace = *can_place;
     m_lastUpdateColor = m_color;
     if (!m_beamCanPlace)
       m_lastUpdateColor.set_hue(0.0f);
@@ -271,7 +271,7 @@ bool BeamItem::beamActive() const {
   return true;
 }
 
-std::expected<bool, StarException> BeamItem::beamCanPlace() const {
+std::expected<bool, StarException> BeamItem::beam_can_place() const {
   return true;
 }
 

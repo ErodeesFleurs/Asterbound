@@ -2080,7 +2080,7 @@ namespace LuaBindings {
             auto layer = layerPointer;
             List<Vec2I> tiles;
             for (auto const& tile : tile_area_brush(radius, center, false)) {
-              if (world.material(tile, layer) != EmptyMaterialId)
+              if (world.material(tile, layer) != empty_material_id)
                 tiles.push_back(tile);
             }
             return tiles;
@@ -3961,9 +3961,9 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
     }
 
     auto material_id = world.material(Vec2I::floor(position), layer);
-    if (material_id == NullMaterialId) {
+    if (material_id == null_material_id) {
       return lua_nil;
-    } else if (material_id == EmptyMaterialId) {
+    } else if (material_id == empty_material_id) {
       return false;
     } else {
       auto materials = world.root().material_database();
@@ -3987,7 +3987,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
     }
 
     auto mod_id = world.mod(Vec2I::floor(position), layer);
-    if (isRealMod(mod_id)) {
+    if (is_real_mod(mod_id)) {
       auto materials = world.root().material_database();
       if (!materials)
         return std::unexpected(std::move(materials.error()));

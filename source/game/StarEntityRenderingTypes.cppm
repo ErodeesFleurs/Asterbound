@@ -76,10 +76,10 @@ struct PreviewTile {
   bool foreground = false;
 
   LiquidId liq_id = empty_liquid_id;
-  MaterialId mat_id = NullMaterialId;
+  MaterialId mat_id = null_material_id;
   MaterialHue hue_shift = 0;
   bool update_mat_id = false;
-  MaterialColorVariant color_variant = DefaultMaterialColorVariant;
+  MaterialColorVariant color_variant = default_material_color_variant;
   Vec3B light;
   bool update_light = false;
 };

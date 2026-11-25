@@ -430,8 +430,8 @@ std::expected<InspectionTool::InspectionResult, StarException> InspectionTool::i
   auto material_database = root().material_database();
   if (!material_database)
     return std::unexpected(std::move(material_database.error()));
-  if (isRealMaterial(fgMaterial)) {
-    auto description = isRealMod(fgMod) ? (*material_database)->mod_description(fgMod, species) : (*material_database)->material_description(fgMaterial, species);
+  if (is_real_material(fgMaterial)) {
+    auto description = is_real_mod(fgMod) ? (*material_database)->mod_description(fgMod, species) : (*material_database)->material_description(fgMaterial, species);
     return std::move(description).transform([](String message) {
       return InspectionResult{.message = std::move(message), .objectName = {}};
     });
@@ -446,8 +446,8 @@ std::expected<InspectionTool::InspectionResult, StarException> InspectionTool::i
     });
   MaterialId bgMaterial = itemWorld->get().material(Vec2I::floor(position), TileLayer::Background);
   MaterialId bgMod = itemWorld->get().mod(Vec2I(position.floor()), TileLayer::Background);
-  if (isRealMaterial(bgMaterial)) {
-    auto description = isRealMod(bgMod) ? (*material_database)->mod_description(bgMod, species) : (*material_database)->material_description(bgMaterial, species);
+  if (is_real_material(bgMaterial)) {
+    auto description = is_real_mod(bgMod) ? (*material_database)->mod_description(bgMod, species) : (*material_database)->material_description(bgMaterial, species);
     return std::move(description).transform([](String message) {
       return InspectionResult{.message = std::move(message), .objectName = {}};
     });

@@ -78,26 +78,59 @@ namespace Tiled {
     return std::optional<std::shared_ptr<Brush const>>{};
   }
 
-  template <typename MaterialBrush>
-  [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> getLayerBrush(String const& name, Properties& properties) {
-    auto hue = properties.opt<float>("hueshift");
-    if (!hue) return std::unexpected(std::move(hue.error()));
-    auto color = properties.opt<std::size_t>("colorVariant");
-    if (!color) return std::unexpected(std::move(color.error()));
-    auto mod = properties.opt<String>("mod");
-    if (!mod) return std::unexpected(std::move(mod.error()));
-    auto modHue = properties.opt<float>("modhueshift");
-    if (!modHue) return std::unexpected(std::move(modHue.error()));
-    std::optional<MaterialColorVariant> colorVariant;
-    if (*color) colorVariant = static_cast<MaterialColorVariant>(**color);
-    return std::make_shared<MaterialBrush>(name, *mod, *hue, *modHue, colorVariant);
+  // lexical_cast keeps the initialized integer on full-token overflow. These
+  // settings must reject overflow instead of turning it into a valid zero.
+  [[nodiscard]] static std::expected<std::int64_t, StarException> parse_integer_property(String const& text, std::string_view field) {
+    auto const& bytes = text.utf8();
+    std::int64_t value;
+    auto end = bytes.data() + bytes.size();
+    auto parsed = std::from_chars(bytes.data(), end, value);
+    if (parsed.ec != std::errc{} || parsed.ptr != end)
+      return std::unexpected(lexical_cast_error(parsed.ec, bytes).with_context(Star::format("Reading Tiled property '{}'", field)));
+    return value;
   }
 
-  [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> getMaterialBrush(String const& name, Properties& properties) {
+  [[nodiscard]] static std::expected<MaterialHue, StarException> read_hue_property(Properties const& properties, String const& field) {
+    auto degrees = properties.opt<float>(field);
+    if (!degrees)
+      return std::unexpected(std::move(degrees.error()));
+    if (!*degrees)
+      return MaterialHue{0};
+    auto hue = material_hue_from_degrees(**degrees);
+    if (!hue)
+      return std::unexpected(std::move(hue.error()).with_context(Star::format("Reading Tiled property '{}'", field)));
+    return hue;
+  }
+
+  template <typename MaterialBrush>
+  [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> get_layer_brush(String const& name, Properties const& properties) {
+    auto hue = read_hue_property(properties, "hueshift");
+    if (!hue) return std::unexpected(std::move(hue.error()));
+    auto settings = properties.toJson();
+    auto color = settings.find("colorVariant");
+    if (!color) return std::unexpected(std::move(color.error()));
+    auto color_variant = default_material_color_variant;
+    if (*color && !(*color)->get().is_null()) {
+      auto text = (*color)->get().string_ptr();
+      if (!text) return std::unexpected(std::move(text.error()));
+      auto raw = parse_integer_property(**text, "colorVariant");
+      if (!raw) return std::unexpected(std::move(raw.error()));
+      auto checked = checked_material_value<MaterialColorVariant>(*raw, "colorVariant");
+      if (!checked) return std::unexpected(std::move(checked.error()));
+      color_variant = *checked;
+    }
+    auto mod = properties.opt<String>("mod");
+    if (!mod) return std::unexpected(std::move(mod.error()));
+    auto mod_hue = read_hue_property(properties, "modhueshift");
+    if (!mod_hue) return std::unexpected(std::move(mod_hue.error()));
+    return std::make_shared<MaterialBrush>(name, std::move(*mod), *hue, *mod_hue, color_variant);
+  }
+
+  [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> get_material_brush(String const& name, Properties const& properties) {
     auto layer = propertyLayer(properties);
     if (!layer) return std::unexpected(std::move(layer.error()));
-    if (*layer == TileLayer::Background) return getLayerBrush<BackBrush>(name, properties);
-    return getLayerBrush<FrontBrush>(name, properties);
+    if (*layer == TileLayer::Background) return get_layer_brush<BackBrush>(name, properties);
+    return get_layer_brush<FrontBrush>(name, properties);
   }
   [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> getPlayerStartBrush(String const&, Properties&) {
     return std::make_shared<PlayerStartBrush>();
@@ -213,14 +246,17 @@ namespace Tiled {
     if (!item) return std::unexpected(std::move(item.error()));
     return std::make_shared<ItemBrush>(*item);
   }
-  [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> getSurfaceBrush(String const& variantText, Properties& properties) {
+  [[nodiscard]] static std::expected<std::shared_ptr<Brush const>, StarException> get_surface_brush(String const& variant_text, Properties& properties) {
     auto layer = propertyLayer(properties);
     if (!layer) return std::unexpected(std::move(layer.error()));
     auto mod = properties.opt<String>("mod");
     if (!mod) return std::unexpected(std::move(mod.error()));
-    auto variant = maybe_lexical_cast<int>(variantText);
-    if (*layer == TileLayer::Background) return std::make_shared<SurfaceBackgroundBrush>(variant, *mod);
-    return std::make_shared<SurfaceBrush>(variant, *mod);
+    auto variant = variant_text.empty() ? std::expected<std::int64_t, StarException>(0) : parse_integer_property(variant_text, "surface");
+    if (!variant) return std::unexpected(std::move(variant.error()));
+    auto material = biome_material_for_variant(*variant);
+    if (!material) return std::unexpected(std::move(material.error()));
+    if (*layer == TileLayer::Background) return std::make_shared<SurfaceBackgroundBrush>(*material, std::move(*mod));
+    return std::make_shared<SurfaceBrush>(*material, std::move(*mod));
   }
   [[nodiscard]] std::expected<std::shared_ptr<Brush const>, StarException> getLiquidBrush(String const& name, Properties& properties) {
     auto quantity = properties.opt<float>("quantity");
@@ -307,11 +343,11 @@ namespace Tiled {
     PropertyReader<std::shared_ptr<Brush const>> br;
     auto clear = br.optRead<bool>(brushes, "clear", getClearBrush, properties);
     if (!clear) return std::unexpected(std::move(clear.error()));
-    auto material = br.optRead<String>(brushes, "material", getMaterialBrush, properties);
+    auto material = br.optRead<String>(brushes, "material", get_material_brush, properties);
     if (!material) return std::unexpected(std::move(material.error()));
-    auto front = br.optRead<String>(brushes, "front", getLayerBrush<FrontBrush>, properties);
+    auto front = br.optRead<String>(brushes, "front", get_layer_brush<FrontBrush>, properties);
     if (!front) return std::unexpected(std::move(front.error()));
-    auto back = br.optRead<String>(brushes, "back", getLayerBrush<BackBrush>, properties);
+    auto back = br.optRead<String>(brushes, "back", get_layer_brush<BackBrush>, properties);
     if (!back) return std::unexpected(std::move(back.error()));
     auto player = br.optRead<String>(brushes, "playerstart", getPlayerStartBrush, properties);
     if (!player) return std::unexpected(std::move(player.error()));
@@ -335,7 +371,7 @@ namespace Tiled {
     if (!biomeTree) return std::unexpected(std::move(biomeTree.error()));
     auto item = br.optRead<String>(brushes, "item", getItemBrush, properties);
     if (!item) return std::unexpected(std::move(item.error()));
-    auto surface = br.optRead<String>(brushes, "surface", getSurfaceBrush, properties);
+    auto surface = br.optRead<String>(brushes, "surface", get_surface_brush, properties);
     if (!surface) return std::unexpected(std::move(surface.error()));
     auto liquid = br.optRead<String>(brushes, "liquid", getLiquidBrush, properties);
     if (!liquid) return std::unexpected(std::move(liquid.error()));

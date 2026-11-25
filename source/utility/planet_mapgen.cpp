@@ -204,13 +204,13 @@ static std::expected<void, StarException> run(std::span<String const> argv) {
           if (!block)
             return std::unexpected(std::move(block.error()));
           auto const& blockInfo = *block;
-          if (isRealMaterial(blockInfo.foreground)) {
+          if (is_real_material(blockInfo.foreground)) {
             Color color = groundColor;
             color.set_hue(blockInfo.biomeTransition ? 0 : 0.5f);
             auto written = outputImage->set(x, y, color.to_rgb());
             if (!written)
               return std::unexpected(std::move(written.error()));
-          } else if (isRealMaterial(blockInfo.background)) {
+          } else if (is_real_material(blockInfo.background)) {
             Color color = caveColor;
             color.set_hue(blockInfo.biomeTransition ? 0 : 0.5f);
             auto written = outputImage->set(x, y, color.to_rgb());
@@ -227,14 +227,14 @@ static std::expected<void, StarException> run(std::span<String const> argv) {
           if (!block)
             return std::unexpected(std::move(block.error()));
           auto const& blockInfo = *block;
-          if (isRealMaterial(blockInfo.foreground)) {
+          if (is_real_material(blockInfo.foreground)) {
             Color color = groundColor;
             color.set_hue(static_random_float(blockInfo.foreground));
             color.set_saturation(static_random_float(blockInfo.foregroundMod));
             auto written = outputImage->set(x, y, color.to_rgb());
             if (!written)
               return std::unexpected(std::move(written.error()));
-          } else if (isRealMaterial(blockInfo.background)) {
+          } else if (is_real_material(blockInfo.background)) {
             Color color = caveColor;
             color.set_hue(static_random_float(blockInfo.background));
             color.set_saturation(static_random_float(blockInfo.backgroundMod));

@@ -109,7 +109,7 @@ public:
   std::expected<void, StarException> update(float dt, FireMode fireMode, bool shifting, HashSet<MoveControlType> const& moves) override;
 
   [[nodiscard]]
-  std::expected<bool, StarException> beamCanPlace() const override;
+  std::expected<bool, StarException> beam_can_place() const override;
 
   [[nodiscard]]
   std::expected<void, StarException> fire(FireMode mode, bool shifting, bool edgeTriggered) override;
@@ -214,7 +214,7 @@ std::expected<void, StarException> LiquidItem::update(float dt, FireMode fireMod
   return {};
 }
 
-std::expected<bool, StarException> LiquidItem::beamCanPlace() const {
+std::expected<bool, StarException> LiquidItem::beam_can_place() const {
   return canPlace(m_shifting);
 }
 
@@ -325,9 +325,9 @@ std::expected<bool, StarException> LiquidItem::canPlaceAtTile(Vec2I pos) const {
   if (!itemWorld)
     return std::unexpected(std::move(itemWorld.error()));
   auto bgTileMaterial = itemWorld->get().material(pos, TileLayer::Background);
-  if (bgTileMaterial != EmptyMaterialId) {
+  if (bgTileMaterial != empty_material_id) {
     auto fgTileMaterial = itemWorld->get().material(pos, TileLayer::Foreground);
-    if (fgTileMaterial == EmptyMaterialId) {
+    if (fgTileMaterial == empty_material_id) {
       auto tileLiquid = itemWorld->get().liquidLevel(pos).liquid;
       if (tileLiquid == empty_liquid_id || tileLiquid == liquidId())
         return true;

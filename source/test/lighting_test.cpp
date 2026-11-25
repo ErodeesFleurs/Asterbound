@@ -158,12 +158,12 @@ void gatherTileOracle(CellularLightingCalculator& calculator, ClientTileSectorAr
         continue;
       auto const& tile = tiles.tile(position);
       Vec3F emission;
-      if (tile.foreground != EmptyMaterialId || tile.foregroundMod != NoModId)
+      if (tile.foreground != empty_material_id || tile.foregroundMod != no_mod_id)
         emission += materials.radiant_light(tile.foreground, tile.foregroundMod);
       if (tile.liquid.liquid != empty_liquid_id && tile.liquid.level != 0.0f)
         emission += liquids.radiant_light(tile.liquid);
       if (tile.foregroundLightTransparent) {
-        if (tile.background != EmptyMaterialId || tile.backgroundMod != NoModId)
+        if (tile.background != empty_material_id || tile.backgroundMod != no_mod_id)
           emission += materials.radiant_light(tile.background, tile.backgroundMod);
         if (tile.backgroundLightTransparent && y > underground)
           emission += environment;
@@ -192,7 +192,7 @@ void checkWideLightingSnapshot(GameTest& fixture, RectI const& query) {
   for (auto const& name : names) {
     auto id = (*materials)->material_id(name);
     ASSERT_TRUE(id);
-    if ((*materials)->radiant_light(*id, NoModId).max() > 0.0f) {
+    if ((*materials)->radiant_light(*id, no_mod_id).max() > 0.0f) {
       radiantMaterial = *id;
       break;
     }
@@ -219,10 +219,10 @@ void checkWideLightingSnapshot(GameTest& fixture, RectI const& query) {
   ASSERT_TRUE(
     tiles.tile_eval(RectI(0, 0, 64, 64), [&](Vec2I const& pos, ClientTile& tile) -> std::expected<void, StarException> {
       int key = pos[0] * 11 + pos[1] * 23;
-      tile.foreground = key % 17 == 0 ? *radiantMaterial : EmptyMaterialId;
-      tile.foregroundMod = NoModId;
-      tile.background = key % 19 == 0 ? *radiantMaterial : EmptyMaterialId;
-      tile.backgroundMod = NoModId;
+      tile.foreground = key % 17 == 0 ? *radiantMaterial : empty_material_id;
+      tile.foregroundMod = no_mod_id;
+      tile.background = key % 19 == 0 ? *radiantMaterial : empty_material_id;
+      tile.backgroundMod = no_mod_id;
       tile.foregroundLightTransparent = pos[0] % 13 != 0 || pos[1] % 7 == 0;
       tile.backgroundLightTransparent = key % 5 != 0;
       tile.liquid = key % 7 == 0 ? LiquidLevel{*radiant_liquid, (key % 5) * 0.25f} : LiquidLevel();
@@ -597,7 +597,7 @@ const GameTestRegistration
     for (auto const& name : names) {
       auto id = (*materials)->material_id(name);
       ASSERT_TRUE(id);
-      if ((*materials)->radiant_light(*id, NoModId).max() > 0.0f) {
+      if ((*materials)->radiant_light(*id, no_mod_id).max() > 0.0f) {
         radiantMaterial = *id;
         break;
       }
@@ -621,7 +621,7 @@ const GameTestRegistration
     for (auto const& name : mod_names) {
       auto id = (*materials)->mod_id(name);
       ASSERT_TRUE(id);
-      if ((*materials)->radiant_light(EmptyMaterialId, *id).max() > 0.0f) {
+      if ((*materials)->radiant_light(empty_material_id, *id).max() > 0.0f) {
         radiantMod = *id;
         break;
       }
@@ -645,10 +645,10 @@ const GameTestRegistration
     ASSERT_TRUE(tiles.tile_eval(RectI(0, 0, static_cast<int>(worldWidth), 96),
                                [&](Vec2I const& pos, ClientTile& tile) -> std::expected<void, StarException> {
                                  int key = pos[0] * 11 + pos[1] * 23;
-                                 tile.foreground = key % 17 == 0 ? *radiantMaterial : EmptyMaterialId;
-                                 tile.foregroundMod = key % 29 == 0 ? *radiantMod : NoModId;
-                                 tile.background = key % 19 == 0 ? *radiantMaterial : EmptyMaterialId;
-                                 tile.backgroundMod = key % 31 == 0 ? *radiantMod : NoModId;
+                                 tile.foreground = key % 17 == 0 ? *radiantMaterial : empty_material_id;
+                                 tile.foregroundMod = key % 29 == 0 ? *radiantMod : no_mod_id;
+                                 tile.background = key % 19 == 0 ? *radiantMaterial : empty_material_id;
+                                 tile.backgroundMod = key % 31 == 0 ? *radiantMod : no_mod_id;
                                  tile.foregroundLightTransparent = pos[0] % 13 != 0 || pos[1] % 7 == 0;
                                  tile.backgroundLightTransparent = key % 5 != 0;
                                  tile.liquid =

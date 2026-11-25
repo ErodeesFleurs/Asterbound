@@ -596,7 +596,7 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
         orientation->materialSpaces.push_back({spacePosition, material});
       }
     } else if (collisionType == "solid" || collisionType == "platform") {
-      auto material = collisionType == "solid" ? ObjectSolidMaterialId : ObjectPlatformMaterialId;
+      auto material = collisionType == "solid" ? object_solid_material_id : object_platform_material_id;
       if (auto containsResult = orientationSettings.contains("collisionSpaces"); !containsResult)
         return std::unexpected(std::move(containsResult.error()));
       else if (*containsResult) {

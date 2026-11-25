@@ -28,9 +28,9 @@ struct BiomePlaceables {
   [[nodiscard]] std::optional<std::reference_wrapper<TreeVariant const>> first_tree() const &;
   std::optional<std::reference_wrapper<TreeVariant const>> first_tree() const && = delete;
 
-  ModId grass_mod = NoModId;
+  ModId grass_mod = no_mod_id;
   float grass_mod_density = 0;
-  ModId ceiling_grass_mod = NoModId;
+  ModId ceiling_grass_mod = no_mod_id;
   float ceiling_grass_mod_density = 0;
 
   List<BiomeItemDistribution> item_distributions;
@@ -46,7 +46,7 @@ struct Biome {
   String base_name;
   String description;
 
-  MaterialId main_block = EmptyMaterialId;
+  MaterialId main_block = empty_material_id;
   List<MaterialId> sub_blocks;
   // Pairs the ore type with the commonality multiplier.
   List<std::pair<ModId, float>> ores;

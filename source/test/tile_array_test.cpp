@@ -68,12 +68,12 @@ const GameTestRegistration tile_match_rules("TileDrawerTest", "RuleJoinsPreserve
   base.foregroundHueShift = 11;
   base.foregroundModHueShift = 37;
   render_data.tiles(0, 0) = base;
-  render_data.tiles(0, 0).foregroundMod = NoModId;
+  render_data.tiles(0, 0).foregroundMod = no_mod_id;
   render_data.tiles(2, 0) = base; // world X = 0, one step across the seam
   render_data.tiles(2, 0).foregroundHueShift = 12;
   render_data.tiles(2, 0).foregroundModHueShift = 38;
   render_data.tiles(3, 0) = base;
-  render_data.tiles(3, 0).foreground = EmptyMaterialId;
+  render_data.tiles(3, 0).foreground = empty_material_id;
 
   auto spec = Json::parse_json(R"json({
     "representativePiece": "",

@@ -1189,7 +1189,7 @@ const GameTestRegistration prediction_liquid_update("WorldClientTest", "LiquidPa
   // of the outpost layout. No network tick can acknowledge our pending edit.
   NetTile air;
   air.background = *dirt;
-  air.foreground = EmptyMaterialId;
+  air.foreground = empty_material_id;
   air.collision = CollisionKind::None;
   air.dungeonId = no_dungeon_id;
   auto patch = std::make_shared<TileArrayUpdatePacket>();
@@ -1227,9 +1227,9 @@ const GameTestRegistration prediction_liquid_update("WorldClientTest", "LiquidPa
   ASSERT_TRUE(placements) << placements.error().what();
   ASSERT_TRUE(placements->empty());
   MaterialId missing = 0;
-  while (isRealMaterial(missing) && (*materials)->is_valid_material_id(missing))
+  while (is_real_material(missing) && (*materials)->is_valid_material_id(missing))
     ++missing;
-  ASSERT_TRUE(isRealMaterial(missing));
+  ASSERT_TRUE(is_real_material(missing));
   EXPECT_FALSE(world->applyTileModifications({{invalid_pos, PlaceMaterial{TileLayer::Foreground, missing, 83}}}, true));
 
   world->setClientWindow(RectI::with_size({8, 8}, {7, 7}));
@@ -1243,10 +1243,10 @@ const GameTestRegistration prediction_liquid_update("WorldClientTest", "LiquidPa
   EXPECT_EQ(predicted_tile(position).foreground, *dirt);
   EXPECT_EQ(predicted_tile(position).foregroundHueShift, 53);
   for (auto pos : {falling_pos, cascading_pos}) {
-    EXPECT_EQ(predicted_tile(pos).foreground, StructureMaterialId);
+    EXPECT_EQ(predicted_tile(pos).foreground, structure_material_id);
     EXPECT_EQ(predicted_tile(pos).foregroundHueShift, air.foregroundHueShift);
   }
-  EXPECT_EQ(predicted_tile(invalid_pos).foreground, EmptyMaterialId);
+  EXPECT_EQ(predicted_tile(invalid_pos).foreground, empty_material_id);
   EXPECT_EQ(predicted_tile(invalid_pos).liquidId, 1);
   EXPECT_EQ(predicted_tile(invalid_pos).liquidLevel, 255);
 });
@@ -2723,14 +2723,14 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
   auto tile = world.modifyServerTile(position, true);
   if (!tile) return std::unexpected(std::move(tile.error()));
   if (!*tile) return std::unexpected(StarException("Isolation material tile is unavailable"));
-  EXPECT_EQ((*tile)->get().foreground, EmptyMaterialId);
-  if ((*tile)->get().foreground != EmptyMaterialId)
+  EXPECT_EQ((*tile)->get().foreground, empty_material_id);
+  if ((*tile)->get().foreground != empty_material_id)
     return std::unexpected(StarException("Isolation material tile is not empty"));
   auto center = Vec2F(position) + Vec2F(0.5f, 0.5f);
   EXPECT_EQ(world.pointTileCollision(center), false);
   // Supply a legitimate attachment surface, then let WorldServer perform the
   // placement and derive its collision from this world's MaterialDatabase.
-  (*tile)->get().background = StructureMaterialId;
+  (*tile)->get().background = structure_material_id;
   auto placed = world.forceModifyTile(
       position, PlaceMaterial{TileLayer::Foreground, material, MaterialHue(0)}, true);
   if (!placed) return std::unexpected(std::move(placed.error()));
@@ -2747,9 +2747,9 @@ const GameTestRegistration simultaneousWorldMaterials("RootTest", "SimultaneousW
   auto materials = fixture.root().material_database();
   ASSERT_TRUE(materials) << materials.error().what();
   MaterialId material = 0;
-  while (material < FirstMetaMaterialId && (*materials)->is_valid_material_id(material))
+  while (material < first_meta_material_id && (*materials)->is_valid_material_id(material))
     ++material;
-  ASSERT_LT(material, FirstMetaMaterialId);
+  ASSERT_LT(material, first_meta_material_id);
 
   auto directoryA = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directoryA) << directoryA.error().what();

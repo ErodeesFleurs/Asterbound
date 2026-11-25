@@ -80,7 +80,7 @@ private:
     if (color_variant > last_color) {
       if (!fallback)
         return {};
-      color_variant = DefaultMaterialColorVariant;
+      color_variant = default_material_color_variant;
     }
     return std::cref(rectangles[std::size_t(color_variant) * variant_count + variant % variant_count]);
   }
@@ -88,7 +88,7 @@ private:
   // Dense color rows; every row has the same number of random variants.
   std::vector<RectF> rectangles;
   unsigned variant_count = 0;
-  MaterialColorVariant last_color = DefaultMaterialColorVariant;
+  MaterialColorVariant last_color = default_material_color_variant;
 };
 
 struct MaterialRenderMatch {
@@ -145,7 +145,7 @@ struct MaterialRenderProfile {
   [[nodiscard]] std::expected<std::reference_wrapper<MaterialRenderPiece const>, StarException> find_piece(String const& name) const;
 
   [[nodiscard]] MaterialColorVariant world_color_variant(MaterialColorVariant color_variant) const {
-    return color_variants > 0 ? color_variant % color_variants : DefaultMaterialColorVariant;
+    return color_variants > 0 ? color_variant % color_variants : default_material_color_variant;
   }
   [[nodiscard]] std::size_t color_directive_slot(MaterialColorVariant selected_color) const {
     return color_directives.empty() ? 0 : selected_color % color_directives.size();
@@ -161,7 +161,7 @@ struct MaterialRenderProfile {
   [[nodiscard]]
   std::expected<String, StarException> piece_image(String const& piece_name,
       unsigned variant,
-      MaterialColorVariant color_variant = DefaultMaterialColorVariant,
+      MaterialColorVariant color_variant = default_material_color_variant,
       MaterialHue hue_shift = MaterialHue()) const;
 
   // Get a damage overlay and its offset in world coordinates.

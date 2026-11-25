@@ -253,16 +253,16 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
 using RenderTileArray = MultiArray<RenderTile, 2>;
 
 inline WorldTile::WorldTile()
-  : foreground(NullMaterialId),
+  : foreground(null_material_id),
     foregroundHueShift(),
-    foregroundMod(NoModId),
+    foregroundMod(no_mod_id),
     foregroundModHueShift(),
-    foregroundColorVariant(DefaultMaterialColorVariant),
-    background(NullMaterialId),
+    foregroundColorVariant(default_material_color_variant),
+    background(null_material_id),
     backgroundHueShift(),
-    backgroundMod(NoModId),
+    backgroundMod(no_mod_id),
     backgroundModHueShift(),
-    backgroundColorVariant(DefaultMaterialColorVariant),
+    backgroundColorVariant(default_material_color_variant),
     blockBiomeIndex(),
     environmentBiomeIndex(),
     dungeonId(no_dungeon_id) {}
@@ -351,15 +351,15 @@ inline ClientTile& ClientTile::operator=(ClientTile const& clientTile) {
 }
 
 inline NetTile::NetTile()
-  : background(NullMaterialId),
+  : background(null_material_id),
     backgroundHueShift(),
     backgroundColorVariant(),
-    backgroundMod(NoModId),
+    backgroundMod(no_mod_id),
     backgroundModHueShift(),
-    foreground(NullMaterialId),
+    foreground(null_material_id),
     foregroundHueShift(),
     foregroundColorVariant(),
-    foregroundMod(NoModId),
+    foregroundMod(no_mod_id),
     foregroundModHueShift(),
     collision(),
     blockBiomeIndex(),

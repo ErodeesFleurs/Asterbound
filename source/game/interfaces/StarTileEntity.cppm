@@ -117,7 +117,7 @@ protected:
 };
 
 inline MaterialSpace::MaterialSpace()
-  : material(NullMaterialId) {}
+  : material(null_material_id) {}
 
 inline MaterialSpace::MaterialSpace(Vec2I space, MaterialId material)
   : space(space), material(material) {}

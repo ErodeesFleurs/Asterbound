@@ -264,11 +264,11 @@ namespace WorldImpl {
       Vec2I const& pos, TileLayer layer, bool includeEphemeral, bool checkCollision) {
     auto& tile = tileSectorArray->tile(pos);
     if (layer == TileLayer::Foreground) {
-      if (checkCollision ? tile.getCollision() >= CollisionKind::Dynamic : tile.foreground != EmptyMaterialId)
+      if (checkCollision ? tile.getCollision() >= CollisionKind::Dynamic : tile.foreground != empty_material_id)
         return true;
       return entityMap->tile_is_occupied(pos, includeEphemeral);
     }
-    return tile.background != EmptyMaterialId;
+    return tile.background != empty_material_id;
   }
 
   template <typename TileSectorArray>
@@ -452,7 +452,7 @@ namespace WorldImpl {
       std::optional<TileDamageParameters>& combined) {
     auto target = tile.material(layer);
     auto mod = tile.mod(layer);
-    if (!isRealMod(mod) || tile_damage_is_penetrating(damage_type))
+    if (!is_real_mod(mod) || tile_damage_is_penetrating(damage_type))
       return materials.material_damage_parameters(target);
     auto breaks_with_tile = materials.mod_breaks_with_tile(mod);
     if (!breaks_with_tile)
@@ -496,7 +496,7 @@ namespace WorldImpl {
     auto material_database = root.material_database();
     if (!material_database)
       return std::unexpected(std::move(material_database.error()));
-    if (!isRealMaterial(material))
+    if (!is_real_material(material))
       return false;
 
     auto isAdjacentToConnectable = [&](Vec2I const& pos, int distance, bool foreground) -> std::expected<bool, StarException> {
@@ -512,7 +512,7 @@ namespace WorldImpl {
             auto tile = getTile(tPos);
             if (!tile)
               return std::unexpected(std::move(tile.error()));
-            if (isConnectableMaterial(foreground ? tile->get().foreground : tile->get().background))
+            if (is_connectable_material(foreground ? tile->get().foreground : tile->get().background))
               return true;
           }
         }
@@ -529,15 +529,15 @@ namespace WorldImpl {
     if (!tile)
       return std::unexpected(std::move(tile.error()));
     if (layer == TileLayer::Background) {
-      if (tile->get().background != EmptyMaterialId && tile->get().background != ObjectPlatformMaterialId)
+      if (tile->get().background != empty_material_id && tile->get().background != object_platform_material_id)
         return false;
       auto adjacent = isAdjacentToConnectable(pos, 1, false);
       if (!adjacent)
         return std::unexpected(std::move(adjacent.error()));
-      if (!*adjacent && !isConnectableMaterial(tile->get().foreground))
+      if (!*adjacent && !is_connectable_material(tile->get().foreground))
         return false;
     } else {
-      if (tile->get().foreground != EmptyMaterialId && tile->get().foreground != ObjectPlatformMaterialId)
+      if (tile->get().foreground != empty_material_id && tile->get().foreground != object_platform_material_id)
         return false;
       if (!allowTileOverlap) {
         auto occupied = entityMap->tile_is_occupied(pos);
@@ -556,7 +556,7 @@ namespace WorldImpl {
       auto adjacent = isAdjacentToConnectable(pos, 1, true);
       if (!adjacent)
         return std::unexpected(std::move(adjacent.error()));
-      if (!*adjacent && !isConnectableMaterial(tile->get().background))
+      if (!*adjacent && !is_connectable_material(tile->get().background))
         return false;
     }
     return true;
@@ -569,7 +569,7 @@ namespace WorldImpl {
     auto material_database = root.material_database();
     if (!material_database)
       return std::unexpected(std::move(material_database.error()));
-    if (!isRealMaterial(material))
+    if (!is_real_material(material))
       return false;
     auto can_place = (*material_database)->can_place_in_layer(material, layer);
     if (!can_place)
@@ -580,8 +580,8 @@ namespace WorldImpl {
     if (!tile)
       return std::unexpected(std::move(tile.error()));
     if (layer == TileLayer::Background)
-      return tile->get().background == EmptyMaterialId || tile->get().background == ObjectPlatformMaterialId;
-    if (tile->get().foreground != EmptyMaterialId && tile->get().foreground != ObjectPlatformMaterialId)
+      return tile->get().background == empty_material_id || tile->get().background == object_platform_material_id;
+    if (tile->get().foreground != empty_material_id && tile->get().foreground != object_platform_material_id)
       return false;
     if (!allowTileOverlap) {
       auto occupied = entityMap->tile_is_occupied(pos);
@@ -621,7 +621,7 @@ namespace WorldImpl {
   template <typename GetTileFunction>
   [[nodiscard]]
   std::expected<bool, StarException> canPlaceMod(Root& root, Vec2I const& pos, TileLayer layer, ModId mod, GetTileFunction& getTile) {
-    if (!isRealMod(mod))
+    if (!is_real_mod(mod))
       return false;
     auto material_database = root.material_database();
     if (!material_database)
@@ -668,7 +668,7 @@ namespace WorldImpl {
   inline std::expected<bool, StarException> validateTileReplacement(Root& root, TileModification const& modification) {
     if (std::holds_alternative<PlaceMaterial>(modification)) {
       auto const& placeMaterial = std::get<PlaceMaterial>(modification);
-      if (!isRealMaterial(placeMaterial.material))
+      if (!is_real_material(placeMaterial.material))
         return false;
       auto material_database = root.material_database();
       if (!material_database)
@@ -719,9 +719,9 @@ namespace WorldImpl {
   template <typename TileSectorArray>
   float windLevel(std::shared_ptr<TileSectorArray> const& tileSectorArray, Vec2F const& position, float weatherWindLevel) {
     auto const& tile = tileSectorArray->tile(Vec2I::floor(position));
-    if (tile.material(TileLayer::Background) != EmptyMaterialId)
+    if (tile.material(TileLayer::Background) != empty_material_id)
       return 0.0f;
-    if (tile.material(TileLayer::Foreground) != EmptyMaterialId)
+    if (tile.material(TileLayer::Foreground) != empty_material_id)
       return 0.0f;
     return weatherWindLevel;
   }

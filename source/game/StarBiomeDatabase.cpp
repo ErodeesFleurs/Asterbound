@@ -92,7 +92,7 @@ std::expected<BiomePlaceables, StarException> read_placeables(Root& root, Materi
   auto pick_mod = [&](String const& key) -> std::expected<ModId, StarException> {
     auto options = optional_array(config, key);
     if (!options) return std::unexpected(std::move(options.error()));
-    if (!*options || (*options)->empty()) return NoModId;
+    if (!*options || (*options)->empty()) return no_mod_id;
     auto choice = random.sample_ref(**options);
     if (!choice) return std::unexpected(std::move(choice.error()));
     auto name = choice->get().string_ptr();
@@ -270,6 +270,10 @@ std::expected<std::shared_ptr<Biome>, StarException> BiomeDatabase::create_biome
     auto biome = std::make_shared<Biome>();
     auto hue = pick_hue_shift(parameters, seed);
     if (!hue) return std::unexpected(std::move(hue.error()));
+    auto material_hue = material_hue_from_degrees(*hue);
+    if (!material_hue) return std::unexpected(std::move(material_hue.error()));
+    biome->hue_shift = *hue;
+    biome->material_hue_shift = *material_hue;
     biome->base_name = biome_name;
     {
       auto value = parameters.get_string("description", "");
@@ -316,8 +320,6 @@ std::expected<std::shared_ptr<Biome>, StarException> BiomeDatabase::create_biome
     auto underground = placeables("undergroundPlaceables");
     if (!underground) return std::unexpected(std::move(underground.error()));
     biome->underground_placeables = std::move(*underground);
-    biome->hue_shift = *hue;
-    biome->material_hue_shift = materialHueFromDegrees(*hue);
     auto parallax = parameters.opt_string("parallax");
     if (!parallax) return std::unexpected(std::move(parallax.error()));
     if (*parallax) {
