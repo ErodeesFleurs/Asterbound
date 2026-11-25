@@ -51,7 +51,9 @@
     "XRC_BETA_STARBOUND", "My Enternia", "StardustLib",
     "Tougher Mobs with Better Loot!", "Meteora-Train-System", "rl_belterdungeons",
     "[oSB]StarTechUltimateUpgrade", "StarTech", "antr_armorImplants",
-    "Weapon Fusion Station", "DSBots"
+    "Weapon Fusion Station", "DSBots", "SpawnableItemPack", "FrackinInterface",
+    "RUS_FU", "RUS_Starbound_MrHimera", "Traducao_PTBR", "ak_crew",
+    "mechdetailedstats", "open_ui", "pat_throwablenpcs", "Русификатор SBT сообщества"
   ],
   "scripts" : {
     "onLoad" : [
@@ -61,6 +63,7 @@
       "/scripts/asterbound/compat/ati.lua",
       "/scripts/asterbound/compat/gic.lua",
       "/scripts/asterbound/compat/frackinuniverse.lua",
+      "/scripts/asterbound/compat/openui.lua",
       "/scripts/asterbound/compat/collection.lua"
     ],
     "postLoad" : ["/scripts/asterbound/compat/arcana.lua"]

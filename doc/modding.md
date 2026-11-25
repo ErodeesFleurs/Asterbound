@@ -175,6 +175,20 @@ Failed assets are not requeued after cache clearing while their cached error rem
 
 The collection still contains genuinely missing items, divergent identifier collisions and unfinished scripts. These repairs do not supply absent FU content, invent missing artwork/physics or make GIC and FU safe to combine. Test with isolated characters/universes; successful startup is not complete campaign or multiplayer acceptance.
 
+### Workshop Top Rated audit (2026-11-25)
+
+The [per-item snapshot](workshop-top-rated-2026-11-25.tsv) records the first 200 entries in Steam's [Top Rated All Time](https://steamcommunity.com/workshop/browse/?appid=211820&browsesort=toprated&actualsort=toprated&section=readytouseitems&days=-1) order, not the most-subscribed list. It includes the Workshop ID, Steam manifest, package hashes and new repair paths. A blank repair column means no new repair in this audit, not a guarantee of compatibility. An existing rule's primary-source match does not imply that its optional dependencies are installed.
+
+| Workshop ranks | Newly repaired behavior |
+| --- | --- |
+| 1 Arcana, 47 Frackin' Interface, 64 GIC, 146 Yet More Things For Crew to Do, 162 Mech Detallist | Load the paint/terminal panes, armor and tech scripts, crew effect and mech color picker with the target Lua parser. The crew effect reads its shipped positive and negative effect lists. |
+| 5 Stardust Core Lite, 66 Stardust Core, 36 Spawnable Item Pack | Keep one input update per tech tick when an owner already imported the input library. Full Stardust's tablet starts its local apps without editing the engine's require cache. SIP's bound key can close and reopen the actual pane. |
+| 9 and 180 Russian base translations, 29 StarCore Simplified Chinese, 118 Brazilian Portuguese | Expand the actual command list in localized `/help` headings instead of displaying a literal `%s`. |
+| 33 Frackin' Universe, 96 Russian FU translation, 128 Draconis | Correct the verified battlepack color, keep the translated SAIL argument handling and Shoggoth shield, and renew the dragon racial effect without an infinite network duration. |
+| 127 OpenUI, 175 throwable npcs | Use OpenUI's installed artwork on current panes without replacing the unified bindings controller. Register the throwable-NPC toggle against the current binds asset only when the original target is absent. Its default remains unbound. |
+
+The 200 items contained 201 PAKs and 9,904 `.lua` files. The patched Lua 5.5.1 parser rejected 60 original files: 40 already had repairs and 11 received new ones. Eight unmounted scripts/tools and GIC's registered but unreferenced `gic_maxfoodscalingboost` were left unchanged; the latter calls a resource getter as if it installed a food-capacity modifier. The scan also checked literal imports, removed runtime-cache use, effect durations, random seeds, renamed asset paths and selected changed data schemas. This was not a playthrough of every mod or a test of all mod combinations.
+
 ## Required third-party dependencies
 
 The compatibility pack does **not** download, install or fabricate dependencies.

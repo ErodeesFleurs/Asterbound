@@ -93,7 +93,11 @@ local function repair(rule, id)
     return
   end
 
-  if rule.kind == "erase" then
+  if rule.kind == "orphanPatch" then
+    -- No slot exists to redirect when a legacy target is absent. Register the
+    -- fingerprinted effective patch itself so diagnostics retain its provider.
+    if assets.exists(rule.target) or not assets.patch(rule.replacementTarget, rule.path) then return end
+  elseif rule.kind == "erase" then
     local canonical = assets.origin(rule.canonical)
     if not canonical then return end
     if canonical ~= source then
