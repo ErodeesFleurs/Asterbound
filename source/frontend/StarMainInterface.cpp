@@ -1060,7 +1060,7 @@ std::expected<void, StarException> MainInterface::openCraftingWindow(Json const&
   if (m_craftingWindow && m_paneManager.isDisplayed(m_craftingWindow)) {
     if (auto dismissed = m_paneManager.dismissPane(m_craftingWindow); !dismissed)
       return std::unexpected(std::move(dismissed.error()));
-    if (sourceEntityId != null_entity_id && m_craftingWindow->sourceEntityId() == sourceEntityId) {
+    if (sourceEntityId != null_entity_id && m_craftingWindow->source_entity_id() == sourceEntityId) {
       m_craftingWindow.reset();
       return {};
     }

@@ -97,6 +97,9 @@ import star.world_client_state;
 import star.world_tiles;
 import star.entity_rendering_types;
 import star.item_lua_bindings;
+import star.container_object;
+import star.object;
+import star.rpc_promise;
 namespace Star {
 
 void PrintTo(ItemDescriptor const& descriptor, std::ostream* stream) {
@@ -273,8 +276,169 @@ const GameTestRegistration ranked_recipes("ItemTest", "SparseContainerChoosesHig
     auto chosen = (*database)->get_precise_recipe_for_materials(group, bag, {});
     fixture.check(chosen.output.name().utf8() == (group == "tieprobe" ? "dirtmaterial" : "perfectlygenericitem"), group.utf8());
   }
+  auto first = inventory_test_item(**database, "perfectlygenericitem", 3);
+  auto second = inventory_test_item(**database, "perfectlygenericitem", 3);
+  if (!fixture.check(first && *first && second && *second && *first != *second, "create distinct material stacks")) return;
+  auto alias = (*database)->get_precise_recipe_for_materials("forwardprobe", std::array{*first, *first}, {});
+  auto distinct = (*database)->get_precise_recipe_for_materials("forwardprobe", std::array{*first, *second}, {});
+  fixture.check(alias.output.name() == "dirtmaterial", "the same input stack cannot be counted twice");
+  fixture.check(distinct.output.name() == "perfectlygenericitem", "distinct stacks can meet the larger requirement");
   auto invalid = (*database)->parse_recipe(JsonObject{{"input", JsonArray{"invalidrecipecurrency"}}, {"output", "dirtmaterial"}});
   fixture.check(!invalid && invalid.error().is<RecipeException>(), "fallback is not a currency");
+});
+
+const GameTestRegistration recipe_currency_hash("ItemTest", "RecipeCurrencyHashIgnoresBucketLayout", [](GameTest& fixture) {
+  auto output = ItemDescriptor::create("dirtmaterial");
+  if (!fixture.check(bool(output), "construct recipe output")) return;
+  ItemRecipe forward{};
+  forward.output = *output;
+  forward.match_input_parameters = true;
+  forward.currency_inputs["money"] = 4;
+  forward.currency_inputs["essence"] = 7;
+  ItemRecipe reverse{};
+  reverse.output = *output;
+  reverse.match_input_parameters = true;
+  reverse.currency_inputs.reserve(128);
+  reverse.currency_inputs["essence"] = 7;
+  reverse.currency_inputs["money"] = 4;
+  for (unsigned i = 1; i <= 32; ++i) {
+    forward.currency_inputs[String(Star::format("token{}", i))] = i;
+    auto j = 33 - i;
+    reverse.currency_inputs[String(Star::format("token{}", j))] = j;
+  }
+  fixture.check(forward == reverse, "currency layout is not part of recipe identity");
+  fixture.check(ValueHash<ItemRecipe>{}(forward) == ValueHash<ItemRecipe>{}(reverse),
+      "equal recipes have identical hashes");
+  HashSet<ItemRecipe> recipes{forward};
+  fixture.check(recipes.contains(reverse), "recipe set can look up the equivalent recipe");
+  fixture.check(!recipes.add(reverse) && recipes.size() == 1, "recipe set deduplicates the equivalent recipe");
+  auto serialized = reverse.to_json();
+  if (!fixture.check(bool(serialized), "serialize recipe")) return;
+  fixture.check(serialized->get_bool("matchInputParameters") == true, "keep the recipe option's JSON key");
+  fixture.check(serialized->get("currencyInputs").and_then([](Json const& value) { return value.get_uint("money"); }) == 4u,
+      "keep the currency map's JSON key and value");
+});
+
+const GameTestRegistration scripted_container_recipes("ItemTest", "ScriptedContainerRecipesAreAtomicAndMatchExactInputs", [](GameTest& fixture) {
+  auto succeeded = [&]<typename Result>(Result const& result, std::string_view operation)
+      requires requires { bool(result); { result.error().what() } -> std::convertible_to<std::string_view>; } {
+    return fixture.check(bool(result), result ? operation : result.error().what());
+  };
+  auto& root = fixture.root();
+  auto storage = File::ephemeral_file(root.random());
+  if (!succeeded(storage, "create private world storage")) return;
+  auto world = WorldServer::create(root, {128, 128}, *storage);
+  if (!succeeded(world, "create world")) return;
+  auto close = make_scope_exit([&] { succeeded((*world)->close(), "close world"); });
+  auto objects = root.objectDatabase();
+  auto database = root.itemDatabase();
+  auto assets = root.assets();
+  if (!succeeded(objects, "load object database") || !succeeded(database, "load item database")
+      || !succeeded(assets, "load assets")) return;
+  auto object = (*objects)->createObject("woodenchest", JsonObject{{"slotCount", 5},
+      {"scripts", JsonArray{}}, {"recipeGroup", Json()}, {"initialItems", Json()}, {"treasurePools", Json()}});
+  if (!succeeded(object, "construct vanilla container")) return;
+  auto container = as<ContainerObject>(*object);
+  if (!fixture.check(bool(container), "wooden chest is a native container")
+      || !succeeded(container->setTilePosition({32, 32}), "position container")
+      || !succeeded(container->init(**world, 1, EntityMode::Master), "initialize container")) return;
+  auto uninit = make_scope_exit([&] { succeeded(container->uninit(), "uninitialize container"); });
+  auto put = [&](std::size_t slot, String const& name, std::uint64_t count, String const& grade) {
+    auto item = inventory_test_item(**database, name, count, JsonObject{{"grade", grade}});
+    if (!succeeded(item, "instantiate test material") || !fixture.check(bool(*item), "material is nonempty")) return false;
+    if (!fixture.check((*item)->parameters() == JsonObject{{"grade", grade}},
+          Star::format("fixture retains only the requested grade for {}", name))) return false;
+    auto placed = container->putItems(slot, *item);
+    if (!succeeded(placed, "put material in container slot")) return false;
+    auto leftover = placed->result();
+    return succeeded(leftover, "read placement result")
+        && fixture.check(*leftover && !**leftover, "material fits in its assigned slot");
+  };
+  if (!fixture.check(container->itemBag()->size() == 5, "container has four input slots and one output slot")
+      || !put(0, "plantfibre", 5, "wrong")
+      || !put(1, "plantfibre", 1, "right")
+      || !put(2, "plantfibre", 2, "right")
+      || !put(3, "dirtmaterial", 2, "soil")
+      || !put(4, "dirtmaterial", 7, "soil")) return;
+
+  auto snapshot = [&] { return container->itemBag()->items().transformed(item_safe_descriptor); };
+  auto const original_slots = container->itemBag()->items();
+  auto const original = snapshot();
+  auto unchanged = [&](std::string_view message) {
+    return fixture.check(container->itemBag()->items() == original_slots && snapshot() == original, message);
+  };
+  auto set_script = [&](String const& code) { return succeeded(container->eval_script(code), "define Lua craftingRecipe"); };
+  std::uint64_t step = 0;
+  auto tick = [&](float dt) { return succeeded(container->update(dt, ++step), "update native container"); };
+  auto reject = [&](String const& code, std::string_view message) {
+    if (!set_script(code) || !succeeded(container->start_crafting(), "start recipe") || !tick(0.0f)) return false;
+    return fixture.check(!container->is_crafting(), message) && unchanged("rejected recipe preserves all slot identities and counts");
+  };
+  auto reject_parse_error = [&](String const& code, std::string_view message) {
+    if (!set_script(code)) return false;
+    auto started = container->start_crafting();
+    return fixture.check(!started && started.error().is<RecipeException>(), message)
+        && fixture.check(!container->is_crafting(), "parse failure does not start crafting")
+        && unchanged("parse failure preserves all slot identities and counts");
+  };
+
+  if (!reject(R"(
+        function craftingRecipe()
+          return {input = {{"plantfibre", 3, {grade = "right"}}, {"dirtmaterial", 3, {grade = "soil"}}},
+            output = {"dirtmaterial", 2, {grade = "soil"}}, duration = 0, matchInputParameters = true}
+        end
+      )", "a missing second ingredient cannot be taken from the output slot")
+      || !reject(R"(
+        function craftingRecipe()
+          return {input = {{"plantfibre", 3, {grade = "right"}}},
+            output = {"dirtmaterial", 2, {grade = "soil"}}, duration = 0, matchInputParameters = true,
+            currencyInputs = {money = 1}}
+        end
+      )", "a container cannot pay a currency requirement")
+      || !reject_parse_error(R"(
+        function craftingRecipe()
+          return {input = {{"perfectlygenericitem", 1}}, output = {"dirtmaterial", 0}, duration = 0}
+        end
+      )", "a script recipe with zero-count output is rejected")
+      || !reject_parse_error(R"(
+        function craftingRecipe()
+          return {input = {{"perfectlygenericitem", 1}}, output = {"dirtmaterial", 1},
+            duration = 0, currencyInputs = {money = "invalid"}}
+        end
+      )", "a script recipe with malformed currency is rejected")) return;
+
+  auto duration = (*assets)->json("/items/defaultParameters.config:defaultCraftDuration")
+      .and_then([](Json const& value) { return value.to_float(); });
+  if (!succeeded(duration, "read default recipe duration") || !fixture.check(*duration > 0, "default duration is positive")
+      || !set_script(R"(
+        function craftingRecipe(materials)
+          if #materials ~= 4 then return nil end
+          return {input = {{"plantfibre", 2, {grade = "right"}}, {"plantfibre", 1, {grade = "right"}},
+              {"dirtmaterial", 1, {grade = "soil"}}},
+            output = {"dirtmaterial", 2, {grade = "soil"}}, matchInputParameters = true}
+        end
+      )")
+      || !succeeded(container->start_crafting(), "start exact recipe using default duration")
+      || !tick(*duration / 2)
+      || !fixture.check(container->is_crafting() && container->crafting_progress() == 0.5f,
+           "default duration advances crafting halfway")
+      || !unchanged("no ingredient or output changes before completion")
+      || !tick(*duration / 2)) return;
+  if (!fixture.check(snapshot() == List<ItemDescriptor>{
+        original[0], {}, {}, original[3].with_count(1), original[4].with_count(9)},
+        "combine exact requirements across input stacks, preserve the earlier variant and add output only to its slot")) return;
+
+  if (!succeeded(container->stop_crafting(), "stop repeated crafting")
+      || !set_script(R"(
+        function craftingRecipe()
+          return {input = {{"dirtmaterial", 1, {grade = "soil"}}},
+            output = {"dirtmaterial", 1, {grade = "soil"}}, duration = 0, matchInputParameters = true}
+        end
+      )")
+      || !succeeded(container->start_crafting(), "start recipe with explicit zero duration")
+      || !tick(0.0f)) return;
+  fixture.check(snapshot() == List<ItemDescriptor>{original[0], {}, {}, {}, original[4].with_count(10)},
+      "an explicit zero duration completes without elapsed time");
 });
 
 const GameTestRegistration item_disk_load("ItemTest", "TypedDiskLoadDistinguishesFailureUnchangedAndClear", [](GameTest& fixture) {
@@ -1400,25 +1564,25 @@ const GameTestRegistration crafting_batch_accounting("ItemTest", "CraftingBatchA
   ItemRecipe recipe{};
   recipe.output = *result;
   recipe.inputs = {plain_id, plain_id};
-  recipe.matchInputParameters = true;
-  recipe.currencyInputs["money"] = 2;
+  recipe.match_input_parameters = true;
+  recipe.currency_inputs["money"] = 2;
   auto starting_money = inventory.currency("money");
   ASSERT_TRUE(inventory.consumeCurrency("money", starting_money));
   ASSERT_TRUE(inventory.addCurrency("money", 6));
-  auto stock = inventory.availableItems();
+  auto stock = inventory.available_items();
   ASSERT_TRUE(stock);
-  auto limit = [&] { return ItemDatabase::max_craftable_in_bag(*stock, inventory.availableCurrencies(), recipe); };
+  auto limit = [&] { return ItemDatabase::max_craftable_in_bag(*stock, inventory.available_currencies(), recipe); };
   auto empty_parameters = ItemDescriptor::create(plain_id.name());
   ASSERT_TRUE(empty_parameters);
   EXPECT_EQ(ItemDatabase::get_count_of_item(*stock, *empty_parameters, true), 0u);
   EXPECT_EQ(ItemDatabase::get_count_of_item(*stock, *empty_parameters, false), 11u);
   EXPECT_EQ(limit(), 2u);
   auto exact_recipe = recipe;
-  recipe.matchInputParameters = false;
+  recipe.match_input_parameters = false;
   EXPECT_NE(exact_recipe, recipe);
   recipe.inputs[1] = marked_id;
   EXPECT_EQ(limit(), 3u);
-  recipe.matchInputParameters = true;
+  recipe.match_input_parameters = true;
   recipe.inputs[1] = plain_id;
   auto invalid_output = recipe;
   invalid_output.output = recipe.output.with_count(0);
@@ -1429,10 +1593,10 @@ const GameTestRegistration crafting_batch_accounting("ItemTest", "CraftingBatchA
   EXPECT_EQ(inventory.currency("money"), 6u);
   EXPECT_EQ(inventory.hasCountOfItem(plain_id, true), 4u);
   EXPECT_EQ(inventory.hasCountOfItem(product_id, true), 0u);
-  recipe.currencyInputs["money"] = 4;
+  recipe.currency_inputs["money"] = 4;
   EXPECT_EQ((*db)->craft_recipe(player, recipe, 2), false);
   EXPECT_EQ(inventory.hasCountOfItem(plain_id, true), 4u);
-  recipe.currencyInputs["money"] = 2;
+  recipe.currency_inputs["money"] = 2;
   auto crafted = (*db)->craft_recipe(player, recipe, 2);
   ASSERT_TRUE(crafted) << crafted.error().what();
   ASSERT_TRUE(*crafted);
@@ -1441,7 +1605,7 @@ const GameTestRegistration crafting_batch_accounting("ItemTest", "CraftingBatchA
   EXPECT_EQ(inventory.currency("money"), 2u);
   EXPECT_EQ(inventory.hasCountOfItem(product_id, true), 6u);
 
-  recipe.matchInputParameters = false;
+  recipe.match_input_parameters = false;
   recipe.inputs = {plain_id, marked_id};
   ASSERT_EQ((*db)->craft_recipe(player, recipe, 1), true);
   EXPECT_EQ(inventory.hasCountOfItem(marked_id, true), 5u);
@@ -1449,14 +1613,14 @@ const GameTestRegistration crafting_batch_accounting("ItemTest", "CraftingBatchA
   EXPECT_EQ(inventory.hasCountOfItem(product_id, true), 9u);
 
   constexpr auto maximum = std::numeric_limits<std::uint64_t>::max();
-  recipe.matchInputParameters = true;
-  recipe.currencyInputs.clear();
+  recipe.match_input_parameters = true;
+  recipe.currency_inputs.clear();
   stock->by_parameters[plain_id] = maximum;
   recipe.inputs = {plain_id.with_count(maximum), plain_id};
   EXPECT_EQ(limit(), 0u);
-  EXPECT_FALSE(ItemDatabase::can_make_recipe(recipe, *stock, inventory.availableCurrencies()));
+  EXPECT_FALSE(ItemDatabase::can_make_recipe(recipe, *stock, inventory.available_currencies()));
   recipe.inputs.clear();
-  recipe.currencyInputs.clear();
+  recipe.currency_inputs.clear();
   EXPECT_EQ(limit(), maximum / 3);
   EXPECT_EQ((*db)->craft_recipe(player, recipe, maximum), false);
 });
@@ -1526,7 +1690,7 @@ const GameTestRegistration constInventoryObservesExternallyConsumedItemsWithoutM
   auto summary = view.itemSummary();
   ASSERT_TRUE(summary);
   EXPECT_TRUE(summary->empty());
-  auto available = view.availableItems();
+  auto available = view.available_items();
   ASSERT_TRUE(available);
   EXPECT_TRUE(available->by_name.empty());
   EXPECT_TRUE(available->by_parameters.empty());
@@ -2239,10 +2403,10 @@ end
     auto const& database = *databaseResult;
     auto builtRecipes = database->recipes_for_output_item("readycatalogbuilt");
     ASSERT_EQ(builtRecipes.size(), 1u);
-    EXPECT_EQ(builtRecipes.begin()->guiFilterString.contains("nestedready_leafowner"), true);
+    EXPECT_EQ(builtRecipes.begin()->gui_filter_string.contains("nestedready_leafowner"), true);
     auto rebuiltRecipes = database->recipes_for_output_item("readycatalogbroken");
     ASSERT_EQ(rebuiltRecipes.size(), 1u);
-    EXPECT_EQ(rebuiltRecipes.begin()->guiFilterString.contains("rebuiltready_leafowner"), true);
+    EXPECT_EQ(rebuiltRecipes.begin()->gui_filter_string.contains("rebuiltready_leafowner"), true);
     auto builtResult = inventory_test_item(*database, "readycatalogbuilt");
     ASSERT_TRUE(builtResult);
     auto const& built = *builtResult;

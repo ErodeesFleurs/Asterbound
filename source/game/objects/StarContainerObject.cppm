@@ -102,10 +102,10 @@ public:
   [[nodiscard]] std::expected<void, StarException> containerOpen() override;
   [[nodiscard]] std::expected<void, StarException> containerClose() override;
 
-  [[nodiscard]] std::expected<void, StarException> startCrafting() override;
-  [[nodiscard]] std::expected<void, StarException> stopCrafting() override;
-  bool isCrafting() const override;
-  float craftingProgress() const override;
+  [[nodiscard]] std::expected<void, StarException> start_crafting() override;
+  [[nodiscard]] std::expected<void, StarException> stop_crafting() override;
+  bool is_crafting() const override;
+  float crafting_progress() const override;
 
   [[nodiscard]] std::expected<void, StarException> burnContainerContents() override;
 
@@ -129,8 +129,11 @@ private:
   explicit ContainerObject(Root& rootContext);
   using ContainerCallback = std::function<void(ContainerObject&)>;
 
-  [[nodiscard]] std::expected<ItemRecipe, StarException> recipeForMaterials(List<std::shared_ptr<Item>> const& inputItems);
-  [[nodiscard]] std::expected<void, StarException> tickCrafting(float dt);
+  enum class CraftResolution { Idle, Resolving, Cancelled };
+
+  [[nodiscard]] std::expected<ItemRecipe, StarException> recipe_for_materials();
+  [[nodiscard]] std::expected<void, StarException> tick_crafting(float dt);
+  bool output_slot_accepts(ItemDescriptor const& output) const;
 
   [[nodiscard]] std::expected<std::shared_ptr<Item>, StarException> doAddItems(std::shared_ptr<Item> const& items);
   [[nodiscard]] std::expected<std::shared_ptr<Item>, StarException> doPutItems(std::size_t slot, std::shared_ptr<Item> const& items);
@@ -147,7 +150,7 @@ private:
   NetElementInt m_opened;
 
   NetElementBool m_crafting;
-  NetElementFloat m_craftingProgress;
+  NetElementFloat m_crafting_progress;
 
   std::shared_ptr<ItemBag> m_items;
   NetElementBytes m_itemsNetState;
@@ -160,7 +163,8 @@ private:
   std::int64_t m_animationFrameCooldown;
   std::int64_t m_autoCloseCooldown;
 
-  ItemRecipe m_goalRecipe;
+  ItemRecipe m_goal_recipe;
+  CraftResolution m_craft_resolution = CraftResolution::Idle;
 
   bool m_itemsUpdated;
   bool m_runUpdatedCallback;

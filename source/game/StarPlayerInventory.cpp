@@ -556,17 +556,17 @@ bool PlayerInventory::consumeItems(ItemDescriptor const& descriptor, bool exactM
 std::expected<bool, StarException> PlayerInventory::consume_recipe(ItemRecipe const& recipe, std::uint64_t batches) {
   if (!batches)
     return false;
-  auto stock = availableItems();
+  auto stock = available_items();
   if (!stock)
     return std::unexpected(std::move(stock.error()));
   if (batches > ItemDatabase::max_craftable_in_bag(*stock, m_currencies, recipe))
     return false;
   // Each product is bounded by the division in max_craftable_in_bag.
   for (auto const& input : recipe.inputs) {
-    if (!consumeItems(input.with_count(input.count() * batches), recipe.matchInputParameters))
+    if (!consumeItems(input.with_count(input.count() * batches), recipe.match_input_parameters))
       return std::unexpected(InventoryException("Recipe inventory changed during consumption"));
   }
-  for (auto const& [name, amount] : recipe.currencyInputs) {
+  for (auto const& [name, amount] : recipe.currency_inputs) {
     if (amount && !consumeCurrency(name, amount * batches))
       return std::unexpected(InventoryException("Recipe currency changed during consumption"));
   }
@@ -585,7 +585,7 @@ std::expected<bool, StarException> PlayerInventory::consume_recipe(ItemRecipe co
   return {};
 }
 
-[[nodiscard]] std::expected<RecipeStock, StarException> PlayerInventory::availableItems() const {
+std::expected<RecipeStock, StarException> PlayerInventory::available_items() const {
   RecipeStock stock;
   auto visited = for_each_item([&](InventorySlot const&, std::shared_ptr<Item> const& item) -> std::expected<void, StarException> {
     stock.add(item->descriptor());
@@ -820,7 +820,7 @@ void PlayerInventory::setEssentialItem(EssentialItem essentialItem, std::shared_
   m_essential[essentialItem] = std::move(item);
 }
 
-StringMap<std::uint64_t> PlayerInventory::availableCurrencies() const {
+StringMap<std::uint64_t> PlayerInventory::available_currencies() const {
   return m_currencies;
 }
 

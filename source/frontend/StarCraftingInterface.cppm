@@ -57,71 +57,85 @@ class LabelWidget;
 class AudioInstance;
 
 class CraftingPane : public Pane {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
 public:
   void query_type(TypeQuery& query) const noexcept override { query_type_of<CraftingPane, Pane>(*this, query); }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<CraftingPane>(); }
 
-  [[nodiscard]] static std::expected<std::shared_ptr<CraftingPane>, StarException> create(GuiContext& guiContext,
-      std::shared_ptr<WorldClient> worldClient, std::shared_ptr<Player> player, Json const& settings, EntityId sourceEntityId = null_entity_id);
+  CraftingPane(ConstructionKey, GuiContext& gui_context);
+  [[nodiscard]] static std::expected<std::shared_ptr<CraftingPane>, StarException> create(GuiContext& gui_context,
+      std::shared_ptr<WorldClient> world_client, std::shared_ptr<Player> player, Json const& settings, EntityId source_entity_id = null_entity_id);
 
   [[nodiscard]] std::expected<void, StarException> displayed() override;
   [[nodiscard]] std::expected<void, StarException> dismissed() override;
-  [[nodiscard]] std::expected<std::shared_ptr<Pane>, StarException> createTooltip(Vec2I const& screenPosition) override;
+  [[nodiscard]] std::expected<std::shared_ptr<Pane>, StarException> createTooltip(Vec2I const& screen_position) override;
 
-  EntityId sourceEntityId() const;
+  EntityId source_entity_id() const;
 
 private:
-  explicit CraftingPane(GuiContext& guiContext);
-  [[nodiscard]] std::expected<void, StarException> initialize(std::shared_ptr<WorldClient> worldClient, std::shared_ptr<Player> player, Json const& settings, EntityId sourceEntityId);
-  [[nodiscard]] std::expected<void, StarException> upgradeTable();
-  [[nodiscard]] std::expected<void, StarException> unlockConfiguredRecipes(String const& setting);
+  struct RecipeInventory {
+    RecipeStock stock;
+    StringMap<std::uint64_t> balances;
+    bool admin;
+  };
 
-  [[nodiscard]] std::expected<List<ItemRecipe>, StarException> determineRecipes();
+  struct RecipeListing {
+    List<ItemRecipe> recipes;
+    bool all_craftable;
+  };
+
+  using RecipeInventoryView = std::optional<std::reference_wrapper<RecipeInventory const>>;
+  using SelectedRecipe = std::optional<std::reference_wrapper<ItemRecipe const>>;
+
+  [[nodiscard]] std::expected<void, StarException> initialize(std::shared_ptr<WorldClient> world_client, std::shared_ptr<Player> player, Json const& settings, EntityId source_entity_id);
+  [[nodiscard]] std::expected<void, StarException> upgrade_table();
+  [[nodiscard]] std::expected<void, StarException> unlock_configured_recipes(String const& setting);
+
+  [[nodiscard]] std::expected<RecipeInventory, StarException> capture_recipe_inventory() const;
+  [[nodiscard]] std::expected<RecipeListing, StarException> determine_recipes(RecipeInventory const& inventory);
 
   [[nodiscard]] std::expected<void, StarException> update(float dt) override;
-  [[nodiscard]] std::expected<void, StarException> updateCraftButtons();
-  [[nodiscard]] std::expected<void, StarException> updateAvailableRecipes();
+  [[nodiscard]] std::expected<void, StarException> update_craft_buttons(RecipeInventory const& inventory, bool selected_available);
+  [[nodiscard]] std::expected<void, StarException> refresh_recipes(bool selection_changed = false);
   void stop_crafting();
   [[nodiscard]] std::expected<void, StarException> toggle_craft();
   [[nodiscard]] std::expected<void, StarException> craft(int count);
-  [[nodiscard]] std::expected<void, StarException> countChanged();
-  [[nodiscard]] std::expected<void, StarException> countTextChanged();
-  [[nodiscard]] std::expected<int, StarException> maxCraft();
-  [[nodiscard]] std::expected<ItemRecipe, StarException> recipeFromSelectedWidget() const;
-  [[nodiscard]] std::expected<void, StarException> setupWidget(std::shared_ptr<Widget> const& widget, ItemRecipe const& recipe, RecipeStock const& normalizedBag, StringMap<std::uint64_t> const& currencies);
+  [[nodiscard]] std::expected<void, StarException> count_changed();
+  [[nodiscard]] std::expected<void, StarException> count_text_changed(RecipeInventoryView inventory = {});
+  [[nodiscard]] std::expected<int, StarException> max_craft(RecipeInventoryView inventory = {}) const;
+  [[nodiscard]] std::expected<SelectedRecipe, StarException> selected_recipe() const;
+  [[nodiscard]] std::expected<void, StarException> setup_widget(std::shared_ptr<Widget> const& widget, ItemRecipe const& recipe, bool available);
+  [[nodiscard]] std::expected<std::shared_ptr<Pane>, StarException> setup_tooltip(ItemRecipe const& recipe);
 
-  [[nodiscard]] std::expected<std::shared_ptr<Pane>, StarException> setupTooltip(ItemRecipe const& recipe);
-
-
-  std::shared_ptr<WorldClient> m_worldClient;
+  std::shared_ptr<WorldClient> m_world_client;
   std::shared_ptr<Player> m_player;
   std::shared_ptr<PlayerBlueprints> m_blueprints;
 
-  bool m_crafting;
+  bool m_crafting = false;
   GameTimer m_craft_timer;
   int m_batch_size = 1;
   std::shared_ptr<AudioInstance> m_crafting_sound;
-  int m_count;
-  List<ItemRecipe> m_recipes;
-  BiHashMap<ItemRecipe, std::shared_ptr<Widget>> m_recipesWidgetMap; // maps ItemRecipe to guiList WidgetPtrs
+  int m_count = 1;
+  BiHashMap<ItemRecipe, std::shared_ptr<Widget>> m_recipe_widgets;
 
-  std::shared_ptr<ListWidget> m_guiList;
-  std::shared_ptr<TextBoxWidget> m_textBox;
-  std::shared_ptr<ButtonWidget> m_filterHaveMaterials;
-  std::size_t m_displayedRecipe;
+  std::shared_ptr<ListWidget> m_gui_list;
+  std::shared_ptr<TextBoxWidget> m_text_box;
+  std::shared_ptr<ButtonWidget> m_filter_have_materials;
+  std::size_t m_displayed_recipe;
 
   StringSet m_filter;
 
-  int m_maxSpinCount;
+  int m_max_spin_count;
 
-  int m_recipeAutorefreshCooldown;
+  int m_recipe_refresh_cooldown = 0;
+  bool m_refreshing_recipes = false;
 
-  HashMap<ItemDescriptor, std::shared_ptr<Item>> m_itemCache;
+  HashMap<ItemDescriptor, std::shared_ptr<Item>> m_item_cache;
 
-  EntityId m_sourceEntityId;
+  EntityId m_source_entity_id;
   Json m_settings;
 
-  std::optional<ItemRecipe> m_upgradeRecipe;
+  std::optional<ItemRecipe> m_upgrade_recipe;
 };
 
 }

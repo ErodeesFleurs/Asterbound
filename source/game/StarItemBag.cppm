@@ -53,6 +53,10 @@ public:
   List<std::shared_ptr<Item>>& items();
   List<std::shared_ptr<Item>> const& items() const;
 
+  // Borrows the raw slots without releasing retained zero-count stacks.
+  // Invalidated by operations that replace or resize the slot storage.
+  std::span<std::shared_ptr<Item> const> item_slots() const;
+
   // Pure query: an externally exhausted stack is observed as an empty slot.
   [[nodiscard]]
   std::expected<std::shared_ptr<Item>, StarException> at(std::size_t i) const;
@@ -85,6 +89,11 @@ public:
   // Consume any items from any stack that matches the given item descriptor,
   // only if the entirety of the count is available.  Returns success.
   bool consume_items(ItemDescriptor const& descriptor, bool exact_match = false);
+
+  // Commits a full batch against only the first slot_count slots. Aliases
+  // count once; a stack also present outside the prefix cannot be consumed.
+  [[nodiscard]]
+  bool consume_items(std::span<ItemDescriptor const> descriptors, std::size_t slot_count, bool exact_match);
 
   // Physical units, independent of the requested stack size.
   std::uint64_t matching_count(ItemDescriptor const& descriptor, bool exact_match) const;

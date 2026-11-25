@@ -147,16 +147,46 @@ std::expected<std::optional<Ret>, StarException> invoke_item_script(LuaBaseCompo
   return result;
 }
 
+template <typename Key>
+concept recipe_stock_key = std::same_as<Key, ItemDescriptor> || std::same_as<Key, String>;
+
+template <typename Projection, typename Key>
+concept recipe_key_projection = requires(Projection& project, ItemDescriptor const& input) {
+  requires std::same_as<std::remove_cvref_t<decltype(project(input))>, Key>;
+};
+
+template <recipe_stock_key Key, recipe_key_projection<Key> Projection>
+std::uint64_t ingredient_batch_limit(std::span<ItemDescriptor const> inputs, HashMap<Key, std::uint64_t> const& stock,
+    std::uint64_t limit, Projection project) {
+  HashMap<Key, std::uint64_t> required;
+  for (auto const& input : inputs) {
+    auto count = input.count();
+    if (!count)
+      continue;
+    auto& total = required.try_emplace(project(input), 0).first->second;
+    if (count > std::numeric_limits<std::uint64_t>::max() - total)
+      return 0;
+    total += count;
+  }
+  for (auto const& [key, total] : required) {
+    auto available = stock.value(key, 0);
+    if (available < total)
+      return 0;
+    limit = std::min(limit, available / total);
+  }
+  return limit;
+}
+
 }// namespace
 
 std::uint64_t ItemDatabase::get_count_of_item(RecipeStock const& bag, ItemDescriptor const& item, bool exact_match) {
   return exact_match ? bag.by_parameters.value(item.singular(), 0) : bag.by_name.value(item.name(), 0);
 }
 
-RecipeStock ItemDatabase::normalize_bag(List<std::shared_ptr<Item>> const& bag) {
+RecipeStock ItemDatabase::normalize_bag(std::span<std::shared_ptr<Item> const> bag) {
   RecipeStock stock;
   for (auto const& item : bag) {
-    if (item)
+    if (item && !item->empty())
       stock.add(item->descriptor());
   }
   return stock;
@@ -426,40 +456,38 @@ std::uint64_t ItemDatabase::max_craftable_in_bag(RecipeStock const& stock, Strin
   if (recipe.output.is_empty())
     return 0;
   auto limit = std::numeric_limits<std::uint64_t>::max() / recipe.output.count();
-  for (auto const& [name, amount] : recipe.currencyInputs) {
-    if (amount)
+  for (auto const& [name, amount] : recipe.currency_inputs) {
+    if (amount) {
       limit = std::min(limit, currencies.value(name, 0) / amount);
+      if (!limit)
+        return 0;
+    }
   }
-  if (!limit || recipe.inputs.empty())
+  if (recipe.inputs.empty())
     return limit;
   if (recipe.inputs.size() == 1) {
     auto const& input = recipe.inputs.front();
-    return input.count() ? std::min(limit, get_count_of_item(stock, input, recipe.matchInputParameters) / input.count()) : limit;
+    return input.count() ? std::min(limit, get_count_of_item(stock, input, recipe.match_input_parameters) / input.count()) : limit;
   }
-  auto aggregate = [&]<typename Stock, std::invocable<ItemDescriptor const&> Key>(Stock const& available, Key key)
-      requires (std::same_as<Stock, decltype(stock.by_parameters)> || std::same_as<Stock, decltype(stock.by_name)>) {
-    Stock required;
-    for (auto const& input : recipe.inputs) {
-      if (!input.count())
-        continue;
-      auto&& id = key(input);
-      auto& amount = required[id];
-      if (input.count() > std::numeric_limits<std::uint64_t>::max() - amount)
-        return std::uint64_t{0};
-      amount += input.count();
-      limit = std::min(limit, available.value(id, 0) / amount);
-      if (!limit)
-        break;
-    }
-    return limit;
-  };
-  if (recipe.matchInputParameters)
-    return aggregate(stock.by_parameters, [](ItemDescriptor const& input) { return input.singular(); });
-  return aggregate(stock.by_name, [](ItemDescriptor const& input) -> String const& { return input.name(); });
+  if (recipe.match_input_parameters)
+    return ingredient_batch_limit(recipe.inputs, stock.by_parameters, limit, [](ItemDescriptor const& input) { return input.singular(); });
+  return ingredient_batch_limit(recipe.inputs, stock.by_name, limit, [](ItemDescriptor const& input) -> String const& { return input.name(); });
 }
 
-ItemRecipe ItemDatabase::get_precise_recipe_for_materials(String const& group, List<std::shared_ptr<Item>> const& bag, StringMap<std::uint64_t> const& currencies) const {
-  auto stock = normalize_bag(bag);
+ItemRecipe ItemDatabase::get_precise_recipe_for_materials(String const& group, std::span<std::shared_ptr<Item> const> bag,
+    StringMap<std::uint64_t> const& currencies) const {
+  RecipeStock stock;
+  if (bag.size() <= 1) {
+    stock = normalize_bag(bag);
+  } else {
+    // Different slots can refer to the same physical stack. Count it only once.
+    using Slot = std::reference_wrapper<std::shared_ptr<Item> const>;
+    HashSet<Slot, std::hash<std::shared_ptr<Item>>, std::equal_to<std::shared_ptr<Item>>> seen;
+    for (auto const& item : bag) {
+      if (item && !item->empty() && seen.add(std::cref(item)))
+        stock.add(item->descriptor());
+    }
+  }
   std::optional<std::reference_wrapper<ItemRecipe const>> best;
   // Each count is 64-bit, and several distinct ingredient counts can add a carry.
   using Score = std::pair<std::size_t, std::uint64_t>;
@@ -469,7 +497,7 @@ ItemRecipe ItemDatabase::get_precise_recipe_for_materials(String const& group, L
       continue;
     if (!std::ranges::all_of(bag, [&](std::shared_ptr<Item> const& item) {
       return !item || item->empty() || std::ranges::any_of(recipe.inputs, [&](ItemDescriptor const& input) {
-        return item->matches(input, recipe.matchInputParameters);
+        return item->matches(input, recipe.match_input_parameters);
       });
     }))
       continue;
@@ -487,6 +515,11 @@ ItemRecipe ItemDatabase::get_precise_recipe_for_materials(String const& group, L
 }
 
 std::expected<ItemRecipe, StarException> ItemDatabase::parse_recipe(Json const& config) const {
+  RecipeDefaultDuration default_duration;
+  return parse_recipe(config, default_duration);
+}
+
+std::expected<ItemRecipe, StarException> ItemDatabase::parse_recipe(Json const& config, RecipeDefaultDuration& default_duration) const {
   auto parsed = [&]() -> std::expected<ItemRecipe, StarException> {
     ItemRecipe res;
     auto currencies = config.get("currencyInputs", JsonObject()).and_then([](Json const& value) {
@@ -494,7 +527,7 @@ std::expected<ItemRecipe, StarException> ItemDatabase::parse_recipe(Json const& 
     });
     if (!currencies)
       return std::unexpected(std::move(currencies.error()));
-    res.currencyInputs = std::move(*currencies);
+    res.currency_inputs = std::move(*currencies);
     auto inputs = config.get_array("input");
     if (!inputs)
       return std::unexpected(std::move(inputs.error()));
@@ -512,7 +545,7 @@ std::expected<ItemRecipe, StarException> ItemDatabase::parse_recipe(Json const& 
         auto currency = as<CurrencyItem>(std::move(*shared));
         if (!currency)
           return std::unexpected(RecipeException::format("Recipe input '{}' did not produce a currency item", id->name()));
-        auto& total = res.currencyInputs[currency->currencyType()];
+        auto& total = res.currency_inputs[currency->currencyType()];
         auto value = currency->currencyValue();
         if (value && id->count() > (std::numeric_limits<std::uint64_t>::max() - total) / value)
           return std::unexpected(RecipeException("Currency requirement exceeds supported range"));
@@ -530,16 +563,25 @@ std::expected<ItemRecipe, StarException> ItemDatabase::parse_recipe(Json const& 
     if (output->is_empty())
       return std::unexpected(RecipeException("Recipe requires a nonempty output"));
     res.output = std::move(*output);
-    auto assets = m_root.assets();
-    if (!assets)
-      return std::unexpected(std::move(assets.error()));
-    auto default_duration = (*assets)->json("/items/defaultParameters.config:defaultCraftDuration").and_then([](Json const& value) { return value.to_float(); });
-    if (!default_duration)
-      return std::unexpected((*assets)->with_asset_context(std::move(default_duration.error()), "/items/defaultParameters.config", "Loading recipe defaults"));
-    auto duration = config.get_float("duration", *default_duration);
+    auto duration = config.opt_float("duration");
     if (!duration)
       return std::unexpected(std::move(duration.error()));
-    res.duration = *duration;
+    if (*duration) {
+      res.duration = **duration;
+    } else {
+      if (!default_duration) {
+        default_duration.emplace(m_root.assets().and_then([](std::shared_ptr<Assets const> const& assets) {
+          return assets->json("/items/defaultParameters.config:defaultCraftDuration")
+              .and_then([](Json const& value) { return value.to_float(); })
+              .transform_error([&](StarException error) {
+                return assets->with_asset_context(std::move(error), "/items/defaultParameters.config", "Loading recipe defaults");
+              });
+        }));
+      }
+      if (!*default_duration)
+        return std::unexpected(default_duration->error());
+      res.duration = **default_duration;
+    }
     auto groups = config.get("groups", JsonArray()).and_then([](Json const& value) { return json_to_string_set(value); });
     if (!groups)
       return std::unexpected(std::move(groups.error()));
@@ -549,11 +591,11 @@ std::expected<ItemRecipe, StarException> ItemDatabase::parse_recipe(Json const& 
       return std::unexpected(std::move(output_item.error()));
     if (!*output_item)
       return std::unexpected(RecipeException("Recipe output did not produce an item"));
-    res.outputRarity = (*output_item)->rarity();
+    res.output_rarity = (*output_item)->rarity();
     auto filter = gui_filter_string(*output_item);
     if (!filter)
       return std::unexpected(std::move(filter.error()));
-    res.guiFilterString = std::move(*filter);
+    res.gui_filter_string = std::move(*filter);
     auto collectables = config.get("collectables", JsonObject()).and_then([](Json const& value) {
       return json_to_map_v<StringMap<String>>(value, [](Json const& entry) { return entry.to_string(); });
     });
@@ -563,7 +605,7 @@ std::expected<ItemRecipe, StarException> ItemDatabase::parse_recipe(Json const& 
     auto match = config.get_bool("matchInputParameters", false);
     if (!match)
       return std::unexpected(std::move(match.error()));
-    res.matchInputParameters = *match;
+    res.match_input_parameters = *match;
     return res;
   }();
   if (!parsed && parsed.error().is<JsonException>())
@@ -971,9 +1013,10 @@ std::expected<void, StarException> ItemDatabase::scan_recipes() {
   auto queued = (*assets)->queue_jsons(files->get());
   if (!queued)
     return std::unexpected(std::move(queued.error()));
+  RecipeDefaultDuration default_duration;
   for (auto const& asset_file : files->get()) {
     auto const& file = asset_file.string();
-    auto recipe = (*assets)->json(file).and_then([&](Json const& config) { return parse_recipe(config); });
+    auto recipe = (*assets)->json(file).and_then([&](Json const& config) { return parse_recipe(config, default_duration); });
     if (recipe) {
       recipe->source_path = file;
       m_recipes.add(std::move(*recipe));

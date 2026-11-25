@@ -22,6 +22,7 @@ import star.ref_ptr;
 import star.logging;
 import star.listener;
 import std;
+import star.small_vector;
 import star.format;
 
 import star.drawable;
@@ -155,6 +156,10 @@ List<std::shared_ptr<Item>> const& ItemBag::items() const {
   return m_items;
 }
 
+std::span<std::shared_ptr<Item> const> ItemBag::item_slots() const {
+  return m_items;
+}
+
 std::expected<std::shared_ptr<Item>, StarException> ItemBag::at(std::size_t i) const {
   auto item = m_items.at(i);
   if (!item)
@@ -255,35 +260,72 @@ std::expected<bool, StarException> ItemBag::consume_items(std::size_t pos, std::
   return consumed;
 }
 
-bool ItemBag::consume_items(ItemDescriptor const& descriptor, bool exact_match) {
-  std::uint64_t count_left = descriptor.count();
-  List<std::pair<std::size_t, std::uint64_t>> consume_locations;
-  for (std::size_t i = 0; i < m_items.size(); ++i) {
-    auto& stored_item = m_items[i];
-    if (stored_item && stored_item->empty())
-      stored_item.reset();
-    if (stored_item && stored_item->matches(descriptor, exact_match)) {
-      std::uint64_t count = stored_item->count();
-      std::uint64_t take = std::min(count, count_left);
-      consume_locations.push_back({i, take});
-      count_left -= take;
-      if (count_left == 0)
-        break;
-    }
-  }
+namespace {
 
-  // Only consume any if we can consume them all
-  if (count_left > 0)
+template <std::ranges::input_range Descriptors>
+  requires std::convertible_to<std::ranges::range_reference_t<Descriptors>, ItemDescriptor const&>
+bool consume_from_slots(std::span<std::shared_ptr<Item>> slots, Descriptors&& descriptors,
+    std::size_t slot_count, bool exact_match) {
+  if (slot_count > slots.size())
     return false;
 
-  for (auto const& [index, count] : consume_locations) {
-    auto& stored_item = m_items[index];
-    stored_item->consume(count);
-    if (stored_item->empty())
-      stored_item.reset();
+  struct Deduction {
+    std::size_t slot;
+    std::uint64_t count;
+  };
+  SmallVector<Deduction, 8> deductions;
+  auto excluded = slots.subspan(slot_count);
+  for (ItemDescriptor const& descriptor : descriptors) {
+    auto remaining = descriptor.count();
+    for (std::size_t slot = 0; remaining && slot < slot_count; ++slot) {
+      auto const& item = slots[slot];
+      if (!item || item->empty() || !item->matches(descriptor, exact_match)
+          || std::ranges::find(excluded, item) != excluded.end())
+        continue;
+
+      auto planned = std::ranges::find_if(deductions, [&](Deduction const& deduction) {
+        return slots[deduction.slot] == item;
+      });
+      auto planned_count = planned == deductions.end() ? 0 : planned->count;
+      auto count = std::min(remaining, item->count() - planned_count);
+      if (!count)
+        continue;
+      if (planned == deductions.end())
+        deductions.push_back({slot, count});
+      else
+        planned->count += count;
+      remaining -= count;
+    }
+    if (remaining)
+      return false;
   }
 
+  // Each distinct stack has one deduction bounded by its unchanged count.
+  // Setting the remainder preserves overfilled stacks and cannot fail.
+  bool exhausted = false;
+  for (auto const& [slot, count] : deductions) {
+    auto& item = slots[slot];
+    item->set_count(item->count() - count, true);
+    exhausted |= item->empty();
+  }
+  if (exhausted) {
+    for (std::size_t slot = 0; slot < slot_count; ++slot) {
+      auto& item = slots[slot];
+      if (item && item->empty())
+        item.reset();
+    }
+  }
   return true;
+}
+
+}
+
+bool ItemBag::consume_items(ItemDescriptor const& descriptor, bool exact_match) {
+  return consume_from_slots(m_items, std::views::single(std::cref(descriptor)), m_items.size(), exact_match);
+}
+
+bool ItemBag::consume_items(std::span<ItemDescriptor const> descriptors, std::size_t slot_count, bool exact_match) {
+  return consume_from_slots(m_items, descriptors, slot_count, exact_match);
 }
 
 std::uint64_t ItemBag::matching_count(ItemDescriptor const& descriptor, bool exact_match) const {

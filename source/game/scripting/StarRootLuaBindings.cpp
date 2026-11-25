@@ -1010,7 +1010,7 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::recipesForIt
   JsonArray result;
   result.reserve(recipes.size());
   for (auto& recipe : recipes) {
-    auto json = recipe.toJson();
+    auto json = recipe.to_json();
     if (!json) return std::unexpected(std::move(json.error()));
     result.push_back(std::move(*json));
   }
@@ -1027,7 +1027,7 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::allRecipes(I
   JsonArray result;
   result.reserve(recipes.get().size());
   for (auto& recipe : recipes.get()) {
-    auto json = recipe.toJson();
+    auto json = recipe.to_json();
     if (!json) return std::unexpected(std::move(json.error()));
     result.push_back(std::move(*json));
   }

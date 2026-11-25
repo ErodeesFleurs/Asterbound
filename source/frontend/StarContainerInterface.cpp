@@ -419,11 +419,7 @@ std::expected<void, StarException> ContainerPane::initialize(std::shared_ptr<Wor
                               return {};
                             });
 
-  m_reader.registerCallback("toggleCrafting", [this](Widget&)  -> std::expected<void, StarException> { auto toggleCraftingResult255 = toggleCrafting();
-                                                                if (!toggleCraftingResult255)
-                                                                  return std::unexpected(std::move(toggleCraftingResult255.error())); 
-  return {};
-});
+  m_reader.registerCallback("toggleCrafting", [this](Widget&) { return toggle_crafting(); });
 
   m_reader.registerCallback("clear", [this](Widget&)  -> std::expected<void, StarException> { auto clearResult256 = clear();
                                                        if (!clearResult256)
@@ -715,47 +711,10 @@ std::expected<void, StarException> ContainerPane::swapSlot(ItemGridWidget& grid)
   return {};
 }
 
-std::expected<void, StarException> ContainerPane::startCrafting() {
-  auto startCraftingInContainerResult307 = m_containerInteractor->startCraftingInContainer();
-  if (!startCraftingInContainerResult307)
-    return std::unexpected(std::move(startCraftingInContainerResult307.error()));
-
-return {};
-}
-
-std::expected<void, StarException> ContainerPane::stopCrafting() {
-  auto stopCraftingInContainerResult308 = m_containerInteractor->stopCraftingInContainer();
-  if (!stopCraftingInContainerResult308)
-    return std::unexpected(std::move(stopCraftingInContainerResult308.error()));
-
-return {};
-}
-
-std::expected<void, StarException> ContainerPane::toggleCrafting() {
+std::expected<void, StarException> ContainerPane::toggle_crafting() {
   if (auto container = m_containerInteractor->openContainer())
-    if (container->isCrafting())
-      {
-        auto stopCraftingResult309 = stopCrafting();
-        if (!stopCraftingResult309)
-          return std::unexpected(std::move(stopCraftingResult309.error()));
-        
-      }
-    else
-      {
-        auto startCraftingResult310 = startCrafting();
-        if (!startCraftingResult310)
-          return std::unexpected(std::move(startCraftingResult310.error()));
-        
-      }
-  else
-    {
-      auto warnResult311 = context().root().logger().warn("ContainerPane::toggleCrafting failed because we don't have an open container!");
-      if (!warnResult311)
-        return std::unexpected(std::move(warnResult311.error()));
-      
-    }
-
-return {};
+    return container->is_crafting() ? container->stop_crafting() : container->start_crafting();
+  return context().root().logger().warn("Cannot toggle crafting without an open container");
 }
 
 std::expected<void, StarException> ContainerPane::clear() {
@@ -814,9 +773,9 @@ std::expected<void, StarException> ContainerPane::update(float dt) {
       if (!fetchChildResult318)
         return std::unexpected(std::move(fetchChildResult318.error()));
       if (auto itemGrid = std::move(*fetchChildResult318)) {
-        auto setProgressResult319 = itemGrid->setProgress(container->craftingProgress());
-        if (!setProgressResult319)
-          return std::unexpected(std::move(setProgressResult319.error()));
+        auto progress = itemGrid->setProgress(container->crafting_progress());
+        if (!progress)
+          return std::unexpected(std::move(progress.error()));
         auto updateAllItemSlotsResult320 = itemGrid->updateAllItemSlots();
         if (!updateAllItemSlotsResult320)
           return std::unexpected(std::move(updateAllItemSlotsResult320.error()));
@@ -827,9 +786,9 @@ std::expected<void, StarException> ContainerPane::update(float dt) {
       if (!fetchChildResult321)
         return std::unexpected(std::move(fetchChildResult321.error()));
       if (auto itemGrid = std::move(*fetchChildResult321)) {
-        auto setProgressResult322 = itemGrid->setProgress(container->craftingProgress());
-        if (!setProgressResult322)
-          return std::unexpected(std::move(setProgressResult322.error()));
+        auto progress = itemGrid->setProgress(container->crafting_progress());
+        if (!progress)
+          return std::unexpected(std::move(progress.error()));
         auto updateAllItemSlotsResult323 = itemGrid->updateAllItemSlots();
         if (!updateAllItemSlotsResult323)
           return std::unexpected(std::move(updateAllItemSlotsResult323.error()));

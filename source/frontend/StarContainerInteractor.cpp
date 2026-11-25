@@ -151,18 +151,6 @@ std::expected<void, StarException> ContainerInteractor::applyAugmentInContainer(
   return {};
 }
 
-std::expected<void, StarException> ContainerInteractor::startCraftingInContainer() {
-  if (auto container = openContainer())
-    return container->startCrafting();
-  return {};
-}
-
-std::expected<void, StarException> ContainerInteractor::stopCraftingInContainer() {
-  if (auto container = openContainer())
-    return container->stopCrafting();
-  return {};
-}
-
 std::expected<void, StarException> ContainerInteractor::burnContainer() {
   if (auto container = openContainer())
     return container->burnContainerContents();

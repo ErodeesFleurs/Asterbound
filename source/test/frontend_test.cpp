@@ -937,6 +937,141 @@ const GameTestRegistration crafting_batches("CraftingPane", "TimedBatchesAndInst
   run_surface_scenario(fixture, exercise_crafting);
 });
 
+void exercise_crafting_inventory_refresh(GameTest& fixture, Application const& application) {
+  auto succeeded = [&]<typename Result>(Result const& result, std::string_view operation)
+      requires requires { bool(result); { result.error().what() } -> std::convertible_to<std::string_view>; } {
+    return fixture.check(bool(result), result ? operation : result.error().what());
+  };
+  auto& root = fixture.root();
+  auto configuration = root.configuration();
+  if (!succeeded(configuration, "load runtime configuration")
+      || !succeeded((*configuration)->set("bindings", JsonObject{}), "initialize bindings")
+      || !succeeded((*configuration)->set_path("crafting.filterHaveMaterials", false), "start with the materials filter off"))
+    return;
+  auto input = Input::create(root);
+  if (!succeeded(input, "create native input"))
+    return;
+  auto context = GuiContext::create(root, std::make_shared<Mixer>(root.logger(), 44100, 2), application.appController());
+  if (!succeeded(context, "create GUI context"))
+    return;
+  (*context)->bindInput(**input);
+  if (!succeeded((*context)->renderInit(application.renderer()), "initialize native GUI renderer"))
+    return;
+
+  auto universe = TestUniverse::create(root, {800, 600});
+  if (!succeeded(universe, "start test universe"))
+    return;
+  auto close = make_scope_exit([&] { succeeded((*universe)->close(), "close test universe"); });
+  auto const& client = (*universe)->client();
+  auto player = client->mainPlayer();
+  player->log()->setIntroComplete(true);
+  if (!succeeded((*universe)->warpPlayer(InstanceWorldId("outpost")), "enter test world"))
+    return;
+  player->setAdmin(false);
+
+  auto inventory = player->inventory();
+  auto database = root.itemDatabase();
+  auto wrong_material = ItemDescriptor::create("plantfibre", 4, JsonObject{{"grade", "wrong"}});
+  auto material = ItemDescriptor::create("plantfibre", 4, JsonObject{{"grade", "right"}});
+  auto output = ItemDescriptor::create("torch");
+  if (!succeeded(database, "load item database")
+      || !succeeded(wrong_material, "create the mismatched material descriptor")
+      || !succeeded(material, "create the exact material descriptor")
+      || !succeeded(output, "create output descriptor")
+      || !fixture.check(inventory->consumeCurrency("money", inventory->currency("money")), "clear initial money"))
+    return;
+  auto install = [&](ItemDescriptor const& descriptor) {
+    auto item = (*database)->item(descriptor);
+    if (!succeeded(item, "instantiate exact stock")
+        || !fixture.check(*item && (*item)->descriptor() == descriptor, "stock preserves its requested descriptor"))
+      return false;
+    auto leftover = inventory->addToBags(std::move(*item));
+    return succeeded(leftover, "install exact stock in bags")
+        && fixture.check(!*leftover && inventory->hasCountOfItem(descriptor, true) == descriptor.count(),
+            "all inserted stock is available under the exact descriptor");
+  };
+
+  Json recipe = JsonObject{{"duration", 0}, {"input", JsonArray{material->with_count(2).to_json()}},
+      {"currencyInputs", JsonObject{{"money", 7}}}, {"matchInputParameters", true},
+      {"output", output->with_count(3).to_json()}};
+  // Exercise synchronous refresh requests from list selection callbacks too.
+  Json item_list = JsonObject{{"callback", "filter"}};
+  Json scroll_area = JsonObject{{"children", JsonObject{{"itemList", std::move(item_list)}}}};
+  Json settings = JsonObject{{"recipes", JsonArray{std::move(recipe)}}, {"requiresBlueprint", false},
+      {"paneLayoutOverride", JsonObject{{"scrollArea", std::move(scroll_area)}}}};
+  auto created = CraftingPane::create(**context, client->worldClient(), player, settings);
+  if (!succeeded(created, "construct native crafting pane"))
+    return;
+  Pane& pane = **created;
+  if (!succeeded(pane.displayed(), "display native crafting pane"))
+    return;
+  auto dismiss = make_scope_exit([&] { succeeded(pane.dismissed(), "dismiss crafting pane"); });
+  auto list = pane.requireChild<ListWidget>("scrollArea.itemList");
+  auto count = pane.requireChild<TextBoxWidget>("tbSpinCount");
+  auto craft_button = pane.requireChild<ButtonWidget>("btnCraft");
+  auto materials_button = pane.requireChild<ButtonWidget>("btnFilterHaveMaterials");
+  if (!succeeded(list, "find recipe list") || !succeeded(count, "find count")
+      || !succeeded(craft_button, "find craft button") || !succeeded(materials_button, "find materials filter")
+      || !fixture.check((*list)->listSize() == 1, "the unfiltered pane includes its configured recipe"))
+    return;
+  auto row = (*list)->itemAt(0);
+  auto overlay = row->requireChild<ImageWidget>("notcraftableoverlay");
+  if (!succeeded(overlay, "find uncraftable overlay") || !succeeded((*list)->setSelected(0), "select the recipe")
+      || !succeeded(pane.update(0), "refresh the selected recipe")
+      || !fixture.check((*overlay)->active(), "the empty inventory is visibly uncraftable"))
+    return;
+
+  auto refresh = [&]() {
+    for (int i = 0; i < 30; ++i) {
+      if (!succeeded(pane.update(0), "advance the pane to its periodic recipe refresh"))
+        return false;
+    }
+    return true;
+  };
+  auto press = [&](ButtonWidget& button) {
+    return succeeded(button.setPressed(true), "press native button")
+        && succeeded(button.setPressed(false), "release native button");
+  };
+  auto produced = [&] { return inventory->hasCountOfItem(*output); };
+  auto expect_blocked = [&](std::string_view reason) {
+    auto before = produced();
+    auto money = inventory->currency("money");
+    auto exact_stock = inventory->hasCountOfItem(*material, true);
+    return fixture.check((*overlay)->active(), reason) && press(**craft_button)
+        && fixture.check(produced() == before && inventory->currency("money") == money
+            && inventory->hasCountOfItem(*material, true) == exact_stock,
+            "even direct invocation of the blocked craft action cannot debit or produce items");
+  };
+
+  if (!install(*wrong_material) || !succeeded(inventory->addCurrency("money", 14), "fund two crafts") || !refresh()
+      || !expect_blocked("a name-only match is visibly uncraftable"))
+    return;
+  if (!install(*material) || !fixture.check(inventory->consumeCurrency("money", 8), "leave only six pixels") || !refresh()
+      || !expect_blocked("an insufficient balance is visibly uncraftable"))
+    return;
+  if (!succeeded(inventory->addCurrency("money", 8), "restore balance") || !refresh()
+      || !fixture.check((*list)->selectedWidget() == row, "refresh retains the selected row")
+      || !fixture.check(!(*overlay)->active(), "exact stock and sufficient balance hide the overlay")
+      || !succeeded((*count)->setText("5"), "enter an unaffordable craft count")
+      || !fixture.check((*count)->getText() == "x2", "quantity is clamped to available batches")
+      || !press(**materials_button) || !fixture.check((*materials_button)->isChecked(), "enable the materials filter")
+      || !fixture.check((*list)->selectedWidget() == row, "filter retains the selected affordable row"))
+    return;
+
+  auto before = produced();
+  if (!press(**craft_button))
+    return;
+  fixture.check(produced() == before + 6, "craft two batches from the selected row");
+  fixture.check(inventory->currency("money") == 0, "craft debits the exact money cost");
+  fixture.check(inventory->hasCountOfItem(*material, true) == 0, "craft consumes only the exact material");
+  fixture.check(inventory->hasCountOfItem(*wrong_material, true) == 4, "craft retains mismatched stock");
+  fixture.check((*list)->listSize() == 0, "the refresh after debiting removes the filtered row");
+  fixture.check((*count)->getText() == "x1", "craft count resets after production");
+}
+
+const GameTestRegistration crafting_inventory_refresh("CraftingPane", "MaterialAndCurrencyRefreshKeepsRowsAndButtonsInSync",
+    [](GameTest& fixture) { run_surface_scenario(fixture, exercise_crafting_inventory_refresh); });
+
 void exercise_merchant_purchase(GameTest& fixture, Application const& application) {
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();

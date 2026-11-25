@@ -53,8 +53,6 @@ public:
   [[nodiscard]] std::expected<void, StarException> takeFromContainerSlot(std::size_t slot, std::size_t count);
   [[nodiscard]] std::expected<void, StarException> applyAugmentInContainer(std::size_t slot, std::shared_ptr<Item> const& augment);
 
-  [[nodiscard]] std::expected<void, StarException> startCraftingInContainer();
-  [[nodiscard]] std::expected<void, StarException> stopCraftingInContainer();
   [[nodiscard]] std::expected<void, StarException> burnContainer();
   [[nodiscard]] std::expected<void, StarException> clearContainer();
 

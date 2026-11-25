@@ -8,8 +8,6 @@ import star.text_formatter;
 import star.hash;
 
 import star.json;
-import star.data_stream;
-import star.bi_map;
 import star.item_descriptor;
 import star.game_types;
 
@@ -27,31 +25,29 @@ struct RecipeStock {
 };
 
 struct ItemRecipe {
-  friend std::expected<void, StarException> write_text(TextBuffer& output, ItemRecipe const& recipe);
   [[nodiscard]]
-  std::expected<Json, StarException> toJson() const;
+  std::expected<Json, StarException> to_json() const;
 
-  bool isNull() const;
+  bool is_null() const;
 
   bool operator==(ItemRecipe const& rhs) const;
-  bool operator!=(ItemRecipe const& rhs) const;
 
-  StringMap<std::uint64_t> currencyInputs;
+  StringMap<std::uint64_t> currency_inputs;
   List<ItemDescriptor> inputs;
   ItemDescriptor output;
-  float duration;
+  float duration = 0;
   StringSet groups;
-  Rarity outputRarity;
-  String guiFilterString;
+  Rarity output_rarity = Rarity::Common;
+  String gui_filter_string;
   StringMap<String> collectables;
-  bool matchInputParameters = false;
+  bool match_input_parameters = false;
   // Catalog tie-break only; not part of recipe identity or serialization.
   String source_path;
 };
 
 template <>
 struct ValueHash<ItemRecipe> {
-  std::size_t operator()(ItemRecipe const& v) const;
+  std::size_t operator()(ItemRecipe const& recipe) const;
 };
 
 [[nodiscard]]
@@ -63,11 +59,6 @@ export module star.item_recipe;
 export namespace Star {
   template <>
   struct ValueHash<ItemRecipe>;
-}
-
-
-
-export namespace Star {
   using ::Star::RecipeExceptionTag;
   using ::Star::RecipeException;
   using ::Star::RecipeStock;

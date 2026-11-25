@@ -130,7 +130,7 @@ public:
   };
 
   static std::uint64_t get_count_of_item(RecipeStock const& bag, ItemDescriptor const& item, bool exact_match = false);
-  static RecipeStock normalize_bag(List<std::shared_ptr<Item>> const& bag);
+  static RecipeStock normalize_bag(std::span<std::shared_ptr<Item> const> bag);
   [[nodiscard]] std::expected<bool, StarException> craft_recipe(Player& player, ItemRecipe const& recipe, std::uint64_t batches) const;
   static bool can_make_recipe(ItemRecipe const& recipe, RecipeStock const& available_ingredients, StringMap<std::uint64_t> const& available_currencies);
   static HashSet<ItemRecipe> recipes_from_subset(RecipeStock const& normalized_bag, StringMap<std::uint64_t> const& available_currencies, HashSet<ItemRecipe> const& subset, StringSet const& allowed_types);
@@ -200,7 +200,7 @@ public:
 
   static std::uint64_t max_craftable_in_bag(RecipeStock const& bag, StringMap<std::uint64_t> const& available_currencies, ItemRecipe const& recipe);
 
-  ItemRecipe get_precise_recipe_for_materials(String const& group, List<std::shared_ptr<Item>> const& bag, StringMap<std::uint64_t> const& available_currencies) const;
+  ItemRecipe get_precise_recipe_for_materials(String const& group, std::span<std::shared_ptr<Item> const> bag, StringMap<std::uint64_t> const& available_currencies) const;
 
   [[nodiscard]]
   std::expected<ItemRecipe, StarException> parse_recipe(Json const& config) const;
@@ -238,6 +238,10 @@ private:
   std::expected<std::shared_ptr<ItemData const>, StarException> item_data(String const& name) const;
   [[nodiscard]]
   std::expected<ItemConfig, StarException> build_item_config(ItemData const& data, Json parameters, std::optional<float> level, std::optional<std::uint64_t> seed) const;
+
+  using RecipeDefaultDuration = std::optional<std::expected<float, StarException>>;
+  [[nodiscard]]
+  std::expected<ItemRecipe, StarException> parse_recipe(Json const& config, RecipeDefaultDuration& default_duration) const;
 
   using ItemPaths = std::ranges::subrange<CaseInsensitiveStringSet::const_iterator>;
 

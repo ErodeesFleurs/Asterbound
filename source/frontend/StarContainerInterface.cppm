@@ -100,9 +100,7 @@ private:
   };
 
   [[nodiscard]] std::expected<void, StarException> swapSlot(ItemGridWidget& grid);
-  [[nodiscard]] std::expected<void, StarException> startCrafting();
-  [[nodiscard]] std::expected<void, StarException> stopCrafting();
-  [[nodiscard]] std::expected<void, StarException> toggleCrafting();
+  [[nodiscard]] std::expected<void, StarException> toggle_crafting();
   [[nodiscard]] std::expected<void, StarException> clear();
   [[nodiscard]] std::expected<void, StarException> burn();
 

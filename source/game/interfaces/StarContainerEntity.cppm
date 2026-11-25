@@ -62,10 +62,10 @@ public:
   [[nodiscard]] virtual std::expected<void, StarException> containerOpen() = 0;
   [[nodiscard]] virtual std::expected<void, StarException> containerClose() = 0;
 
-  [[nodiscard]] virtual std::expected<void, StarException> startCrafting() = 0;
-  [[nodiscard]] virtual std::expected<void, StarException> stopCrafting() = 0;
-  virtual bool isCrafting() const = 0;
-  virtual float craftingProgress() const = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> start_crafting() = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> stop_crafting() = 0;
+  virtual bool is_crafting() const = 0;
+  virtual float crafting_progress() const = 0;
 
   [[nodiscard]] virtual std::expected<void, StarException> burnContainerContents() = 0;
 

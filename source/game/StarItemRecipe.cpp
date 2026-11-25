@@ -1,56 +1,37 @@
-import star.hash;
-import star.json_extra;
-import star.json;
-import star.item_recipe;
+import std;
 import star.format;
-import star.text_formatter;
+import star.hash;
+import star.item_descriptor;
+import star.item_recipe;
+import star.json;
+import star.json_extra;
+import star.list;
+import star.map;
 import star.set;
 import star.string;
-import star.color;
-import star.list;
-import star.image_processing;
-import star.data_stream;
-import star.string_view;
-import star.thread;
-import star.directives;
-import star.asset_path;
-import star.strong_typedef;
-import star.bi_map;
-import star.game_types;
-import star.ordered_map;
-import star.io_device;
-import star.ref_ptr;
-import star.logging;
-import star.listener;
-import std;
-
-import star.drawable;
-import star.celestial_coordinate;
-import star.quest_descriptor;
-import star.item;
-import star.item_descriptor;
+import star.text_formatter;
 
 namespace Star {
 
-std::expected<Json, StarException> ItemRecipe::toJson() const {
-  JsonArray inputList;
-  inputList.reserve(inputs.size());
+std::expected<Json, StarException> ItemRecipe::to_json() const {
+  JsonArray input_list;
+  input_list.reserve(inputs.size());
   for (auto const& input : inputs)
-    inputList.push_back(input.to_json());
-  auto currencies = json_from_map(currencyInputs);
+    input_list.push_back(input.to_json());
+  auto currencies = json_from_map(currency_inputs);
   if (!currencies)
     return std::unexpected(std::move(currencies.error()));
-  auto collectableJson = json_from_map(collectables);
-  if (!collectableJson)
-    return std::unexpected(std::move(collectableJson.error()));
+  auto collectable_json = json_from_map(collectables);
+  if (!collectable_json)
+    return std::unexpected(std::move(collectable_json.error()));
   return Json(JsonObject{
       {"currencyInputs", std::move(*currencies)},
-      {"input", std::move(inputList)},
+      {"input", std::move(input_list)},
       {"output", output.to_json()},
       {"duration", duration},
       {"groups", json_from_string_set(groups)},
-      {"collectables", std::move(*collectableJson)},
-      {"matchInputParameters", matchInputParameters}
+      {"collectables", std::move(*collectable_json)},
+      {"matchInputParameters", match_input_parameters}
     });
 }
 
@@ -64,19 +45,16 @@ void RecipeStock::add(ItemDescriptor const& item) {
   add_count(by_parameters[item.singular()]);
 }
 
-bool ItemRecipe::isNull() const { return currencyInputs.empty() && inputs.empty() && output.is_null(); }
+bool ItemRecipe::is_null() const { return currency_inputs.empty() && inputs.empty() && output.is_null(); }
 
 bool ItemRecipe::operator==(ItemRecipe const& rhs) const {
-  return matchInputParameters == rhs.matchInputParameters && std::tie(currencyInputs, inputs, output) == std::tie(rhs.currencyInputs, rhs.inputs, rhs.output);
-}
-
-bool ItemRecipe::operator!=(ItemRecipe const& rhs) const {
-  return !(*this == rhs);
+  return match_input_parameters == rhs.match_input_parameters && currency_inputs == rhs.currency_inputs
+      && inputs == rhs.inputs && output == rhs.output;
 }
 
 std::expected<void, StarException> write_text(TextBuffer& output, ItemRecipe const& recipe) {
   output.append("CurrencyInputs: ");
-  append_text(output, recipe.currencyInputs);
+  append_text(output, recipe.currency_inputs);
   output.append("Inputs: [");
   bool first = true;
   for (auto const& input : recipe.inputs) {
@@ -98,8 +76,12 @@ std::expected<void, StarException> write_text(TextBuffer& output, ItemRecipe con
   return {};
 }
 
-std::size_t ValueHash<ItemRecipe>::operator()(ItemRecipe const& v) const {
-  return hash_of(v.currencyInputs.keys(), v.currencyInputs.values(), v.inputs, v.output);
+std::size_t ValueHash<ItemRecipe>::operator()(ItemRecipe const& recipe) const {
+  // Currency order is immaterial; ingredient order is part of recipe identity.
+  std::size_t currencies = 0;
+  for (auto const& [name, amount] : recipe.currency_inputs)
+    currencies += hash_of(name, amount);
+  return hash_of(currencies, recipe.match_input_parameters, recipe.inputs, recipe.output);
 }
 
 }

@@ -112,6 +112,21 @@ import star.data_stream_devices;
 import star.algorithm;
 namespace Star {
 
+namespace {
+
+bool is_container_recipe(ItemRecipe const& recipe) {
+  if (recipe.output.is_empty())
+    return false;
+  // A container has no wallet. Zero-valued entries require no payment.
+  for (auto const& [name, amount] : recipe.currency_inputs) {
+    if (amount)
+      return false;
+  }
+  return true;
+}
+
+}
+
 ContainerObject::ContainerObject(Root& rootContext) : Entity(rootContext), Object(rootContext), m_initialized(false), m_count(0), m_currentState(0), m_animationFrameCooldown(0), m_autoCloseCooldown(0), m_itemsUpdated(true), m_runUpdatedCallback(true) {}
 
 std::expected<std::shared_ptr<ContainerObject>, StarException> ContainerObject::create(Root& rootContext, std::shared_ptr<ObjectConfig const> config, Json const& parameters) {
@@ -121,7 +136,7 @@ std::expected<std::shared_ptr<ContainerObject>, StarException> ContainerObject::
     return std::unexpected(std::move(operation1.error()));
   object->m_opened.set(0);
   object->m_crafting.set(false);
-  object->m_craftingProgress.set(0);
+  object->m_crafting_progress.set(0);
   auto slotConfigResult = object->configValue("slotCount");
   if (!slotConfigResult)
     return std::unexpected(std::move(slotConfigResult.error()));
@@ -137,13 +152,13 @@ std::expected<std::shared_ptr<ContainerObject>, StarException> ContainerObject::
   auto operation3 = object->m_netGroup.add_net_element(object->m_crafting);
   if (!operation3)
     return std::unexpected(std::move(operation3.error()));
-  auto operation4 = object->m_netGroup.add_net_element(object->m_craftingProgress);
+  auto operation4 = object->m_netGroup.add_net_element(object->m_crafting_progress);
   if (!operation4)
     return std::unexpected(std::move(operation4.error()));
   auto operation5 = object->m_netGroup.add_net_element(object->m_itemsNetState);
   if (!operation5)
     return std::unexpected(std::move(operation5.error()));
-  object->m_craftingProgress.set_interpolator(lerp<float, float>);
+  object->m_crafting_progress.set_interpolator(lerp<float, float>);
   return object;
 }
 
@@ -278,9 +293,8 @@ std::expected<void, StarException> ContainerObject::update(float dt, std::uint64
         return std::unexpected(std::move(operation2.error()));
     }
     if (m_crafting.get()) {
-      auto operation3 = tickCrafting(dt);
-      if (!operation3)
-        return std::unexpected(std::move(operation3.error()));
+      if (auto ticked = tick_crafting(dt); !ticked)
+        return std::unexpected(std::move(ticked.error()));
     }
     if (m_autoCloseCooldown > 0) {
       m_autoCloseCooldown -= 1;
@@ -474,24 +488,20 @@ MessageResponseResult ContainerObject::receiveMessage(ConnectionId sendingConnec
   if (!databaseResult)
     return std::unexpected(std::move(databaseResult.error()));
   auto database = std::move(*databaseResult);
-  auto matches0Result = message.equals_ignore_case("startCrafting");
-  if (!matches0Result)
-    return std::unexpected(std::move(matches0Result.error()));
-  auto matches0 = std::move(*matches0Result);
-  if (matches0) {
-    auto operation1 = startCrafting();
-    if (!operation1)
-      return std::unexpected(std::move(operation1.error()));
+  auto start = message.equals_ignore_case("startCrafting");
+  if (!start)
+    return std::unexpected(std::move(start.error()));
+  if (*start) {
+    if (auto started = start_crafting(); !started)
+      return std::unexpected(std::move(started.error()));
     return ChainableJsonMessageResponse(Json());
   }
-  auto matches1Result = message.equals_ignore_case("stopCrafting");
-  if (!matches1Result)
-    return std::unexpected(std::move(matches1Result.error()));
-  auto matches1 = std::move(*matches1Result);
-  if (matches1) {
-    auto operation2 = stopCrafting();
-    if (!operation2)
-      return std::unexpected(std::move(operation2.error()));
+  auto stop = message.equals_ignore_case("stopCrafting");
+  if (!stop)
+    return std::unexpected(std::move(stop.error()));
+  if (*stop) {
+    if (auto stopped = stop_crafting(); !stopped)
+      return std::unexpected(std::move(stopped.error()));
     return ChainableJsonMessageResponse(Json());
   }
   auto matches2Result = message.equals_ignore_case("burnContainerContents");
@@ -1018,61 +1028,60 @@ std::expected<RpcPromise<List<std::shared_ptr<Item>>>, StarException> ContainerO
   return RpcPromise<List<std::shared_ptr<Item>>>::make_fulfilled(std::move(result));
 }
 
-bool ContainerObject::isCrafting() const {
+bool ContainerObject::is_crafting() const {
   return m_crafting.get();
 }
 
-std::expected<void, StarException> ContainerObject::startCrafting() {
+std::expected<void, StarException> ContainerObject::start_crafting() {
   if (isSlave()) {
-    auto currentWorldResult = world();
-    if (!currentWorldResult)
-      return std::unexpected(std::move(currentWorldResult.error()));
-    auto currentWorld = std::move(*currentWorldResult);
-    auto operation1 = currentWorld.get().sendEntityMessage(entityId(), "startCrafting");
-    if (!operation1)
-      return std::unexpected(std::move(operation1.error()));
-  } else {
-    if (m_crafting.get())
-      return {};
-    auto inputItems = m_items->items();
-    auto operation2 = inputItems.pop_back_checked();
-    if (!operation2)
-      return std::unexpected(std::move(operation2.error()));
-    auto recipeResult = recipeForMaterials(inputItems);
-    if (!recipeResult)
-      return std::unexpected(std::move(recipeResult.error()));
-    auto recipe = std::move(*recipeResult);
-    m_goalRecipe = std::move(recipe);
-    m_crafting.set(true);
-    itemsUpdated();
-    // tickCrafting validates the selected recipe.
+    auto current_world = world();
+    if (!current_world)
+      return std::unexpected(std::move(current_world.error()));
+    if (auto sent = current_world->get().sendEntityMessage(entityId(), "startCrafting"); !sent)
+      return std::unexpected(std::move(sent.error()));
+    return {};
   }
+  if (is_crafting() || m_craft_resolution != CraftResolution::Idle || !m_items->size())
+    return {};
+
+  m_craft_resolution = CraftResolution::Resolving;
+  auto reset_resolution = make_scope_exit([this] { m_craft_resolution = CraftResolution::Idle; });
+  auto recipe = recipe_for_materials();
+  if (!recipe)
+    return std::unexpected(std::move(recipe.error()));
+  if (m_craft_resolution == CraftResolution::Cancelled || !is_container_recipe(*recipe))
+    return {};
+
+  m_goal_recipe = std::move(*recipe);
+  m_crafting.set(true);
+  itemsUpdated();
   return {};
 }
 
-std::expected<void, StarException> ContainerObject::stopCrafting() {
+std::expected<void, StarException> ContainerObject::stop_crafting() {
   if (isSlave()) {
-    auto currentWorldResult = world();
-    if (!currentWorldResult)
-      return std::unexpected(std::move(currentWorldResult.error()));
-    auto currentWorld = std::move(*currentWorldResult);
-    auto operation1 = currentWorld.get().sendEntityMessage(entityId(), "stopCrafting");
-    if (!operation1)
-      return std::unexpected(std::move(operation1.error()));
-  } else {
-    if (!m_crafting.get())
-      return {};
+    auto current_world = world();
+    if (!current_world)
+      return std::unexpected(std::move(current_world.error()));
+    if (auto sent = current_world->get().sendEntityMessage(entityId(), "stopCrafting"); !sent)
+      return std::unexpected(std::move(sent.error()));
+    return {};
+  }
+
+  if (m_craft_resolution == CraftResolution::Resolving)
+    m_craft_resolution = CraftResolution::Cancelled;
+  if (is_crafting()) {
     m_crafting.set(false);
-    m_craftingProgress.set(0);
-    m_goalRecipe = ItemRecipe();
+    m_crafting_progress.set(0);
+    m_goal_recipe = ItemRecipe{};
   }
   return {};
 }
 
-float ContainerObject::craftingProgress() const {
-  if (!isCrafting())
+float ContainerObject::crafting_progress() const {
+  if (!is_crafting())
     return 1;
-  return std::clamp(m_craftingProgress.get(), 0.0f, 1.0f);
+  return std::clamp(m_crafting_progress.get(), 0.0f, 1.0f);
 }
 
 std::expected<void, StarException> ContainerObject::burnContainerContents() {
@@ -1085,9 +1094,8 @@ std::expected<void, StarException> ContainerObject::burnContainerContents() {
     if (!operation1)
       return std::unexpected(std::move(operation1.error()));
   } else {
-    auto operation2 = stopCrafting();
-    if (!operation2)
-      return std::unexpected(std::move(operation2.error()));
+    if (auto stopped = stop_crafting(); !stopped)
+      return std::unexpected(std::move(stopped.error()));
     auto fuelConfigResult = currentWorld.get().getProperty("ship.fuel", 0);
     if (!fuelConfigResult)
       return std::unexpected(std::move(fuelConfigResult.error()));
@@ -1180,16 +1188,14 @@ std::expected<void, StarException> ContainerObject::readStoredData(Json const& d
     return std::unexpected(std::move(currentStateResult.error()));
   auto currentState = std::move(*currentStateResult);
   m_currentState = currentState;
-  auto craftingResult = diskStore.get_bool("crafting");
-  if (!craftingResult)
-    return std::unexpected(std::move(craftingResult.error()));
-  auto crafting = std::move(*craftingResult);
-  m_crafting.set(crafting);
-  auto progressResult = diskStore.get_float("craftingProgress");
-  if (!progressResult)
-    return std::unexpected(std::move(progressResult.error()));
-  auto progress = std::move(*progressResult);
-  m_craftingProgress.set(progress);
+  auto crafting = diskStore.get_bool("crafting");
+  if (!crafting)
+    return std::unexpected(std::move(crafting.error()));
+  m_crafting.set(*crafting);
+  auto progress = diskStore.get_float("craftingProgress");
+  if (!progress)
+    return std::unexpected(std::move(progress.error()));
+  m_crafting_progress.set(*progress);
   auto initializedResult = diskStore.get_bool("initialized");
   if (!initializedResult)
     return std::unexpected(std::move(initializedResult.error()));
@@ -1236,110 +1242,114 @@ std::expected<Json, StarException> ContainerObject::writeStoredData() const {
   return stored.set_all({{"opened", m_opened.get()},
                          {"currentState", m_currentState},
                          {"crafting", m_crafting.get()},
-                         {"craftingProgress", m_craftingProgress.get()},
+                         {"craftingProgress", m_crafting_progress.get()},
                          {"initialized", m_initialized},
                          {"items", std::move(items)},
                          {"ageItemsTimer", m_age_items_timer.to_json()}});
 }
 
-std::expected<ItemRecipe, StarException> ContainerObject::recipeForMaterials(List<std::shared_ptr<Item>> const& inputItems) {
-  auto databaseResult = root().itemDatabase();
-  if (!databaseResult)
-    return std::unexpected(std::move(databaseResult.error()));
-  auto database = std::move(*databaseResult);
-  auto recipeGroupResult = configValue("recipeGroup");
-  if (!recipeGroupResult)
-    return std::unexpected(std::move(recipeGroupResult.error()));
-  auto recipeGroup = std::move(*recipeGroupResult);
-  if (!recipeGroup.is_null()) {
-    auto groupResult = recipeGroup.to_string();
-    if (!groupResult)
-      return std::unexpected(std::move(groupResult.error()));
-    auto group = std::move(*groupResult);
-    return database->get_precise_recipe_for_materials(group, inputItems, {});
+std::expected<ItemRecipe, StarException> ContainerObject::recipe_for_materials() {
+  auto database = root().itemDatabase();
+  if (!database)
+    return std::unexpected(std::move(database.error()));
+  auto recipe_group = configValue("recipeGroup");
+  if (!recipe_group)
+    return std::unexpected(std::move(recipe_group.error()));
+  auto input_slots = [this] {
+    auto slots = m_items->item_slots();
+    return slots.empty() ? slots : slots.first(slots.size() - 1);
+  };
+  if (!recipe_group->is_null()) {
+    auto group = recipe_group->to_string();
+    if (!group)
+      return std::unexpected(std::move(group.error()));
+    return (*database)->get_precise_recipe_for_materials(*group, input_slots(), {});
   }
-  auto descriptors = inputItems
-      | std::views::filter([](std::shared_ptr<Item> const& item) { return bool(item); })
-      | std::views::transform([](std::shared_ptr<Item> const& item) { return item->descriptor().to_json(); });
+
   JsonArray materials;
-  materials.reserve(inputItems.size());
-  std::ranges::copy(descriptors, std::back_inserter(materials));
-  auto resultResult = recover_lua_script_error(m_scriptComponent.invoke<Json>("craftingRecipe", materials));
-  if (!resultResult)
-    return std::unexpected(std::move(resultResult.error()));
-  auto result = std::move(*resultResult);
-  if (!result || result->is_null())
-    return ItemRecipe();
-  return database->parse_recipe(*result);
+  {
+    auto inputs = input_slots();
+    materials.reserve(inputs.size());
+    for (auto const& item : inputs) {
+      if (item && !item->empty())
+        materials.push_back(item->descriptor().to_json());
+    }
+  }
+  auto result = recover_lua_script_error(m_scriptComponent.invoke<Json>("craftingRecipe", materials));
+  if (!result)
+    return std::unexpected(std::move(result.error()));
+  if (!*result || (*result)->is_null())
+    return ItemRecipe{};
+  return (*database)->parse_recipe(**result);
 }
 
-std::expected<void, StarException> ContainerObject::tickCrafting(float dt) {
-  if (!m_crafting.get())
+bool ContainerObject::output_slot_accepts(ItemDescriptor const& output) const {
+  auto slots = m_items->item_slots();
+  if (slots.empty())
+    return false;
+  auto const& target = slots.back();
+  if (!target || target->empty())
+    return true;
+  if (!target->matches(output, true) || target->count() > target->max_stack()
+      || output.count() > target->max_stack() - target->count())
+    return false;
+  auto inputs = slots.first(slots.size() - 1);
+  // Stacking a product into an input alias would also change that input.
+  return std::ranges::find(inputs, target) == inputs.end();
+}
+
+std::expected<void, StarException> ContainerObject::tick_crafting(float dt) {
+  if (!is_crafting() || m_craft_resolution != CraftResolution::Idle)
     return {};
-  auto inputItems = m_items->items();
-  auto operation1 = inputItems.pop_back_checked();
-  if (!operation1)
-    return std::unexpected(std::move(operation1.error()));
-  auto recipeResult = recipeForMaterials(inputItems);
-  if (!recipeResult)
-    return std::unexpected(std::move(recipeResult.error()));
-  auto recipe = std::move(*recipeResult);
-  bool craftingFail = recipe.isNull() || m_goalRecipe != recipe;
-  auto targetItemResult = std::as_const(*m_items).at(m_items->size() - 1);
-  if (!targetItemResult)
-    return std::unexpected(std::move(targetItemResult.error()));
-  auto targetItem = std::move(*targetItemResult);
-  if (targetItem) {
-    if (!targetItem->matches(m_goalRecipe.output, true))
-      craftingFail = true;
-    else if (targetItem->count() + m_goalRecipe.output.count() > targetItem->max_stack())
-      craftingFail = true;
-  }
-  if (craftingFail) {
-    m_crafting.set(false);
-    m_craftingProgress.set(0);
-    m_goalRecipe = ItemRecipe();
+
+  m_craft_resolution = CraftResolution::Resolving;
+  auto reset_resolution = make_scope_exit([this] { m_craft_resolution = CraftResolution::Idle; });
+  auto recipe = recipe_for_materials();
+  if (!recipe)
+    return std::unexpected(std::move(recipe.error()));
+  if (m_craft_resolution == CraftResolution::Cancelled)
+    return {};
+  if (!is_container_recipe(*recipe) || m_goal_recipe != *recipe || !output_slot_accepts(recipe->output))
+    return stop_crafting();
+
+  auto progress = m_goal_recipe.duration > 0
+      ? m_crafting_progress.get() + dt / m_goal_recipe.duration : 1.0f;
+  if (!(progress >= 1.0f)) {
+    m_crafting_progress.set(progress);
     return {};
   }
-  if (m_goalRecipe.duration > 0)
-    m_craftingProgress.set(m_craftingProgress.get() + dt / m_goalRecipe.duration);
-  else
-    m_craftingProgress.set(1.0f);
-  if (m_craftingProgress.get() >= 1.0f) {
-    m_craftingProgress.set(0);
-    for (auto const& input : m_goalRecipe.inputs) {
-      bool consumed = m_items->consume_items(input);
-      ((void)(consumed));
-      if constexpr (Star::debug_enabled) {
-        Star::star_assert_failed((consumed));
-      }
-    }
-    auto databaseResult = root().itemDatabase();
-    if (!databaseResult)
-      return std::unexpected(std::move(databaseResult.error()));
-    auto database = std::move(*databaseResult);
-    auto outputResult = database->item(m_goalRecipe.output);
-    if (!outputResult)
-      return std::unexpected(std::move(outputResult.error()));
-    auto output = std::move(*outputResult);
-    auto overflowResult = m_items->put_items(m_items->size() - 1, std::move(output));
-    if (!overflowResult)
-      return std::unexpected(std::move(overflowResult.error()));
-    auto overflow = std::move(*overflowResult);
-    if (overflow) {
-      auto currentWorldResult = world();
-      if (!currentWorldResult)
-        return std::unexpected(std::move(currentWorldResult.error()));
-      auto currentWorld = std::move(*currentWorldResult);
-      auto drop_result = ItemDrop::create_randomized_drop(root(), overflow, position());
-      if (!drop_result)
-        return std::unexpected(std::move(drop_result.error()));
-      auto drop = std::move(*drop_result);
-      auto operation2 = currentWorld.get().addEntity(drop);
-      if (!operation2)
-        return std::unexpected(std::move(operation2.error()));
-    }
-    itemsUpdated();
+
+  auto database = root().itemDatabase();
+  if (!database)
+    return std::unexpected(std::move(database.error()));
+  auto output = (*database)->item(recipe->output);
+  if (!output)
+    return std::unexpected(std::move(output.error()));
+  if (m_craft_resolution == CraftResolution::Cancelled)
+    return {};
+  if (!*output || (*output)->empty() || !output_slot_accepts(recipe->output))
+    return stop_crafting();
+
+  // A recipe callback or the output builder may have changed the slots.
+  // Plan and commit against the current inputs only, after both calls return.
+  auto output_slot = m_items->size() - 1;
+  if (!m_items->consume_items(recipe->inputs, output_slot, recipe->match_input_parameters))
+    return stop_crafting();
+
+  auto overflow = m_items->put_items(output_slot, std::move(*output));
+  if (!overflow)
+    return std::unexpected(std::move(overflow.error()));
+  m_crafting_progress.set(0);
+  itemsUpdated();
+  if (*overflow) {
+    auto current_world = world();
+    if (!current_world)
+      return std::unexpected(std::move(current_world.error()));
+    auto drop = ItemDrop::create_randomized_drop(root(), *overflow, position());
+    if (!drop)
+      return std::unexpected(std::move(drop.error()));
+    if (auto added = current_world->get().addEntity(*drop); !added)
+      return std::unexpected(std::move(added.error()));
   }
   return {};
 }
@@ -1405,9 +1415,8 @@ std::expected<bool, StarException> ContainerObject::doConsumeItems(std::size_t s
 }
 
 std::expected<List<std::shared_ptr<Item>>, StarException> ContainerObject::doClearContainer() {
-  auto operation1 = stopCrafting();
-  if (!operation1)
-    return std::unexpected(std::move(operation1.error()));
+  if (auto stopped = stop_crafting(); !stopped)
+    return std::unexpected(std::move(stopped.error()));
   auto result = m_items->take_all();
   m_items->clear_items();
   itemsUpdated();

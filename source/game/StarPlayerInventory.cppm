@@ -106,7 +106,7 @@ public:
   bool consumeItems(ItemDescriptor const& descriptor, bool exactMatch = false);
   [[nodiscard]] std::expected<ItemDescriptor, StarException> takeItems(ItemDescriptor const& descriptor, bool takePartial = false, bool exactMatch = false);
   // Return a summary of every item that can be consumed by ItemDescriptor.
-  [[nodiscard]] std::expected<RecipeStock, StarException> availableItems() const;
+  [[nodiscard]] std::expected<RecipeStock, StarException> available_items() const;
 
   std::shared_ptr<HeadArmor> headArmor() const;
   std::shared_ptr<ChestArmor> chestArmor() const;
@@ -148,7 +148,7 @@ public:
   void setEssentialItem(EssentialItem essentialItem, std::shared_ptr<Item> item);
 
   // Non-manageable currencies
-  StringMap<std::uint64_t> availableCurrencies() const;
+  StringMap<std::uint64_t> available_currencies() const;
   std::uint64_t currency(String const& currencyType) const;
   [[nodiscard]] std::expected<void, StarException> addCurrency(String const& currencyType, std::uint64_t amount);
   bool consumeCurrency(String const& currencyType, std::uint64_t amount);
