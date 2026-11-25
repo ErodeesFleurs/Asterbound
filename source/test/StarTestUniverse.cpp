@@ -157,7 +157,7 @@ TestUniverse::TestUniverse(Vec2U clientWindowSize)
   : m_clientWindowSize(clientWindowSize) {}
 
 std::expected<std::unique_ptr<TestUniverse>, StarException> TestUniverse::create(
-    Root& root, Vec2U clientWindowSize, bool force_legacy) {
+    Root& root, Vec2U clientWindowSize, bool force_legacy, String const& saved_chunks) {
   auto fixture = std::unique_ptr<TestUniverse>(new TestUniverse(clientWindowSize));
   auto storagePath = File::temporary_directory(root.random());
   if (!storagePath)
@@ -169,7 +169,16 @@ std::expected<std::unique_ptr<TestUniverse>, StarException> TestUniverse::create
   auto statistics = Statistics::create(root, File::relative_to(fixture->m_storagePath, "statistics"));
   if (!statistics)
     return std::unexpected(std::move(statistics.error()));
-  auto server = UniverseServer::create(root, File::relative_to(fixture->m_storagePath, "universe"));
+  auto universe_path = File::relative_to(fixture->m_storagePath, "universe");
+  if (!saved_chunks.empty()) {
+    auto created = File::create_directory(universe_path);
+    if (!created)
+      return std::unexpected(std::move(created.error()));
+    auto copied = File::copy(saved_chunks, File::relative_to(universe_path, "universe.chunks"));
+    if (!copied)
+      return std::unexpected(std::move(copied.error()));
+  }
+  auto server = UniverseServer::create(root, universe_path);
   if (!server)
     return std::unexpected(std::move(server.error()));
   fixture->m_server = std::move(*server);

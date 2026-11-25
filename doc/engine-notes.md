@@ -102,6 +102,12 @@ unchanged.
 
 ## Network and frame preparation
 
+When a returning player joins, the server requests the star chart summary for
+the chunk containing the saved ship position and the orbital details for the
+original system. No save conversion is needed. If a celestial request fails,
+the server logs it and still delivers the other completed responses; it does
+not substitute an empty chunk for unreadable data.
+
 ### Buffer and snapshot ownership
 
 Entity creation encoders transfer completed buffers instead of copying them. Read-only RPC and monster/NPC variant decoders borrow their input only during decoding; decoded fields remain owned. Network formats and compatibility versions are unchanged. Frame data owns reusable entity collections and particle snapshots; painters borrow them only during submission. Typed spatial queries collect a single owned result list without changing traversal order, wrapping, deduplication or insertion-safe candidate snapshots.

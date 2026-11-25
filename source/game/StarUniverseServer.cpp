@@ -2126,23 +2126,26 @@ std::expected<void, StarException> UniverseServer::respond_to_celestial_requests
   for (auto&& entry : m_pending_celestial_requests) {
     List<CelestialResponse> responses;
     for (auto it = entry.second.begin(); it != entry.second.end();) {
-      auto ready = it->poll();
-      if (!ready)
-        return std::unexpected(std::move(ready.error()));
-      if (*ready) {
-        auto response = it->get();
-        if (!response)
-          return std::unexpected(std::move(response.error()));
-        // add_celestial_requests puts the only consumer handle directly in this queue.
-        if (responses.empty())
-          responses.reserve(entry.second.size());
-        responses.push_back(std::move(response->get()));
-        it = entry.second.erase(it);
-      } else {
+      if (!it->done()) {
         ++it;
+        continue;
       }
+      auto response = it->get();
+      if (!response) {
+        it = entry.second.erase(it);
+        if (auto logged = m_root.logger().warn_exception(
+                Star::format("UniverseServer: Dropping celestial request for client {}", entry.first),
+                ExceptionDiagnostic(response.error())); !logged)
+          return std::unexpected(std::move(logged.error()));
+        continue;
+      }
+      // The queue holds the only consumer handle; move the response before erasing it.
+      if (responses.empty())
+        responses.reserve(entry.second.size());
+      responses.push_back(std::move(response->get()));
+      it = entry.second.erase(it);
     }
-    if (m_clients.contains(entry.first)) {
+    if (!responses.empty() && m_clients.contains(entry.first)) {
       if (auto sent = m_connectionServer->sendPackets(entry.first, {std::make_shared<CelestialResponsePacket>(std::move(responses))}); !sent)
         return std::unexpected(std::move(sent.error()));
     }
@@ -3065,7 +3068,14 @@ std::expected<void, StarException> UniverseServer::add_celestial_requests(Connec
   lock_with_diagnostics(locker);
   for (auto const& request : requests) {
     m_pending_celestial_requests[clientId].push_back(m_workerPool.add_producer<CelestialResponse>(
-      [&database = *m_celestial_database, request]() { return database.respond_to_request(request); }));
+      [&database = *m_celestial_database, request]() {
+        auto response = database.respond_to_request(request);
+        if (!response)
+          response.error() = std::move(response.error()).with_context(request.is_left()
+              ? Star::format("Loading celestial chunk {}", request.left_ref())
+              : Star::format("Loading celestial system {}", request.right_ref()));
+        return response;
+      }));
   }
   return {};
 }
@@ -3680,7 +3690,8 @@ std::expected<void, StarException> UniverseServer::acceptConnection(UniverseConn
           return std::unexpected(std::move(system.error()));
         if (auto added = (*system)->addClient(clientId, client->player_uuid(), client->ship_speed(), client->ship_location()); !added)
           return std::unexpected(std::move(added.error()));
-        if (auto requested = add_celestial_requests(clientId, {make_left(location.vec2()), make_right(location)}); !requested) {
+        auto chunk_index = m_celestial_database->chunk_index_for(location.vec2());
+        if (auto requested = add_celestial_requests(clientId, {make_left(chunk_index), make_right(location)}); !requested) {
           auto removed = (*system)->removeClient(clientId);
           if (!removed)
             return std::unexpected(requested.error().with_related(removed.error(), "Removing failed system client failed"));

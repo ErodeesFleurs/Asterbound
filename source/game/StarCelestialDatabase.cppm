@@ -41,6 +41,7 @@ public:
 
   // The x/y region of usable worlds.
   RectI xy_range() const;
+  Vec2I chunk_index_for(Vec2I const& system_xy) const;
 
   // The maximum number of bodies that can orbit a single system center /
   // planetary body.  Orbital numbers are up to this number of levels
@@ -77,7 +78,6 @@ public:
 
 protected:
   Vec2I chunk_index_for(CelestialCoordinate const& coordinate) const;
-  Vec2I chunk_index_for(Vec2I const& system_xy) const;
 
   [[nodiscard]] static std::expected<void, StarException> validate_base_information(CelestialBaseInformation const& info);
   static bool contains_system(RectI const& region, Vec2I const& position);
