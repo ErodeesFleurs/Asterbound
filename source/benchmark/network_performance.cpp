@@ -164,11 +164,11 @@ bool snapshotFieldsEqual(std::shared_ptr<Packet> const& before, std::shared_ptr<
       && std::tie(expected->templateData, expected->skyData, expected->weatherData, expected->playerStart,
                   expected->playerRespawn, expected->respawnInWorld, expected->worldProperties,
                   expected->dungeonIdGravity, expected->dungeonIdBreathable, expected->protectedDungeonIds,
-                  expected->clientId, expected->localInterpolationMode)
+                  expected->clientId, expected->local_interpolation_mode)
       == std::tie(actual->templateData, actual->skyData, actual->weatherData, actual->playerStart,
                   actual->playerRespawn, actual->respawnInWorld, actual->worldProperties, actual->dungeonIdGravity,
                   actual->dungeonIdBreathable, actual->protectedDungeonIds, actual->clientId,
-                  actual->localInterpolationMode);
+                  actual->local_interpolation_mode);
   }
   if (auto expected = as<WorldLayoutUpdatePacket>(before)) {
     auto actual = as<WorldLayoutUpdatePacket>(after);

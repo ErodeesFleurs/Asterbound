@@ -870,15 +870,15 @@ std::expected<void, StarException> ClientContextUpdatePacket::write(DataStream& 
   return ds.write(update_data);
 }
 
-WorldStartPacket::WorldStartPacket() : clientId(), localInterpolationMode() {}
+WorldStartPacket::WorldStartPacket() : clientId(), local_interpolation_mode() {}
 
 std::expected<void, StarException> WorldStartPacket::read(DataStream& ds) {
-  auto fields = std::tie(templateData, skyData, weatherData, playerStart, playerRespawn, respawnInWorld, worldProperties, dungeonIdGravity, dungeonIdBreathable, protectedDungeonIds, clientId, localInterpolationMode);
+  auto fields = std::tie(templateData, skyData, weatherData, playerStart, playerRespawn, respawnInWorld, worldProperties, dungeonIdGravity, dungeonIdBreathable, protectedDungeonIds, clientId, local_interpolation_mode);
   return ds.read(fields);
 }
 
 std::expected<void, StarException> WorldStartPacket::write(DataStream& ds) const {
-  auto fields = std::tie(templateData, skyData, weatherData, playerStart, playerRespawn, respawnInWorld, worldProperties, dungeonIdGravity, dungeonIdBreathable, protectedDungeonIds, clientId, localInterpolationMode);
+  auto fields = std::tie(templateData, skyData, weatherData, playerStart, playerRespawn, respawnInWorld, worldProperties, dungeonIdGravity, dungeonIdBreathable, protectedDungeonIds, clientId, local_interpolation_mode);
   return ds.write(fields);
 }
 
@@ -1922,42 +1922,40 @@ std::expected<void, StarException> PongPacket::write(DataStream& ds) const {
   return {};
 }
 
-StepUpdatePacket::StepUpdatePacket() : remoteTime(0.0) {}
+namespace {
+constexpr double legacy_steps_per_second = 60.0;
+}
 
-StepUpdatePacket::StepUpdatePacket(double remoteTime) : remoteTime(remoteTime) {}
-
+StepUpdatePacket::StepUpdatePacket(double remote_time) : remote_time(remote_time) {}
 
 std::expected<void, StarException> StepUpdatePacket::read(DataStream& ds) {
   if (ds.stream_compatibility_version() == legacy_version) {
     auto steps = ds.read_vlq_u();
     if (!steps)
       return std::unexpected(std::move(steps.error()));
-    remoteTime = static_cast<double>(*steps) / 60.0;
+    remote_time = static_cast<double>(*steps) / legacy_steps_per_second;
   } else {
-    {
-      auto result = ds.read(remoteTime);
-      if (!result)
-        return std::unexpected(std::move(result.error()));
-    }
+    auto seconds = ds.read<double>();
+    if (!seconds)
+      return std::unexpected(std::move(seconds.error()));
+    if (!is_finite(*seconds))
+      return std::unexpected(StarPacketException("StepUpdate time must be finite"));
+    remote_time = *seconds;
   }
   return {};
 }
 
 std::expected<void, StarException> StepUpdatePacket::write(DataStream& ds) const {
-  if (ds.stream_compatibility_version() == legacy_version) {
-    {
-      auto result = ds.write_vlq_u(static_cast<std::uint64_t>(std::round(remoteTime * 60.0)));
-      if (!result)
-        return std::unexpected(std::move(result.error()));
-    }
-  } else {
-    {
-      auto result = ds.write(remoteTime);
-      if (!result)
-        return std::unexpected(std::move(result.error()));
-    }
-  }
-  return {};
+  if (!is_finite(remote_time))
+    return std::unexpected(StarPacketException("StepUpdate time must be finite"));
+  if (ds.stream_compatibility_version() != legacy_version)
+    return ds.write(remote_time);
+
+  // This binary64 boundary scales to 2^64, while its predecessor scales
+  // to 2^64 - 4096. Check before multiplication and the unsigned cast.
+  if (remote_time < 0.0 || remote_time >= 0x1p64 / legacy_steps_per_second)
+    return std::unexpected(StarPacketException("StepUpdate time is outside the legacy step range"));
+  return ds.vuwrite(static_cast<std::uint64_t>(std::round(remote_time * legacy_steps_per_second)));
 }
 
 SystemWorldStartPacket::SystemWorldStartPacket() : clientShip(unfilledPacketUuid(), SystemLocation()) {}

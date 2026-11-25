@@ -211,6 +211,106 @@ TEST(HandshakeDigestTest, Utf8CredentialsAndBinarySalt) {
   EXPECT_EQ(digest, hex_decode("90b7b1151a80bd041027d8838ae3c9f5dc07549c44684afc75b86ffbbbabf199"));
 }
 
+TEST(StepUpdateWire, LegacyQuantizesSecondsToUnsignedSixtieths) {
+  struct Fixture {
+    double seconds;
+    std::uint64_t steps;
+    std::string_view hex;
+  };
+  constexpr Fixture fixtures[]{
+    {-0.0, 0, "00"},
+    {0x1.fffffffffffffp-4, 7, "07"}, // Just below 7.5 steps.
+    {0.375, 23, "17"},               // 22.5 rounds up, not to even.
+    {2.125, 128, "8100"},
+    {0x1.1111111111110p58, 0xfffffffffffff000ULL, "81ffffffffffffffe000"},
+  };
+  StepUpdatePacket target(-1.0);
+  for (auto const& fixture : fixtures) {
+    SCOPED_TRACE(fixture.hex);
+    auto bytes = hex_decode(fixture.hex);
+    DataStreamBuffer encoded;
+    encoded.set_stream_compatibility_version(legacy_version);
+    ASSERT_TRUE(StepUpdatePacket(fixture.seconds).write(encoded));
+    EXPECT_EQ(encoded.data(), bytes);
+    DataStreamReader input(bytes.span());
+    input.set_stream_compatibility_version(legacy_version);
+    ASSERT_TRUE(target.read(input));
+    EXPECT_EQ(target.remote_time, static_cast<double>(fixture.steps) / 60.0);
+    EXPECT_EQ(input.remaining(), 0u);
+  }
+
+  // The largest received VLQ is valid even though binary64 cannot represent
+  // all its ticks: decoding is not subject to the outgoing range check.
+  auto maximum = hex_decode("81ffffffffffffffff7f");
+  DataStreamReader input(maximum.span());
+  input.set_stream_compatibility_version(legacy_version);
+  ASSERT_TRUE(target.read(input));
+  EXPECT_EQ(target.remote_time, 0x1p64 / 60.0);
+}
+
+TEST(StepUpdateWire, ModernPreservesFiniteBinary64Bits) {
+  for (auto bits : {0ULL, 0x8000000000000000ULL, 1ULL, 0xbff123456789abcdULL, 0x7fefffffffffffffULL}) {
+    SCOPED_TRACE(bits);
+    DataStreamBuffer bytes;
+    ASSERT_TRUE(bytes.write(static_cast<std::uint64_t>(bits)));
+    for (auto version : {VersionNumber{1}, open_protocol_version}) {
+      DataStreamReader input(bytes.span());
+      input.set_stream_compatibility_version(version);
+      StepUpdatePacket target;
+      ASSERT_TRUE(target.read(input));
+      EXPECT_EQ(std::bit_cast<std::uint64_t>(target.remote_time), bits);
+      EXPECT_EQ(input.remaining(), 0u);
+      DataStreamBuffer encoded;
+      encoded.set_stream_compatibility_version(version);
+      ASSERT_TRUE(target.write(encoded));
+      EXPECT_EQ(encoded.data(), bytes.data());
+    }
+  }
+}
+
+TEST(StepUpdateWire, RejectsInvalidValuesBeforeWritingOrReplacingTime) {
+  StepUpdatePacket target(13.25);
+  for (auto bits : {0x7ff0000000000000ULL, 0xfff0000000000000ULL, 0x7ff8000000000001ULL}) {
+    SCOPED_TRACE(bits);
+    DataStreamBuffer bytes;
+    ASSERT_TRUE(bytes.write(static_cast<std::uint64_t>(bits)));
+    DataStreamReader input(bytes.span());
+    EXPECT_FALSE(target.read(input));
+    EXPECT_EQ(target.remote_time, 13.25);
+
+    // Materialize nonfinite binary64 inputs even with Release FP flags.
+    volatile std::uint64_t runtime_bits = bits;
+    StepUpdatePacket packet(std::bit_cast<double>(static_cast<std::uint64_t>(runtime_bits)));
+    for (auto version : {legacy_version, open_protocol_version}) {
+      DataStreamBuffer output;
+      output.set_stream_compatibility_version(version);
+      EXPECT_FALSE(packet.write(output));
+      EXPECT_TRUE(output.empty());
+    }
+  }
+  for (double seconds : {-0.001, 0x1.1111111111111p58, 0x1p64, std::numeric_limits<double>::max()}) {
+    SCOPED_TRACE(seconds);
+    DataStreamBuffer output;
+    output.set_stream_compatibility_version(legacy_version);
+    EXPECT_FALSE(StepUpdatePacket(seconds).write(output));
+    EXPECT_TRUE(output.empty());
+  }
+}
+
+TEST(StepUpdateWire, TruncatedPayloadsPreservePreviousTime) {
+  StepUpdatePacket target(13.25);
+  for (auto version : {legacy_version, open_protocol_version}) {
+    auto bytes = hex_decode(version == legacy_version ? "81ffffffffffffffe000" : "bff123456789abcd");
+    for (std::size_t n = 0; n < bytes.size(); ++n) {
+      SCOPED_TRACE(n);
+      DataStreamReader input(bytes.span().first(n));
+      input.set_stream_compatibility_version(version);
+      EXPECT_FALSE(target.read(input));
+      EXPECT_EQ(target.remote_time, 13.25);
+    }
+  }
+}
+
 namespace Star {
 // Only this real-socket fixture changes native buffer sizes; production sockets
 // retain their normal settings and expose no test/failure control API.

@@ -228,7 +228,7 @@ std::optional<std::reference_wrapper<Directives const>> select_directive(
 
 const float WorldClient::DropDist = 6.0f;
 WorldClient::WorldClient(Root& root, UniverseClient& universe)
-  : World(root), m_currentStep(0), m_currentTime(0), m_pendingLightReady(false),
+  : World(root), m_currentStep(0), m_current_time(0), m_pendingLightReady(false),
     m_subWorldId(main_client_world_id), m_worldDimLevel(0), m_latency(0),
     m_ambient_sounds(root), m_music_track(root), m_alt_music_track(root),
     m_broadcast_public_key(std::string(root.identity().public_key().begin(), root.identity().public_key().end())),
@@ -273,7 +273,7 @@ std::expected<void, StarException> WorldClient::initialize(std::shared_ptr<Playe
   m_subWorldId = main_client_world_id;
   
   m_currentStep = 0;
-  m_currentTime = 0;
+  m_current_time = 0;
   m_fullBright = false;
   m_asyncLighting = false;
   auto result3 = m_clientConfig.get_float("worldDimTime");
@@ -443,7 +443,7 @@ std::expected<void, StarException> WorldClient::initialize(ClientSubWorldId subW
   m_headless = true;
   
   m_currentStep = 0;
-  m_currentTime = 0;
+  m_current_time = 0;
   
   m_inWorld = false;
   m_subWorldId = subWorldId;
@@ -1179,7 +1179,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
             image = Star::format("/rendering/sprites/error_{}.png", *result65);
           }
           Color color = Color::rgb_f(
-            0.8f + static_cast<float>(std::sin(self.m_currentTime * std::numbers::pi * 2.0)) * 0.2f, 0.0f, 0.0f);
+            0.8f + static_cast<float>(std::sin(self.m_current_time * std::numbers::pi * 2.0)) * 0.2f, 0.0f, 0.0f);
           auto result66 = self.root().image_metadata_database();
           if (!result66)
             return std::unexpected(std::move(result66.error()));
@@ -1606,28 +1606,28 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         return std::unexpected(std::move(result103.error()));
       }
       
-      if (m_interpolationTracker.interpolationEnabled()) {
-        auto result104 = entity->enableInterpolation(m_interpolationTracker.extrapolationHint());
+      if (m_interpolation_tracker.interpolation_enabled()) {
+        auto result104 = entity->enableInterpolation(m_interpolation_tracker.extrapolation_hint());
         if (!result104)
           return std::unexpected(std::move(result104.error()));
         
         // Delay appearance of new slaved entities to match with interplation
         // state.
         m_startupHiddenEntities.add(entityCreate->entityId);
-        timer(m_interpolationTracker.interpolationLeadTime(), [&self = *this, entityId = entityCreate->entityId](World&)  -> std::expected<void, StarException> {
+        timer(m_interpolation_tracker.interpolation_lead_time(), [&self = *this, entityId = entityCreate->entityId](World&)  -> std::expected<void, StarException> {
           self.m_startupHiddenEntities.remove(entityId);
           return {};
         });
       }
     } else if (auto entityUpdateSet = as<EntityUpdateSetPacket>(packet)) {
-      float interpolationLeadTime = m_interpolationTracker.interpolationLeadTime();
+      float interpolation_lead_time = m_interpolation_tracker.interpolation_lead_time();
       auto result106 = m_entityMap->for_all_entities([&, &self = *this](std::shared_ptr<Entity> const& entity)  -> std::expected<void, StarException> {
               EntityId entityId = entity->entityId();
               if (connection_for_entity(entityId) == entityUpdateSet->forConnection) {
                 if (Star::debug_enabled) {
                   Star::star_assert_failed((entity->isSlave()));
                 }
-                auto result105 = entity->read_net_state(entityUpdateSet->deltas.value(entityId), interpolationLeadTime, self.m_clientState->netCompatibilityRules());
+                auto result105 = entity->read_net_state(entityUpdateSet->deltas.value(entityId), interpolation_lead_time, self.m_clientState->netCompatibilityRules());
                 if (!result105)
                   return std::unexpected(std::move(result105.error()));
               }
@@ -1637,17 +1637,17 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         return std::unexpected(std::move(result106.error()));
     } else if (auto entityDestroy = as<EntityDestroyPacket>(packet)) {
       if (auto entity = m_entityMap->entity(entityDestroy->entityId)) {
-        auto result107 = entity->read_net_state(entityDestroy->finalNetState, m_interpolationTracker.interpolationLeadTime(), m_clientState->netCompatibilityRules());
+        auto result107 = entity->read_net_state(entityDestroy->finalNetState, m_interpolation_tracker.interpolation_lead_time(), m_clientState->netCompatibilityRules());
         if (!result107)
           return std::unexpected(std::move(result107.error()));
         
         // Before destroying the entity, we should make sure that the entity is
         // using the absolute latest data, so we disable interpolation.
         
-        if (m_interpolationTracker.interpolationEnabled() && entityDestroy->death) {
+        if (m_interpolation_tracker.interpolation_enabled() && entityDestroy->death) {
           // Delay death packets by the interpolation step to give time for
           // interpolation to catch up.
-          timer(m_interpolationTracker.interpolationLeadTime(), [&self = *this, entity, entityDestroy](World&)  -> std::expected<void, StarException> {
+          timer(m_interpolation_tracker.interpolation_lead_time(), [&self = *this, entity, entityDestroy](World&)  -> std::expected<void, StarException> {
             auto result108 = entity->disableInterpolation();
             if (!result108)
               return std::unexpected(std::move(result108.error()));
@@ -1801,8 +1801,8 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         if (!result123)
           return std::unexpected(std::move(result123.error()));
       }
-    } else if (auto stepUpdate = as<StepUpdatePacket>(packet)) {
-      m_interpolationTracker.receiveTimeUpdate(stepUpdate->remoteTime);
+    } else if (auto step_update = as<StepUpdatePacket>(packet)) {
+      m_interpolation_tracker.receive_time_update(step_update->remote_time);
     } else if (auto environmentUpdatePacket = as<EnvironmentUpdatePacket>(packet)) {
       auto result124 = m_sky->readUpdate(environmentUpdatePacket->skyDelta, m_clientState->netCompatibilityRules());
       if (!result124)
@@ -2116,8 +2116,8 @@ std::expected<void, StarException> WorldClient::update(float dt) {
   }
   
   ++m_currentStep;
-  m_currentTime += dt;
-  m_interpolationTracker.update(m_currentTime);
+  m_current_time += dt;
+  m_interpolation_tracker.update(m_current_time);
   
   List<WorldAction> triggeredActions;
   m_timers.filter([&triggeredActions, dt](std::pair<float, WorldAction>& timer) {
@@ -2798,7 +2798,7 @@ std::expected<void, StarException> WorldClient::queueUpdatePackets(bool sendEnti
     return std::unexpected(std::move(result204.error()));
   auto entityFactory = (std::move(*result204));
 
-  m_outgoingPackets.push_back(std::make_shared<StepUpdatePacket>(m_currentTime));
+  m_outgoingPackets.push_back(std::make_shared<StepUpdatePacket>(m_current_time));
 
   {
     auto result205 = m_clientConfig.get_int("worldClientStateUpdateDelta");
@@ -3301,25 +3301,12 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
     if (!result252)
       return std::unexpected(std::move(result252.error()));
     auto assets = (std::move(*result252));
-    if (startPacket.localInterpolationMode) {
-      auto result253 = m_clientConfig.query("interpolationSettings.local");
-      if (!result253)
-        return std::unexpected(std::move(result253.error()));
-      auto result254 = InterpolationTracker::create(this->root(), (std::move(*result253)));
-      if (!result254)
-        return std::unexpected(std::move(result254.error()));
-      m_interpolationTracker = (std::move(*result254));
-    } else {
-      auto result255 = m_clientConfig.query("interpolationSettings.normal");
-      if (!result255)
-        return std::unexpected(std::move(result255.error()));
-      auto result256 = InterpolationTracker::create(this->root(), (std::move(*result255)));
-      if (!result256)
-        return std::unexpected(std::move(result256.error()));
-      m_interpolationTracker = (std::move(*result256));
-    }
-    
-    m_entity_update_timer = GameTimer(m_interpolationTracker.entityUpdateDelta());
+    auto settings = m_clientConfig.query(startPacket.local_interpolation_mode ? String("interpolationSettings.local") : String("interpolationSettings.normal"));
+    if (!settings) return std::unexpected(std::move(settings.error()));
+    auto tracker = InterpolationTracker::create(root(), *settings);
+    if (!tracker) return std::unexpected(std::move(tracker.error()));
+    m_interpolation_tracker = std::move(*tracker);
+    m_entity_update_timer = GameTimer(m_interpolation_tracker.entity_update_delta());
     
     m_clientId = startPacket.clientId;
     auto result257 = connection_entity_space(startPacket.clientId);
@@ -3562,11 +3549,11 @@ std::expected<void, StarException> WorldClient::clearWorld() {
   m_scriptContexts.clear();
 
   m_currentStep = 0;
-  m_currentTime = 0;
+  m_current_time = 0;
   m_inWorld = false;
   m_clientId.reset();
 
-  m_interpolationTracker = InterpolationTracker();
+  m_interpolation_tracker = InterpolationTracker();
 
   m_masterEntitiesNetVersion.clear();
   m_outgoingPackets.clear();

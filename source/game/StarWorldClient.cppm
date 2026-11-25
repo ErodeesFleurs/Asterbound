@@ -494,7 +494,7 @@ private:
 
   WorldGeometry m_geometry;
   std::uint64_t m_currentStep;
-  double m_currentTime;
+  double m_current_time;
   bool m_fullBright = false;
   bool m_asyncLighting = false;
   CellularLightingCalculator m_lightingCalculator;
@@ -563,7 +563,7 @@ private:
 
   HashMap<EntityId, std::uint64_t> m_masterEntitiesNetVersion;
 
-  InterpolationTracker m_interpolationTracker;
+  InterpolationTracker m_interpolation_tracker;
   GameTimer m_entity_update_timer;
 
   List<std::shared_ptr<Packet>> m_outgoingPackets;

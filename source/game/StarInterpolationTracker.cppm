@@ -1,45 +1,45 @@
 module;
-import star.format;
-
 import std;
-import star.json;
+
+import star.format;
 
 namespace Star {
 
+class Json;
 class Root;
 
 class InterpolationTracker {
 public:
-  InterpolationTracker();
-  [[nodiscard]] static std::expected<InterpolationTracker, StarException> create(Root& root, Json config);
+  [[nodiscard]] static std::expected<InterpolationTracker, StarException> from_config(Json const& config);
+  [[nodiscard]] static std::expected<InterpolationTracker, StarException> create(Root& root, Json const& config);
 
-  // Should interpolation be enabled on entities at all?  If this is false,
-  // extrapolationHint and interpolationLead will always return 0.
-  bool interpolationEnabled() const;
-  unsigned extrapolationHint() const;
+  [[nodiscard]] bool interpolation_enabled() const { return m_interpolation_enabled; }
+  [[nodiscard]] unsigned extrapolation_hint() const { return m_extrapolation_hint; }
+  // Seconds between entity updates, even when interpolation is disabled.
+  [[nodiscard]] float entity_update_delta() const { return m_entity_update_delta; }
 
-  // Time in-between entity updates
-  float entityUpdateDelta() const;
+  // The packet decoder has already validated the remote timestamp. Local time
+  // is the world's own simulation clock; it may stay still or roll back.
+  void receive_time_update(double remote_time) {
+    if (m_interpolation_enabled)
+      m_remote_time = remote_time;
+  }
+  void update(double local_time);
 
-  void receiveTimeUpdate(double remoteTime);
-  void update(double newLocalTime);
-
-  // Lead time that incoming interpolated data as of this moment should be
-  // marked for.  If interpolation is disabled, this is always 0.0
-  float interpolationLeadTime() const;
+  // Evaluated against the latest heartbeat, even before the next update().
+  [[nodiscard]] float interpolation_lead_time() const;
 
 private:
-  [[nodiscard]] std::expected<void, StarException> readConfig(Json const& config);
-  bool m_interpolationEnabled;
-  float m_entityUpdateDelta;
-  double m_timeLead;
-  unsigned m_extrapolationHint;
-  double m_timeTrackFactor;
-  double m_timeMaxDistance;
+  bool m_interpolation_enabled = false;
+  unsigned m_extrapolation_hint = 0;
+  float m_entity_update_delta = 0.05f;
+  double m_time_lead = 0;
+  double m_time_track_factor = 1;
+  double m_time_max_distance = 0;
 
-  double m_currentTime;
-  std::optional<double> m_lastTimeUpdate;
-  std::optional<double> m_predictedTime;
+  double m_local_time = 0;
+  std::optional<double> m_remote_time;
+  std::optional<double> m_predicted_time;
 };
 
 }

@@ -265,6 +265,7 @@ set (star_game_tests_SOURCES
       function_test.cpp
       humanoid_render_test.cpp
       interaction_types_test.cpp
+      interpolation_tracker_test.cpp
       lighting_test.cpp
       item_test.cpp
       liquid_types_test.cpp

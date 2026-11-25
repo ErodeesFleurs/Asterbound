@@ -405,8 +405,8 @@ private:
 
   explicit WorldServer(Root& root);
   struct ClientInfo {
-    [[nodiscard]] static std::expected<std::shared_ptr<ClientInfo>, StarException> create(Root& root, ConnectionId clientId, InterpolationTracker const trackerInit);
-    ClientInfo(ConnectionId clientId, InterpolationTracker const trackerInit);
+    [[nodiscard]] static std::expected<std::shared_ptr<ClientInfo>, StarException> create(Root& root, ConnectionId client_id, InterpolationTracker const& tracker);
+    ClientInfo(ConnectionId client_id, InterpolationTracker const& tracker);
 
     [[nodiscard]] std::expected<List<RectI>, StarException> monitoringRegions(std::shared_ptr<EntityMap> const& entityMap) const;
 
@@ -435,7 +435,7 @@ private:
     HashSet<ServerTileSectorArray::Sector> pendingSectors;
     HashSet<ServerTileSectorArray::Sector> activeSectors;
 
-    InterpolationTracker interpolationTracker;
+    InterpolationTracker interpolation_tracker;
   };
 
   struct TileEntitySpaces {

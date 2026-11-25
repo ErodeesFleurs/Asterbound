@@ -625,7 +625,7 @@ struct WorldStartPacket : PacketBase<PacketType::WorldStart> {
   StableHashSet<DungeonId> protectedDungeonIds;
   Json worldProperties;
   ConnectionId clientId;
-  bool localInterpolationMode;
+  bool local_interpolation_mode;
 };
 
 // Sent when a client is leaving a world
@@ -1313,13 +1313,13 @@ struct StepUpdatePacket : PacketBase<PacketType::StepUpdate> {
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<StepUpdatePacket>(); }
 
-  StepUpdatePacket();
-  StepUpdatePacket(double remoteTime);
+  StepUpdatePacket() = default;
+  StepUpdatePacket(double remote_time);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  double remoteTime;
+  double remote_time = 0.0;
 };
 
 struct SystemWorldStartPacket : PacketBase<PacketType::SystemWorldStart> {

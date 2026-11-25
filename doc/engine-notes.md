@@ -110,6 +110,10 @@ original system. No save conversion is needed. If a celestial request fails,
 the server logs it and still delivers the other completed responses; it does
 not substitute an empty chunk for unreadable data.
 
+### Entity network clock
+
+`entityUpdateDelta`, `stepLead`, and `stepMaxDistance` are in legacy 60 Hz steps, regardless of simulation or display rate. Disabling interpolation disables clock tracking and extrapolation, not entity update transmission. A new tracker returns zero lead until its first heartbeat has been followed by a logic update. Once synchronized, a heartbeat changes the lead used by subsequent packets immediately; smoothing and distance limiting run on the next logic update.
+
 ### Buffer and snapshot ownership
 
 Entity creation encoders transfer completed buffers instead of copying them. Read-only RPC and monster/NPC variant decoders borrow their input only during decoding; decoded fields remain owned. Network formats and compatibility versions are unchanged. Frame data owns reusable entity collections and particle snapshots; painters borrow them only during submission. Typed spatial queries collect a single owned result list without changing traversal order, wrapping, deduplication or insertion-safe candidate snapshots.

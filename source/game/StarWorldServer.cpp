@@ -681,31 +681,15 @@ std::expected<bool, StarException> WorldServer::addClient(ConnectionId clientId,
   if (auto result = m_spawner->activateEmptyRegion(spawnRegion); !result)
     return std::unexpected(std::move(result.error()));
 
-  InterpolationTracker tracker;
-  if (isLocal) {
-    auto result45 = m_serverConfig.query("interpolationSettings.local");
-    if (!result45)
-      return std::unexpected(std::move(result45.error()));
-    auto result46 = InterpolationTracker::create(this->root(), std::move(*result45));
-    if (!result46)
-      return std::unexpected(std::move(result46.error()));
-    tracker = std::move(*result46);
-  } else {
-    auto result47 = m_serverConfig.query("interpolationSettings.normal");
-    if (!result47)
-      return std::unexpected(std::move(result47.error()));
-    auto result48 = InterpolationTracker::create(this->root(), std::move(*result47));
-    if (!result48)
-      return std::unexpected(std::move(result48.error()));
-    tracker = std::move(*result48);
-  }
+  auto settings = m_serverConfig.query(isLocal ? String("interpolationSettings.local") : String("interpolationSettings.normal"));
+  if (!settings) return std::unexpected(std::move(settings.error()));
+  auto tracker = InterpolationTracker::create(root(), *settings);
+  if (!tracker) return std::unexpected(std::move(tracker.error()));
+  tracker->update(m_current_time);
 
-  tracker.update(m_current_time);
-
-  auto result49 = ClientInfo::create(this->root(), clientId, tracker);
-  if (!result49)
-    return std::unexpected(std::move(result49.error()));
-  auto result50 = m_clientInfo.add(clientId, std::move(*result49));
+  auto info = ClientInfo::create(root(), clientId, *tracker);
+  if (!info) return std::unexpected(std::move(info.error()));
+  auto result50 = m_clientInfo.add(clientId, std::move(*info));
   if (!result50)
     return std::unexpected(std::move(result50.error()));
   auto& clientInfo = result50->get();
@@ -765,7 +749,7 @@ std::expected<bool, StarException> WorldServer::addClient(ConnectionId clientId,
   worldStartPacket->dungeonIdBreathable = m_dungeonIdBreathable;
   worldStartPacket->protectedDungeonIds = m_protectedDungeonIds;
   worldStartPacket->clientId = clientId;
-  worldStartPacket->localInterpolationMode = isLocal;
+  worldStartPacket->local_interpolation_mode = isLocal;
   clientInfo->outgoingPackets.push_back(worldStartPacket);
 
   auto result61 = m_centralStructure.store();
@@ -894,7 +878,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       // clients which have not sent a world start acknowledge are not sending packets intended for this world
       continue;
     } else if (auto heartbeat = as<StepUpdatePacket>(packet)) {
-      clientInfo->interpolationTracker.receiveTimeUpdate(heartbeat->remoteTime);
+      clientInfo->interpolation_tracker.receive_time_update(heartbeat->remote_time);
     } else if (auto wcsPacket = as<WorldClientStateUpdatePacket>(packet)) {
       auto result69 = clientInfo->clientState->readDelta(wcsPacket->worldClientStateDelta);
       if (!result69)
@@ -1135,8 +1119,8 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           if (auto result = world.m_entityMap->add_entity(entity); !result)
             return reject(std::move(result.error()));
           published = true;
-          if (clientInfo->interpolationTracker.interpolationEnabled()) {
-            if (auto result = entity->enableInterpolation(clientInfo->interpolationTracker.extrapolationHint()); !result)
+          if (clientInfo->interpolation_tracker.interpolation_enabled()) {
+            if (auto result = entity->enableInterpolation(clientInfo->interpolation_tracker.extrapolation_hint()); !result)
               return reject(std::move(result.error()));
           }
           return {};
@@ -1150,14 +1134,14 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         }
       }
     } else if (auto entityUpdateSet = as<EntityUpdateSetPacket>(packet)) {
-      float interpolationLeadTime = clientInfo->interpolationTracker.interpolationLeadTime();
+      float interpolation_lead_time = clientInfo->interpolation_tracker.interpolation_lead_time();
       auto result102 = m_entityMap->for_all_entities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
         EntityId entityId = entity->entityId();
         if (connection_for_entity(entityId) == clientId) {
           if constexpr (Star::debug_enabled) {
             Star::star_assert_failed((entity->isSlave()));
           }
-          auto result101 = entity->read_net_state(entityUpdateSet->deltas.value(entityId), interpolationLeadTime, clientInfo->clientState->netCompatibilityRules());
+          auto result101 = entity->read_net_state(entityUpdateSet->deltas.value(entityId), interpolation_lead_time, clientInfo->clientState->netCompatibilityRules());
           if (!result101)
             return std::unexpected(std::move(result101.error()));
         }
@@ -1168,7 +1152,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       clientInfo->pendingForward = true;
     } else if (auto entityDestroy = as<EntityDestroyPacket>(packet)) {
       if (auto entity = m_entityMap->entity(entityDestroy->entityId)) {
-        auto result103 = entity->read_net_state(entityDestroy->finalNetState, clientInfo->interpolationTracker.interpolationLeadTime(), clientInfo->clientState->netCompatibilityRules());
+        auto result103 = entity->read_net_state(entityDestroy->finalNetState, clientInfo->interpolation_tracker.interpolation_lead_time(), clientInfo->clientState->netCompatibilityRules());
         if (!result103)
           return std::unexpected(std::move(result103.error()));
         // Before destroying the entity, we should make sure that the entity is
@@ -1498,7 +1482,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
   m_current_time += dt;
   ++m_currentStep;
   for (auto const& pair : m_clientInfo)
-    pair.second->interpolationTracker.update(m_current_time);
+    pair.second->interpolation_tracker.update(m_current_time);
 
   List<WorldAction> triggeredActions;
   m_timers.filter([&triggeredActions, dt](std::pair<float, WorldAction>& timer) {
@@ -2780,12 +2764,11 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
     return world.m_tileArray->tile({x, y}).getCollision();
   });
 
-  auto result312 = m_serverConfig.query("interpolationSettings.normal");
-  if (!result312)
-    return std::unexpected(std::move(result312.error()));
-  auto update_delta = result312->get_float("entityUpdateDelta");
-  if (!update_delta) return std::unexpected(std::move(update_delta.error()));
-  m_entity_update_timer = GameTimer(*update_delta / 60.f);
+  auto settings = m_serverConfig.query("interpolationSettings.normal");
+  if (!settings) return std::unexpected(std::move(settings.error()));
+  auto normal_tracker = InterpolationTracker::create(root, *settings);
+  if (!normal_tracker) return std::unexpected(std::move(normal_tracker.error()));
+  m_entity_update_timer = GameTimer(normal_tracker->entity_update_delta());
   auto check_interval = m_serverConfig.get_float("tileEntityBreakCheckInterval");
   if (!check_interval) return std::unexpected(std::move(check_interval.error()));
   m_tile_entity_break_check_timer = GameTimer(*check_interval);
@@ -4548,15 +4531,14 @@ std::expected<bool, StarException> WorldServer::isVisibleToPlayer(RectF const& r
   return false;
 }
 
-WorldServer::ClientInfo::ClientInfo(ConnectionId clientId, InterpolationTracker const trackerInit)
-  : clientId(clientId), subWorldId(main_client_world_id), skyNetVersion(0), weatherNetVersion(0), pendingForward(false), started(false), local(false), admin(false), interpolationTracker(trackerInit) {}
+WorldServer::ClientInfo::ClientInfo(ConnectionId client_id, InterpolationTracker const& tracker)
+  : clientId(client_id), subWorldId(main_client_world_id), skyNetVersion(0), weatherNetVersion(0), pendingForward(false), started(false), local(false), admin(false), interpolation_tracker(tracker) {}
 
-std::expected<std::shared_ptr<WorldServer::ClientInfo>, StarException> WorldServer::ClientInfo::create(Root& root, ConnectionId clientId, InterpolationTracker const trackerInit) {
-  auto clientState = WorldClientState::create(root);
-  if (!clientState)
-    return std::unexpected(std::move(clientState.error()));
-  auto info = std::shared_ptr<ClientInfo>(new ClientInfo(clientId, trackerInit));
-  info->clientState = std::move(*clientState);
+std::expected<std::shared_ptr<WorldServer::ClientInfo>, StarException> WorldServer::ClientInfo::create(Root& root, ConnectionId client_id, InterpolationTracker const& tracker) {
+  auto state = WorldClientState::create(root);
+  if (!state) return std::unexpected(std::move(state.error()));
+  auto info = std::make_shared<ClientInfo>(client_id, tracker);
+  info->clientState = std::move(*state);
   return info;
 }
 

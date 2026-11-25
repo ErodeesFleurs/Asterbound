@@ -911,11 +911,11 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
             EXPECT_EQ(std::tie(expected->templateData, expected->skyData, expected->weatherData, expected->playerStart,
                                expected->playerRespawn, expected->respawnInWorld, expected->worldProperties,
                                expected->dungeonIdGravity, expected->dungeonIdBreathable, expected->protectedDungeonIds,
-                               expected->clientId, expected->localInterpolationMode),
+                               expected->clientId, expected->local_interpolation_mode),
                       std::tie(actual->templateData, actual->skyData, actual->weatherData, actual->playerStart,
                                actual->playerRespawn, actual->respawnInWorld, actual->worldProperties,
                                actual->dungeonIdGravity, actual->dungeonIdBreathable, actual->protectedDungeonIds,
-                               actual->clientId, actual->localInterpolationMode));
+                               actual->clientId, actual->local_interpolation_mode));
           } else if (auto expected = as<CentralStructureUpdatePacket>(original)) {
             auto actual = as<CentralStructureUpdatePacket>(*decoded);
             ASSERT_TRUE(actual);
