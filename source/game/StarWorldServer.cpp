@@ -999,8 +999,8 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         if (!logged)
           return std::unexpected(std::move(logged.error()));
       }
-    } else if (auto rdpacket = as<RequestDropPacket>(packet)) {
-      if (auto drop = m_entityMap->get<ItemDrop>(rdpacket->dropEntityId); drop && drop->isMaster()) {
+    } else if (auto request_drop = as<RequestDropPacket>(packet)) {
+      if (auto drop = m_entityMap->get<ItemDrop>(request_drop->dropEntityId); drop && drop->isMaster()) {
         auto taken = drop->take_by(clientInfo->clientState->playerId());
         if (!taken)
           return std::unexpected(std::move(taken.error()));
@@ -1115,7 +1115,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
             return reject(std::move(result.error()));
           published = true;
           if (clientInfo->interpolation_tracker.interpolation_enabled()) {
-            if (auto result = entity->enableInterpolation(clientInfo->interpolation_tracker.extrapolation_hint()); !result)
+            if (auto result = entity->enable_interpolation(clientInfo->interpolation_tracker.extrapolation_hint()); !result)
               return reject(std::move(result.error()));
           }
           return {};
@@ -1152,7 +1152,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           return std::unexpected(std::move(result103.error()));
         // Before destroying the entity, we should make sure that the entity is
         // using the absolute latest data, so we disable interpolation.
-        auto result104 = entity->disableInterpolation();
+        auto result104 = entity->disable_interpolation();
         if (!result104)
           return std::unexpected(std::move(result104.error()));
         auto result105 = removeEntity(entityDestroy->entityId, entityDestroy->death);
@@ -1513,7 +1513,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
       // *and surrounding sectors* are active.  Objects that this object
       // rests on can be up to an entire sector large in any direction.
       if (do_break_checks) {
-        auto active = world.regionActive(RectI::integral(tileEntity->metaBoundBox().translated(tileEntity->position())).padded(world_sector_size));
+        auto active = world.regionActive(RectI::integral(tileEntity->meta_bound_box().translated(tileEntity->position())).padded(world_sector_size));
         if (!active) return std::unexpected(std::move(active.error()));
         if (*active) {
           auto broken = tileEntity->checkBroken();
@@ -1525,14 +1525,14 @@ std::expected<void, StarException> WorldServer::update(float dt) {
         return std::unexpected(std::move(result159.error()));
     }
 
-    auto result161 = entity->shouldDestroy();
+    auto result161 = entity->should_destroy();
     if (!result161)
       return std::unexpected(std::move(result161.error()));
     if (std::move(*result161) && entity->entityMode() == EntityMode::Master)
       toRemove.push_back(entity->entityId());
     return {};
   }, [](std::shared_ptr<Entity> const& a, std::shared_ptr<Entity> const& b) {
-        return a->entityType() < b->entityType();
+        return a->entity_type() < b->entity_type();
       });
   if (!result162)
     return std::unexpected(std::move(result162.error()));
@@ -2003,13 +2003,13 @@ std::expected<bool, StarException> WorldServer::replaceTile(Vec2I const& pos, Ti
       auto damageParameters = std::move(*result225);
       bool harvested = tileDamage.amount >= 0 && tileDamage.harvest_level >= damageParameters.required_harvest_level();
       auto damage = placeMaterial.layer == TileLayer::Foreground ? tile->get().foregroundDamage : tile->get().backgroundDamage;
-      Vec2F dropPosition = center_of_tile(pos);
+      Vec2F drop_position = center_of_tile(pos);
 
       auto result226 = destroyBlock(placeMaterial.layer, pos, harvested, !tile_damage_is_penetrating(damage.damage_type()), false);
       if (!result226)
         return std::unexpected(std::move(result226.error()));
       for (auto const& drop : std::move(*result226)) {
-        auto result227 = ItemDrop::create_randomized_drop(this->root(), drop, dropPosition);
+        auto result227 = ItemDrop::create_randomized_drop(this->root(), drop, drop_position);
         if (!result227)
           return std::unexpected(std::move(result227.error()));
         auto result228 = addEntity(std::move(*result227), null_entity_id);
@@ -2157,7 +2157,7 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
               }
               if (!EntityTypeNames)
                 return std::unexpected(EntityTypeNames.error());
-              auto result240 = (*EntityTypeNames).get_right(entity->entityType());
+              auto result240 = (*EntityTypeNames).get_right(entity->entity_type());
               if (!result240)
                 return std::unexpected(std::move(result240.error()));
               auto result241 = sendEntityMessage(*sourceEntity, "tileEntityBroken", {
@@ -3266,7 +3266,7 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
 
   // check whether we've broken any other nearby entities
   if (checkBreaks) {
-    auto result361 = checkEntityBreaks(entity->metaBoundBox().translated(entity->position()));
+    auto result361 = checkEntityBreaks(entity->meta_bound_box().translated(entity->position()));
     if (!result361)
       return std::unexpected(std::move(result361.error()));
   }
@@ -3718,7 +3718,7 @@ std::expected<void, StarException> WorldServer::queueUpdatePackets(ConnectionId 
         if (!result410)
           return std::unexpected(std::move(result410.error()));
         clientInfo->outgoingPackets.push_back(std::make_shared<EntityCreatePacket>(
-          monitoredEntity->entityType(), std::move(*result410), std::move(firstUpdate.first), entityId));
+          monitoredEntity->entity_type(), std::move(*result410), std::move(firstUpdate.first), entityId));
       }
     }
   }
@@ -3802,14 +3802,14 @@ std::expected<void, StarException> WorldServer::updateDamagedBlocks(float dt) {
       continue;
     }
 
-    Vec2F dropPosition = center_of_tile(pos);
+    Vec2F drop_position = center_of_tile(pos);
     if (tile->get().foregroundDamage.dead()) {
       bool harvested = tile->get().foregroundDamage.harvested();
       auto result417 = destroyBlock(TileLayer::Foreground, pos, harvested, !tile_damage_is_penetrating(tile->get().foregroundDamage.damage_type()), true);
       if (!result417)
         return std::unexpected(std::move(result417.error()));
       for (auto const& drop : std::move(*result417)) {
-        auto result418 = ItemDrop::create_randomized_drop(this->root(), drop, dropPosition);
+        auto result418 = ItemDrop::create_randomized_drop(this->root(), drop, drop_position);
         if (!result418)
           return std::unexpected(std::move(result418.error()));
         auto result419 = addEntity(std::move(*result418), null_entity_id);
@@ -3867,7 +3867,7 @@ std::expected<void, StarException> WorldServer::updateDamagedBlocks(float dt) {
       if (!result427)
         return std::unexpected(std::move(result427.error()));
       for (auto const& drop : std::move(*result427)) {
-        auto result428 = ItemDrop::create_randomized_drop(this->root(), drop, dropPosition);
+        auto result428 = ItemDrop::create_randomized_drop(this->root(), drop, drop_position);
         if (!result428)
           return std::unexpected(std::move(result428.error()));
         auto result429 = addEntity(std::move(*result428), null_entity_id);
@@ -4572,7 +4572,7 @@ std::expected<std::shared_ptr<WorldServer::ClientInfo>, StarException> WorldServ
 std::expected<List<RectI>, StarException> WorldServer::ClientInfo::monitoringRegions(std::shared_ptr<EntityMap> const& entityMap) const {
   return clientState->monitoringRegions([entityMap](EntityId entityId) -> std::optional<RectI> {
     if (auto entity = entityMap->entity(entityId))
-      return RectI::integral(entity->metaBoundBox().translated(entity->position()));
+      return RectI::integral(entity->meta_bound_box().translated(entity->position()));
     return {};
   });
 }

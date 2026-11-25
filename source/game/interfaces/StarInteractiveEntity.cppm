@@ -41,7 +41,7 @@ public:
   // entity is master or slave there.
   [[nodiscard]] virtual std::expected<InteractAction, StarException> interact(InteractRequest const& request) = 0;
 
-  // Defaults to metaBoundBox
+  // Defaults to meta_bound_box
   virtual RectF interactiveBoundBox() const;
 
   // Defaults to true

@@ -203,7 +203,7 @@ if (!result983) return std::unexpected(std::move(result983.error()));
 return ds.take_data();
 }
 
-EntityType Projectile::entityType() const {
+EntityType Projectile::entity_type() const {
   return EntityType::Projectile;
 }
 
@@ -218,8 +218,8 @@ return std::move(*result976);
 std::expected<void, StarException> Projectile::init(World& world, EntityId entityId, EntityMode mode) {
   auto result948 = Entity::init(world, entityId, mode);
 if (!result948) return std::unexpected(std::move(result948.error()));
-  m_movementController->init(world);
-  m_movementController->setIgnorePhysicsEntities({entityId});
+  m_movement_controller->init(world);
+  m_movement_controller->setIgnorePhysicsEntities({entityId});
 
   auto result949 = m_parameters.get_float("timeToLive", m_config->timeToLive);
 if (!result949) return std::unexpected(std::move(result949.error()));
@@ -274,7 +274,7 @@ if (!result965) return std::unexpected(std::move(result965.error()));
 if (!result966) return std::unexpected(std::move(result966.error()));
 auto result967 = m_scriptComponent.add_callbacks("entity", std::move(*result966));
 if (!result967) return std::unexpected(std::move(result967.error()));
-      auto result968 = LuaBindings::make_movement_controller_callbacks(*m_movementController);
+      auto result968 = LuaBindings::make_movement_controller_callbacks(*m_movement_controller);
 if (!result968) return std::unexpected(std::move(result968.error()));
 auto result969 = m_scriptComponent.add_callbacks("mcontroller", std::move(*result968));
 if (!result969) return std::unexpected(std::move(result969.error()));
@@ -311,7 +311,7 @@ m_pendingRenderables.push_back(m_persistentAudio);
 std::expected<void, StarException> Projectile::uninit() {
   if (m_persistentAudio)
     m_persistentAudio->stop();
-  m_movementController->uninit();
+  m_movement_controller->uninit();
   if (isMaster()) {
     auto result940 = configValue("scripts", Json());
 if (!result940) return std::unexpected(std::move(result940.error()));
@@ -349,15 +349,15 @@ std::expected<String, StarException> Projectile::description() const {
 }
 
 Vec2F Projectile::position() const {
-  return m_movementController->position();
+  return m_movement_controller->position();
 }
 
-RectF Projectile::metaBoundBox() const {
+RectF Projectile::meta_bound_box() const {
   return m_config->boundBox;
 }
 
 Vec2F Projectile::velocity() const {
-  return m_movementController->velocity();
+  return m_movement_controller->velocity();
 }
 
 std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Projectile::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
@@ -374,19 +374,19 @@ std::expected<void, StarException> Projectile::read_net_state(ByteArray data, fl
   return m_netGroup.read_net_state(std::move(data), interpolationTime, rules);
 }
 
-std::expected<void, StarException> Projectile::enableInterpolation(float extrapolationHint) {
-  auto result937 = m_netGroup.enable_net_interpolation(extrapolationHint);
+std::expected<void, StarException> Projectile::enable_interpolation(float extrapolation_hint) {
+  auto result937 = m_netGroup.enable_net_interpolation(extrapolation_hint);
 if (!result937) return std::unexpected(std::move(result937.error()));
   return {};
 }
 
-std::expected<void, StarException> Projectile::disableInterpolation() {
+std::expected<void, StarException> Projectile::disable_interpolation() {
   auto result936 = m_netGroup.disable_net_interpolation();
 if (!result936) return std::unexpected(std::move(result936.error()));
   return {};
 }
 
-std::expected<bool, StarException> Projectile::shouldDestroy() const {
+std::expected<bool, StarException> Projectile::should_destroy() const {
   auto result935 = recover_lua_script_error(m_scriptComponent.invoke<bool>("shouldDestroy"));
 if (!result935) return std::unexpected(std::move(result935.error()));
 if (auto res = std::move(*result935))
@@ -460,7 +460,7 @@ float knockbackMagnitude = std::move(*result923);
   auto result924 = m_parameters.get_bool("knockbackDirectional", m_config->knockbackDirectional);
 if (!result924) return std::unexpected(std::move(result924.error()));
 if (std::move(*result924))
-  knockback = Vec2F::with_angle(m_movementController->rotation()) * knockbackMagnitude;
+  knockback = Vec2F::with_angle(m_movement_controller->rotation()) * knockbackMagnitude;
   else
     knockback = knockbackMagnitude;
 
@@ -482,12 +482,12 @@ if (!result925) return std::unexpected(std::move(result925.error()));
   if (!m_config->damagePoly.empty()) {
     PolyF damagePoly = m_config->damagePoly;
     if (m_config->flippable) {
-      auto angleSide = get_angle_side(m_movementController->rotation(), true);
+      auto angleSide = get_angle_side(m_movement_controller->rotation(), true);
       if (angleSide.second == Direction::Left)
         damagePoly.flip_horizontal(0);
       damagePoly.rotate(angleSide.first);
     } else {
-      damagePoly.rotate(m_movementController->rotation());
+      damagePoly.rotate(m_movement_controller->rotation());
     }
     addDamageSource(damagePoly);
   } else if (!useDamageLine) {
@@ -512,13 +512,13 @@ if (auto hitPoly = std::move(*result918)) {
           auto result919 = world();
 if (!result919) return std::unexpected(std::move(result919.error()));
 auto geometry = result919->get().geometry();
-          Vec2F checkVec = m_movementController->velocity().normalized() * 5;
-          Vec2F nearMin = geometry.nearest_to(hitPoly->center(), m_movementController->position() - checkVec);
+          Vec2F checkVec = m_movement_controller->velocity().normalized() * 5;
+          Vec2F nearMin = geometry.nearest_to(hitPoly->center(), m_movement_controller->position() - checkVec);
           if (auto intersection = hitPoly->line_intersection(Line2F(nearMin, nearMin + checkVec * 2)))
-            m_movementController->setPosition(intersection->point);
+            m_movement_controller->setPosition(intersection->point);
         }
       }
-      m_movementController->setVelocity({0, 0});
+      m_movement_controller->setVelocity({0, 0});
       m_collision = true;
       m_timeToLive = 0.0f;
     }
@@ -529,10 +529,10 @@ if (!result920) return std::unexpected(std::move(result920.error()));
 }
 
 std::expected<void, StarException> Projectile::update(float dt, std::uint64_t) {
-  capturePresentationRotation(m_movementController->rotation());
+  capturePresentationRotation(m_movement_controller->rotation());
   m_previousAnimationTimer = m_animationTimer;
   m_previousTimeToLive = m_timeToLive;
-  m_movementController->setTimestep(dt);
+  m_movement_controller->setTimestep(dt);
 
   if (isMaster()) {
     m_timeToLive -= dt;
@@ -542,19 +542,19 @@ std::expected<void, StarException> Projectile::update(float dt, std::uint64_t) {
     m_effectEmitter->addEffectSources("normal", m_config->emitters);
 
     if (m_referenceVelocity)
-      m_movementController->setVelocity(m_movementController->velocity() - *m_referenceVelocity);
+      m_movement_controller->setVelocity(m_movement_controller->velocity() - *m_referenceVelocity);
 
     auto result905 = recover_lua_script_error(m_scriptComponent.update(m_scriptComponent.update_dt(dt)));
 if (!result905) return std::unexpected(std::move(result905.error()));
-    m_movementController->accelerate(m_movementController->velocity().normalized() * m_acceleration);
+    m_movement_controller->accelerate(m_movement_controller->velocity().normalized() * m_acceleration);
 
     if (m_referenceVelocity)
-      m_movementController->setVelocity(m_movementController->velocity() + *m_referenceVelocity);
+      m_movement_controller->setVelocity(m_movement_controller->velocity() + *m_referenceVelocity);
 
-    auto result906 = m_movementController->tickMaster(dt);
+    auto result906 = m_movement_controller->tickMaster(dt);
 if (!result906) return std::unexpected(std::move(result906.error()));
     m_travelLine.min() = m_travelLine.max();
-    m_travelLine.max() = m_movementController->position();
+    m_travelLine.max() = m_movement_controller->position();
 
     auto result907 = tickShared(dt);
 if (!result907) return std::unexpected(std::move(result907.error()));
@@ -564,17 +564,17 @@ if (!result907) return std::unexpected(std::move(result907.error()));
 if (!result908) return std::unexpected(std::move(result908.error()));
 if (auto sourceEntity = result908->get().entity(m_sourceEntity)) {
         Vec2F newEntityPosition = sourceEntity->position();
-        m_movementController->translate(newEntityPosition - m_lastEntityPosition);
+        m_movement_controller->translate(newEntityPosition - m_lastEntityPosition);
         m_lastEntityPosition = newEntityPosition;
       } else {
         m_trackSourceEntity = false;
       }
     }
 
-    if (m_movementController->atWorldLimit())
+    if (m_movement_controller->atWorldLimit())
       m_timeToLive = 0.0f;
 
-    if ((m_movementController->isColliding() || m_movementController->stickingDirection()) && !m_movementController->isNullColliding()) {
+    if ((m_movement_controller->isColliding() || m_movement_controller->stickingDirection()) && !m_movement_controller->isNullColliding()) {
       if (!m_wasColliding)
         m_collisionEvent.trigger();
       m_wasColliding = true;
@@ -582,8 +582,8 @@ if (auto sourceEntity = result908->get().entity(m_sourceEntity)) {
       m_wasColliding = false;
     }
 
-    if (m_movementController->isColliding()) {
-      if (m_movementController->isNullColliding()) {
+    if (m_movement_controller->isColliding()) {
+      if (m_movement_controller->isNullColliding()) {
         // Don't trigger collision action, just silently die if we collide with a
         // null block.
         m_timeToLive = 0.0f;
@@ -592,19 +592,19 @@ if (auto sourceEntity = result908->get().entity(m_sourceEntity)) {
 if (!result909) return std::unexpected(std::move(result909.error()));
         if (m_bounces > 0)
           --m_bounces;
-      } else if (m_falldown && !(m_movementController->onGround() || m_movementController->isCollisionStuck() || m_movementController->stickingDirection())) {
+      } else if (m_falldown && !(m_movement_controller->onGround() || m_movement_controller->isCollisionStuck() || m_movement_controller->stickingDirection())) {
         // Wait til this projectile actually hits the ground before dying
 
-      } else if (!m_movementController->stickingDirection()) {
+      } else if (!m_movement_controller->stickingDirection()) {
         m_collision = true;
         m_timeToLive = 0.0f;
         // Move slightly less than one tile unit in the direction that the projectile
         // has most recently moved to find the collision tile.  This is *not* perfect by any means.
-        m_collisionTile = Vec2I::floor(m_movementController->position() + m_travelLine.direction() * 0.9f);
+        m_collisionTile = Vec2I::floor(m_movement_controller->position() + m_travelLine.direction() * 0.9f);
 
-        m_lastNonCollidingTile = Vec2I::floor(m_movementController->position());
+        m_lastNonCollidingTile = Vec2I::floor(m_movement_controller->position());
         for (float i = 0; i < 1.51f; i += 0.5f) {
-          auto pos = Vec2I::floor(m_movementController->position() + m_travelLine.direction() * -i);
+          auto pos = Vec2I::floor(m_movement_controller->position() + m_travelLine.direction() * -i);
           auto result910 = world();
 if (!result910) return std::unexpected(std::move(result910.error()));
 if (result910->get().material(pos, TileLayer::Foreground) == EmptyMaterialId) {
@@ -629,10 +629,10 @@ auto liquid = result911->get().liquidLevel(Vec2I::floor(position()));
   } else {
     auto result912 = m_netGroup.tick_net_interpolation(dt);
 if (!result912) return std::unexpected(std::move(result912.error()));
-    auto result913 = m_movementController->tickSlave(dt);
+    auto result913 = m_movement_controller->tickSlave(dt);
 if (!result913) return std::unexpected(std::move(result913.error()));
     m_travelLine.min() = m_travelLine.max();
-    m_travelLine.max() = m_movementController->position();
+    m_travelLine.max() = m_movement_controller->position();
 
     m_timeToLive -= dt;
 
@@ -643,13 +643,13 @@ if (!result914) return std::unexpected(std::move(result914.error()));
   auto result915 = world();
   if (!result915) return std::unexpected(std::move(result915.error()));
   if (result915->get().isClient()) {
-    this->root().spatialLogger().log_poly("world", m_movementController->collisionBody(), Color::palette_red.to_rgba());
+    this->root().spatialLogger().log_poly("world", m_movement_controller->collisionBody(), Color::palette_red.to_rgba());
   }
   return {};
 }
 
-std::uint64_t Projectile::presentationEpoch() const {
-  return Entity::presentationEpoch() + m_movementController->presentationEpoch();
+std::uint64_t Projectile::presentation_epoch() const {
+  return Entity::presentation_epoch() + m_movement_controller->presentation_epoch();
 }
 
 std::expected<void, StarException> Projectile::collectRenderEvents(RenderCallback& render_callback) {
@@ -666,7 +666,7 @@ if (!result901) return std::unexpected(std::move(result901.error()));
 }
 
 std::expected<void, StarException> Projectile::render(RenderCallback& render_callback) {
-  float rotation = samplePresentationRotation(m_movementController->rotation(), render_callback.presentation().interpolation());
+  float rotation = samplePresentationRotation(m_movement_controller->rotation(), render_callback.presentation().interpolation());
   float alpha = render_callback.presentation().interpolation();
   int frame = m_frame;
   if (frame == getFrame())
@@ -697,7 +697,7 @@ if (!result904) return std::unexpected(std::move(result904.error()));
   return {};
 }
 
-std::expected<void, StarException> Projectile::renderLightSources(RenderCallback& render_callback) {
+std::expected<void, StarException> Projectile::render_light_sources(RenderCallback& render_callback) {
   auto lights = render_callback.add_light_sources(m_renderLights);
   if (!lights)
     return std::unexpected(std::move(lights.error()));
@@ -714,13 +714,13 @@ if (!result897) return std::unexpected(std::move(result897.error()));
 return std::move(*result897);
 }
 
-std::expected<std::optional<LuaValue>, StarException> Projectile::callScript(String const& func, LuaVariadic<LuaValue> const& args) {
+std::expected<std::optional<LuaValue>, StarException> Projectile::call_script(String const& func, LuaVariadic<LuaValue> const& args) {
   auto result895 = recover_lua_script_error(m_scriptComponent.invoke(func, args));
 if (!result895) return std::unexpected(std::move(result895.error()));
 return std::move(*result895);
 }
 
-std::expected<std::optional<LuaValue>, StarException> Projectile::evalScript(String const& code) {
+std::expected<std::optional<LuaValue>, StarException> Projectile::eval_script(String const& code) {
   auto result894 = recover_lua_script_error(m_scriptComponent.eval(code));
 if (!result894) return std::unexpected(std::move(result894.error()));
 return std::move(*result894);
@@ -731,9 +731,9 @@ String Projectile::projectileType() const {
 }
 
 void Projectile::setReferenceVelocity(std::optional<Vec2F> const& velocity) {
-  m_movementController->setVelocity(m_movementController->velocity() - m_referenceVelocity.value_or(Vec2F{}));
+  m_movement_controller->setVelocity(m_movement_controller->velocity() - m_referenceVelocity.value_or(Vec2F{}));
   m_referenceVelocity = velocity;
-  m_movementController->setVelocity(m_movementController->velocity() + velocity.value_or(Vec2F{}));
+  m_movement_controller->setVelocity(m_movement_controller->velocity() + velocity.value_or(Vec2F{}));
   m_effectEmitter->setBaseVelocity(velocity.value_or(Vec2F{}));
 }
 
@@ -747,17 +747,17 @@ void Projectile::setInitialSpeed(float speed) {
 
 void Projectile::setInitialPosition(Vec2F const& position) {
   resetPresentation();
-  m_movementController->setPosition(position);
+  m_movement_controller->setPosition(position);
 }
 
 void Projectile::setInitialDirection(Vec2F const& direction) {
-  m_movementController->setVelocity(vnorm(direction) * m_initialSpeed + m_referenceVelocity.value_or(Vec2F{}));
-  m_movementController->setRotation(direction.angle());
+  m_movement_controller->setVelocity(vnorm(direction) * m_initialSpeed + m_referenceVelocity.value_or(Vec2F{}));
+  m_movement_controller->setRotation(direction.angle());
 }
 
 void Projectile::setInitialVelocity(Vec2F const& velocity) {
-  m_movementController->setVelocity(velocity + m_referenceVelocity.value_or(Vec2F{}));
-  m_movementController->setRotation(velocity.angle());
+  m_movement_controller->setVelocity(velocity + m_referenceVelocity.value_or(Vec2F{}));
+  m_movement_controller->setRotation(velocity.angle());
 }
 
 void Projectile::setSourceEntity(EntityId source, bool trackSource) {
@@ -815,8 +815,8 @@ std::expected<std::optional<PhysicsMovingCollision>, StarException> Projectile::
   return collision;
 }
 
-MovementController& Projectile::movementController() {
-  return *m_movementController;
+MovementController& Projectile::movement_controller() {
+  return *m_movement_controller;
 }
 
 std::expected<List<Particle>, StarException> Projectile::sparkBlock(Root& rootContext, World& world, Vec2I const& position, Vec2F const& damageSource) {
@@ -899,8 +899,8 @@ bool Projectile::ephemeral() const {
   return true;
 }
 
-ClientEntityMode Projectile::clientEntityMode() const {
-  return m_config->clientEntityMode;
+ClientEntityMode Projectile::client_entity_mode() const {
+  return m_config->client_entity_mode;
 }
 
 bool Projectile::masterOnly() const {
@@ -1173,7 +1173,7 @@ if (!result778) return std::unexpected(std::move(result778.error()));
         return std::unexpected(std::move(speed_factor.error()));
       auto updated = set_parameter(
         "speed",
-        (m_movementController->velocity() - m_referenceVelocity.value_or(Vec2F{})).magnitude() * *speed_factor);
+        (m_movement_controller->velocity() - m_referenceVelocity.value_or(Vec2F{})).magnitude() * *speed_factor);
       if (!updated)
         return std::unexpected(std::move(updated.error()));
     }
@@ -1222,7 +1222,7 @@ auto result803 = json_to_vec2f(std::move(*result802));
 if (!result803) return std::unexpected(std::move(result803.error()));
 projectile->setInitialDirection(std::move(*result803));
     } else {
-      float angle = m_movementController->rotation();
+      float angle = m_movement_controller->rotation();
       float angleAdjust = 0;
       auto result804 = parameters.contains("angle");
 if (!result804) return std::unexpected(std::move(result804.error()));
@@ -1259,7 +1259,7 @@ if (!result812) return std::unexpected(std::move(result812.error()));
 condition813 = static_cast<bool>(std::move(*result812));
 }
 if (condition813) {
-  if (Vec2F::with_angle(m_movementController->rotation())[0] < 0)
+  if (Vec2F::with_angle(m_movement_controller->rotation())[0] < 0)
     angleAdjust = -angleAdjust;
       }
       auto result814 = parameters.contains("autoFlipAngle");
@@ -1271,7 +1271,7 @@ if (!result815) return std::unexpected(std::move(result815.error()));
 condition816 = static_cast<bool>(std::move(*result815));
 }
 if (condition816) {
-  if (Vec2F::with_angle(m_movementController->rotation())[0] < 0)
+  if (Vec2F::with_angle(m_movement_controller->rotation())[0] < 0)
     angle = -angle;
       }
       angle += angleAdjust;
@@ -1337,12 +1337,12 @@ if (!result827) return std::unexpected(std::move(result827.error()));
 auto result828 = std::move(*result826)->particle(std::move(*result827));
 if (!result828) return std::unexpected(std::move(result828.error()));
 Particle particle = std::move(*result828);
-    particle.position = particle.position.rotate(m_movementController->rotation());
+    particle.position = particle.position.rotate(m_movement_controller->rotation());
     auto result829 = parameters.get_bool("rotate", false);
 if (!result829) return std::unexpected(std::move(result829.error()));
 if (std::move(*result829)) {
-      particle.rotation = m_movementController->rotation();
-      particle.velocity = particle.velocity.rotate(m_movementController->rotation());
+      particle.rotation = m_movement_controller->rotation();
+      particle.velocity = particle.velocity.rotate(m_movement_controller->rotation());
     }
     particle.translate(position());
     particle.velocity += m_referenceVelocity.value_or(Vec2F{});
@@ -1575,17 +1575,17 @@ if (!result884) return std::unexpected(std::move(result884.error()));
 }
 
 std::expected<void, StarException> Projectile::tickShared(float dt) {
-  if (!m_config->orientationLocked && !m_movementController->stickingDirection()) {
-    auto apparentVelocity = m_movementController->velocity() - m_referenceVelocity.value_or(Vec2F{});
+  if (!m_config->orientationLocked && !m_movement_controller->stickingDirection()) {
+    auto apparentVelocity = m_movement_controller->velocity() - m_referenceVelocity.value_or(Vec2F{});
     if (apparentVelocity != Vec2F())
-      m_movementController->setRotation(apparentVelocity.angle());
+      m_movement_controller->setRotation(apparentVelocity.angle());
   }
 
   m_animationTimer += dt;
   setFrame(getFrame());
 
   m_effectEmitter->setSourcePosition("normal", position());
-  m_effectEmitter->setDirection(get_angle_side(m_movementController->rotation(), true).second);
+  m_effectEmitter->setDirection(get_angle_side(m_movement_controller->rotation(), true).second);
   auto result719 = m_effectEmitter->tick(dt, *entityMode());
 if (!result719) return std::unexpected(std::move(result719.error()));
 
@@ -1715,7 +1715,7 @@ movementSettings = std::move(*result701);
 if (!result702) return std::unexpected(std::move(result702.error()));
 auto result703 = MovementController::create(this->root(), std::move(*result702));
 if (!result703) return std::unexpected(std::move(result703.error()));
-m_movementController = std::move(*result703);
+m_movement_controller = std::move(*result703);
 
   auto result704 = EffectEmitter::create(this->root());
 if (!result704) return std::unexpected(std::move(result704.error()));
@@ -1782,7 +1782,7 @@ for (auto& p : m_physicsCollisions) {
 
   auto result716 = m_netGroup.add_net_element(m_collisionEvent);
 if (!result716) return std::unexpected(std::move(result716.error()));
-  auto result717 = m_netGroup.add_net_element(*m_movementController);
+  auto result717 = m_netGroup.add_net_element(*m_movement_controller);
 if (!result717) return std::unexpected(std::move(result717.error()));
   auto result718 = m_netGroup.add_net_element(*m_effectEmitter);
 if (!result718) return std::unexpected(std::move(result718.error()));

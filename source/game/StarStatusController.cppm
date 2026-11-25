@@ -161,7 +161,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> net_store(DataStream& ds, NetCompatibilityRules rules = {}) const override;
   [[nodiscard]] std::expected<void, StarException> net_load(DataStream& ds, NetCompatibilityRules rules) override;
 
-  [[nodiscard]] std::expected<void, StarException> enable_net_interpolation(float extrapolationHint = 0.0f) override;
+  [[nodiscard]] std::expected<void, StarException> enable_net_interpolation(float extrapolation_hint = 0.0f) override;
   [[nodiscard]] std::expected<void, StarException> disable_net_interpolation() override;
   [[nodiscard]] std::expected<void, StarException> tick_net_interpolation(float dt) override;
 
@@ -199,7 +199,7 @@ private:
     [[nodiscard]] std::expected<void, StarException> net_store(DataStream& ds, NetCompatibilityRules rules = {}) const override;
     [[nodiscard]] std::expected<void, StarException> net_load(DataStream& ds, NetCompatibilityRules rules) override;
 
-    [[nodiscard]] std::expected<void, StarException> enable_net_interpolation(float extrapolationHint = 0.0f) override;
+    [[nodiscard]] std::expected<void, StarException> enable_net_interpolation(float extrapolation_hint = 0.0f) override;
     [[nodiscard]] std::expected<void, StarException> disable_net_interpolation() override;
     [[nodiscard]] std::expected<void, StarException> tick_net_interpolation(float dt) override;
 
@@ -288,7 +288,7 @@ private:
   EffectAnimatorGroup m_effectAnimators;
 
   std::optional<std::reference_wrapper<Entity>> m_parentEntity;
-  std::optional<std::reference_wrapper<ActorMovementController>> m_movementController;
+  std::optional<std::reference_wrapper<ActorMovementController>> m_movement_controller;
 
   // Members below are only valid on the master entity
 

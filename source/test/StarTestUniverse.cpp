@@ -531,12 +531,12 @@ TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
         }
         for (auto id : world.entity_ids()) {
           auto entity = world.entity(id);
-          if (!entity || (entity->entityType() != EntityType::Npc && entity->entityType() != EntityType::Stagehand))
+          if (!entity || (entity->entity_type() != EntityType::Npc && entity->entity_type() != EntityType::Stagehand))
             continue;
           auto scripted = as<ScriptedEntity>(entity);
           if (!scripted)
             continue;
-          auto period = scripted->evalScript("return script.updateDt()");
+          auto period = scripted->eval_script("return script.updateDt()");
           if (!period)
             return std::unexpected(std::move(period.error()));
           if (!*period)
@@ -550,7 +550,7 @@ TestUniverse::waitForWorldReady(std::int64_t timeoutMilliseconds) {
             return std::unexpected(StarException("Test entity script did not report its scheduling period"));
           auto [entry, inserted] = observedEntities.try_emplace(id, Observation{step});
           if (inserted) {
-            if (entity->entityType() == EntityType::Npc) {
+            if (entity->entity_type() == EntityType::Npc) {
               ++ready.observedScriptedNpcs;
             } else {
               auto type = as<Stagehand>(entity)->typeName();

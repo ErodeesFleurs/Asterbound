@@ -65,16 +65,16 @@ namespace Star::LuaBindings::ItemCallbacks {
   std::size_t count(Item& item);
   std::size_t set_count(Item& item, std::size_t count);
   std::size_t max_stack(Item& item);
-  [[nodiscard]] std::expected<bool, StarException> matches(Item& item, Json const& descriptor, std::optional<bool> exactMatch);
+  [[nodiscard]] std::expected<bool, StarException> matches(Item& item, Json const& descriptor, std::optional<bool> exact_match);
   bool consume(Item& item, std::size_t count);
   bool empty(Item& item);
   Json descriptor(Item& item);
   String description(Item& item);
   String friendly_name(Item& item);
   int rarity(Item& item);
-  [[nodiscard]] std::expected<String, StarException> rarityString(Item& item);
+  [[nodiscard]] std::expected<String, StarException> rarity_string(Item& item);
   std::size_t price(Item& item);
-  [[nodiscard]] std::expected<unsigned, StarException> fuelAmount(Item& item);
+  [[nodiscard]] std::expected<unsigned, StarException> fuel_amount(Item& item);
   [[nodiscard]] std::expected<Json, StarException> icon_drawables(Item& item);
   [[nodiscard]] std::expected<Json, StarException> drop_drawables(Item& item);
   String large_image(Item& item);
@@ -134,11 +134,11 @@ std::expected<LuaCallbacks, StarException> bind_item_callbacks(Resolve resolve) 
     return std::unexpected(std::move(result.error()));
   if (auto result = bind.template operator()<rarity, int>("rarity"); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = bind.template operator()<rarityString, String>("rarityString"); !result)
+  if (auto result = bind.template operator()<rarity_string, String>("rarityString"); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = bind.template operator()<price, std::size_t>("price"); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = bind.template operator()<fuelAmount, Json>("fuelAmount"); !result)
+  if (auto result = bind.template operator()<fuel_amount, Json>("fuelAmount"); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = bind.template operator()<icon_drawables, Json>("iconDrawables"); !result)
     return std::unexpected(std::move(result.error()));
@@ -216,18 +216,18 @@ std::size_t LuaBindings::ItemCallbacks::max_stack(Item& item) {
 // @param descriptor A properly serialized item descriptor
 // @return A bool true if matches, false if not.
 //
-std::expected<bool, StarException> LuaBindings::ItemCallbacks::matches(Item& item, Json const& desc, std::optional<bool> exactMatch) {
-  auto itemDesc = ItemDescriptor::create(desc);
-  if (!itemDesc)
-    return std::unexpected(std::move(itemDesc.error()));
-  return item.matches(*itemDesc, exactMatch.value_or(false));
+std::expected<bool, StarException> LuaBindings::ItemCallbacks::matches(Item& item, Json const& desc, std::optional<bool> exact_match) {
+  auto item_desc = ItemDescriptor::create(desc);
+  if (!item_desc)
+    return std::unexpected(std::move(item_desc.error()));
+  return item.matches(*item_desc, exact_match.value_or(false));
 }
 
 // If the given number of this item is available, consumes that number and
 // returns true, otherwise
 // returns false.
 //
-// @param toConsume The number of items you'd like to consume from this stack
+// @param count The number of items you'd like to consume from this stack
 // @return true if items were successfully consumed, false otherwise
 bool LuaBindings::ItemCallbacks::consume(Item& item, std::size_t count) {
   return item.consume(count);
@@ -274,7 +274,7 @@ int LuaBindings::ItemCallbacks::rarity(Item& item) { return static_cast<int>(ite
 // Returns the rarity of the item as a string
 //
 // @return a string representing the rarity of the item
-std::expected<String, StarException> LuaBindings::ItemCallbacks::rarityString(Item& item) {
+std::expected<String, StarException> LuaBindings::ItemCallbacks::rarity_string(Item& item) {
   auto name = enum_name<rarity_names>(item.rarity());
   if (!name)
     return std::unexpected(std::move(name.error()));
@@ -292,7 +292,7 @@ std::size_t LuaBindings::ItemCallbacks::price(Item& item) {
 // Returns the amount of fuel given for buring this item stack in an engine
 //
 // @return an integer representing the amount of fuel in the entire stack
-std::expected<unsigned, StarException> LuaBindings::ItemCallbacks::fuelAmount(Item& item) {
+std::expected<unsigned, StarException> LuaBindings::ItemCallbacks::fuel_amount(Item& item) {
   auto value = item.instance_value("fuelAmount", 0);
   if (!value)
     return std::unexpected(std::move(value.error()));
@@ -380,7 +380,7 @@ std::expected<Json, StarException> LuaBindings::ItemCallbacks::learn_blueprints_
 
 // Returns whether or not this items has a specific item tag
 //
-// @param itemTag a string containing the tag value
+// @param item_tag a string containing the tag value
 // @return a bool representing whether or not this item contains that tag
 std::expected<bool, StarException> LuaBindings::ItemCallbacks::has_item_tag(Item& item, String const& item_tag) {
   return item.has_item_tag(item_tag);

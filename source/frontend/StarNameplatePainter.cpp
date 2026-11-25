@@ -250,7 +250,7 @@ std::expected<void, StarException> NameplatePainter::update(float dt, std::share
                          .entityId = entity->entityId(),
                          .origin = {},
                          .instance = entity,
-                         .presentationEpoch = entity->presentationEpoch()};
+                         .presentation_epoch = entity->presentation_epoch()};
       auto bounds = determineBoundBox(Vec2F(), nametag);
       if (!bounds) return std::unexpected(std::move(bounds.error()));
       m_nametags.add_bubble(Vec2F(), *bounds, std::move(nametag));
@@ -259,9 +259,9 @@ std::expected<void, StarException> NameplatePainter::update(float dt, std::share
   m_nametags.filter([&foundEntities](BubbleState<Nametag> const&, Nametag const& nametag) { return foundEntities.contains(nametag.entityId); });
   auto updated = m_nametags.update_destinations([&world, &camera, this, inspectionMode](BubbleState<Nametag>& bubble_state, Nametag& nametag) -> std::expected<void, StarException> {
     if (auto entity = as<NametagEntity>(world->entity(nametag.entityId))) {
-      if (nametag.presentationEpoch != entity->presentationEpoch()) {
+      if (nametag.presentation_epoch != entity->presentation_epoch()) {
         bubble_state.reset_presentation();
-        nametag.presentationEpoch = entity->presentationEpoch();
+        nametag.presentation_epoch = entity->presentation_epoch();
       }
       auto origin = entity->nametagOrigin();
       if (!origin) return std::unexpected(std::move(origin.error()));
@@ -294,9 +294,9 @@ std::expected<void, StarException> NameplatePainter::update(float dt, std::share
 std::expected<void, StarException> NameplatePainter::render(WorldClient const& world, WorldCamera const& camera, PresentationContext presentation) {
   if (m_world.lock().get() != &world)
     return {};
-  if (m_presentationEpoch != presentation.epoch()) {
+  if (m_presentation_epoch != presentation.epoch()) {
     m_nametags.reset_presentation();
-    m_presentationEpoch = presentation.epoch();
+    m_presentation_epoch = presentation.epoch();
   }
   auto& context = m_guiContext.get();
   return m_nametags.for_each([&context, &world, &camera, presentation, this](BubbleState<Nametag> const& bubble, Nametag const& nametag) -> std::expected<void, StarException> {
@@ -306,7 +306,7 @@ std::expected<void, StarException> NameplatePainter::render(WorldClient const& w
       return {};
     auto origin = nametag.origin + world.sample_entity(*entity, presentation).offset;
     auto position = camera.worldToScreen(origin) + m_offset * camera.pixelRatio()
-        + bubble.sample_offset(nametag.presentationEpoch == entity->presentationEpoch() ? presentation.interpolation() : 1.0f);
+        + bubble.sample_offset(nametag.presentation_epoch == entity->presentation_epoch() ? presentation.interpolation() : 1.0f);
     auto style = context.setTextStyle(m_textStyle);
     if (!style) return std::unexpected(std::move(style.error()));
     auto color = Color::rgb(nametag.color);

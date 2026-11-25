@@ -1729,7 +1729,7 @@ const GameTestRegistration status_lifecycle("StatusControllerTest", "ReentrantLu
   auto created = StatusController::create(**root, config);
   ASSERT_TRUE(created) << created.error().what();
   auto& status = **created;
-  ASSERT_TRUE(status.init(**npc, (*npc)->movementController()));
+  ASSERT_TRUE(status.init(**npc, (*npc)->movement_controller()));
   auto stop = make_scope_exit([&] { EXPECT_TRUE(status.uninit()); });
   ASSERT_TRUE(status.addEphemeralEffects({{"probe-a", {}}, {"probe-b", {}}}, 11));
   ASSERT_TRUE(status.toolUsageSuppressed());
@@ -1764,7 +1764,7 @@ const GameTestRegistration status_lifecycle("StatusControllerTest", "ReentrantLu
   ASSERT_TRUE(wire.seek(0));
   auto receiver = StatusController::create(**root, config);
   ASSERT_TRUE(receiver) << receiver.error().what();
-  ASSERT_TRUE((*receiver)->init(**npc, (*npc)->movementController()));
+  ASSERT_TRUE((*receiver)->init(**npc, (*npc)->movement_controller()));
   auto stop_receiver = make_scope_exit([&] { EXPECT_TRUE((*receiver)->uninit()); });
   ASSERT_TRUE((*receiver)->net_load(wire, {}));
   auto replicated = (*receiver)->activeUniqueStatusEffectSummary();

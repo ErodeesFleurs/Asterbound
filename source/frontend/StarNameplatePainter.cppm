@@ -57,7 +57,7 @@ private:
     EntityId entityId;
     Vec2F origin;
     std::weak_ptr<Entity> instance;
-    std::uint64_t presentationEpoch = 0;
+    std::uint64_t presentation_epoch = 0;
   };
 
   TextPositioning namePosition(Vec2F bubblePosition) const;
@@ -80,7 +80,7 @@ private:
   Set<EntityId> m_foundEntities;
   BubbleSeparator<Nametag> m_nametags;
   std::weak_ptr<WorldClient> m_world;
-  std::optional<std::uint64_t> m_presentationEpoch;
+  std::optional<std::uint64_t> m_presentation_epoch;
   float m_pixelRatio = 0.0f;
 };
 

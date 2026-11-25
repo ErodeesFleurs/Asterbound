@@ -84,7 +84,7 @@ public:
 
   [[nodiscard]] std::expected<ByteArray, StarException> net_store(NetCompatibilityRules rules = {}) const;
 
-  EntityType entityType() const override;
+  EntityType entity_type() const override;
 
   [[nodiscard]] std::expected<void, StarException> init(World& world, EntityId entityId, EntityMode mode) override;
   [[nodiscard]] std::expected<void, StarException> uninit() override;
@@ -94,39 +94,39 @@ public:
   [[nodiscard]] std::expected<String, StarException> description() const override;
 
   Vec2F position() const override;
-  RectF metaBoundBox() const override;
+  RectF meta_bound_box() const override;
 
   Vec2F velocity() const;
 
   bool ephemeral() const override;
-  ClientEntityMode clientEntityMode() const override;
+  ClientEntityMode client_entity_mode() const override;
   bool masterOnly() const override;
 
   [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> write_net_state(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
   [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> snapshot_net_state(NetCompatibilityRules rules = {}) const;
   [[nodiscard]] std::expected<void, StarException> read_net_state(ByteArray data, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
 
-  [[nodiscard]] std::expected<void, StarException> enableInterpolation(float extrapolationHint = 0.0f) override;
-  [[nodiscard]] std::expected<void, StarException> disableInterpolation() override;
+  [[nodiscard]] std::expected<void, StarException> enable_interpolation(float extrapolation_hint = 0.0f) override;
+  [[nodiscard]] std::expected<void, StarException> disable_interpolation() override;
 
   // If the bullet time to live has run out, or if it has collided, etc this
   // will return true.
-  [[nodiscard]] std::expected<bool, StarException> shouldDestroy() const override;
+  [[nodiscard]] std::expected<bool, StarException> should_destroy() const override;
   [[nodiscard]] std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) override;
 
   [[nodiscard]] std::expected<List<DamageSource>, StarException> damageSources() const override;
   [[nodiscard]] std::expected<void, StarException> hitOther(EntityId targetEntityId, DamageRequest const& dr) override;
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
-  std::uint64_t presentationEpoch() const override;
+  std::uint64_t presentation_epoch() const override;
   [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& render_callback) override;
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback) override;
-  [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& render_callback) override;
+  [[nodiscard]] std::expected<void, StarException> render_light_sources(RenderCallback& render_callback) override;
 
   [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) override;
 
-  [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> callScript(String const& func, LuaVariadic<LuaValue> const& args) override;
-  [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> evalScript(String const& code) override;
+  [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> call_script(String const& func, LuaVariadic<LuaValue> const& args) override;
+  [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> eval_script(String const& code) override;
 
   String projectileType() const;
   
@@ -164,7 +164,7 @@ public:
 
   using Entity::setTeam;
   
-  MovementController& movementController() override;
+  MovementController& movement_controller() override;
 
 private:
   Projectile(Root& rootContext);
@@ -230,7 +230,7 @@ private:
   List<std::tuple<GameTimer, bool, Json>> m_periodic_actions;
 
   NetElementTopGroup m_netGroup;
-  std::shared_ptr<MovementController> m_movementController;
+  std::shared_ptr<MovementController> m_movement_controller;
   std::shared_ptr<EffectEmitter> m_effectEmitter;
   float m_timeToLive;
 

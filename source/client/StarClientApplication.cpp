@@ -1042,7 +1042,7 @@ std::expected<void, StarException> ClientApplication::render() {
         appController()->renderEpoch());
     if (worldClient) {
       auto& camera = m_worldPainter->camera();
-      auto playerEpoch = m_player ? m_player->presentationEpoch() : 0;
+      auto playerEpoch = m_player ? m_player->presentation_epoch() : 0;
       auto renderEpoch = presentation.epoch();
       if (m_presentedWorld.lock() != worldClient || m_presentedPlayer.lock() != m_player
           || m_presentedPlayerEpoch != playerEpoch || m_presentedRenderEpoch != renderEpoch) {
@@ -1117,7 +1117,7 @@ void ClientApplication::restorePresentedCamera() {
   auto world = m_universeClient ? m_universeClient->worldClient() : nullptr;
   if (m_state <= MainAppState::Title || !world
       || m_inputCamera->world.lock() != world || m_inputCamera->player.lock() != m_player
-      || m_inputCamera->playerEpoch != (m_player ? m_player->presentationEpoch() : 0)
+      || m_inputCamera->playerEpoch != (m_player ? m_player->presentation_epoch() : 0)
       || m_inputCamera->renderEpoch != appController()->renderEpoch()) {
     m_inputCamera.reset();
     m_worldPainter->camera().resetPresentation();

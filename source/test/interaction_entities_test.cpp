@@ -40,9 +40,9 @@ void expect_action(InteractiveEntity& entity, InteractRequest const& request, In
 void expect_actor_script(InteractiveEntity& entity, ScriptedEntity& script, EntityId id) {
   InteractRequest request{37, {13, 19}, id, {0, 0}};
   expect_action(entity, request, InteractActionType::None);
-  ASSERT_TRUE(script.evalScript("function interact() return nil end"));
+  ASSERT_TRUE(script.eval_script("function interact() return nil end"));
   expect_action(entity, request, InteractActionType::None);
-  ASSERT_TRUE(script.evalScript("function interact(r) return {'Message', {r.sourceId, r.sourcePosition}} end"));
+  ASSERT_TRUE(script.eval_script("function interact(r) return {'Message', {r.sourceId, r.sourcePosition}} end"));
   expect_action(entity, request, InteractActionType::Message, JsonArray{37, JsonArray{13, 19}});
 }
 
@@ -64,9 +64,9 @@ const GameTestRegistration entity_scripts("InteractionEntities", "ObjectNpcAndMo
   auto release_object = make_scope_exit([&] { EXPECT_TRUE((*object)->uninit()); });
   InteractRequest request{37, {1, 57}, 1, {0, 0}};
   expect_action(**object, request, InteractActionType::ShowPopup, "configured");
-  ASSERT_TRUE((*object)->evalScript("function onInteraction() return nil end"));
+  ASSERT_TRUE((*object)->eval_script("function onInteraction() return nil end"));
   expect_action(**object, request, InteractActionType::None);
-  ASSERT_TRUE((*object)->evalScript("function onInteraction(r) return {'Message', {r.sourceId, r.source}} end"));
+  ASSERT_TRUE((*object)->eval_script("function onInteraction(r) return {'Message', {r.sourceId, r.source}} end"));
   expect_action(**object, request, InteractActionType::Message, JsonArray{37, JsonArray{3, 4}});
 
   auto npcs = root.npcDatabase();
@@ -115,9 +115,9 @@ const GameTestRegistration vehicle_seats("InteractionEntities", "VehicleEnabledS
     ASSERT_TRUE((*vehicle)->init(**world, 1, EntityMode::Master));
     auto release = make_scope_exit([&] { EXPECT_TRUE((*vehicle)->uninit()); });
     expect_action(**vehicle, request, type, data);
-    ASSERT_TRUE((*vehicle)->evalScript("function onInteraction() return nil end"));
+    ASSERT_TRUE((*vehicle)->eval_script("function onInteraction() return nil end"));
     expect_action(**vehicle, request, type, data);
-    ASSERT_TRUE((*vehicle)->evalScript("function onInteraction(r) return {'Message', {r.sourceId,r.sourcePosition,r.interactPosition}} end"));
+    ASSERT_TRUE((*vehicle)->eval_script("function onInteraction(r) return {'Message', {r.sourceId,r.sourcePosition,r.interactPosition}} end"));
     expect_action(**vehicle, request, InteractActionType::Message, JsonArray{37, JsonArray{12, 31}, JsonArray{20, 20}});
   };
   exercise({}, InteractActionType::None, {});
@@ -143,7 +143,7 @@ const GameTestRegistration vehicle_seats("InteractionEntities", "VehicleEnabledS
   auto error = (*broken)->interact(request);
   ASSERT_FALSE(error);
   EXPECT_NE(std::string_view(error.error().what()).find("missing-candidate"), std::string_view::npos);
-  ASSERT_TRUE((*broken)->evalScript("function onInteraction() return 'ShowPopup' end"));
+  ASSERT_TRUE((*broken)->eval_script("function onInteraction() return 'ShowPopup' end"));
   expect_action(**broken, request, InteractActionType::ShowPopup);
 });
 

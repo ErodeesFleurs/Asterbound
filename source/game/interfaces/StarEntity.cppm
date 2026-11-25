@@ -78,7 +78,7 @@ public:
 
   Root& root() const;
 
-  virtual EntityType entityType() const = 0;
+  virtual EntityType entity_type() const = 0;
 
   // Called when an entity is first inserted into a World.  Calling base class
   // init binds the world, entityId, and entityMode.
@@ -99,8 +99,8 @@ public:
   // enabled.
   [[nodiscard]] virtual std::expected<void, StarException> read_net_state(ByteArray data, float interpolationTime = 0.0f, NetCompatibilityRules rules = {});
 
-  [[nodiscard]] virtual std::expected<void, StarException> enableInterpolation(float extrapolationHint);
-  [[nodiscard]] virtual std::expected<void, StarException> disableInterpolation();
+  [[nodiscard]] virtual std::expected<void, StarException> enable_interpolation(float extrapolation_hint);
+  [[nodiscard]] virtual std::expected<void, StarException> disable_interpolation();
 
   // Base position of this entity, bound boxes, drawables, and other entity
   // positions are relative to this.
@@ -109,12 +109,12 @@ public:
   // Largest bounding-box of this entity.  Any damage boxes / drawables / light
   // or sound *sources* must be contained within this bounding box.  Used for
   // all top-level spatial queries.
-  virtual RectF metaBoundBox() const = 0;
+  virtual RectF meta_bound_box() const = 0;
 
   // By default returns a null rect, if non-null, it defines the area around
   // this entity where it is likely for the entity to physically collide with
   // collision geometry.
-  virtual RectF collisionArea() const;
+  virtual RectF collision_area() const;
 
   // Should this entity allow object / block placement over it, and can the
   // entity immediately be despawned without terribly bad effects?
@@ -122,7 +122,7 @@ public:
 
   // How should this entity be treated if created on the client?  Defaults to
   // ClientSlave.
-  virtual ClientEntityMode clientEntityMode() const;
+  virtual ClientEntityMode client_entity_mode() const;
   // Should this entity only exist on the master side?
   virtual bool masterOnly() const;
 
@@ -167,7 +167,7 @@ public:
 
   // Returning true here indicates that this entity should be removed from the
   // world, default returns false.
-  [[nodiscard]] virtual std::expected<bool, StarException> shouldDestroy() const;
+  [[nodiscard]] virtual std::expected<bool, StarException> should_destroy() const;
   // Will be called once before removing the entity from the World on both
   // master and slave entities. The callback is absent on the server.
   [[nodiscard]] virtual std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback);
@@ -185,12 +185,12 @@ public:
   // when the entity is outside the display window.
   [[nodiscard]] virtual std::expected<void, StarException> collectRenderEvents(RenderCallback& renderer);
 
-  virtual std::uint64_t presentationEpoch() const;
+  virtual std::uint64_t presentation_epoch() const;
   void resetPresentation();
 
   [[nodiscard]] virtual std::expected<void, StarException> render(RenderCallback& renderer);
 
-  [[nodiscard]] virtual std::expected<void, StarException> renderLightSources(RenderCallback& renderer);
+  [[nodiscard]] virtual std::expected<void, StarException> render_light_sources(RenderCallback& renderer);
 
   EntityId entityId() const;
 
@@ -243,7 +243,7 @@ private:
   std::optional<String> m_uniqueId;
   std::optional<std::reference_wrapper<World>> m_world;
   EntityDamageTeam m_team;
-  std::uint64_t m_presentationEpoch = 0;
+  std::uint64_t m_presentation_epoch = 0;
   std::optional<float> m_previousPresentationRotation;
 };
 

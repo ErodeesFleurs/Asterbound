@@ -83,7 +83,7 @@ public:
   [[nodiscard]] virtual std::expected<void, StarException> loungeControl(std::size_t anchorPositionIndex, LoungeControl loungeControl);
   [[nodiscard]] virtual std::expected<void, StarException> loungeAim(std::size_t anchorPositionIndex, Vec2F const& aimPosition);
 
-  // Queries around this entity's metaBoundBox for any LoungingEntities
+  // Queries around this entity's meta_bound_box for any LoungingEntities
   // reporting that they are lounging in this entity, and returns ones that are
   // lounging in the given position.
   [[nodiscard]] std::expected<Set<EntityId>, StarException> entitiesLoungingIn(std::size_t anchorPositionIndex) const;

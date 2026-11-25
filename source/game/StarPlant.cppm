@@ -107,7 +107,7 @@ public:
   [[nodiscard]] std::expected<Json, StarException> diskStore() const;
   [[nodiscard]] std::expected<ByteArray, StarException> net_store(NetCompatibilityRules rules = {}) const;
 
-  EntityType entityType() const override;
+  EntityType entity_type() const override;
 
   [[nodiscard]] std::expected<void, StarException> init(World& world, EntityId entityId, EntityMode mode) override;
 
@@ -116,15 +116,15 @@ public:
   [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> write_net_state(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
   [[nodiscard]] std::expected<void, StarException> read_net_state(ByteArray data, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
 
-  [[nodiscard]] std::expected<void, StarException> enableInterpolation(float extrapolationHint) override;
-  [[nodiscard]] std::expected<void, StarException> disableInterpolation() override;
+  [[nodiscard]] std::expected<void, StarException> enable_interpolation(float extrapolation_hint) override;
+  [[nodiscard]] std::expected<void, StarException> disable_interpolation() override;
 
   Vec2F position() const override;
-  RectF metaBoundBox() const override;
+  RectF meta_bound_box() const override;
 
   bool ephemeral() const override;
 
-  [[nodiscard]] std::expected<bool, StarException> shouldDestroy() const override;
+  [[nodiscard]] std::expected<bool, StarException> should_destroy() const override;
 
   // Forces the plant to check if it has been invalidly placed in some way, and
   // should die.  shouldDie does not, by default, do this expensive calculation
@@ -212,7 +212,7 @@ private:
   float m_windTime;
   float m_windLevel;
 
-  RectF m_metaBoundBox;
+  RectF m_meta_bound_box;
 
   bool m_piecesScanned;
 

@@ -279,7 +279,7 @@ std::expected<SmallList<DamageManager::PendingHit, 4>, StarException> DamageMana
     if (source.ray_check) {
       if (polygon) {
         if (auto origin = world.entity(source.source_entity_id)) {
-          auto overlap = world.geometry().rect_overlap(target->metaBoundBox().translated(target->position()), bounds);
+          auto overlap = world.geometry().rect_overlap(target->meta_bound_box().translated(target->position()), bounds);
           if (!overlap.is_empty()) {
             auto collision = world.lineTileCollision(overlap.center(), origin->position());
             if (!collision) return std::unexpected(std::move(collision.error()));

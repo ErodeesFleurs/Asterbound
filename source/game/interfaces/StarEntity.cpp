@@ -74,11 +74,11 @@ std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Entity::write_
 
 std::expected<void, StarException> Entity::read_net_state(ByteArray, float, NetCompatibilityRules) { return {}; }
 
-std::expected<void, StarException> Entity::enableInterpolation(float) { return {}; }
+std::expected<void, StarException> Entity::enable_interpolation(float) { return {}; }
 
-std::expected<void, StarException> Entity::disableInterpolation() { return {}; }
+std::expected<void, StarException> Entity::disable_interpolation() { return {}; }
 
-RectF Entity::collisionArea() const {
+RectF Entity::collision_area() const {
   return RectF::null();
 }
 
@@ -86,7 +86,7 @@ bool Entity::ephemeral() const {
   return false;
 }
 
-ClientEntityMode Entity::clientEntityMode() const {
+ClientEntityMode Entity::client_entity_mode() const {
   return ClientEntityMode::ClientSlaveOnly;
 }
 
@@ -130,7 +130,7 @@ std::expected<List<DamageNotification>, StarException> Entity::selfDamageNotific
   return List<DamageNotification>{};
 }
 
-std::expected<bool, StarException> Entity::shouldDestroy() const {
+std::expected<bool, StarException> Entity::should_destroy() const {
   return false;
 }
 
@@ -144,10 +144,10 @@ std::expected<void, StarException> Entity::update(float, std::uint64_t) { return
 
 std::expected<void, StarException> Entity::collectRenderEvents(RenderCallback&) { return {}; }
 
-std::uint64_t Entity::presentationEpoch() const { return m_presentationEpoch; }
+std::uint64_t Entity::presentation_epoch() const { return m_presentation_epoch; }
 
 void Entity::resetPresentation() {
-  ++m_presentationEpoch;
+  ++m_presentation_epoch;
   m_previousPresentationRotation.reset();
 }
 
@@ -164,7 +164,7 @@ float Entity::samplePresentationRotation(float rotation, float interpolation) co
 
 std::expected<void, StarException> Entity::render(RenderCallback&) { return {}; }
 
-std::expected<void, StarException> Entity::renderLightSources(RenderCallback&) { return {}; }
+std::expected<void, StarException> Entity::render_light_sources(RenderCallback&) { return {}; }
 
 EntityId Entity::entityId() const {
   return m_entityId;

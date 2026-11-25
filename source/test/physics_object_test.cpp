@@ -178,7 +178,7 @@ std::shared_ptr<ObjectConfig> unanchored_physics_config() {
   auto orientation = std::make_shared<ObjectOrientation>();
   orientation->config = JsonObject();
   orientation->boundBox = RectI(0, 0, 0, 0);
-  orientation->metaBoundBox = RectF(-1, -1, 1, 1);
+  orientation->meta_bound_box = RectF(-1, -1, 1, 1);
   config->orientations.push_back(std::move(orientation));
   return config;
 }
@@ -252,11 +252,11 @@ const GameTestRegistration farm_immersion("FarmableObject", "ImmersionSampleThre
     ASSERT_TRUE((*crop)->init(**world, 1, EntityMode::Master));
     auto release = make_scope_exit([&] { EXPECT_TRUE((*crop)->uninit()); });
     ASSERT_TRUE((*crop)->update(period / 2, 1));
-    auto before = (*crop)->shouldDestroy();
+    auto before = (*crop)->should_destroy();
     ASSERT_TRUE(before);
     EXPECT_FALSE(*before);
     ASSERT_TRUE((*crop)->update(period / 2, 2));
-    auto after = (*crop)->shouldDestroy();
+    auto after = (*crop)->should_destroy();
     ASSERT_TRUE(after);
     EXPECT_EQ(*after, threshold != 0); // Dry soil: exactly at zero survives, strictly below one dies.
   }
@@ -438,13 +438,13 @@ const GameTestRegistration
         });
         Vec2F position(tilePosition);
         EXPECT_EQ(object->position(), position);
-        EXPECT_EQ(object->metaBoundBox(), expected_bounds);
+        EXPECT_EQ(object->meta_bound_box(), expected_bounds);
         if (firstBounds)
-          EXPECT_EQ(object->metaBoundBox(), *firstBounds);
+          EXPECT_EQ(object->meta_bound_box(), *firstBounds);
         else
-          firstBounds = object->metaBoundBox();
-        EXPECT_LT(object->metaBoundBox().width(), EntityMap::maximum_entity_bound_box);
-        EXPECT_LT(object->metaBoundBox().height(), EntityMap::maximum_entity_bound_box);
+          firstBounds = object->meta_bound_box();
+        EXPECT_LT(object->meta_bound_box().width(), EntityMap::maximum_entity_bound_box);
+        EXPECT_LT(object->meta_bound_box().height(), EntityMap::maximum_entity_bound_box);
 
         auto output = object->force_regions();
         ASSERT_TRUE(output) << output.error().what();
@@ -630,7 +630,7 @@ const GameTestRegistration entity_query_geometry("EntityMap", "InteractionRadius
   });
   auto add = [&](EntityId id, int x, RectF bounds, int interaction_x) {
     auto config = unanchored_physics_config();
-    config->orientations.front()->metaBoundBox = bounds;
+    config->orientations.front()->meta_bound_box = bounds;
     config->orientations.front()->interactiveSpaces = List<Vec2I>{{interaction_x, 0}};
     auto object = PhysicsObject::create(fixture.root(), config, JsonObject{{"interactAction", "OpenCraftingInterface"}});
     ASSERT_TRUE(object) << object.error().what();

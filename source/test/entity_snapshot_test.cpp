@@ -103,7 +103,7 @@ const GameTestRegistration drop_physics("ItemDrop", "TickRestoresDropPhysicsAfte
   if (!fixture.check(stored && stored->get_bool("eternal") == true && stored->get_string("mode") == "Intangible",
       "thrown descriptor retains lifetime and pickup delay")) return;
   if (!fixture.check(bool(drop.update(1.0f / 60, 1)), "advance drop before modifying controller")) return;
-  auto& controller = drop.movementController();
+  auto& controller = drop.movement_controller();
   MovementParameters changed;
   changed.gravityEnabled = false;
   changed.collisionEnabled = false;
@@ -115,7 +115,7 @@ const GameTestRegistration drop_physics("ItemDrop", "TickRestoresDropPhysicsAfte
       "drop restores gravity and collision without resetting unrelated movement settings");
 });
 
-const GameTestRegistration persistentSnapshot("EntitySnapshot", "VersionedPersistentEntityRoundTrips", [](GameTest& fixture) {
+const GameTestRegistration persistent_snapshot("EntitySnapshot", "VersionedPersistentEntityRoundTrips", [](GameTest& fixture) {
   SnapshotWorld setup;
   auto initialized = setup.init(fixture.root());
   ASSERT_TRUE(initialized) << initialized.error().what();
@@ -124,6 +124,10 @@ const GameTestRegistration persistentSnapshot("EntitySnapshot", "VersionedPersis
   auto drop = ItemDrop::create_randomized_drop(fixture.root(), *descriptor, Vec2F(1024, 1024));
   ASSERT_TRUE(drop) << drop.error().what();
   ASSERT_TRUE(setup.world->addEntity(*drop));
+  auto lua_bounds = setup.context->eval<Json>(Star::format("world.entity({}):metaBoundBox()", (*drop)->entityId()));
+  if (!fixture.check(lua_bounds && *lua_bounds == json_from_rectf((*drop)->meta_bound_box()),
+          "legacy Lua metaBoundBox returns the drop's native bounds"))
+    return;
   auto original = (*drop)->disk_store();
   ASSERT_TRUE(original) << original.error().what();
   auto result = snapshot(setup, (*drop)->entityId());
@@ -146,10 +150,10 @@ const GameTestRegistration persistentSnapshot("EntitySnapshot", "VersionedPersis
   ASSERT_TRUE(factory) << factory.error().what();
   auto restored = (*factory)->load_versioned_entity(*versioned);
   ASSERT_TRUE(restored) << restored.error().what();
-  auto restoredDrop = as<ItemDrop>(*restored);
-  ASSERT_TRUE(restoredDrop);
-  EXPECT_EQ(restoredDrop->item()->descriptor(), *descriptor);
-  EXPECT_EQ(restoredDrop->position(), (*drop)->position());
+  auto restored_drop = as<ItemDrop>(*restored);
+  ASSERT_TRUE(restored_drop);
+  EXPECT_EQ(restored_drop->item()->descriptor(), *descriptor);
+  EXPECT_EQ(restored_drop->position(), (*drop)->position());
   EXPECT_EQ((*drop)->disk_store(), *original);
   EXPECT_EQ(snapshot(setup, (*drop)->entityId()), *result);
 });
@@ -226,15 +230,15 @@ const GameTestRegistration replicaPlayerSnapshot("EntitySnapshot", "RemotePlayer
   EXPECT_EQ(remote->diskStore(), *localDisk);
 });
 
-const GameTestRegistration transientSnapshots("EntitySnapshot", "TransientStateRestoresWithoutConsumingReplication", [](GameTest& fixture) {
+const GameTestRegistration transient_snapshots("EntitySnapshot", "TransientStateRestoresWithoutConsumingReplication", [](GameTest& fixture) {
   SnapshotWorld setup;
   auto initialized = setup.init(fixture.root());
   ASSERT_TRUE(initialized) << initialized.error().what();
   // Projectile::init deliberately clears a source that is absent from its
   // world. Keep a real source alive so the net_store assertion is meaningful.
-  auto sourceDescriptor = ItemDescriptor::create("dirtmaterial", 1);
-  ASSERT_TRUE(sourceDescriptor) << sourceDescriptor.error().what();
-  auto source = ItemDrop::create_randomized_drop(fixture.root(), *sourceDescriptor, Vec2F(1024, 1024));
+  auto source_descriptor = ItemDescriptor::create("dirtmaterial", 1);
+  ASSERT_TRUE(source_descriptor) << source_descriptor.error().what();
+  auto source = ItemDrop::create_randomized_drop(fixture.root(), *source_descriptor, Vec2F(1024, 1024));
   ASSERT_TRUE(source) << source.error().what();
   ASSERT_TRUE(setup.world->addEntity(*source, 4242));
   auto database = fixture.root().projectileDatabase();
@@ -258,10 +262,10 @@ const GameTestRegistration transientSnapshots("EntitySnapshot", "TransientStateR
   EXPECT_FALSE((*factory)->net_store_entity({}));
   NetCompatibilityRules rules;
   for (std::shared_ptr<Entity> const& entity : {std::shared_ptr<Entity>(*projectile), std::shared_ptr<Entity>(*plantDrop)}) {
-    SCOPED_TRACE(static_cast<unsigned>(entity->entityType()));
+    SCOPED_TRACE(static_cast<unsigned>(entity->entity_type()));
     ASSERT_TRUE(setup.world->addEntity(entity));
     EXPECT_FALSE((*factory)->disk_store_entity(entity));
-    EXPECT_FALSE((*factory)->disk_load_entity(entity->entityType(), JsonObject{}));
+    EXPECT_FALSE((*factory)->disk_load_entity(entity->entity_type(), JsonObject{}));
     auto baseline = entity->write_net_state(0, rules);
     ASSERT_TRUE(baseline) << baseline.error().what();
     auto result = snapshot(setup, entity->entityId());
@@ -282,7 +286,7 @@ const GameTestRegistration transientSnapshots("EntitySnapshot", "TransientStateR
     ASSERT_FALSE(state->empty());
     auto decodedState = base64_decode(state->utf8());
     EXPECT_EQ(decodedState, baseline->first);
-    auto restored = (*factory)->net_load_entity(entity->entityType(), base64_decode(store->utf8()), rules);
+    auto restored = (*factory)->net_load_entity(entity->entity_type(), base64_decode(store->utf8()), rules);
     ASSERT_TRUE(restored) << restored.error().what();
     ASSERT_TRUE((*restored)->read_net_state(decodedState, 0.f, rules));
     EXPECT_EQ((*restored)->position(), entity->position());
@@ -298,7 +302,7 @@ const GameTestRegistration transientSnapshots("EntitySnapshot", "TransientStateR
 
     auto mobile = as<MobileEntity>(entity);
     ASSERT_TRUE(mobile);
-    mobile->movementController().setPosition(Vec2F(1035, 1041));
+    mobile->movement_controller().setPosition(Vec2F(1035, 1041));
     auto movedSnapshot = snapshot(setup, entity->entityId());
     ASSERT_TRUE(movedSnapshot) << movedSnapshot.error().what();
     auto movedData = movedSnapshot->get("data");

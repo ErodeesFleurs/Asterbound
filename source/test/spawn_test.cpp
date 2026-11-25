@@ -241,9 +241,9 @@ namespace {
 class PresentationLifecycleEntity : public Entity {
 public:
   explicit PresentationLifecycleEntity(Root& root) : Entity(root) {}
-  EntityType entityType() const override { return EntityType::Stagehand; }
+  EntityType entity_type() const override { return EntityType::Stagehand; }
   Vec2F position() const override { return current_position; }
-  std::expected<void, StarException> renderLightSources(RenderCallback&) override {
+  std::expected<void, StarException> render_light_sources(RenderCallback&) override {
     ++light_collections;
     return {};
   }
@@ -253,8 +253,8 @@ public:
       return renderer.add_drawable(*image, fixture_layer);
     return {};
   }
-  RectF metaBoundBox() const override { return RectF::with_size({}, {1, 1}); }
-  ClientEntityMode clientEntityMode() const override { return ClientEntityMode::ClientMasterAllowed; }
+  RectF meta_bound_box() const override { return RectF::with_size({}, {1, 1}); }
+  ClientEntityMode client_entity_mode() const override { return ClientEntityMode::ClientMasterAllowed; }
   std::expected<void, StarException> init(World& world, EntityId id, EntityMode) override {
     // Insert as a local slave so this behavioral fixture is not serialized to
     // the real server. Promotion below tests the client-master death path.
@@ -267,7 +267,7 @@ public:
       return std::unexpected(std::move(cleared.error()));
     return Entity::init(world, id, EntityMode::Master);
   }
-  std::expected<bool, StarException> shouldDestroy() const override { return dying; }
+  std::expected<bool, StarException> should_destroy() const override { return dying; }
   std::expected<void, StarException> collectRenderEvents(RenderCallback& renderer) override {
     ++collections;
     if (next_position)

@@ -198,7 +198,7 @@ std::expected<void, StarException> TechController::diskLoad(Json const& store) {
 
 std::expected<void, StarException> TechController::init(Entity& parentEntity, ActorMovementController& movementController, StatusController& statusController) {
   m_parentEntity = std::ref(parentEntity);
-  m_movementController = std::ref(movementController);
+  m_movement_controller = std::ref(movementController);
   m_statusController = std::ref(statusController);
 
   m_moveRun = false;
@@ -223,7 +223,7 @@ std::expected<void, StarException> TechController::uninit() {
     }
   }
   m_parentEntity.reset();
-  m_movementController.reset();
+  m_movement_controller.reset();
   m_statusController.reset();
   if (error)
     return std::unexpected(std::move(*error));
@@ -322,7 +322,7 @@ void TechController::setAimPosition(Vec2F const& aimPosition) {
 
 std::expected<void, StarException> TechController::tickMaster(float dt) {
   // if there's no gravity, fly instead of walking
-  if (m_movementController->get().zeroG()) {
+  if (m_movement_controller->get().zeroG()) {
     if (m_moveRight || m_moveLeft || m_moveUp || m_moveDown) {
       Vec2F flightControl = {0, 0};
 
@@ -335,19 +335,19 @@ std::expected<void, StarException> TechController::tickMaster(float dt) {
       if (m_moveDown)
         flightControl[1]--;
 
-      m_movementController->get().control_fly(flightControl);
+      m_movement_controller->get().control_fly(flightControl);
     }
   } else {
     if (m_moveLeft != m_moveRight)
-      m_movementController->get().control_move(m_moveLeft ? Direction::Left : Direction::Right, m_moveRun);
+      m_movement_controller->get().control_move(m_moveLeft ? Direction::Left : Direction::Right, m_moveRun);
 
     if (m_moveJump && !m_moveDown)
-      m_movementController->get().control_jump();
+      m_movement_controller->get().control_jump();
 
-    if (m_movementController->get().onGround() && m_moveDown && !m_moveJump)
-      m_movementController->get().control_crouch();
+    if (m_movement_controller->get().onGround() && m_moveDown && !m_moveJump)
+      m_movement_controller->get().control_crouch();
     else if (m_moveDown)
-      m_movementController->get().control_down();
+      m_movement_controller->get().control_down();
   }
 
   for (auto& module : m_techModules) {
@@ -405,7 +405,7 @@ std::expected<List<Drawable>, StarException> TechController::backDrawables(float
   for (auto const& animator : m_techAnimators.net_elements()) {
     if (animator->isVisible()) {
       auto sample = animator->animator->sample(interpolation);
-      auto pieces = sample.drawablesWithZLevel(m_movementController->get().position());
+      auto pieces = sample.drawablesWithZLevel(m_movement_controller->get().position());
       if (!pieces)
         return std::unexpected(std::move(pieces.error()));
       for (auto& piece : *pieces) {
@@ -424,7 +424,7 @@ std::expected<List<Drawable>, StarException> TechController::frontDrawables(floa
   for (auto const& animator : m_techAnimators.net_elements()) {
     if (animator->isVisible()) {
       auto sample = animator->animator->sample(interpolation);
-      auto pieces = sample.drawablesWithZLevel(m_movementController->get().position());
+      auto pieces = sample.drawablesWithZLevel(m_movement_controller->get().position());
       if (!pieces)
         return std::unexpected(std::move(pieces.error()));
       for (auto& piece : *pieces) {
@@ -443,7 +443,7 @@ std::expected<List<LightSource>, StarException> TechController::lightSources(flo
   for (auto const& animator : m_techAnimators.net_elements()) {
     if (animator->isVisible()) {
       auto sample = animator->animator->sample(interpolation);
-      auto lights = sample.lightSources(m_movementController->get().position());
+      auto lights = sample.lightSources(m_movement_controller->get().position());
       if (!lights)
         return std::unexpected(std::move(lights.error()));
       lightSources.append_range(std::move(*lights));
@@ -539,8 +539,8 @@ std::expected<void, StarException> TechController::TechAnimator::net_load(DataSt
   return netGroup.net_load(ds, rules);
 }
 
-std::expected<void, StarException> TechController::TechAnimator::enable_net_interpolation(float extrapolationHint) {
-  return netGroup.enable_net_interpolation(extrapolationHint);
+std::expected<void, StarException> TechController::TechAnimator::enable_net_interpolation(float extrapolation_hint) {
+  return netGroup.enable_net_interpolation(extrapolation_hint);
 }
 
 std::expected<void, StarException> TechController::TechAnimator::disable_net_interpolation() {
@@ -677,7 +677,7 @@ std::expected<void, StarException> TechController::initializeModules() {
         if (auto result = add("player", LuaBindings::makePlayerCallbacks(m_root, player->get())); !result)
           return std::unexpected(std::move(result.error()));
       }
-      if (auto added = module.scriptComponent.add_actor_movement_callbacks(m_movementController->get()); !added)
+      if (auto added = module.scriptComponent.add_actor_movement_callbacks(m_movement_controller->get()); !added)
         return std::unexpected(std::move(added.error()));
       auto world = m_parentEntity->get().world();
       if (!world)
@@ -728,7 +728,7 @@ std::expected<void, StarException> TechController::updateAnimators(float dt) {
     if (!updated)
       return std::unexpected(std::move(updated.error()));
     if (dynamicTarget)
-      dynamicTarget->get().updatePosition(m_movementController->get().position());
+      dynamicTarget->get().updatePosition(m_movement_controller->get().position());
   }
   return {};
 }

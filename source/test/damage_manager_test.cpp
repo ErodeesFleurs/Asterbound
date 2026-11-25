@@ -37,9 +37,9 @@ public:
     setPersistent(false);
   }
 
-  EntityType entityType() const override { return EntityType::Stagehand; }
+  EntityType entity_type() const override { return EntityType::Stagehand; }
   Vec2F position() const override { return {1024, 1024}; }
-  RectF metaBoundBox() const override { return RectF(-1, -1, 1, 1); }
+  RectF meta_bound_box() const override { return RectF(-1, -1, 1, 1); }
 
   std::expected<List<DamageSource>, StarException> damageSources() const override {
     return sources;

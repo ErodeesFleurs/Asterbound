@@ -180,8 +180,8 @@ public:
   [[nodiscard]] std::expected<Json, StarException> diskStore();
   [[nodiscard]] std::expected<ByteArray, StarException> net_store(NetCompatibilityRules rules = {});
 
-  EntityType entityType() const override;
-  ClientEntityMode clientEntityMode() const override;
+  EntityType entity_type() const override;
+  ClientEntityMode client_entity_mode() const override;
 
   [[nodiscard]] std::expected<void, StarException> init(World& world, EntityId entityId, EntityMode mode) override;
   [[nodiscard]] std::expected<void, StarException> uninit() override;
@@ -199,16 +199,16 @@ public:
   [[nodiscard]] std::expected<Vec2F, StarException> backArmorOffset() const;
 
   // relative to current position
-  RectF metaBoundBox() const override;
+  RectF meta_bound_box() const override;
 
   // relative to current position
-  RectF collisionArea() const override;
+  RectF collision_area() const override;
 
   [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> write_net_state(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
   [[nodiscard]] std::expected<void, StarException> read_net_state(ByteArray data, float interpolationStep = 0.0f, NetCompatibilityRules rules = {}) override;
 
-  [[nodiscard]] std::expected<void, StarException> enableInterpolation(float extrapolationHint = 0.0f) override;
-  [[nodiscard]] std::expected<void, StarException> disableInterpolation() override;
+  [[nodiscard]] std::expected<void, StarException> enable_interpolation(float extrapolation_hint = 0.0f) override;
+  [[nodiscard]] std::expected<void, StarException> disable_interpolation() override;
 
   [[nodiscard]] std::expected<std::optional<HitType>, StarException> queryHit(DamageSource const& source) const override;
   [[nodiscard]] std::expected<std::optional<PolyF>, StarException> hitPoly() const override;
@@ -221,7 +221,7 @@ public:
 
   [[nodiscard]] std::expected<List<DamageSource>, StarException> damageSources() const override;
 
-  [[nodiscard]] std::expected<bool, StarException> shouldDestroy() const override;
+  [[nodiscard]] std::expected<bool, StarException> should_destroy() const override;
   [[nodiscard]] std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) override;
 
   std::optional<EntityAnchorState> loungingIn() const override;
@@ -293,13 +293,13 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
 
-  std::uint64_t presentationEpoch() const override;
+  std::uint64_t presentation_epoch() const override;
 
   [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& render_callback) override;
 
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback) override;
 
-  [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& render_callback) override;
+  [[nodiscard]] std::expected<void, StarException> render_light_sources(RenderCallback& render_callback) override;
   
   [[nodiscard]] std::expected<void, StarException> setRenderLayer(std::optional<EntityRenderLayer> layer);
 
@@ -527,7 +527,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> addEffectEmitters(StringSet const& emitters) override;
   [[nodiscard]] std::expected<void, StarException> requestEmote(String const& emote) override;
 
-  ActorMovementController& movementController() override;
+  ActorMovementController& movement_controller() override;
   StatusController& statusController() override;
 
   [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> force_regions() const override;
@@ -735,7 +735,7 @@ private:
 
   std::optional<EntityId> m_cameraFocusEntity;
 
-  std::shared_ptr<ActorMovementController> m_movementController;
+  std::shared_ptr<ActorMovementController> m_movement_controller;
   std::shared_ptr<TechController> m_techController;
   std::shared_ptr<StatusController> m_statusController;
 

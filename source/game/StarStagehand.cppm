@@ -68,13 +68,13 @@ public:
   [[nodiscard]] std::expected<void, StarException> init(World& world, EntityId entityId, EntityMode mode) override;
   [[nodiscard]] std::expected<void, StarException> uninit() override;
 
-  EntityType entityType() const override;
+  EntityType entity_type() const override;
 
   void setPosition(Vec2F const& position);
 
   Vec2F position() const override;
 
-  RectF metaBoundBox() const override;
+  RectF meta_bound_box() const override;
 
   [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> write_net_state(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
   [[nodiscard]] std::expected<void, StarException> read_net_state(ByteArray data, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
@@ -83,12 +83,12 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
 
-  [[nodiscard]] std::expected<bool, StarException> shouldDestroy() const override;
+  [[nodiscard]] std::expected<bool, StarException> should_destroy() const override;
   
-  ClientEntityMode clientEntityMode() const override;
+  ClientEntityMode client_entity_mode() const override;
 
-  [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> callScript(String const& func, LuaVariadic<LuaValue> const& args) override;
-  [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> evalScript(String const& code) override;
+  [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> call_script(String const& func, LuaVariadic<LuaValue> const& args) override;
+  [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> eval_script(String const& code) override;
 
   [[nodiscard]] std::expected<String, StarException> typeName() const;
 
@@ -111,7 +111,7 @@ private:
 
   bool m_dead = false;
       
-  ClientEntityMode m_clientEntityMode;
+  ClientEntityMode m_client_entity_mode;
 
   NetElementTopGroup m_netGroup;
 

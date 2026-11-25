@@ -30,7 +30,7 @@ public:
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ActorEntity>(); }
 
   // Successfully constructed actors always own both controllers.
-  ActorMovementController& movementController() override = 0;
+  ActorMovementController& movement_controller() override = 0;
   virtual StatusController& statusController() = 0;
 };
 }

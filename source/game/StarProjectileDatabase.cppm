@@ -117,7 +117,7 @@ struct ProjectileConfig {
 
   bool hydrophobic = false;
   bool onlyHitTerrain = false;
-  ClientEntityMode clientEntityMode = ClientEntityMode::ClientMasterAllowed;
+  ClientEntityMode client_entity_mode = ClientEntityMode::ClientMasterAllowed;
   bool masterOnly = false;
 
   StringList scripts;

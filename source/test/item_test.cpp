@@ -208,7 +208,7 @@ TEST(EpochTimerTest, LegacyOptionalAndTruncatedRead) {
   }
 }
 
-[[nodiscard]] std::expected<std::shared_ptr<Item>, StarException> inventoryTestItem(
+[[nodiscard]] std::expected<std::shared_ptr<Item>, StarException> inventory_test_item(
     ItemDatabase const& database, String const& name, std::uint64_t count = 1, Json parameters = Json()) {
   auto descriptor = ItemDescriptor::create(name, count, std::move(parameters));
   if (!descriptor)
@@ -266,7 +266,7 @@ const GameTestRegistration ranked_recipes("ItemTest", "SparseContainerChoosesHig
   if (!fixture.check(bool(root), "create private root")) return;
   auto database = (*root)->itemDatabase();
   if (!fixture.check(bool(database), "bad recipe does not prevent catalog construction")) return;
-  auto material = inventoryTestItem(**database, "perfectlygenericitem", 5);
+  auto material = inventory_test_item(**database, "perfectlygenericitem", 5);
   if (!fixture.check(material && *material, "instantiate material")) return;
   List<std::shared_ptr<Item>> bag{{}, *material, {}};
   for (String const& group : {String("forwardprobe"), String("reverseprobe"), String("tieprobe")}) {
@@ -280,7 +280,7 @@ const GameTestRegistration ranked_recipes("ItemTest", "SparseContainerChoosesHig
 const GameTestRegistration item_disk_load("ItemTest", "TypedDiskLoadDistinguishesFailureUnchangedAndClear", [](GameTest& fixture) {
   auto database = fixture.root().itemDatabase();
   if (!fixture.check(bool(database), "load catalog")) return;
-  auto original = inventoryTestItem(**database, "perfectlygenericitem", 3);
+  auto original = inventory_test_item(**database, "perfectlygenericitem", 3);
   if (!fixture.check(original && *original, "load original stack")) return;
   auto slot = *original;
   fixture.check(!(*database)->disk_load(JsonObject{{"invalid", true}}, slot), "malformed save returns an error");
@@ -411,11 +411,11 @@ const GameTestRegistration itemComparison("ItemTest", "ItemComparison", [](GameT
   auto database = fixture.root().itemDatabase();
   ASSERT_TRUE(database);
   auto& itemDatabase = **database;
-  auto plainItem = inventoryTestItem(itemDatabase, "perfectlygenericitem");
+  auto plainItem = inventory_test_item(itemDatabase, "perfectlygenericitem");
   ASSERT_TRUE(plainItem);
   auto testItem = std::move(*plainItem);
   ASSERT_TRUE(testItem);
-  auto parameterizedItem = inventoryTestItem(itemDatabase, "perfectlygenericitem", 1, JsonObject{{"testParameter", "testValue"}});
+  auto parameterizedItem = inventory_test_item(itemDatabase, "perfectlygenericitem", 1, JsonObject{{"testParameter", "testValue"}});
   ASSERT_TRUE(parameterizedItem);
   auto testItemParams = std::move(*parameterizedItem);
   ASSERT_TRUE(testItemParams);
@@ -486,9 +486,9 @@ const GameTestRegistration itemComparison("ItemTest", "ItemComparison", [](GameT
 const GameTestRegistration itemStackingPreservesCountsAndNullSemantics("ItemTest", "ItemStackingPreservesCountsAndNullSemantics", [](GameTest& fixture) {
   auto database = fixture.root().itemDatabase();
   ASSERT_TRUE(database);
-  auto targetResult = inventoryTestItem(**database, "perfectlygenericitem", 4, JsonObject{{"maxStack", 5}});
-  auto sourceResult = inventoryTestItem(**database, "perfectlygenericitem", 3, JsonObject{{"maxStack", 5}});
-  auto differentResult = inventoryTestItem(**database, "perfectlygenericitem", 3,
+  auto targetResult = inventory_test_item(**database, "perfectlygenericitem", 4, JsonObject{{"maxStack", 5}});
+  auto sourceResult = inventory_test_item(**database, "perfectlygenericitem", 3, JsonObject{{"maxStack", 5}});
+  auto differentResult = inventory_test_item(**database, "perfectlygenericitem", 3,
       JsonObject{{"maxStack", 5}, {"testParameter", "different"}});
   ASSERT_TRUE(targetResult);
   ASSERT_TRUE(sourceResult);
@@ -644,7 +644,7 @@ const GameTestRegistration item_drop_merge("ItemTest", "MergeTransfersOneWholeSt
   if (!fixture.check(bool(world->generateRegion(RectI(-32, 984, 32, 1112))), "generate open seam region")) return;
 
   auto make_drop = [&](Vec2F position, std::uint64_t count) -> std::shared_ptr<ItemDrop> {
-    auto item = inventoryTestItem(**database, "perfectlygenericitem", count, JsonObject{
+    auto item = inventory_test_item(**database, "perfectlygenericitem", count, JsonObject{
       {"maxStack", 5}, {"itemDrop", JsonObject{{"scripts", JsonArray{"/drop-merge-probe.lua"}}}}
     });
     if (!fixture.check(item && *item && (*item)->count() == count, "instantiate drop fixture stack")) return {};
@@ -656,7 +656,7 @@ const GameTestRegistration item_drop_merge("ItemTest", "MergeTransfersOneWholeSt
     return std::move(*drop);
   };
   auto script = [&](ItemDrop& drop, String const& code) {
-    auto result = drop.evalScript(code);
+    auto result = drop.eval_script(code);
     return fixture.check(result && *result && std::holds_alternative<bool>(**result) && std::get<bool>(**result),
         result ? std::string_view(code.utf8()) : result.error().what());
   };
@@ -689,7 +689,7 @@ const GameTestRegistration item_drop_merge("ItemTest", "MergeTransfersOneWholeSt
   if (!fixture.check(bool(receiver->update(dt, 0)), "run one deterministic merge tick")) return;
   fixture.check(receiver->item()->count() == total && source.item()->empty() && !other.item()->empty(),
       "first accepted candidate transfers completely; next candidate is untouched");
-  fixture.check(source.shouldDestroy() == true, "drained source is ready for removal");
+  fixture.check(source.should_destroy() == true, "drained source is ready for removal");
   fixture.check(std::abs(receiver->position()[0] - center_x) < 0.01f, "receiver moves to wrapped midpoint");
   script(source, "return calls == 1");
   script(other, "return calls == nil");
@@ -845,10 +845,10 @@ const GameTestRegistration item_icon_normalization("ItemTest", "AuthoredAndUpdat
 const GameTestRegistration bagStackQueriesAndTransfersPreserveBehavior("ItemTest", "BagStackQueriesAndTransfersPreserveBehavior", [](GameTest& fixture) {
   auto database = fixture.root().itemDatabase();
   ASSERT_TRUE(database);
-  auto targetResult = inventoryTestItem(**database, "perfectlygenericitem", 4, JsonObject{{"maxStack", 5}});
-  auto blockerResult = inventoryTestItem(**database, "perfectlygenericitem", 5,
+  auto targetResult = inventory_test_item(**database, "perfectlygenericitem", 4, JsonObject{{"maxStack", 5}});
+  auto blockerResult = inventory_test_item(**database, "perfectlygenericitem", 5,
       JsonObject{{"maxStack", 5}, {"testParameter", "different"}});
-  auto sourceResult = inventoryTestItem(**database, "perfectlygenericitem", 3, JsonObject{{"maxStack", 5}});
+  auto sourceResult = inventory_test_item(**database, "perfectlygenericitem", 3, JsonObject{{"maxStack", 5}});
   ASSERT_TRUE(targetResult);
   ASSERT_TRUE(blockerResult);
   ASSERT_TRUE(sourceResult);
@@ -938,7 +938,7 @@ const GameTestRegistration constructItems("ItemTest", "ConstructItems", [](GameT
   auto itemDatabase = fixture.root().itemDatabase();
   ASSERT_TRUE(itemDatabase);
   for (auto const& itemName : (*itemDatabase)->all_items()) {
-    auto item = inventoryTestItem(**itemDatabase, itemName);
+    auto item = inventory_test_item(**itemDatabase, itemName);
     ASSERT_TRUE(item);
   }
 });
@@ -946,7 +946,7 @@ const GameTestRegistration constructItems("ItemTest", "ConstructItems", [](GameT
 const GameTestRegistration bag_wire_snapshot("ItemTest", "BagWireSnapshotCommitsOnlyCompletePrefix", [](GameTest& fixture) {
   auto database = fixture.root().itemDatabase();
   ASSERT_TRUE(database);
-  auto item = inventoryTestItem(**database, "perfectlygenericitem", 3);
+  auto item = inventory_test_item(**database, "perfectlygenericitem", 3);
   ASSERT_TRUE(item && *item);
   ItemBag source(fixture.root(), 512);
   ASSERT_TRUE(source.set_item(1, *item));
@@ -980,7 +980,7 @@ const GameTestRegistration constBagObservesEmptyStacksWithoutReleasingThem("Item
   auto makeEmptyBag = [&]() -> std::expected<ItemBag, StarException> {
     ItemBag bag(fixture.root(), 2);
     for (std::size_t slot = 0; slot != 2; ++slot) {
-      auto item = inventoryTestItem(**itemDatabase, "perfectlygenericitem");
+      auto item = inventory_test_item(**itemDatabase, "perfectlygenericitem");
       if (!item)
         return std::unexpected(std::move(item.error()));
       auto set = bag.set_item(slot, std::move(*item));
@@ -1038,7 +1038,7 @@ const GameTestRegistration bag_placement_skips_overfilled_targets(
   auto database = fixture.root().itemDatabase();
   ASSERT_TRUE(database);
   auto make_stack = [&](std::uint64_t count) {
-    return inventoryTestItem(**database, "perfectlygenericitem", count, JsonObject{{"maxStack", 5}});
+    return inventory_test_item(**database, "perfectlygenericitem", count, JsonObject{{"maxStack", 5}});
   };
   auto overfilled = make_stack(1);
   auto first_target = make_stack(3);
@@ -1085,10 +1085,10 @@ const GameTestRegistration bag_placement_distinguishes_retained_zero(
   auto database = fixture.root().itemDatabase();
   ASSERT_TRUE(database);
   Json const parameters = JsonObject{{"maxStack", 5}};
-  auto target = inventoryTestItem(**database, "perfectlygenericitem", 4, parameters);
-  auto retained = inventoryTestItem(**database, "perfectlygenericitem", 1);
-  auto source = inventoryTestItem(**database, "perfectlygenericitem", 3, parameters);
-  auto blocker = inventoryTestItem(**database, "perfectlygenericitem", 1);
+  auto target = inventory_test_item(**database, "perfectlygenericitem", 4, parameters);
+  auto retained = inventory_test_item(**database, "perfectlygenericitem", 1);
+  auto source = inventory_test_item(**database, "perfectlygenericitem", 3, parameters);
+  auto blocker = inventory_test_item(**database, "perfectlygenericitem", 1);
   ASSERT_TRUE(target && *target);
   ASSERT_TRUE(retained && *retained);
   ASSERT_TRUE(source && *source);
@@ -1131,7 +1131,7 @@ const GameTestRegistration bag_condense_prefers_high_targets_and_low_donors(
       continue;
     auto parameters = i == 1 ? JsonObject{{"maxStack", 5}, {"testParameter", "different"}}
                              : JsonObject{{"maxStack", 5}};
-    auto item = inventoryTestItem(**database, "perfectlygenericitem", counts[i], std::move(parameters));
+    auto item = inventory_test_item(**database, "perfectlygenericitem", counts[i], std::move(parameters));
     ASSERT_TRUE(item && *item);
     slots[i] = std::move(*item);
     ASSERT_TRUE(bag.set_item(i, slots[i]));
@@ -1161,7 +1161,7 @@ namespace {
     if (!type)
       return std::unexpected(std::move(type.error()));
     if (*type == ItemType::HeadArmor)
-      return inventoryTestItem(**itemDatabase, name);
+      return inventory_test_item(**itemDatabase, name);
   }
   return std::unexpected(ItemException("Inventory tests require a head armor item"));
 }
@@ -1380,8 +1380,8 @@ const GameTestRegistration crafting_batch_accounting("ItemTest", "CraftingBatchA
   auto uninit = make_scope_exit([&] { EXPECT_TRUE(entity.uninit()); });
   ASSERT_FALSE(player.isAdmin());
   auto& inventory = *player.inventory();
-  auto plain = inventoryTestItem(**db, "perfectlygenericitem", 4);
-  auto marked = inventoryTestItem(**db, "perfectlygenericitem", 7, JsonObject{{"grade", 1}});
+  auto plain = inventory_test_item(**db, "perfectlygenericitem", 4);
+  auto marked = inventory_test_item(**db, "perfectlygenericitem", 7, JsonObject{{"grade", 1}});
   auto result = ItemDescriptor::create("perfectlygenericitem", 3, JsonObject{{"product", true}, {"maxStack", 2}});
   ASSERT_TRUE(plain && marked && result);
   auto product = (*db)->item(result->singular());
@@ -1468,7 +1468,7 @@ const GameTestRegistration constInventoryObservesExternallyConsumedItemsWithoutM
   ASSERT_TRUE(createdInventory);
   auto& inventory = **createdInventory;
   auto const& view = std::as_const(inventory);
-  auto bagItemResult = inventoryTestItem(**itemDatabase, "perfectlygenericitem");
+  auto bagItemResult = inventory_test_item(**itemDatabase, "perfectlygenericitem");
   ASSERT_TRUE(bagItemResult);
   auto bagItem = std::move(*bagItemResult);
   auto slotResult = inventoryTestBagSlot(fixture.root(), view, bagItem);
@@ -1476,9 +1476,9 @@ const GameTestRegistration constInventoryObservesExternallyConsumedItemsWithoutM
   auto bagSlot = *slotResult;
   auto head = inventoryTestHeadArmor(fixture.root());
   ASSERT_TRUE(head);
-  auto swap = inventoryTestItem(**itemDatabase, "perfectlygenericitem");
+  auto swap = inventory_test_item(**itemDatabase, "perfectlygenericitem");
   ASSERT_TRUE(swap);
-  auto trash = inventoryTestItem(**itemDatabase, "perfectlygenericitem");
+  auto trash = inventory_test_item(**itemDatabase, "perfectlygenericitem");
   ASSERT_TRUE(trash);
   List<std::pair<InventorySlot, std::shared_ptr<Item>>> items{
     {EquipmentSlot::Head, std::move(*head)},
@@ -1568,7 +1568,7 @@ const GameTestRegistration inventoryMutationNormalizesEmptySlots("ItemTest", "In
   ASSERT_TRUE(createdInventory);
   auto& inventory = **createdInventory;
   auto makeItems = [&](std::uint64_t count) {
-    return inventoryTestItem(**itemDatabase, "perfectlygenericitem", count);
+    return inventory_test_item(**itemDatabase, "perfectlygenericitem", count);
   };
 
   auto itemResult = makeItems(2);
@@ -1750,10 +1750,10 @@ const GameTestRegistration inventory_layout("ItemTest", "InventoryLayoutCountsAn
   EXPECT_FALSE(inventory.set_custom_bar_primary_slot(256, {}));
   auto database = root.itemDatabase();
   ASSERT_TRUE(database);
-  auto item = inventoryTestItem(**database, "perfectlygenericitem", 3,
+  auto item = inventory_test_item(**database, "perfectlygenericitem", 3,
       JsonObject{{"inventoryFilters", JsonObject{{"default", JsonObject{}}}}});
   ASSERT_TRUE(item);
-  auto blocker = inventoryTestItem(**database, "perfectlygenericitem", 1,
+  auto blocker = inventory_test_item(**database, "perfectlygenericitem", 1,
       JsonObject{{"inventoryFilters", JsonObject{{"default", JsonObject{}}}}, {"marker", "keep"}});
   ASSERT_TRUE(blocker);
   ASSERT_EQ(inventory.setItem(BagSlot{"bag", 0}, *blocker), true);
@@ -1890,7 +1890,7 @@ const GameTestRegistration inventory_delta_visibility(
     NetCompatibilityRules privileged(open_protocol_version, true);
     auto initial = (*source)->write_net_state(0, privileged);
     ASSERT_TRUE(initial);
-    auto item = inventoryTestItem(**database, "perfectlygenericitem", 2);
+    auto item = inventory_test_item(**database, "perfectlygenericitem", 2);
     ASSERT_TRUE(item);
     ASSERT_EQ((*source)->setItem(SwapSlot(), std::move(*item)), true);
 
@@ -1922,7 +1922,7 @@ const GameTestRegistration inventoryMutableTraversalAndNetworkNormalizeConsumpti
   auto slaveResult = NetElementTop<PlayerInventory>::create(fixture.root());
   ASSERT_TRUE(slaveResult);
   auto& slave = **slaveResult;
-  auto itemResult = inventoryTestItem(**itemDatabase, "perfectlygenericitem", 2);
+  auto itemResult = inventory_test_item(**itemDatabase, "perfectlygenericitem", 2);
   ASSERT_TRUE(itemResult);
   auto item = std::move(*itemResult);
   auto slotResult = inventoryTestBagSlot(fixture.root(), master, item);
@@ -1930,7 +1930,7 @@ const GameTestRegistration inventoryMutableTraversalAndNetworkNormalizeConsumpti
   auto bagSlot = *slotResult;
   ASSERT_EQ(master.setItem(bagSlot, item), true);
   {
-    auto trash = inventoryTestItem(**itemDatabase, "perfectlygenericitem");
+    auto trash = inventory_test_item(**itemDatabase, "perfectlygenericitem");
     ASSERT_TRUE(trash);
     ASSERT_EQ(master.setItem(TrashSlot(), std::move(*trash)), true);
   }
@@ -1971,7 +1971,7 @@ const GameTestRegistration inventoryMutableTraversalAndNetworkNormalizeConsumpti
   EXPECT_FALSE(*slaveCustomBarPrimarySlot);
 
   {
-    auto swap = inventoryTestItem(**itemDatabase, "perfectlygenericitem");
+    auto swap = inventory_test_item(**itemDatabase, "perfectlygenericitem");
     ASSERT_TRUE(swap);
     ASSERT_EQ(master.setItem(SwapSlot(), std::move(*swap)), true);
   }
@@ -2243,14 +2243,14 @@ end
     auto rebuiltRecipes = database->recipes_for_output_item("readycatalogbroken");
     ASSERT_EQ(rebuiltRecipes.size(), 1u);
     EXPECT_EQ(rebuiltRecipes.begin()->guiFilterString.contains("rebuiltready_leafowner"), true);
-    auto builtResult = inventoryTestItem(*database, "readycatalogbuilt");
+    auto builtResult = inventory_test_item(*database, "readycatalogbuilt");
     ASSERT_TRUE(builtResult);
     auto const& built = *builtResult;
     ASSERT_TRUE(built);
     EXPECT_EQ(built->name(), "readycatalogbuilt");
     EXPECT_EQ(built->friendly_name(), "NestedReady_LeafOwner");
     EXPECT_EQ(built->parameters().get_string("nestedCatalog"), "builder");
-    auto rebuiltResult = inventoryTestItem(*database, "readycatalogbroken", 3);
+    auto rebuiltResult = inventory_test_item(*database, "readycatalogbroken", 3);
     ASSERT_TRUE(rebuiltResult);
     auto const& rebuilt = *rebuiltResult;
     ASSERT_TRUE(rebuilt);
@@ -2535,7 +2535,7 @@ end
       if ((*item)->initialized())
         EXPECT_TRUE((*item)->uninit());
     });
-    auto& movement = player.movementController();
+    auto& movement = player.movement_controller();
     for (Direction facing : {Direction::Right, Direction::Left}) {
       auto state = movement.store_state();
       ASSERT_TRUE(state);
@@ -2806,7 +2806,7 @@ const GameTestRegistration codex_item_messages(
     auto uninit_player = make_scope_exit([&] { EXPECT_TRUE(entity.uninit()); });
     auto database = root.itemDatabase();
     ASSERT_TRUE(database);
-    auto item = inventoryTestItem(**database, "codexhintfixture-codex");
+    auto item = inventory_test_item(**database, "codexhintfixture-codex");
     ASSERT_TRUE(item && *item);
     auto book = as_ref<CodexItem>(**item);
     ASSERT_TRUE(book);
@@ -2848,7 +2848,7 @@ const GameTestRegistration codex_item_messages(
     ASSERT_TRUE(book->get().fire_triggered());
     EXPECT_FALSE(books->is_read(id));
     EXPECT_EQ(player.pullQueuedMessages(), List<String>({"Known fixture"}));
-    auto missing_item = inventoryTestItem(**database, "codexhintfixture-codex", 1,
+    auto missing_item = inventory_test_item(**database, "codexhintfixture-codex", 1,
         JsonObject{{"codexId", "missing-codex-hint-fixture"}});
     ASSERT_TRUE(missing_item && *missing_item);
     auto missing = as_ref<CodexItem>(**missing_item);
@@ -3059,7 +3059,7 @@ end
                                        {"unchanged", test.unchanged}}));
         for (std::string_view key : {"lifecycleInit", "lifecycleInvoke", "lifecycleCleanup"})
           ASSERT_TRUE((*configuration)->set(key, 0));
-        auto target = inventoryTestItem(**database, "lifecycletarget", 4, JsonObject{{"original", true}});
+        auto target = inventory_test_item(**database, "lifecycletarget", 4, JsonObject{{"original", true}});
         ASSERT_TRUE(target) << target.error().what();
         ASSERT_TRUE(*target);
         auto original = *target;
@@ -3546,7 +3546,7 @@ const GameTestRegistration item_drop_aging_replacement("ItemTest", "DropAgingKee
   if (!fixture.check(bool(world), "create an isolated world")) return;
   auto close = make_scope_exit([&] { fixture.check(bool((*world)->close()), "close isolated world"); });
 
-  auto original = inventoryTestItem(**database, "dropagingprobe", 4);
+  auto original = inventory_test_item(**database, "dropagingprobe", 4);
   if (!fixture.check(original && *original, "construct the scripted aging item")) return;
   auto stored_item = (*database)->disk_store(*original);
   if (!fixture.check(bool(stored_item), "serialize the scripted item")) return;
@@ -3559,7 +3559,7 @@ const GameTestRegistration item_drop_aging_replacement("ItemTest", "DropAgingKee
   auto uninit = make_scope_exit([&] { fixture.check(bool((*drop)->uninit()), "uninitialize the scripted drop"); });
   std::weak_ptr<Item> old_item = (*drop)->item();
   auto lua_check = [&](String const& code) {
-    auto result = (*drop)->evalScript(code);
+    auto result = (*drop)->eval_script(code);
     return result && *result && std::holds_alternative<bool>(**result) && std::get<bool>(**result);
   };
   DropImages old_frame;
@@ -3610,7 +3610,7 @@ const GameTestRegistration item_drop_replica_replacement("ItemTest", "DropReplic
   auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
   if (!fixture.check(bool(world), "create replica test world")) return;
   auto close = make_scope_exit([&] { fixture.check(bool((*world)->close()), "close replica test world"); });
-  auto material = inventoryTestItem(**database, "dirtmaterial", 4);
+  auto material = inventory_test_item(**database, "dirtmaterial", 4);
   if (!fixture.check(material && *material, "construct the real material item")) return;
   auto material_master = ItemDrop::create(root, *material);
   if (!fixture.check(bool(material_master), "create the first source drop")) return;
@@ -3621,7 +3621,7 @@ const GameTestRegistration item_drop_replica_replacement("ItemTest", "DropReplic
   if (!fixture.check(replica && (*replica)->init(**world, 102, EntityMode::Slave), "initialize the replica drop")) return;
   auto uninit_replica = make_scope_exit([&] { fixture.check(bool((*replica)->uninit()), "uninitialize the replica drop"); });
   if (!fixture.check((*replica)->read_net_state(std::move(material_state->first)) && (*replica)->update(0, 0)
-          && (*replica)->enableInterpolation(), "synchronize material replica and enable interpolation"))
+          && (*replica)->enable_interpolation(), "synchronize material replica and enable interpolation"))
     return;
 
   // The legacy incremental record uses the fourth group field for the
@@ -3651,7 +3651,7 @@ const GameTestRegistration item_drop_replica_replacement("ItemTest", "DropReplic
     }
   }
 
-  auto ordinary = inventoryTestItem(**database, "perfectlygenericitem", 5, JsonObject{{"maxStack", 5}});
+  auto ordinary = inventory_test_item(**database, "perfectlygenericitem", 5, JsonObject{{"maxStack", 5}});
   if (!fixture.check(ordinary && *ordinary && (*ordinary)->set_count(12, true) == 0, "construct an overfilled item")) return;
   auto master = ItemDrop::create(root, *ordinary);
   if (!fixture.check(master && (*master)->init(**world, 103, EntityMode::Master), "initialize the overfilled authority")) return;

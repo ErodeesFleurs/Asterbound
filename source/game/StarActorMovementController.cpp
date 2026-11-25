@@ -1727,7 +1727,7 @@ std::expected<bool, StarException> PathController::validate_edge(ActorMovementCo
         auto arg = world.luaRoot()->lua_engine().create_string("closedDoor");
         if (!arg)
           return std::unexpected(std::move(arg.error()));
-        auto response = object->callScript("hasCapability", LuaVariadic<LuaValue>{*arg});
+        auto response = object->call_script("hasCapability", LuaVariadic<LuaValue>{*arg});
         if (!response)
           return std::unexpected(std::move(response.error()));
         if (*response && std::holds_alternative<LuaBoolean>(**response) && std::get<LuaBoolean>(**response)) {

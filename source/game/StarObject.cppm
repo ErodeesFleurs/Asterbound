@@ -104,14 +104,14 @@ public:
   [[nodiscard]] std::expected<Json, StarException> diskStore() const;
   [[nodiscard]] std::expected<ByteArray, StarException> net_store(NetCompatibilityRules rules = {});
 
-  EntityType entityType() const override;
-  ClientEntityMode clientEntityMode() const override;
+  EntityType entity_type() const override;
+  ClientEntityMode client_entity_mode() const override;
 
   [[nodiscard]] std::expected<void, StarException> init(World& world, EntityId entityId, EntityMode mode) override;
   [[nodiscard]] std::expected<void, StarException> uninit() override;
 
   Vec2F position() const override;
-  RectF metaBoundBox() const override;
+  RectF meta_bound_box() const override;
 
   [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException>
   write_net_state(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
@@ -128,7 +128,7 @@ public:
 
   [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources() const override;
 
-  [[nodiscard]] std::expected<bool, StarException> shouldDestroy() const override;
+  [[nodiscard]] std::expected<bool, StarException> should_destroy() const override;
   [[nodiscard]] std::expected<void, StarException>
   destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) override;
 
@@ -138,7 +138,7 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback) override;
 
-  [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& render_callback) override;
+  [[nodiscard]] std::expected<void, StarException> render_light_sources(RenderCallback& render_callback) override;
 
   [[nodiscard]] std::expected<bool, StarException> checkBroken() override;
 
@@ -187,8 +187,8 @@ public:
   [[nodiscard]] std::expected<InteractAction, StarException> interact(InteractRequest const& request) override;
   List<Vec2I> interactiveSpaces() const override;
 
-  [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> callScript(String const& func, LuaVariadic<LuaValue> const& args) override;
-  [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> evalScript(String const& code) override;
+  [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> call_script(String const& func, LuaVariadic<LuaValue> const& args) override;
+  [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> eval_script(String const& code) override;
 
   [[nodiscard]] std::expected<Vec2F, StarException> mouth_position() const override;
   [[nodiscard]] std::expected<Vec2F, StarException> mouth_position(bool ignore_adjustments) const override;
@@ -360,7 +360,7 @@ private:
 
   NetElementData<List<DamageSource>> m_damageSources;
 
-  ClientEntityMode m_clientEntityMode;
+  ClientEntityMode m_client_entity_mode;
 };
 
 }

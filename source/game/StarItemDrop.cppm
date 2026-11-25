@@ -68,7 +68,7 @@ public:
   [[nodiscard]]
   std::expected<ByteArray, StarException> net_store(NetCompatibilityRules rules = {}) const;
 
-  EntityType entityType() const override;
+  EntityType entity_type() const override;
 
   [[nodiscard]]
   std::expected<void, StarException> init(World& world, EntityId entity_id, EntityMode mode) override;
@@ -86,31 +86,31 @@ public:
   std::expected<void, StarException> read_net_state(ByteArray data, float interpolation_time = 0.0f, NetCompatibilityRules rules = {}) override;
 
   [[nodiscard]]
-  std::expected<void, StarException> enableInterpolation(float extrapolation_hint = 0.0f) override;
+  std::expected<void, StarException> enable_interpolation(float extrapolation_hint = 0.0f) override;
   [[nodiscard]]
-  std::expected<void, StarException> disableInterpolation() override;
+  std::expected<void, StarException> disable_interpolation() override;
 
   Vec2F position() const override;
-  RectF metaBoundBox() const override;
+  RectF meta_bound_box() const override;
 
   bool ephemeral() const override;
 
-  RectF collisionArea() const override;
+  RectF collision_area() const override;
 
   [[nodiscard]]
   std::expected<void, StarException> update(float dt, std::uint64_t current_step) override;
 
   [[nodiscard]]
-  std::expected<bool, StarException> shouldDestroy() const override;
+  std::expected<bool, StarException> should_destroy() const override;
 
-  std::uint64_t presentationEpoch() const override;
+  std::uint64_t presentation_epoch() const override;
 
   [[nodiscard]]
   std::expected<void, StarException> render(RenderCallback& render_callback) override;
   [[nodiscard]]
-  std::expected<void, StarException> renderLightSources(RenderCallback& render_callback) override;
+  std::expected<void, StarException> render_light_sources(RenderCallback& render_callback) override;
   
-  MovementController& movementController() override;
+  MovementController& movement_controller() override;
   
   // The item that this drop contains
   std::shared_ptr<Item> item() const;
@@ -144,11 +144,11 @@ public:
   std::expected<Json, StarException> config_value(String const& name, Json const& def = Json()) const;
 
   [[nodiscard]]
-  std::expected<std::optional<LuaValue>, StarException> callScript(String const& func, LuaVariadic<LuaValue> const& args) override;
+  std::expected<std::optional<LuaValue>, StarException> call_script(String const& func, LuaVariadic<LuaValue> const& args) override;
   [[nodiscard]]
-  std::expected<std::optional<LuaValue>, StarException> evalScript(String const& code) override;
+  std::expected<std::optional<LuaValue>, StarException> eval_script(String const& code) override;
   
-  ClientEntityMode clientEntityMode() const override;
+  ClientEntityMode client_entity_mode() const override;
 
 private:
   enum class Mode { Intangible, Available, Taken, Dead };

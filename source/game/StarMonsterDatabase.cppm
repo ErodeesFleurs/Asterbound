@@ -103,7 +103,7 @@ struct MonsterVariant {
   unsigned initialScriptDelta;
   StringList animationScripts;
 
-  RectF metaBoundBox;
+  RectF meta_bound_box;
   EntityRenderLayer renderLayer;
   float scale;
 
@@ -124,7 +124,7 @@ struct MonsterVariant {
   String powerLevelFunction;
   String healthLevelFunction;
 
-  ClientEntityMode clientEntityMode;
+  ClientEntityMode client_entity_mode;
   bool persistent;
 
   TeamType damageTeamType;

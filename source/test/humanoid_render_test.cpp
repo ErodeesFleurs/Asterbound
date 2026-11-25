@@ -501,7 +501,7 @@ const GameTestRegistration transientMovementAnimation(
     auto initialized = setup.init(**root);
     ASSERT_TRUE(initialized) << initialized.error().what();
     auto& player = *setup.player;
-    auto& movement = player.movementController();
+    auto& movement = player.movement_controller();
     ActorMovementParameters parameters;
     parameters.gravity_enabled = false;
     parameters.collision_enabled = false;
@@ -564,11 +564,11 @@ const GameTestRegistration transientMovementAnimation(
         EXPECT_EQ(remotes[i]->humanoid()->state(), state);
         EXPECT_EQ(remotes[i]->humanoid()->facing_direction(), player.humanoid()->facing_direction());
         EXPECT_EQ(remotes[i]->humanoid()->moving_backwards(), player.humanoid()->moving_backwards());
-        EXPECT_EQ(remotes[i]->movementController().moving_direction(), networkDirection);
-        EXPECT_NEAR(remotes[i]->movementController().rotation(), movement.rotation(), .011f);
-        EXPECT_FALSE(remotes[i]->movementController().onGround());
-        EXPECT_FALSE(remotes[i]->movementController().crouching());
-        EXPECT_EQ(remotes[i]->movementController().collisionPoly(), nativeCollisionPoly);
+        EXPECT_EQ(remotes[i]->movement_controller().moving_direction(), networkDirection);
+        EXPECT_NEAR(remotes[i]->movement_controller().rotation(), movement.rotation(), .011f);
+        EXPECT_FALSE(remotes[i]->movement_controller().onGround());
+        EXPECT_FALSE(remotes[i]->movement_controller().crouching());
+        EXPECT_EQ(remotes[i]->movement_controller().collisionPoly(), nativeCollisionPoly);
         auto rendered = remotes[i]->humanoid()->render();
         ASSERT_TRUE(rendered) << rendered.error().what();
         EXPECT_FALSE(rendered->empty());
@@ -667,7 +667,7 @@ const GameTestRegistration transientMovementAnimation(
       versions[i] = packet->second;
       ASSERT_TRUE(remotes[i]->read_net_state(packet->first, 0.f, rules[i]));
       EXPECT_TRUE(remotes[i]->isTeleporting());
-      EXPECT_EQ(remotes[i]->movementController().moving_direction(), movement.moving_direction());
+      EXPECT_EQ(remotes[i]->movement_controller().moving_direction(), movement.moving_direction());
     }
     ASSERT_TRUE(tick());
     EXPECT_TRUE(player.isTeleporting());
@@ -1145,7 +1145,7 @@ const GameTestRegistration playerPresentationEvents(
       auto geometry = player.render(events);
       ASSERT_TRUE(geometry) << geometry.error().what();
       ASSERT_EQ(root.random().next_u64(), untouchedGameplay.next_u64()) << "geometry alpha=" << alpha;
-      auto lighting = player.renderLightSources(events);
+      auto lighting = player.render_light_sources(events);
       ASSERT_TRUE(lighting) << lighting.error().what();
       ASSERT_EQ(root.random().next_u64(), untouchedGameplay.next_u64()) << "lighting alpha=" << alpha;
     }
@@ -1184,10 +1184,10 @@ const GameTestRegistration playerPresentationEvents(
     ASSERT_TRUE(lua);
     auto context = (*lua)->create_context(StringList{});
     ASSERT_TRUE(context);
-    auto callbacks = LuaBindings::make_movement_controller_callbacks(player.movementController());
+    auto callbacks = LuaBindings::make_movement_controller_callbacks(player.movement_controller());
     ASSERT_TRUE(callbacks);
     ASSERT_TRUE(context->set_callbacks("mcontroller", *callbacks));
-    auto epoch = player.presentationEpoch();
+    auto epoch = player.presentation_epoch();
     auto moved = context->eval<bool>(R"LUA(
       mcontroller.translate({0.1, 0})
       mcontroller.setXPosition(mcontroller.xPosition() + 0.1)
@@ -1195,14 +1195,14 @@ const GameTestRegistration playerPresentationEvents(
     )LUA");
     ASSERT_TRUE(moved);
     EXPECT_TRUE(*moved);
-    EXPECT_EQ(player.presentationEpoch(), epoch);
+    EXPECT_EQ(player.presentation_epoch(), epoch);
     auto reset = context->eval<bool>("mcontroller.resetPresentation(); return true");
     ASSERT_TRUE(reset);
     EXPECT_TRUE(*reset);
-    EXPECT_GT(player.presentationEpoch(), epoch);
-    epoch = player.presentationEpoch();
+    EXPECT_GT(player.presentation_epoch(), epoch);
+    epoch = player.presentation_epoch();
     ASSERT_TRUE(player.moveTo(Vec2F(1200, 1100)));
-    EXPECT_GT(player.presentationEpoch(), epoch);
+    EXPECT_GT(player.presentation_epoch(), epoch);
   });
 
 const GameTestRegistration hiddenLoopingPresentationAudio(

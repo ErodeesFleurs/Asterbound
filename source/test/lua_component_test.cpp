@@ -624,7 +624,7 @@ const GameTestRegistration npcUpdateRecovery(
     ASSERT_TRUE(setup) << setup.error().what();
     auto closed = make_scope_exit([&] { EXPECT_TRUE(setup->world->close()); });
     auto id = setup->npc->entityId();
-    ASSERT_TRUE(setup->npc->evalScript(
+    ASSERT_TRUE(setup->npc->eval_script(
       "function update(dt) error('npc update recovery fault', 0) end"));
     auto updated = expectLoggedFailure(
       [&] { return setup->world->update(fixture.root().timing().server_time_step); }, "npc update recovery fault");
@@ -643,7 +643,7 @@ const GameTestRegistration npcMessageRecovery(
     ASSERT_TRUE(added) << added.error().what();
     ASSERT_TRUE(*added);
     ASSERT_TRUE(setup->world->handleIncomingPackets(client, {std::make_shared<WorldStartAcknowledgePacket>()}));
-    ASSERT_TRUE(setup->npc->evalScript(
+    ASSERT_TRUE(setup->npc->eval_script(
       "message.setHandler('recoveryProbe', function() error('npc message recovery fault', 0) end)"));
     Uuid uuid(fixture.root().random());
     auto packet = std::make_shared<EntityMessagePacket>(

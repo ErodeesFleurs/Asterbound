@@ -126,27 +126,27 @@ public:
   [[nodiscard]] std::expected<Json, StarException> diskStore() const;
   [[nodiscard]] std::expected<ByteArray, StarException> net_store(NetCompatibilityRules rules = {});
 
-  EntityType entityType() const override;
-  ClientEntityMode clientEntityMode() const override;
+  EntityType entity_type() const override;
+  ClientEntityMode client_entity_mode() const override;
 
   [[nodiscard]] std::expected<void, StarException> init(World& world, EntityId entityId, EntityMode mode) override;
   [[nodiscard]] std::expected<void, StarException> uninit() override;
 
   Vec2F position() const override;
-  RectF metaBoundBox() const override;
+  RectF meta_bound_box() const override;
 
   Vec2F velocity() const;
 
   [[nodiscard]] std::expected<Vec2F, StarException> mouthOffset() const;
   [[nodiscard]] std::expected<Vec2F, StarException> feetOffset() const;
 
-  RectF collisionArea() const override;
+  RectF collision_area() const override;
 
   [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> write_net_state(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
   [[nodiscard]] std::expected<void, StarException> read_net_state(ByteArray data, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
 
-  [[nodiscard]] std::expected<void, StarException> enableInterpolation(float extrapolationHint) override;
-  [[nodiscard]] std::expected<void, StarException> disableInterpolation() override;
+  [[nodiscard]] std::expected<void, StarException> enable_interpolation(float extrapolation_hint) override;
+  [[nodiscard]] std::expected<void, StarException> disable_interpolation() override;
 
   [[nodiscard]] std::expected<String, StarException> name() const override;
   [[nodiscard]] std::expected<String, StarException> description() const override;
@@ -167,18 +167,18 @@ public:
   [[nodiscard]] std::expected<bool, StarException> shouldDie();
   [[nodiscard]] std::expected<void, StarException> knockout();
 
-  [[nodiscard]] std::expected<bool, StarException> shouldDestroy() const override;
+  [[nodiscard]] std::expected<bool, StarException> should_destroy() const override;
   [[nodiscard]] std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) override;
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
 
-  std::uint64_t presentationEpoch() const override;
+  std::uint64_t presentation_epoch() const override;
 
   [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& render_callback) override;
 
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback) override;
 
-  [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& render_callback) override;
+  [[nodiscard]] std::expected<void, StarException> render_light_sources(RenderCallback& render_callback) override;
 
   void setPosition(Vec2F const& pos);
 
@@ -203,8 +203,8 @@ public:
 
   bool aggressive() const override;
 
-  [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> callScript(String const& func, LuaVariadic<LuaValue> const& args) override;
-  [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> evalScript(String const& code) override;
+  [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> call_script(String const& func, LuaVariadic<LuaValue> const& args) override;
+  [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> eval_script(String const& code) override;
 
   [[nodiscard]] std::expected<Vec2F, StarException> mouth_position() const override;
   [[nodiscard]] std::expected<Vec2F, StarException> mouth_position(bool ignore_adjustments) const override;
@@ -217,7 +217,7 @@ public:
 
   [[nodiscard]] std::expected<Vec2F, StarException> questIndicatorPosition() const override;
 
-  ActorMovementController& movementController() override;
+  ActorMovementController& movement_controller() override;
   StatusController& statusController() override;
 
   using Entity::setKeepAlive;
@@ -249,7 +249,7 @@ private:
   std::shared_ptr<NetworkedAnimator> m_networkedAnimator;
   NetworkedAnimator::DynamicTarget m_networkedAnimatorDynamicTarget;
 
-  std::shared_ptr<ActorMovementController> m_movementController;
+  std::shared_ptr<ActorMovementController> m_movement_controller;
   std::shared_ptr<StatusController> m_statusController;
 
   std::shared_ptr<EffectEmitter> m_effectEmitter;

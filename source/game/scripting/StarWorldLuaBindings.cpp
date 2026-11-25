@@ -221,7 +221,7 @@ namespace LuaBindings {
 
   namespace WorldCallbacks {
     [[nodiscard]] std::expected<bool, StarException> placeObject(World& world, String const& arg1, Vec2I const& arg2, std::optional<int> const& arg3, Json const& arg4);
-    [[nodiscard]] std::expected<std::optional<EntityId>, StarException> spawnItem(World& world, Json const& itemType, Vec2F const& worldPosition, std::optional<std::size_t> const& inputCount, Json const& inputParameters, std::optional<Vec2F> const& initialVelocity, std::optional<float> const& intangibleTime);
+    [[nodiscard]] std::expected<std::optional<EntityId>, StarException> spawnItem(World& world, Json const& itemType, Vec2F const& world_position, std::optional<std::size_t> const& inputCount, Json const& inputParameters, std::optional<Vec2F> const& initial_velocity, std::optional<float> const& intangibleTime);
     [[nodiscard]] std::expected<List<EntityId>, StarException> spawnTreasure(World& world, Vec2F const& position, String const& pool, float level, std::optional<std::uint64_t> seed);
     [[nodiscard]] std::expected<std::optional<EntityId>, StarException> spawnMonster(World& world, String const& arg1, Vec2F const& arg2, std::optional<JsonObject> const& arg3);
     [[nodiscard]] std::expected<std::optional<EntityId>, StarException> spawnNpc(World& world, Vec2F const& arg1, String const& arg2, String const& arg3, float arg4, std::optional<std::uint64_t> arg5, Json const& arg6);
@@ -301,7 +301,7 @@ namespace LuaBindings {
     [[nodiscard]] std::expected<bool, StarException> entityCanDamage(World& world, EntityId sourceId, EntityId targetId);
     [[nodiscard]] std::expected<Json, StarException> entityDamageTeam(World& world, EntityId entityId);
     [[nodiscard]] std::expected<bool, StarException> entityAggressive(World& world, EntityId entityId);
-    [[nodiscard]] std::expected<std::optional<LuaString>, StarException> entityType(World& world, LuaEngine& engine, EntityId entityId);
+    [[nodiscard]] std::expected<std::optional<LuaString>, StarException> entity_type(World& world, LuaEngine& engine, EntityId entityId);
     [[nodiscard]] std::expected<std::optional<Vec2F>, StarException> entityPosition(World& world, EntityId entityId);
     [[nodiscard]] std::expected<std::optional<Vec2F>, StarException> entityVelocity(World& world, EntityId entityId);
     [[nodiscard]] std::expected<std::optional<RectF>, StarException> entityMetaBoundBox(World& world, EntityId entityId);
@@ -512,7 +512,7 @@ namespace LuaBindings {
           return false;
       }
 
-      if (includedTypes && !includedTypes->contains(entity->entityType()))
+      if (includedTypes && !includedTypes->contains(entity->entity_type()))
         return false;
 
       if (withoutEntityId && entity->entityId() == *withoutEntityId)
@@ -523,7 +523,7 @@ namespace LuaBindings {
         if (!scriptedEntity || !scriptedEntity->isMaster())
           return false;
 
-        auto scriptResult = scriptedEntity->callScript(*callScript, lua_unpack(callScriptArgs));
+        auto scriptResult = scriptedEntity->call_script(*callScript, lua_unpack(callScriptArgs));
         if (!scriptResult)
           return std::unexpected(std::move(scriptResult.error()));
         auto& res = *scriptResult;
@@ -539,13 +539,13 @@ namespace LuaBindings {
         // enforce collision with MetaBoundBox
         if (radiusQuery)
           return geometry.rect_intersects_circle(
-              entity->metaBoundBox().translated(position), radiusQuery->first, radiusQuery->second);
+              entity->meta_bound_box().translated(position), radiusQuery->first, radiusQuery->second);
       } else if (boundMode == EntityBoundMode::CollisionArea) {
         // Collision area queries either query based on the collision area if
         // that's given, or as a fallback the regular bound box.
-        auto collisionArea = entity->collisionArea();
+        auto collisionArea = entity->collision_area();
         if (collisionArea.is_null())
-          collisionArea = entity->metaBoundBox();
+          collisionArea = entity->meta_bound_box();
         collisionArea.translate(position);
 
         if (lineQuery)
@@ -1004,7 +1004,7 @@ namespace LuaBindings {
       if (auto result = callbacks.register_callback("players", [clientWorld]() -> std::expected<List<EntityId>, StarException> {
         List<EntityId> playerIds;
         auto queried = clientWorld->get().forAllEntities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
-          if (entity->entityType() == EntityType::Player)
+          if (entity->entity_type() == EntityType::Player)
             playerIds.emplace_back(entity->entityId());
           return {};
         });
@@ -1569,7 +1569,7 @@ namespace LuaBindings {
       return std::unexpected(std::move(result.error()));
     if (auto result = callbacks.register_callback_with_signature<std::optional<LuaString>, LuaEngine&, int>(
           "entityType",
-          [&world](LuaEngine& engine, int entity) { return WorldEntityCallbacks::entityType(world, engine, entity); });
+          [&world](LuaEngine& engine, int entity) { return WorldEntityCallbacks::entity_type(world, engine, entity); });
         !result)
       return std::unexpected(std::move(result.error()));
     if (auto result = callbacks.register_callback_with_signature<std::optional<Vec2F>, int>(
@@ -2527,33 +2527,33 @@ namespace LuaBindings {
 
   std::expected<std::optional<EntityId>, StarException> WorldCallbacks::spawnItem(World& world,
       Json const& itemType,
-      Vec2F const& worldPosition,
+      Vec2F const& world_position,
       std::optional<std::size_t> const& inputCount,
       Json const& inputParameters,
-      std::optional<Vec2F> const& initialVelocity,
+      std::optional<Vec2F> const& initial_velocity,
       std::optional<float> const& intangibleTime) {
     bool emptyItem = false;
     auto spawn = [&]() -> std::expected<std::optional<EntityId>, StarException> {
-      auto descriptorResult = itemType.is_type(Json::Type::String)
+      auto descriptor_result = itemType.is_type(Json::Type::String)
           ? itemType.to_string().and_then([&](String name) { return ItemDescriptor::create(std::move(name), inputCount.value_or(1), inputParameters ? inputParameters : JsonObject()); })
           : ItemDescriptor::create(itemType);
-      if (!descriptorResult)
-        return std::unexpected(std::move(descriptorResult.error()));
-      auto itemDropResult = ItemDrop::create_randomized_drop(world.root(), *descriptorResult, worldPosition);
-      if (!itemDropResult)
-        return std::unexpected(std::move(itemDropResult.error()));
-      auto itemDrop = std::move(*itemDropResult);
-      if (!itemDrop) {
+      if (!descriptor_result)
+        return std::unexpected(std::move(descriptor_result.error()));
+      auto item_drop_result = ItemDrop::create_randomized_drop(world.root(), *descriptor_result, world_position);
+      if (!item_drop_result)
+        return std::unexpected(std::move(item_drop_result.error()));
+      auto item_drop = std::move(*item_drop_result);
+      if (!item_drop) {
         emptyItem = true;
         return {};
       }
-      if (initialVelocity)
-        itemDrop->set_velocity(*initialVelocity);
+      if (initial_velocity)
+        item_drop->set_velocity(*initial_velocity);
       if (intangibleTime)
-        itemDrop->set_intangible_time(*intangibleTime);
-      if (auto operation = world.addEntity(itemDrop); !operation)
+        item_drop->set_intangible_time(*intangibleTime);
+      if (auto operation = world.addEntity(item_drop); !operation)
         return std::unexpected(std::move(operation.error()));
-      return itemDrop->inWorld() ? std::optional<EntityId>(itemDrop->entityId()) : std::nullopt;
+      return item_drop->inWorld() ? std::optional<EntityId>(item_drop->entityId()) : std::nullopt;
     };
     auto result = spawn();
     if (emptyItem) {
@@ -2587,11 +2587,11 @@ namespace LuaBindings {
       if (!treasureResult)
         return std::unexpected(std::move(treasureResult.error()));
       auto treasure = std::move(*treasureResult);
-      for (auto const& treasureItem : treasure) {
-        auto entityResult = ItemDrop::create_randomized_drop(world.root(), treasureItem, position);
-        if (!entityResult)
-          return std::unexpected(std::move(entityResult.error()));
-        auto entity = std::move(*entityResult);
+      for (auto const& treasure_item : treasure) {
+        auto entity_result = ItemDrop::create_randomized_drop(world.root(), treasure_item, position);
+        if (!entity_result)
+          return std::unexpected(std::move(entity_result.error()));
+        auto entity = std::move(*entity_result);
         entities.push_back(entity->entityId());
         if (auto operation = world.addEntity(entity); !operation)
           return std::unexpected(std::move(operation.error()));
@@ -2928,7 +2928,7 @@ namespace LuaBindings {
     else {
       if (!EntityTypeNames)
         return std::unexpected(EntityTypeNames.error());
-      auto typePointerResult = EntityTypeNames->get_right(entity->entityType());
+      auto typePointerResult = EntityTypeNames->get_right(entity->entity_type());
       if (!typePointerResult)
         return std::unexpected(std::move(typePointerResult.error()));
       auto typePointer = std::move(*typePointerResult);
@@ -3132,7 +3132,7 @@ namespace LuaBindings {
       return {};
     if (!EntityTypeNames)
       return std::unexpected(EntityTypeNames.error());
-    auto type = EntityTypeNames->get_right(entity->entityType());
+    auto type = EntityTypeNames->get_right(entity->entity_type());
     if (!type)
       return std::unexpected(std::move(type.error()));
     auto factory = world.root().entityFactory();
@@ -3140,7 +3140,7 @@ namespace LuaBindings {
       return std::unexpected(std::move(factory.error()));
 
     bool master = entity->isMaster();
-    bool transient = entity->entityType() == EntityType::Projectile || entity->entityType() == EntityType::PlantDrop;
+    bool transient = entity->entity_type() == EntityType::Projectile || entity->entity_type() == EntityType::PlantDrop;
     JsonObject snapshot{
       {"schema", "asterbound.entitySnapshot"}, {"schemaVersion", 1},
       {"type", type->get()}, {"entityId", entityId}, {"position", json_from_vec2f(entity->position())},
@@ -3181,7 +3181,7 @@ namespace LuaBindings {
     }
     if (!master) {
       warnings.push_back("Local replica only: fields not synchronized to this world may be absent, stale, or local defaults; this is not the remote authoritative save.");
-      if (entity->entityType() == EntityType::Player)
+      if (entity->entity_type() == EntityType::Player)
         warnings.push_back("Player disk serialization includes locally held inventory, quests, and script storage, but cannot recover inventory, quests, script storage, or other private fields the remote player has not transmitted.");
     }
     snapshot["warnings"] = std::move(warnings);
@@ -3213,11 +3213,11 @@ namespace LuaBindings {
     return false;
   }
 
-  std::expected<std::optional<LuaString>, StarException> WorldEntityCallbacks::entityType(World& world, LuaEngine& engine, EntityId entityId) {
+  std::expected<std::optional<LuaString>, StarException> WorldEntityCallbacks::entity_type(World& world, LuaEngine& engine, EntityId entityId) {
     if (auto entity = world.entity(entityId)) {
       if (!EntityTypeNames)
         return std::unexpected(EntityTypeNames.error());
-      auto namePointerResult = EntityTypeNames->get_right(entity->entityType());
+      auto namePointerResult = EntityTypeNames->get_right(entity->entity_type());
       if (!namePointerResult)
         return std::unexpected(std::move(namePointerResult.error()));
       auto namePointer = std::move(*namePointerResult);
@@ -3237,7 +3237,7 @@ namespace LuaBindings {
 
   std::expected<std::optional<RectF>, StarException> WorldEntityCallbacks::entityMetaBoundBox(World& world, EntityId entityId) {
     if (auto entity = world.entity(entityId)) {
-      return entity->metaBoundBox();
+      return entity->meta_bound_box();
     } else {
       return {};
     }
@@ -3247,7 +3247,7 @@ namespace LuaBindings {
     auto entity = world.entity(entityId);
 
     if (auto mobileEntity = as<MobileEntity>(entity))
-        return mobileEntity->movementController().velocity();
+        return mobileEntity->movement_controller().velocity();
 
     return {};
   }
@@ -3845,7 +3845,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
     auto entity = as<ScriptedEntity>(world.entity(entityId));
     if (!entity || !entity->isMaster())
       return std::unexpected(StarException::format("Entity {} does not exist or is not a local master scripted entity", entityId));
-    return entity->callScript(function, args);
+    return entity->call_script(function, args);
   }
 
   std::expected<RpcPromise<Vec2F>, StarException> WorldEntityCallbacks::findUniqueEntity(World& world, String const& uniqueId) {

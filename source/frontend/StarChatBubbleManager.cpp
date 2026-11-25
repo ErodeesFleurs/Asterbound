@@ -350,11 +350,11 @@ std::expected<void, StarException> ChatBubbleManager::update(float dt, std::shar
         return {};
       if (!bubble.instance)
         bubble.instance = entity;
-      if (bubble.presentation_epoch != entity->presentationEpoch()) {
+      if (bubble.presentation_epoch != entity->presentation_epoch()) {
         bubble_state.reset_presentation();
-        bubble.presentation_epoch = entity->presentationEpoch();
+        bubble.presentation_epoch = entity->presentation_epoch();
       }
-      auto onscreen = m_camera.worldGeometry().rect_intersects_rect(m_camera.worldScreenRect(), entity->metaBoundBox().translated(entity->position()));
+      auto onscreen = m_camera.worldGeometry().rect_intersects_rect(m_camera.worldScreenRect(), entity->meta_bound_box().translated(entity->position()));
       if (!onscreen) return std::unexpected(std::move(onscreen.error()));
       bubble.onscreen = *onscreen;
       auto mouth = entity->mouth_position();
@@ -372,7 +372,7 @@ std::expected<void, StarException> ChatBubbleManager::update(float dt, std::shar
         continue;
       if (!portrait_bubble.instance)
         portrait_bubble.instance = entity;
-      auto onscreen = m_camera.worldGeometry().rect_intersects_rect(m_camera.worldScreenRect(), entity->metaBoundBox().translated(entity->position()));
+      auto onscreen = m_camera.worldGeometry().rect_intersects_rect(m_camera.worldScreenRect(), entity->meta_bound_box().translated(entity->position()));
       if (!onscreen) return std::unexpected(std::move(onscreen.error()));
       portrait_bubble.onscreen = *onscreen;
       if (auto chatter = as<ChattyEntity>(entity)) {
@@ -448,7 +448,7 @@ std::expected<void, StarException> ChatBubbleManager::render(WorldClient const& 
         auto origin = m_camera.screenToWorld(state.ideal_destination);
         origin += world.sample_entity(*entity, presentation).offset;
         auto screen_position = camera.worldToScreen(origin)
-            + state.sample_offset(bubble.presentation_epoch == entity->presentationEpoch() ? presentation.interpolation() : 1.0f);
+            + state.sample_offset(bubble.presentation_epoch == entity->presentation_epoch() ? presentation.interpolation() : 1.0f);
         auto fade = calc_distance_fade_alpha(screen_position, *m_bubble_fade_function, camera);
         if (!fade) return std::unexpected(std::move(fade.error()));
         int alpha = *fade;

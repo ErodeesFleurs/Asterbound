@@ -154,11 +154,11 @@ std::expected<std::shared_ptr<PhysicsObject>, StarException> PhysicsObject::crea
   return object;
 }
 
-std::expected<void, StarException> PhysicsObject::enableInterpolation(float extrapolationHint) {
-  return m_netGroup.enable_net_interpolation(extrapolationHint);
+std::expected<void, StarException> PhysicsObject::enable_interpolation(float extrapolation_hint) {
+  return m_netGroup.enable_net_interpolation(extrapolation_hint);
 }
 
-std::expected<void, StarException> PhysicsObject::disableInterpolation() {
+std::expected<void, StarException> PhysicsObject::disable_interpolation() {
   return m_netGroup.disable_net_interpolation();
 }
 
@@ -207,9 +207,9 @@ std::expected<void, StarException> PhysicsObject::init(World& world, EntityId en
       return std::unexpected(initialized.error().with_context(Star::format("Physics callback cleanup failed: {}", Star::output_exception(removed.error(), false))));
     return std::unexpected(std::move(initialized.error()));
   }
-  m_metaBoundBox = Object::metaBoundBox();
+  m_meta_bound_box = Object::meta_bound_box();
   for (auto const& pair : m_physics_forces)
-    m_metaBoundBox.combine(std::visit([](physics_force_region auto const& force) { return force.bounding_box(); }, pair.second.force_region));
+    m_meta_bound_box.combine(std::visit([](physics_force_region auto const& force) { return force.bounding_box(); }, pair.second.force_region));
   return {};
 }
 
@@ -230,8 +230,8 @@ std::expected<void, StarException> PhysicsObject::update(float dt, std::uint64_t
   return {};
 }
 
-RectF PhysicsObject::metaBoundBox() const {
-  return m_metaBoundBox;
+RectF PhysicsObject::meta_bound_box() const {
+  return m_meta_bound_box;
 }
 
 std::expected<List<PhysicsForceRegion>, StarException> PhysicsObject::force_regions() const {

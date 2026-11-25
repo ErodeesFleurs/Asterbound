@@ -207,7 +207,7 @@ auto movementParameters = std::move(*result12).merge(monsterVariant.movementSett
     movementParameters.physics_effect_categories = StringSet{"monster"};
   auto result13 = ActorMovementController::create(this->root(), movementParameters);
 if (!result13) return std::unexpected(std::move(result13.error()));
-m_movementController = std::move(*result13);
+m_movement_controller = std::move(*result13);
 
   setPersistent(m_monsterVariant.persistent);
 
@@ -239,7 +239,7 @@ if (!result16) return std::unexpected(std::move(result16.error()));
 m_monsterLevel = std::move(*result16);
   auto result17 = diskStore.get("movementState");
 if (!result17) return std::unexpected(std::move(result17.error()));
-auto result18 = m_movementController->load_state(std::move(*result17));
+auto result18 = m_movement_controller->load_state(std::move(*result17));
 if (!result18) return std::unexpected(std::move(result18.error()));
 
   auto result19 = diskStore.get("statusController");
@@ -295,7 +295,7 @@ setUniqueId(std::move(*result31));
 }
 
 std::expected<Json, StarException> Monster::diskStore() const {
-  auto result35 = m_movementController->store_state();
+  auto result35 = m_movement_controller->store_state();
 if (!result35) return std::unexpected(std::move(result35.error()));
 auto result36 = m_statusController->diskStore();
 if (!result36) return std::unexpected(std::move(result36.error()));
@@ -333,12 +333,12 @@ if (!result42) return std::unexpected(std::move(result42.error()));
 return std::move(*result42)->writeMonsterVariant(m_monsterVariant, rules);
 }
 
-EntityType Monster::entityType() const {
+EntityType Monster::entity_type() const {
   return EntityType::Monster;
 }
 
-ClientEntityMode Monster::clientEntityMode() const {
-  return m_monsterVariant.clientEntityMode;
+ClientEntityMode Monster::client_entity_mode() const {
+  return m_monsterVariant.client_entity_mode;
 }
 
 std::expected<void, StarException> Monster::init(World& world, EntityId entityId, EntityMode mode) {
@@ -346,9 +346,9 @@ std::expected<void, StarException> Monster::init(World& world, EntityId entityId
 if (!result43) return std::unexpected(std::move(result43.error()));
 
 
-  m_movementController->init(world);
-  m_movementController->setIgnorePhysicsEntities({entityId});
-  auto result44 = m_statusController->init(*this, *m_movementController);
+  m_movement_controller->init(world);
+  m_movement_controller->setIgnorePhysicsEntities({entityId});
+  auto result44 = m_statusController->init(*this, *m_movement_controller);
 if (!result44) return std::unexpected(std::move(result44.error()));
 
 
@@ -406,7 +406,7 @@ if (!result61) return std::unexpected(std::move(result61.error()));
 auto result62 = m_scriptComponent.add_callbacks("behavior", std::move(*result61));
 if (!result62) return std::unexpected(std::move(result62.error()));
 
-    auto result63 = m_scriptComponent.add_actor_movement_callbacks(*m_movementController);
+    auto result63 = m_scriptComponent.add_actor_movement_callbacks(*m_movement_controller);
 if (!result63) return std::unexpected(std::move(result63.error()));
 
     auto result64 = recover_lua_script_error(m_scriptComponent.init(world));
@@ -490,7 +490,7 @@ if (!result79) return std::unexpected(std::move(result79.error()));
   auto result84 = m_statusController->uninit();
 if (!result84) return std::unexpected(std::move(result84.error()));
 
-  m_movementController->uninit();
+  m_movement_controller->uninit();
   auto result85 = Entity::uninit();
 if (!result85) return std::unexpected(std::move(result85.error()));
 
@@ -510,19 +510,19 @@ return std::move(*result87) - position();
 }
 
 Vec2F Monster::position() const {
-  return m_movementController->position();
+  return m_movement_controller->position();
 }
 
-RectF Monster::metaBoundBox() const {
-  return m_monsterVariant.metaBoundBox;
+RectF Monster::meta_bound_box() const {
+  return m_monsterVariant.meta_bound_box;
 }
 
-RectF Monster::collisionArea() const {
-  return m_movementController->collisionPoly().bounding_box();
+RectF Monster::collision_area() const {
+  return m_movement_controller->collisionPoly().bounding_box();
 }
 
 Vec2F Monster::velocity() const {
-  return m_movementController->velocity();
+  return m_movement_controller->velocity();
 }
 
 std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Monster::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
@@ -533,14 +533,14 @@ std::expected<void, StarException> Monster::read_net_state(ByteArray data, float
   return m_netGroup.read_net_state(std::move(data), interpolationTime, rules);
 }
 
-std::expected<void, StarException> Monster::enableInterpolation(float extrapolationHint) {
-  auto result89 = m_netGroup.enable_net_interpolation(extrapolationHint);
+std::expected<void, StarException> Monster::enable_interpolation(float extrapolation_hint) {
+  auto result89 = m_netGroup.enable_net_interpolation(extrapolation_hint);
 if (!result89) return std::unexpected(std::move(result89.error()));
 
   return {};
 }
 
-std::expected<void, StarException> Monster::disableInterpolation() {
+std::expected<void, StarException> Monster::disable_interpolation() {
   auto result90 = m_netGroup.disable_net_interpolation();
 if (!result90) return std::unexpected(std::move(result90.error()));
 
@@ -577,7 +577,7 @@ std::expected<std::optional<HitType>, StarException> Monster::queryHit(DamageSou
 
 std::expected<std::optional<PolyF>, StarException> Monster::hitPoly() const {
   PolyF hitBody = m_monsterVariant.selfDamagePoly;
-  hitBody.rotate(m_movementController->rotation());
+  hitBody.rotate(m_movement_controller->rotation());
   hitBody.translate(position());
   return hitBody;
 }
@@ -632,7 +632,7 @@ float levelPowerMultiplier = std::move(*result98);
 if (!result99) return std::unexpected(std::move(result99.error()));
 auto damageSource = std::move(*result99);
     if (std::holds_alternative<PolyF>(damageSource.damage_area))
-      std::get<PolyF>(damageSource.damage_area).rotate(m_movementController->rotation());
+      std::get<PolyF>(damageSource.damage_area).rotate(m_movement_controller->rotation());
     damageSource.damage *= m_monsterVariant.touchDamageMultiplier * levelPowerMultiplier * m_statusController->stat("powerMultiplier");
     damageSource.source_entity_id = entityId();
     damageSource.team = getTeam();
@@ -765,7 +765,7 @@ for (auto const& pair : knockoutAnimationStates) {
   return {};
 }
 
-std::expected<bool, StarException> Monster::shouldDestroy() const {
+std::expected<bool, StarException> Monster::should_destroy() const {
   return m_knockedOut && m_knockoutTimer <= 0;
 }
 
@@ -816,11 +816,11 @@ treasurePool = std::move(*result121);
   if (!result125) return std::unexpected(std::move(result125.error()));
   auto result126 = treasureDatabase->createTreasure(treasurePool, std::move(*result125));
   if (!result126) return std::unexpected(std::move(result126.error()));
-  for (auto const& treasureItem : std::move(*result126))
+  for (auto const& treasure_item : std::move(*result126))
           {
     auto result127 = world();
     if (!result127) return std::unexpected(std::move(result127.error()));
-    auto result128 = ItemDrop::create_randomized_drop(this->root(), treasureItem, position());
+    auto result128 = ItemDrop::create_randomized_drop(this->root(), treasure_item, position());
     if (!result128) return std::unexpected(std::move(result128.error()));
     auto result129 = result127->get().addEntity(std::move(*result128));
     if (!result129) return std::unexpected(std::move(result129.error()));
@@ -902,10 +902,10 @@ std::expected<void, StarException> Monster::update(float dt, std::uint64_t) {
   if (!inWorld())
     return {};
 
-  m_movementController->setTimestep(dt);
+  m_movement_controller->setTimestep(dt);
 
   if (isMaster()) {
-    m_networkedAnimator->setFlipped((m_movementController->facing_direction() == Direction::Left) != m_monsterVariant.reversed);
+    m_networkedAnimator->setFlipped((m_movement_controller->facing_direction() == Direction::Left) != m_monsterVariant.reversed);
 
     if (m_knockedOut) {
       m_knockoutTimer -= dt;
@@ -928,7 +928,7 @@ if (!result140) return std::unexpected(std::move(result140.error()));
 }
     }
 
-    auto result143 = m_movementController->tick_master(dt);
+    auto result143 = m_movement_controller->tick_master(dt);
 if (!result143) return std::unexpected(std::move(result143.error()));
 
 
@@ -950,7 +950,7 @@ if (!result147) return std::unexpected(std::move(result147.error()));
 if (!result148) return std::unexpected(std::move(result148.error()));
 
 
-    auto result149 = m_movementController->tick_slave(dt);
+    auto result149 = m_movement_controller->tick_slave(dt);
 if (!result149) return std::unexpected(std::move(result149.error()));
 
   }
@@ -971,14 +971,14 @@ if (!result149) return std::unexpected(std::move(result149.error()));
       auto result153 = recover_lua_script_error(m_scriptedAnimator.update());
   if (!result153) return std::unexpected(std::move(result153.error()));
 
-  this->root().spatialLogger().log_poly("world", m_movementController->collisionBody(), {255, 0, 0, 255});
+  this->root().spatialLogger().log_poly("world", m_movement_controller->collisionBody(), {255, 0, 0, 255});
     }
 }
   return {};
 }
 
-std::uint64_t Monster::presentationEpoch() const {
-  return Entity::presentationEpoch() + m_movementController->presentationEpoch();
+std::uint64_t Monster::presentation_epoch() const {
+  return Entity::presentation_epoch() + m_movement_controller->presentation_epoch();
 }
 
 std::expected<void, StarException> Monster::collectRenderEvents(RenderCallback& render_callback) {
@@ -1032,7 +1032,7 @@ for (auto const& drawablePair : m_scriptedAnimator.drawables()) {
   return {};
 }
 
-std::expected<void, StarException> Monster::renderLightSources(RenderCallback& render_callback) {
+std::expected<void, StarException> Monster::render_light_sources(RenderCallback& render_callback) {
   auto sample = m_networkedAnimator->sample(render_callback.presentation().interpolation());
   auto result168 = sample.lightSources(position());
 if (!result168) return std::unexpected(std::move(result168.error()));
@@ -1049,7 +1049,7 @@ if (!result172) return std::unexpected(std::move(result172.error()));
 
 void Monster::setPosition(Vec2F const& pos) {
   resetPresentation();
-  m_movementController->setPosition(pos);
+  m_movement_controller->setPosition(pos);
 }
 
 MessageResponseResult Monster::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
@@ -1085,11 +1085,11 @@ DamageBarType Monster::damageBar() const {
 }
 
 std::expected<Vec2F, StarException> Monster::getAbsolutePosition(Vec2F relativePosition) const {
-  if (m_movementController->facing_direction() == Direction::Left)
+  if (m_movement_controller->facing_direction() == Direction::Left)
     relativePosition[0] *= -1;
-  if (m_movementController->rotation() != 0)
-    relativePosition = relativePosition.rotate(m_movementController->rotation());
-  return m_movementController->position() + relativePosition;
+  if (m_movement_controller->rotation() != 0)
+    relativePosition = relativePosition.rotate(m_movement_controller->rotation());
+  return m_movement_controller->position() + relativePosition;
 }
 
 std::expected<void, StarException> Monster::updateStatus(float dt) {
@@ -1100,7 +1100,7 @@ m_effectEmitter->setSourcePosition("mouth", position() + std::move(*result177));
   auto result178 = feetOffset();
 if (!result178) return std::unexpected(std::move(result178.error()));
 m_effectEmitter->setSourcePosition("feet", position() + std::move(*result178));
-  m_effectEmitter->setDirection(m_movementController->facing_direction());
+  m_effectEmitter->setDirection(m_movement_controller->facing_direction());
   auto result179 = m_effectEmitter->tick(dt, *entityMode());
 if (!result179) return std::unexpected(std::move(result179.error()));
 
@@ -1183,7 +1183,7 @@ if (!result191) return std::unexpected(std::move(result191.error()));
   auto result193 = callbacks.register_callback("flyTo", [this](Vec2F const& arg1) -> std::expected<void, StarException> {
       auto result192 = world();
 if (!result192) return std::unexpected(std::move(result192.error()));
-m_movementController->control_fly(result192->get().geometry().diff(arg1, position()));
+m_movement_controller->control_fly(result192->get().geometry().diff(arg1, position()));
       return {};
 });
 if (!result193) return std::unexpected(std::move(result193.error()));
@@ -1350,7 +1350,7 @@ if (!result225) return std::unexpected(std::move(result225.error()));
   auto result226 = m_netGroup.add_net_element(*m_networkedAnimator);
 if (!result226) return std::unexpected(std::move(result226.error()));
 
-  auto result227 = m_netGroup.add_net_element(*m_movementController);
+  auto result227 = m_netGroup.add_net_element(*m_movement_controller);
 if (!result227) return std::unexpected(std::move(result227.error()));
 
   auto result228 = m_netGroup.add_net_element(*m_statusController);
@@ -1512,11 +1512,11 @@ bool Monster::aggressive() const {
   return m_aggressive;
 }
 
-std::expected<std::optional<LuaValue>, StarException> Monster::callScript(String const& func, LuaVariadic<LuaValue> const& args) {
+std::expected<std::optional<LuaValue>, StarException> Monster::call_script(String const& func, LuaVariadic<LuaValue> const& args) {
   return recover_lua_script_error(m_scriptComponent.invoke(func, args));
 }
 
-std::expected<std::optional<LuaValue>, StarException> Monster::evalScript(String const& code) {
+std::expected<std::optional<LuaValue>, StarException> Monster::eval_script(String const& code) {
   return recover_lua_script_error(m_scriptComponent.eval(code));
 }
 
@@ -1554,12 +1554,12 @@ bool Monster::isInteractive() const {
 
 std::expected<Vec2F, StarException> Monster::questIndicatorPosition() const {
   Vec2F pos = position() + m_questIndicatorOffset;
-  pos[1] += collisionArea().y_max();
+  pos[1] += collision_area().y_max();
   return pos;
 }
 
-ActorMovementController& Monster::movementController() {
-  return *m_movementController;
+ActorMovementController& Monster::movement_controller() {
+  return *m_movement_controller;
 }
 
 StatusController& Monster::statusController() {

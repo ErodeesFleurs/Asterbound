@@ -163,7 +163,7 @@ std::expected<void, StarException> Stagehand::uninit() {
   return {};
 }
 
-EntityType Stagehand::entityType() const {
+EntityType Stagehand::entity_type() const {
   return EntityType::Stagehand;
 }
 
@@ -176,7 +176,7 @@ Vec2F Stagehand::position() const {
   return {m_xPosition.get(), m_yPosition.get()};
 }
 
-RectF Stagehand::metaBoundBox() const {
+RectF Stagehand::meta_bound_box() const {
   return m_boundBox;
 }
 
@@ -206,7 +206,7 @@ std::expected<void, StarException> Stagehand::update(float dt, std::uint64_t) {
   if (!currentWorld)
     return std::unexpected(std::move(currentWorld.error()));
   if (currentWorld->get().isClient()) {
-    auto boundBox = metaBoundBox().translated(position());
+    auto boundBox = meta_bound_box().translated(position());
     this->root().spatialLogger().log_poly("world", PolyF(boundBox), {0, 255, 255, 255});
     this->root().spatialLogger().log_line("world", boundBox.min(), boundBox.max(), {0, 255, 255, 255});
     this->root().spatialLogger().log_line("world", {boundBox.x_min(), boundBox.y_max()},
@@ -215,15 +215,15 @@ std::expected<void, StarException> Stagehand::update(float dt, std::uint64_t) {
   return {};
 }
 
-std::expected<bool, StarException> Stagehand::shouldDestroy() const {
+std::expected<bool, StarException> Stagehand::should_destroy() const {
   return m_dead;
 }
 
-std::expected<std::optional<LuaValue>, StarException> Stagehand::callScript(String const& func, LuaVariadic<LuaValue> const& args) {
+std::expected<std::optional<LuaValue>, StarException> Stagehand::call_script(String const& func, LuaVariadic<LuaValue> const& args) {
   return recover_lua_script_error(m_scriptComponent.invoke(func, args));
 }
 
-std::expected<std::optional<LuaValue>, StarException> Stagehand::evalScript(String const& code) {
+std::expected<std::optional<LuaValue>, StarException> Stagehand::eval_script(String const& code) {
   return recover_lua_script_error(m_scriptComponent.eval(code));
 }
 
@@ -260,7 +260,7 @@ std::expected<void, StarException> Stagehand::readConfig(Json config) {
   auto clientMode = ClientEntityModeNames->get_left(*clientModeName);
   if (!clientMode)
     return std::unexpected(std::move(clientMode.error()));
-  m_clientEntityMode = clientMode->get();
+  m_client_entity_mode = clientMode->get();
   auto position = m_config.opt("position");
   if (!position)
     return std::unexpected(std::move(position.error()));
@@ -328,8 +328,8 @@ std::expected<LuaCallbacks, StarException> Stagehand::makeStagehandCallbacks() {
   return callbacks;
 }
 
-ClientEntityMode Stagehand::clientEntityMode() const {
-  return m_clientEntityMode;
+ClientEntityMode Stagehand::client_entity_mode() const {
+  return m_client_entity_mode;
 }
 
 std::expected<String, StarException> Stagehand::typeName() const {

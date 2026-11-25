@@ -92,7 +92,7 @@ std::expected<Set<std::pair<EntityId, std::size_t>>, StarException> LoungeableEn
   if (!currentWorld)
     return std::unexpected(std::move(currentWorld.error()));
   Set<std::pair<EntityId, std::size_t>> loungingInEntities;
-  auto scanned = currentWorld->get().forEachEntity(metaBoundBox().translated(position()),
+  auto scanned = currentWorld->get().forEachEntity(meta_bound_box().translated(position()),
       [&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
         if (auto lounger = as<LoungingEntity>(entity)) {
           if (auto anchorStatus = lounger->loungingIn()) {

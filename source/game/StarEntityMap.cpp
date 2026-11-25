@@ -108,7 +108,7 @@ std::expected<bool, StarException> line_hits_entity(WorldGeometry const& geometr
     StaticList<Line2F, 2> const& lines, Entity const& entity) {
   // Mirror the entity instead of the line: a diagonal ending on the seam
   // only touches the opposite side at its endpoint, not along a second ray.
-  auto boxes = closed_query_bounds(geometry, entity.metaBoundBox().translated(entity.position()));
+  auto boxes = closed_query_bounds(geometry, entity.meta_bound_box().translated(entity.position()));
   if (!boxes) return std::unexpected(std::move(boxes.error()));
   for (auto const& box : *boxes) {
     if (box.is_null()) continue;
@@ -207,7 +207,7 @@ std::expected<EntityId, StarException> EntityMap::reserve_entity_id(EntityId ent
 
 std::expected<void, StarException> EntityMap::add_entity(std::shared_ptr<Entity> entity) {
   auto position = entity->position();
-  auto bound_box = entity->metaBoundBox();
+  auto bound_box = entity->meta_bound_box();
   auto entity_id = entity->entityId();
   auto unique_id = entity->uniqueId();
 
@@ -217,7 +217,7 @@ std::expected<void, StarException> EntityMap::add_entity(std::shared_ptr<Entity>
   if (bound_box.is_negative() || bound_box.width() > maximum_entity_bound_box || bound_box.height() > maximum_entity_bound_box) {
     return std::unexpected(EntityMapException::format("Entity id: {} type: {} bound box is negative or beyond the "
                                                       "maximum entity bound box size in EntityMap::add_entity",
-                                                      entity->entityId(), static_cast<int>(entity->entityType())));
+                                                      entity->entityId(), static_cast<int>(entity->entity_type())));
   }
 
   if (entity_id == null_entity_id)
@@ -259,12 +259,12 @@ std::expected<void, StarException> EntityMap::update_all_entities(EntityCallback
     auto const& entity = entry.value;
 
     auto position = entity->position();
-    auto bound_box = entity->metaBoundBox();
+    auto bound_box = entity->meta_bound_box();
 
     if (bound_box.is_negative() || bound_box.width() > maximum_entity_bound_box || bound_box.height() > maximum_entity_bound_box) {
       return std::unexpected(EntityMapException::format("Entity id: {} type: {} bound box is negative or beyond the "
                                                         "maximum entity bound box size during refresh",
-                                                        entity->entityId(), static_cast<int>(entity->entityType())));
+                                                        entity->entityId(), static_cast<int>(entity->entity_type())));
     }
 
     if (entity->entityId() != entity_id)
@@ -432,7 +432,7 @@ std::expected<void, StarException> EntityMap::for_all_entities(EntityCallback co
     auto result = callback(entity);
     if (!result) {
       if (!EntityTypeNames) return std::unexpected(result.error().with_related(EntityTypeNames.error(), "Naming the failing entity type"));
-      auto type = EntityTypeNames->get_right(entity->entityType());
+      auto type = EntityTypeNames->get_right(entity->entity_type());
       if (!type) return std::unexpected(result.error().with_related(type.error(), "Naming the failing entity type"));
       auto name = entity->name();
       if (!name) return std::unexpected(result.error().with_related(name.error(), "Naming the failing entity"));
@@ -540,7 +540,7 @@ std::expected<std::shared_ptr<InteractiveEntity>, StarException> EntityMap::inte
           if (spaces.empty())
             return {};
           auto tile_position = tile_entity.tilePosition();
-          auto center_distance = m_geometry.diff(tile_entity.metaBoundBox().center() + tile_entity.position(), pos).magnitude();
+          auto center_distance = m_geometry.diff(tile_entity.meta_bound_box().center() + tile_entity.position(), pos).magnitude();
           for (auto const& space : spaces) {
             auto dist = m_geometry.diff(pos, center_of_tile(space + tile_position)).magnitude();
             if ((dist < best_distance) || ((dist == best_distance) && (center_distance < best_center_distance))) {
@@ -585,7 +585,7 @@ std::expected<bool, StarException> EntityMap::space_is_occupied(RectF const& rec
   return m_spatial_map.any_of(*bounds, [&](std::shared_ptr<Entity> const& entity) -> std::expected<bool, StarException> {
     if (!include_ephemeral && entity->ephemeral())
       return false;
-    auto boxes = split_entity_bounds(m_geometry, entity->collisionArea().translated(entity->position()));
+    auto boxes = split_entity_bounds(m_geometry, entity->collision_area().translated(entity->position()));
     if (!boxes) return std::unexpected(std::move(boxes.error()));
     for (auto const& box : *boxes)
       for (auto const& query : *bounds)

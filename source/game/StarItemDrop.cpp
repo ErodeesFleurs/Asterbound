@@ -260,7 +260,7 @@ std::expected<ByteArray, StarException> ItemDrop::net_store(NetCompatibilityRule
   return ds.take_data();
 }
 
-EntityType ItemDrop::entityType() const {
+EntityType ItemDrop::entity_type() const {
   return EntityType::ItemDrop;
 }
 
@@ -313,7 +313,7 @@ std::expected<void, StarException> ItemDrop::init(World& world, EntityId entity_
   return setup;
 }
 
-ClientEntityMode ItemDrop::clientEntityMode() const {
+ClientEntityMode ItemDrop::client_entity_mode() const {
   return m_client_entity_mode;
 }
 
@@ -361,7 +361,7 @@ std::expected<void, StarException> ItemDrop::read_net_state(ByteArray data, floa
   return m_net_group.read_net_state(std::move(data), interpolation_time, rules);
 }
 
-std::expected<void, StarException> ItemDrop::enableInterpolation(float extrapolation_hint) {
+std::expected<void, StarException> ItemDrop::enable_interpolation(float extrapolation_hint) {
   if (auto enabled = m_net_group.enable_net_interpolation(extrapolation_hint); !enabled)
     return std::unexpected(std::move(enabled.error()));
   if (auto disabled = m_mode.disable_net_interpolation(); !disabled)
@@ -369,7 +369,7 @@ std::expected<void, StarException> ItemDrop::enableInterpolation(float extrapola
   return m_owning_entity.disable_net_interpolation();
 }
 
-std::expected<void, StarException> ItemDrop::disableInterpolation() {
+std::expected<void, StarException> ItemDrop::disable_interpolation() {
   return m_net_group.disable_net_interpolation();
 }
 
@@ -377,7 +377,7 @@ Vec2F ItemDrop::position() const {
   return m_movement_controller->position();
 }
 
-RectF ItemDrop::metaBoundBox() const {
+RectF ItemDrop::meta_bound_box() const {
   return m_bound_box;
 }
 
@@ -385,7 +385,7 @@ bool ItemDrop::ephemeral() const {
   return true;
 }
 
-RectF ItemDrop::collisionArea() const {
+RectF ItemDrop::collision_area() const {
   return m_bound_box;
 }
 
@@ -545,12 +545,12 @@ void ItemDrop::replace_item(std::shared_ptr<Item> replacement) {
   m_item = std::move(replacement);
 }
 
-std::expected<bool, StarException> ItemDrop::shouldDestroy() const {
+std::expected<bool, StarException> ItemDrop::should_destroy() const {
   return m_mode.get() == Mode::Dead || (m_item->empty() && m_owning_entity.get() == null_entity_id);
 }
 
-std::uint64_t ItemDrop::presentationEpoch() const {
-  return Entity::presentationEpoch() + m_movement_controller->presentationEpoch();
+std::uint64_t ItemDrop::presentation_epoch() const {
+  return Entity::presentation_epoch() + m_movement_controller->presentation_epoch();
 }
 
 std::expected<void, StarException> ItemDrop::render(RenderCallback& render_callback) {
@@ -625,7 +625,7 @@ std::expected<void, StarException> ItemDrop::render(RenderCallback& render_callb
   return {};
 }
 
-std::expected<void, StarException> ItemDrop::renderLightSources(RenderCallback& render_callback) {
+std::expected<void, StarException> ItemDrop::render_light_sources(RenderCallback& render_callback) {
   LightSource light;
   light.type = LightType::Spread;
   light.color = Vec3F::filled(20.f / 255.f);
@@ -633,7 +633,7 @@ std::expected<void, StarException> ItemDrop::renderLightSources(RenderCallback& 
   return render_callback.add_light_source(std::move(light));
 }
 
-MovementController& ItemDrop::movementController() {
+MovementController& ItemDrop::movement_controller() {
   return *m_movement_controller;
 }
 
@@ -814,7 +814,7 @@ std::expected<void, StarException> ItemDrop::update_taken(bool master) {
     Vec2F target_position = owning_entity->position();
     if (overhead) {
       target_position += m_overhead_offset;
-      auto rect = owning_entity->collisionArea();
+      auto rect = owning_entity->collision_area();
       if (!rect.is_null())
         target_position[1] += rect.y_max() + 1.5f;
       else
@@ -844,11 +844,11 @@ std::expected<void, StarException> ItemDrop::update_taken(bool master) {
   return m_movement_controller->applyParameters(parameters);
 }
 
-std::expected<std::optional<LuaValue>, StarException> ItemDrop::callScript(String const& func, LuaVariadic<LuaValue> const& args) {
+std::expected<std::optional<LuaValue>, StarException> ItemDrop::call_script(String const& func, LuaVariadic<LuaValue> const& args) {
   return recover_lua_script_error(m_script_component.invoke(func, args));
 }
 
-std::expected<std::optional<LuaValue>, StarException> ItemDrop::evalScript(String const& code) {
+std::expected<std::optional<LuaValue>, StarException> ItemDrop::eval_script(String const& code) {
   return recover_lua_script_error(m_script_component.eval(code));
 }
 

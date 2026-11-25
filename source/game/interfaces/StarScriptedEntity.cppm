@@ -33,9 +33,9 @@ public:
 
   // Missing/unloaded script contexts return an empty optional; execution errors
   // are returned separately without losing the diagnostic.
-  [[nodiscard]] virtual std::expected<std::optional<LuaValue>, StarException> callScript(String const& func, LuaVariadic<LuaValue> const& args) = 0;
+  [[nodiscard]] virtual std::expected<std::optional<LuaValue>, StarException> call_script(String const& func, LuaVariadic<LuaValue> const& args) = 0;
 
-  [[nodiscard]] virtual std::expected<std::optional<LuaValue>, StarException> evalScript(String const& code) = 0;
+  [[nodiscard]] virtual std::expected<std::optional<LuaValue>, StarException> eval_script(String const& code) = 0;
 };
 
 }

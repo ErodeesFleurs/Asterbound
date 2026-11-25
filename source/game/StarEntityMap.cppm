@@ -76,7 +76,7 @@ public:
   std::shared_ptr<Entity> entity(EntityId entity_id) const;
   std::shared_ptr<Entity> unique_entity(String const& unique_id) const;
 
-  // Queries entities based on metaBoundBox
+  // Queries entities based on meta_bound_box
   [[nodiscard]] std::expected<List<std::shared_ptr<Entity>>, StarException> entity_query(RectF const& bound_box, EntityFilter const& filter = {}) const;
 
   // A fuzzy query of the entities at this position, sorted by closeness.

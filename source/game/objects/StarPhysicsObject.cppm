@@ -82,15 +82,15 @@ public:
 
   [[nodiscard]] static std::expected<std::shared_ptr<PhysicsObject>, StarException> create(Root& rootContext, std::shared_ptr<ObjectConfig const> config, Json const& parameters = Json());
 
-  [[nodiscard]] std::expected<void, StarException> enableInterpolation(float extrapolationHint = 0.0f) override;
-  [[nodiscard]] std::expected<void, StarException> disableInterpolation() override;
+  [[nodiscard]] std::expected<void, StarException> enable_interpolation(float extrapolation_hint = 0.0f) override;
+  [[nodiscard]] std::expected<void, StarException> disable_interpolation() override;
 
   [[nodiscard]] std::expected<void, StarException> init(World& world, EntityId entityId, EntityMode mode) override;
   [[nodiscard]] std::expected<void, StarException> uninit() override;
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
 
-  RectF metaBoundBox() const override;
+  RectF meta_bound_box() const override;
 
   [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> force_regions() const override;
 
@@ -114,7 +114,7 @@ private:
   OrderedHashMap<String, PhysicsForceConfig> m_physics_forces;
   OrderedHashMap<String, PhysicsCollisionConfig> m_physicsCollisions;
 
-  RectF m_metaBoundBox;
+  RectF m_meta_bound_box;
 };
 
 }

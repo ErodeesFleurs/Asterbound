@@ -269,10 +269,10 @@ std::expected<void, StarException> ContainerObject::update(float dt, std::uint64
       return std::unexpected(std::move(currentWorldResult.error()));
     auto currentWorld = std::move(*currentWorldResult);
     for (auto const& item : std::exchange(m_lostItems, {})) {
-      auto dropResult = ItemDrop::create_randomized_drop(root(), item, position());
-      if (!dropResult)
-        return std::unexpected(std::move(dropResult.error()));
-      auto drop = std::move(*dropResult);
+      auto drop_result = ItemDrop::create_randomized_drop(root(), item, position());
+      if (!drop_result)
+        return std::unexpected(std::move(drop_result.error()));
+      auto drop = std::move(*drop_result);
       auto operation2 = currentWorld.get().addEntity(drop);
       if (!operation2)
         return std::unexpected(std::move(operation2.error()));
@@ -457,10 +457,10 @@ std::expected<void, StarException> ContainerObject::destroy(std::optional<std::r
       return std::unexpected(std::move(currentWorldResult.error()));
     auto currentWorld = std::move(*currentWorldResult);
     for (auto const& item : m_items->items()) {
-      auto dropResult = ItemDrop::create_randomized_drop(root(), item, position());
-      if (!dropResult)
-        return std::unexpected(std::move(dropResult.error()));
-      auto drop = std::move(*dropResult);
+      auto drop_result = ItemDrop::create_randomized_drop(root(), item, position());
+      if (!drop_result)
+        return std::unexpected(std::move(drop_result.error()));
+      auto drop = std::move(*drop_result);
       auto operation2 = currentWorld.get().addEntity(drop);
       if (!operation2)
         return std::unexpected(std::move(operation2.error()));
@@ -1331,10 +1331,10 @@ std::expected<void, StarException> ContainerObject::tickCrafting(float dt) {
       if (!currentWorldResult)
         return std::unexpected(std::move(currentWorldResult.error()));
       auto currentWorld = std::move(*currentWorldResult);
-      auto dropResult = ItemDrop::create_randomized_drop(root(), overflow, position());
-      if (!dropResult)
-        return std::unexpected(std::move(dropResult.error()));
-      auto drop = std::move(*dropResult);
+      auto drop_result = ItemDrop::create_randomized_drop(root(), overflow, position());
+      if (!drop_result)
+        return std::unexpected(std::move(drop_result.error()));
+      auto drop = std::move(*drop_result);
       auto operation2 = currentWorld.get().addEntity(drop);
       if (!operation2)
         return std::unexpected(std::move(operation2.error()));

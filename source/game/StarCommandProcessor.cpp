@@ -1148,7 +1148,7 @@ std::expected<String, StarException> CommandProcessor::entity_eval(ConnectionId 
             target_entity = entity;
         }
 
-        auto res = target_entity->evalScript(lua);
+        auto res = target_entity->eval_script(lua);
         if (!res) return std::unexpected(std::move(res.error()));
         if (*res) {
           auto printed = Star::print_lua_value(**res);

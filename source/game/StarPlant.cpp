@@ -1086,7 +1086,7 @@ Plant::Plant(Root& rootContext) : Entity(rootContext) {
   m_tileDamageEvent = false;
 }
 
-EntityType Plant::entityType() const {
+EntityType Plant::entity_type() const {
   return EntityType::Plant;
 }
 
@@ -1109,18 +1109,18 @@ std::expected<void, StarException> Plant::read_net_state(ByteArray data, float i
   return m_netGroup.read_net_state(std::move(data), interpolationTime, rules);
 }
 
-std::expected<void, StarException> Plant::enableInterpolation(float extrapolationHint) {
+std::expected<void, StarException> Plant::enable_interpolation(float extrapolation_hint) {
   // Only enable plant interpolation when it actually matters, for things that
   // generate PlantDrops so that they match when the PlantDrops appear.
   if (m_fallsWhenDead)
     {
-auto result632 = m_netGroup.enable_net_interpolation(extrapolationHint);
+auto result632 = m_netGroup.enable_net_interpolation(extrapolation_hint);
 if (!result632) return std::unexpected(std::move(result632.error()));
 }
   return {};
 }
 
-std::expected<void, StarException> Plant::disableInterpolation() {
+std::expected<void, StarException> Plant::disable_interpolation() {
   auto result631 = m_netGroup.disable_net_interpolation();
 if (!result631) return std::unexpected(std::move(result631.error()));
   return {};
@@ -1136,8 +1136,8 @@ Vec2F Plant::position() const {
   return Vec2F(m_tilePosition);
 }
 
-RectF Plant::metaBoundBox() const {
-  return m_metaBoundBox;
+RectF Plant::meta_bound_box() const {
+  return m_meta_bound_box;
 }
 
 bool Plant::ephemeral() const {
@@ -1169,7 +1169,7 @@ bool Plant::ceiling() const {
   return m_ceiling;
 }
 
-std::expected<bool, StarException> Plant::shouldDestroy() const {
+std::expected<bool, StarException> Plant::should_destroy() const {
   return m_broken || m_pieces.size() == 0;
 }
 
@@ -1242,7 +1242,7 @@ void Plant::calcBoundBox() {
   RectF boundBox = RectF::bound_box_of_points(m_spaces);
   // Plants are allowed to visibly occupy one outside space from the spaces
   // they take up.
-  m_metaBoundBox = RectF(boundBox.min() - Vec2F(1, 1), boundBox.max() + Vec2F(2, 2));
+  m_meta_bound_box = RectF(boundBox.min() - Vec2F(1, 1), boundBox.max() + Vec2F(2, 2));
 }
 
 float Plant::branchRotation(float xPos, float rotoffset, float interpolation) const {

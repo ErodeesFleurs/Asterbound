@@ -586,7 +586,7 @@ std::expected<void, StarException> StatusController::init(Entity& parentEntity, 
   if (auto result = uninit(); !result) return std::unexpected(std::move(result.error()));
 
   m_parentEntity = std::ref(parentEntity);
-  m_movementController = std::ref(movementController);
+  m_movement_controller = std::ref(movementController);
 
   if (m_parentEntity->get().isMaster()) {
     auto effects = effect_snapshot();
@@ -618,7 +618,7 @@ std::expected<void, StarException> StatusController::uninit() {
   m_recent_damage_given.reset();
   m_recent_damage_taken.reset();
   m_parentEntity.reset();
-  m_movementController.reset();
+  m_movement_controller.reset();
   if (error) return std::unexpected(std::move(*error));
   return {};
 }
@@ -639,8 +639,8 @@ std::expected<void, StarException> StatusController::net_load(DataStream& ds, Ne
   return m_netGroup.net_load(ds, rules);
 }
 
-std::expected<void, StarException> StatusController::enable_net_interpolation(float extrapolationHint) {
-  return m_netGroup.enable_net_interpolation(extrapolationHint);
+std::expected<void, StarException> StatusController::enable_net_interpolation(float extrapolation_hint) {
+  return m_netGroup.enable_net_interpolation(extrapolation_hint);
 }
 
 std::expected<void, StarException> StatusController::disable_net_interpolation() {
@@ -669,10 +669,10 @@ std::expected<void, StarException> StatusController::tickMaster(float dt) {
   m_recent_damage_given.tick();
   m_recent_damage_taken.tick();
   bool statusImmune = statPositive("statusImmunity");
-  if (!statusImmune && m_movementController->get().liquidPercentage() > m_minimumLiquidStatusEffectPercentage) {
+  if (!statusImmune && m_movement_controller->get().liquidPercentage() > m_minimumLiquidStatusEffectPercentage) {
     auto database = m_root.liquidsDatabase();
     if (!database) return std::unexpected(std::move(database.error()));
-    if (auto settings = (*database)->liquidSettings(m_movementController->get().liquidId())) {
+    if (auto settings = (*database)->liquidSettings(m_movement_controller->get().liquidId())) {
       for (auto const& value : settings->statusEffects) {
         auto effect = jsonToEphemeralStatusEffect(value);
         if (!effect) return std::unexpected(std::move(effect.error()));
@@ -681,7 +681,7 @@ std::expected<void, StarException> StatusController::tickMaster(float dt) {
     }
   }
   if (m_environment_status_effect_update_timer.wrap_tick(m_root.timing().time_step)) {
-    PolyF collisionBody = m_movementController->get().collisionBody();
+    PolyF collisionBody = m_movement_controller->get().collisionBody();
     auto world = m_parentEntity->get().world();
     if (!world) return std::unexpected(std::move(world.error()));
     List<PersistentStatusEffect> entityEffects;
@@ -766,7 +766,7 @@ std::expected<List<Drawable>, StarException> StatusController::drawables(float i
   List<Drawable> output;
   for (auto const& animator : m_effectAnimators.net_elements()) {
     auto sample = animator->animator->sample(interpolation);
-    auto values = sample.drawables(m_movementController->get().position());
+    auto values = sample.drawables(m_movement_controller->get().position());
     if (!values) return std::unexpected(std::move(values.error()));
     output.append_range(std::move(*values));
   }
@@ -777,7 +777,7 @@ std::expected<List<LightSource>, StarException> StatusController::lightSources(f
   List<LightSource> output;
   for (auto const& animator : m_effectAnimators.net_elements()) {
     auto sample = animator->animator->sample(interpolation);
-    auto values = sample.lightSources(m_movementController->get().position());
+    auto values = sample.lightSources(m_movement_controller->get().position());
     if (!values) return std::unexpected(std::move(values.error()));
     output.append_range(std::move(*values));
   }
@@ -879,8 +879,8 @@ std::expected<void, StarException> StatusController::EffectAnimator::net_load(Da
   return animator->net_load(ds, rules);
 }
 
-std::expected<void, StarException> StatusController::EffectAnimator::enable_net_interpolation(float extrapolationHint) {
-  return animator->enable_net_interpolation(extrapolationHint);
+std::expected<void, StarException> StatusController::EffectAnimator::enable_net_interpolation(float extrapolation_hint) {
+  return animator->enable_net_interpolation(extrapolation_hint);
 }
 
 std::expected<void, StarException> StatusController::EffectAnimator::disable_net_interpolation() {
@@ -938,7 +938,7 @@ std::expected<void, StarException> StatusController::updateAnimators(float dt) {
       if (auto result = animator->animator->update(dt, std::nullopt); !result) return std::unexpected(std::move(result.error()));
     } else {
       if (auto result = animator->animator->update(dt, std::ref(animator->dynamicTarget)); !result) return std::unexpected(std::move(result.error()));
-      animator->dynamicTarget.updatePosition(m_movementController->get().position());
+      animator->dynamicTarget.updatePosition(m_movement_controller->get().position());
     }
   }
   return {};
@@ -1093,7 +1093,7 @@ std::expected<void, StarException> StatusController::initPrimaryScript() {
     if (!callbacks) return std::unexpected(std::move(callbacks.error()));
     if (auto result = m_primaryScript.add_callbacks("animator", std::move(*callbacks)); !result) return std::unexpected(std::move(result.error()));
   }
-  if (auto result = m_primaryScript.add_actor_movement_callbacks(m_movementController->get()); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = m_primaryScript.add_actor_movement_callbacks(m_movement_controller->get()); !result) return std::unexpected(std::move(result.error()));
   auto world = m_parentEntity->get().world();
   if (!world) return std::unexpected(std::move(world.error()));
   auto initialized = m_primaryScript.init(world->get());
@@ -1133,7 +1133,7 @@ std::expected<void, StarException> StatusController::initUniqueEffectScript(Uniq
     if (!callbacks) return std::unexpected(std::move(callbacks.error()));
     if (auto result = uniqueEffect.script.add_callbacks("animator", std::move(*callbacks)); !result) return std::unexpected(std::move(result.error()));
   }
-  if (auto result = uniqueEffect.script.add_actor_movement_callbacks(m_movementController->get()); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = uniqueEffect.script.add_actor_movement_callbacks(m_movement_controller->get()); !result) return std::unexpected(std::move(result.error()));
   auto world = m_parentEntity->get().world();
   if (!world) return std::unexpected(std::move(world.error()));
   auto initialized = uniqueEffect.script.init(world->get());

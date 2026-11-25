@@ -132,7 +132,7 @@ std::expected<void, StarException> Vehicle::initialize(Root& rootContext, Json b
   m_dynamicConfig = std::move(dynamicConfig);
   auto result1006 = MovementController::create(rootContext);
 if (!result1006) return std::unexpected(std::move(result1006.error()));
-m_movementController = std::move(*result1006);
+m_movement_controller = std::move(*result1006);
 
   auto result1007 = m_baseConfig.get_string("name");
 if (!result1007) return std::unexpected(std::move(result1007.error()));
@@ -150,7 +150,7 @@ if (!result1011) return std::unexpected(std::move(result1011.error()));
 if (!ClientEntityModeNames) return std::unexpected(ClientEntityModeNames.error());
 auto result1012 = ClientEntityModeNames->get_left(std::move(*result1011));
 if (!result1012) return std::unexpected(std::move(result1012.error()));
-m_clientEntityMode = result1012->get();
+m_client_entity_mode = result1012->get();
 
   auto result1013 = configValue("script");
 if (!result1013) return std::unexpected(std::move(result1013.error()));
@@ -384,12 +384,12 @@ if (!result1087) return std::unexpected(std::move(result1087.error()));
 auto movementParameters = std::move(*result1087);
   if (!movementParameters.physics_effect_categories)
     movementParameters.physics_effect_categories = StringSet({"vehicle"});
-  auto result1088 = m_movementController->resetParameters(movementParameters);
+  auto result1088 = m_movement_controller->resetParameters(movementParameters);
 if (!result1088) return std::unexpected(std::move(result1088.error()));
 
   auto result1089 = m_netGroup.add_net_element(m_interactive);
 if (!result1089) return std::unexpected(std::move(result1089.error()));
-  auto result1090 = m_netGroup.add_net_element(*m_movementController);
+  auto result1090 = m_netGroup.add_net_element(*m_movement_controller);
 if (!result1090) return std::unexpected(std::move(result1090.error()));
   auto result1091 = m_netGroup.add_net_element(*m_networkedAnimator);
 if (!result1091) return std::unexpected(std::move(result1091.error()));
@@ -463,7 +463,7 @@ if (!result1273) return std::unexpected(std::move(result1273.error()));
 auto result1274 = m_scriptComponent.get_script_storage();
 if (!result1274) return std::unexpected(std::move(result1274.error()));
 return JsonObject{
-    {"movement", m_movementController->storeState()},
+    {"movement", m_movement_controller->storeState()},
     {"damageTeam", std::move(*result1273)},
     {"persistent", persistent()},
     {"scriptStorage", std::move(*result1274)}
@@ -473,7 +473,7 @@ return JsonObject{
 std::expected<void, StarException> Vehicle::diskLoad(Json diskStore) {
   auto result1266 = diskStore.get("movement");
 if (!result1266) return std::unexpected(std::move(result1266.error()));
-auto result1267 = m_movementController->loadState(std::move(*result1266));
+auto result1267 = m_movement_controller->loadState(std::move(*result1266));
 if (!result1267) return std::unexpected(std::move(result1267.error()));
   auto result1268 = diskStore.get("damageTeam");
 if (!result1268) return std::unexpected(std::move(result1268.error()));
@@ -490,18 +490,18 @@ if (!result1272) return std::unexpected(std::move(result1272.error()));
   return {};
 }
 
-EntityType Vehicle::entityType() const {
+EntityType Vehicle::entity_type() const {
   return EntityType::Vehicle;
 }
 
-ClientEntityMode Vehicle::clientEntityMode() const {
-  return m_clientEntityMode;
+ClientEntityMode Vehicle::client_entity_mode() const {
+  return m_client_entity_mode;
 }
 
 std::expected<std::optional<HitType>, StarException> Vehicle::queryHit(DamageSource const& source) const {
   auto result1264 = world();
 if (!result1264) return std::unexpected(std::move(result1264.error()));
-auto result1265 = source.intersects_with_poly(result1264->get().geometry(), m_movementController->collisionBody());
+auto result1265 = source.intersects_with_poly(result1264->get().geometry(), m_movement_controller->collisionBody());
 if (!result1265) return std::unexpected(std::move(result1265.error()));
 if (std::move(*result1265))
     return HitType::Hit;
@@ -510,7 +510,7 @@ if (std::move(*result1265))
 }
 
 std::expected<std::optional<PolyF>, StarException> Vehicle::hitPoly() const {
-  return m_movementController->collisionBody();
+  return m_movement_controller->collisionBody();
 }
 
 std::expected<List<DamageNotification>, StarException> Vehicle::applyDamage(DamageRequest const& damage) {
@@ -531,8 +531,8 @@ if (!result1260) return std::unexpected(std::move(result1260.error()));
 std::expected<void, StarException> Vehicle::init(World& world, EntityId entityId, EntityMode mode) {
   auto result1241 = Entity::init(world, entityId, mode);
 if (!result1241) return std::unexpected(std::move(result1241.error()));
-  m_movementController->init(world);
-  m_movementController->setIgnorePhysicsEntities({entityId});
+  m_movement_controller->init(world);
+  m_movement_controller->setIgnorePhysicsEntities({entityId});
   if (isMaster()) {
     auto result1242 = makeVehicleCallbacks();
 if (!result1242) return std::unexpected(std::move(result1242.error()));
@@ -548,7 +548,7 @@ if (!result1245) return std::unexpected(std::move(result1245.error()));
 if (!result1246) return std::unexpected(std::move(result1246.error()));
 auto result1247 = m_scriptComponent.add_callbacks("entity", std::move(*result1246));
 if (!result1247) return std::unexpected(std::move(result1247.error()));
-    auto result1248 = LuaBindings::make_movement_controller_callbacks(*m_movementController);
+    auto result1248 = LuaBindings::make_movement_controller_callbacks(*m_movement_controller);
 if (!result1248) return std::unexpected(std::move(result1248.error()));
 auto result1249 = m_scriptComponent.add_callbacks("mcontroller", std::move(*result1248));
 if (!result1249) return std::unexpected(std::move(result1249.error()));
@@ -600,7 +600,7 @@ if (!result1233) return std::unexpected(std::move(result1233.error()));
 if (!result1234) return std::unexpected(std::move(result1234.error()));
   auto result1235 = m_scriptComponent.remove_callbacks("animator");
 if (!result1235) return std::unexpected(std::move(result1235.error()));
-  m_movementController->uninit();
+  m_movement_controller->uninit();
 
   auto result1236 = world();
 if (!result1236) return std::unexpected(std::move(result1236.error()));
@@ -619,19 +619,19 @@ if (!result1240) return std::unexpected(std::move(result1240.error()));
 }
 
 Vec2F Vehicle::position() const {
-  return m_movementController->position();
+  return m_movement_controller->position();
 }
 
-RectF Vehicle::metaBoundBox() const {
+RectF Vehicle::meta_bound_box() const {
   return m_boundBox;
 }
 
-RectF Vehicle::collisionArea() const {
-  return m_movementController->collisionPoly().bounding_box();
+RectF Vehicle::collision_area() const {
+  return m_movement_controller->collisionPoly().bounding_box();
 }
 
 Vec2F Vehicle::velocity() const {
-  return m_movementController->velocity();
+  return m_movement_controller->velocity();
 }
 
 std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Vehicle::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
@@ -644,13 +644,13 @@ std::expected<void, StarException> Vehicle::read_net_state(ByteArray data, float
   return m_netGroup.read_net_state(std::move(data), interpolationTime, rules);
 }
 
-std::expected<void, StarException> Vehicle::enableInterpolation(float extrapolationHint) {
-  auto result1227 = m_netGroup.enable_net_interpolation(extrapolationHint);
+std::expected<void, StarException> Vehicle::enable_interpolation(float extrapolation_hint) {
+  auto result1227 = m_netGroup.enable_net_interpolation(extrapolation_hint);
 if (!result1227) return std::unexpected(std::move(result1227.error()));
   return {};
 }
 
-std::expected<void, StarException> Vehicle::disableInterpolation() {
+std::expected<void, StarException> Vehicle::disable_interpolation() {
   auto result1226 = m_netGroup.disable_net_interpolation();
 if (!result1226) return std::unexpected(std::move(result1226.error()));
   return {};
@@ -671,7 +671,7 @@ if (!result1203) return std::unexpected(std::move(result1203.error()));
   }
 
   if (isMaster()) {
-    auto result1204 = m_movementController->tickMaster(dt);
+    auto result1204 = m_movement_controller->tickMaster(dt);
 if (!result1204) return std::unexpected(std::move(result1204.error()));
     auto result1205 = recover_lua_script_error(m_scriptComponent.update(m_scriptComponent.update_dt(dt)));
 if (!result1205) return std::unexpected(std::move(result1205.error()));
@@ -692,7 +692,7 @@ if (!result1205) return std::unexpected(std::move(result1205.error()));
     auto result1206 = m_netGroup.tick_net_interpolation(dt);
 if (!result1206) return std::unexpected(std::move(result1206.error()));
 
-    auto result1207 = m_movementController->tickSlave(dt);
+    auto result1207 = m_movement_controller->tickSlave(dt);
 if (!result1207) return std::unexpected(std::move(result1207.error()));
 
     bool heartbeat = m_slave_heartbeat_timer.wrap_tick(root().timing().time_step);
@@ -770,13 +770,13 @@ if (!result1224) return std::unexpected(std::move(result1224.error()));
   auto result1225 = world();
   if (!result1225) return std::unexpected(std::move(result1225.error()));
   if (result1225->get().isClient()) {
-    this->root().spatialLogger().log_poly("world", m_movementController->collisionBody(), {255, 255, 0, 255});
+    this->root().spatialLogger().log_poly("world", m_movement_controller->collisionBody(), {255, 255, 0, 255});
   }
   return {};
 }
 
-std::uint64_t Vehicle::presentationEpoch() const {
-  return Entity::presentationEpoch() + m_movementController->presentationEpoch();
+std::uint64_t Vehicle::presentation_epoch() const {
+  return Entity::presentation_epoch() + m_movement_controller->presentation_epoch();
 }
 
 std::expected<void, StarException> Vehicle::collectRenderEvents(RenderCallback& renderer) {
@@ -822,7 +822,7 @@ if (!result1195) return std::unexpected(std::move(result1195.error()));
   return {};
 }
 
-std::expected<void, StarException> Vehicle::renderLightSources(RenderCallback& renderer) {
+std::expected<void, StarException> Vehicle::render_light_sources(RenderCallback& renderer) {
   auto sample = m_networkedAnimator->sample(renderer.presentation().interpolation());
   auto result1183 = sample.lightSources(position());
 if (!result1183) return std::unexpected(std::move(result1183.error()));
@@ -841,7 +841,7 @@ auto lightSources = std::move(*result1182);
   return lightSources;
 }
 
-std::expected<bool, StarException> Vehicle::shouldDestroy() const {
+std::expected<bool, StarException> Vehicle::should_destroy() const {
   return m_shouldDestroy;
 }
 
@@ -967,7 +967,7 @@ return std::move(*result1176);
 }
 
 RectF Vehicle::interactiveBoundBox() const {
-  return collisionArea();
+  return collision_area();
 }
 
 bool Vehicle::isInteractive() const {
@@ -1168,25 +1168,25 @@ Mat3F partTransformation = std::move(*result1125);
   return collision;
 }
 
-std::expected<std::optional<LuaValue>, StarException> Vehicle::callScript(String const& func, LuaVariadic<LuaValue> const& args) {
+std::expected<std::optional<LuaValue>, StarException> Vehicle::call_script(String const& func, LuaVariadic<LuaValue> const& args) {
   auto result1123 = recover_lua_script_error(m_scriptComponent.invoke(func, args));
 if (!result1123) return std::unexpected(std::move(result1123.error()));
 return std::move(*result1123);
 }
 
-std::expected<std::optional<LuaValue>, StarException> Vehicle::evalScript(String const& code) {
+std::expected<std::optional<LuaValue>, StarException> Vehicle::eval_script(String const& code) {
   auto result1122 = recover_lua_script_error(m_scriptComponent.eval(code));
 if (!result1122) return std::unexpected(std::move(result1122.error()));
 return std::move(*result1122);
 }
 
-MovementController& Vehicle::movementController() {
-  return *m_movementController;
+MovementController& Vehicle::movement_controller() {
+  return *m_movement_controller;
 }
 
 void Vehicle::setPosition(Vec2F const& position) {
   resetPresentation();
-  m_movementController->setPosition(position);
+  m_movement_controller->setPosition(position);
 }
 
 EntityRenderLayer Vehicle::render_layer(VehicleLayer vehicle_layer) const {

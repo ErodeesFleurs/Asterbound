@@ -108,7 +108,7 @@ struct ObjectOrientation {
 
   // Allow an orientation to override the metaboundbox in case you don't want to
   // specify spaces
-  std::optional<RectF> metaBoundBox;
+  std::optional<RectF> meta_bound_box;
 
   // Anchors of the object to place it in the world
   // For background tiles set in order for the object to

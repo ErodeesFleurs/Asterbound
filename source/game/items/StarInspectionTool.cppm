@@ -339,7 +339,7 @@ std::expected<float, StarException> InspectionTool::inspectionLevel(std::shared_
   if (!initialized() || !inspectable->inspectable())
     return 0;
 
-  if (m_inspectableTypeFilter && !m_inspectableTypeFilter->contains(inspectable->entityType()))
+  if (m_inspectableTypeFilter && !m_inspectableTypeFilter->contains(inspectable->entity_type()))
     return 0;
 
   if (auto tileEntity = as<TileEntity>(inspectable)) {
@@ -405,7 +405,7 @@ std::expected<InspectionTool::InspectionResult, StarException> InspectionTool::i
     return std::unexpected(std::move(itemOwner.error()));
   auto species = itemOwner->get().species();
   auto check = [&](std::shared_ptr<InspectableEntity> const& entity) -> std::expected<std::optional<InspectionResult>, StarException> {
-    if (m_inspectableTypeFilter && !m_inspectableTypeFilter->contains(entity->entityType()))
+    if (m_inspectableTypeFilter && !m_inspectableTypeFilter->contains(entity->entity_type()))
       return {};
     if (entity->inspectable()) {
       auto level = inspectionLevel(entity);
@@ -433,9 +433,9 @@ std::expected<InspectionTool::InspectionResult, StarException> InspectionTool::i
     return std::unexpected(std::move(itemWorld.error()));
   WorldGeometry geometry = itemWorld->get().geometry();
   auto candidates = itemWorld->get().query<InspectableEntity>(RectF::with_center(position, Vec2F()), [&](std::shared_ptr<InspectableEntity> const& entity) -> std::expected<bool, StarException> {
-    if (entity->entityType() == EntityType::Object)
+    if (entity->entity_type() == EntityType::Object)
       return false;
-    auto contained = geometry.rect_contains(entity->metaBoundBox().translated(entity->position()), position);
+    auto contained = geometry.rect_contains(entity->meta_bound_box().translated(entity->position()), position);
     if (!contained)
       return std::unexpected(std::move(contained.error()));
     if (!*contained)

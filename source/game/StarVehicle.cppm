@@ -103,8 +103,8 @@ public:
   [[nodiscard]] std::expected<Json, StarException> diskStore() const;
   [[nodiscard]] std::expected<void, StarException> diskLoad(Json diskStore);
 
-  EntityType entityType() const override;
-  ClientEntityMode clientEntityMode() const override;
+  EntityType entity_type() const override;
+  ClientEntityMode client_entity_mode() const override;
 
   [[nodiscard]] std::expected<List<DamageSource>, StarException> damageSources() const override;
   [[nodiscard]] std::expected<std::optional<HitType>, StarException> queryHit(DamageSource const& source) const override;
@@ -117,29 +117,29 @@ public:
   [[nodiscard]] std::expected<void, StarException> uninit() override;
 
   Vec2F position() const override;
-  RectF metaBoundBox() const override;
-  RectF collisionArea() const override;
+  RectF meta_bound_box() const override;
+  RectF collision_area() const override;
   Vec2F velocity() const;
 
   [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> write_net_state(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
   [[nodiscard]] std::expected<void, StarException> read_net_state(ByteArray data, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
 
-  [[nodiscard]] std::expected<void, StarException> enableInterpolation(float extrapolationHint) override;
-  [[nodiscard]] std::expected<void, StarException> disableInterpolation() override;
+  [[nodiscard]] std::expected<void, StarException> enable_interpolation(float extrapolation_hint) override;
+  [[nodiscard]] std::expected<void, StarException> disable_interpolation() override;
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
 
-  std::uint64_t presentationEpoch() const override;
+  std::uint64_t presentation_epoch() const override;
 
   [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderer) override;
 
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderer) override;
 
-  [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& renderer) override;
+  [[nodiscard]] std::expected<void, StarException> render_light_sources(RenderCallback& renderer) override;
 
   [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources() const override;
 
-  [[nodiscard]] std::expected<bool, StarException> shouldDestroy() const override;
+  [[nodiscard]] std::expected<bool, StarException> should_destroy() const override;
   [[nodiscard]] std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) override;
 
   [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) override;
@@ -157,10 +157,10 @@ public:
   std::size_t movingCollisionCount() const override;
   [[nodiscard]] std::expected<std::optional<PhysicsMovingCollision>, StarException> movingCollision(std::size_t positionIndex) const override;
 
-  [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> callScript(String const& func, LuaVariadic<LuaValue> const& args) override;
-  [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> evalScript(String const& code) override;
+  [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> call_script(String const& func, LuaVariadic<LuaValue> const& args) override;
+  [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> eval_script(String const& code) override;
   
-  MovementController& movementController() override;
+  MovementController& movement_controller() override;
 
   void setPosition(Vec2F const& position);
 
@@ -237,11 +237,11 @@ private:
   OrderedHashMap<String, MovingCollisionConfig> m_movingCollisions;
   OrderedHashMap<String, ForceRegionConfig> m_force_regions;
 
-  ClientEntityMode m_clientEntityMode;
+  ClientEntityMode m_client_entity_mode;
 
   NetElementTopGroup m_netGroup;
   NetElementBool m_interactive;
-  std::shared_ptr<MovementController> m_movementController;
+  std::shared_ptr<MovementController> m_movement_controller;
   std::shared_ptr<NetworkedAnimator> m_networkedAnimator;
   NetworkedAnimator::DynamicTarget m_networkedAnimatorDynamicTarget;
   LuaStoredEntityScript m_scriptComponent;

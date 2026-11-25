@@ -31,7 +31,7 @@ public:
   void query_type(TypeQuery& query) const noexcept override { query_type_of<MobileEntity, Entity>(*this, query); }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<MobileEntity>(); }
 
-  virtual MovementController& movementController() = 0;
+  virtual MovementController& movement_controller() = 0;
 };
 }
 

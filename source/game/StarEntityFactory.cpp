@@ -174,7 +174,7 @@ std::expected<ByteArray, StarException> EntityFactory::net_store_entity(std::sha
 
   if (!entity)
     return std::unexpected(EntityFactoryException::format("Cannot make net store for a null entity"));
-  auto type = entity->entityType();
+  auto type = entity->entity_type();
   auto store = [&]<typename T>() -> std::expected<ByteArray, StarException> {
     auto typed = convert_ref<T>(*entity);
     if (!typed) return std::unexpected(std::move(typed.error()));
@@ -257,7 +257,7 @@ std::expected<Json, StarException> EntityFactory::disk_store_entity_locked(std::
 
   if (!entity)
     return std::unexpected(EntityFactoryException::format("Cannot make disk store for a null entity"));
-  auto type = entity->entityType();
+  auto type = entity->entity_type();
   auto store = [&]<typename T>() -> std::expected<Json, StarException> {
     auto typed = convert_ref<T>(*entity);
     if (!typed) return std::unexpected(std::move(typed.error()));
@@ -367,7 +367,7 @@ std::expected<VersionedJson, StarException> EntityFactory::store_versioned_entit
   lock_with_diagnostics(locker);
   auto store = disk_store_entity_locked(entity);
   if (!store) return std::unexpected(std::move(store.error()));
-  return store_versioned_json_locked(entity->entityType(), *store);
+  return store_versioned_json_locked(entity->entity_type(), *store);
 }
 
 }

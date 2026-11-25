@@ -294,10 +294,10 @@ std::expected<bool, StarException> FarmableObject::harvest() {
       return std::unexpected(std::move(itemsResult.error()));
     auto items = std::move(*itemsResult);
     for (auto const& item : items) {
-      auto dropResult = ItemDrop::create_randomized_drop(root(), item, position());
-      if (!dropResult)
-        return std::unexpected(std::move(dropResult.error()));
-      auto drop = std::move(*dropResult);
+      auto drop_result = ItemDrop::create_randomized_drop(root(), item, position());
+      if (!drop_result)
+        return std::unexpected(std::move(drop_result.error()));
+      auto drop = std::move(*drop_result);
       auto operation8 = currentWorld.get().addEntity(drop);
       if (!operation8)
         return std::unexpected(std::move(operation8.error()));

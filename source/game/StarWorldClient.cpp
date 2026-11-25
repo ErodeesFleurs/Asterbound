@@ -980,7 +980,7 @@ std::shared_ptr<VisitableWorldParameters const> WorldClient::directive_parameter
 WorldClient::EntityRenderSample WorldClient::sample_entity(Entity const& entity, PresentationContext presentation) const {
   if (auto entry = m_entityPresentation.find_ref(entity.entityId())) {
     auto const& state = entry->get();
-    if (state.continuous && state.instance.lock().get() == &entity && state.epoch == entity.presentationEpoch())
+    if (state.continuous && state.instance.lock().get() == &entity && state.epoch == entity.presentation_epoch())
       return {presentation, m_geometry.diff(state.position.sample(m_geometry, presentation.interpolation()), entity.position())};
   }
   // A replacement, teleport, or explicit reset has no previous display pose.
@@ -1059,7 +1059,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
       auto sample = sample_entity(*entity, presentation);
       lighting_callback.position_offset = sample.offset;
       lighting_callback.sample_context = sample.context;
-      return entity->renderLightSources(lighting_callback);
+      return entity->render_light_sources(lighting_callback);
     });
     if (!lights)
       return std::unexpected(std::move(lights.error()));
@@ -1164,7 +1164,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
           
           if (!EntityTypeNames)
             return std::unexpected(EntityTypeNames.error());
-          auto result63 = EntityTypeNames->get_right(entity->entityType());
+          auto result63 = EntityTypeNames->get_right(entity->entity_type());
           if (!result63)
             return std::unexpected(std::move(result63.error()));
           auto result64 = self.root().logger().error("WorldClient: Exception caught in {}::render ({}): {}", result63->get(), entity->entityId(), issue);
@@ -1607,7 +1607,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       }
       
       if (m_interpolation_tracker.interpolation_enabled()) {
-        auto result104 = entity->enableInterpolation(m_interpolation_tracker.extrapolation_hint());
+        auto result104 = entity->enable_interpolation(m_interpolation_tracker.extrapolation_hint());
         if (!result104)
           return std::unexpected(std::move(result104.error()));
         
@@ -1648,7 +1648,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
           // Delay death packets by the interpolation step to give time for
           // interpolation to catch up.
           timer(m_interpolation_tracker.interpolation_lead_time(), [&self = *this, entity, entityDestroy](World&)  -> std::expected<void, StarException> {
-            auto result108 = entity->disableInterpolation();
+            auto result108 = entity->disable_interpolation();
             if (!result108)
               return std::unexpected(std::move(result108.error()));
             auto result109 = self.removeEntity(entityDestroy->entityId, entityDestroy->death);
@@ -1657,7 +1657,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
             return {};
           });
         } else {
-          auto result110 = entity->disableInterpolation();
+          auto result110 = entity->disable_interpolation();
           if (!result110)
             return std::unexpected(std::move(result110.error()));
           auto result111 = removeEntity(entityDestroy->entityId, entityDestroy->death);
@@ -2064,9 +2064,9 @@ std::expected<void, StarException> WorldClient::update(float dt) {
   }
   auto beginPresentation = m_entityMap->for_all_entities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
     auto& state = m_entityPresentation[entity->entityId()];
-    if (state.instance.lock() != entity || state.epoch != entity->presentationEpoch()) {
+    if (state.instance.lock() != entity || state.epoch != entity->presentation_epoch()) {
       state.instance = entity;
-      state.epoch = entity->presentationEpoch();
+      state.epoch = entity->presentation_epoch();
       state.position.reset(entity->position());
       state.continuous = false;
     } else {
@@ -2154,7 +2154,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
           
           if (!EntityTypeNames)
             return std::unexpected(EntityTypeNames.error());
-          auto result156 = EntityTypeNames->get_right(entity->entityType());
+          auto result156 = EntityTypeNames->get_right(entity->entity_type());
           if (!result156)
             return std::unexpected(std::move(result156.error()));
           auto result157 = self.root().logger().error("WorldClient: Exception caught in {}::update ({}): {}", result156->get(), entity->entityId(), issue);
@@ -2164,19 +2164,19 @@ std::expected<void, StarException> WorldClient::update(float dt) {
       }
       
       {
-        auto result159 = entity->shouldDestroy();
+        auto result159 = entity->should_destroy();
         if (!result159)
           return std::unexpected(std::move(result159.error()));
         if ((std::move(*result159)) && entity->entityMode() == EntityMode::Master) {
           toRemove.push_back(entity->entityId());
         }
       }
-      if (entity->isMaster() && entity->clientEntityMode() == ClientEntityMode::ClientPresenceMaster) {
+      if (entity->isMaster() && entity->client_entity_mode() == ClientEntityMode::ClientPresenceMaster) {
         clientPresenceEntities.push_back(entity->entityId());
       }
       return {};
     }, [](std::shared_ptr<Entity> const& a, std::shared_ptr<Entity> const& b) {
-      return a->entityType() < b->entityType();
+      return a->entity_type() < b->entity_type();
     });
   if (!result160)
     return std::unexpected(std::move(result160.error()));
@@ -2503,7 +2503,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
   Set<ClientTileSectorArray::Sector> neededSectors;
   auto monitoredRegions = m_clientState->monitoringRegions([&self = *this](EntityId entityId) -> std::optional<RectI> {
     if (auto entity = self.entity(entityId)) {
-      return RectI::integral(entity->metaBoundBox().translated(entity->position()));
+      return RectI::integral(entity->meta_bound_box().translated(entity->position()));
     }
     return {};
   });
@@ -2533,9 +2533,9 @@ std::expected<void, StarException> WorldClient::update(float dt) {
   this->root().logMap().set(Star::format("client_{}_lua_mem",m_subWorldId), m_luaRoot->lua_memory_usage());
   auto endPresentation = m_entityMap->for_all_entities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
     auto& state = m_entityPresentation[entity->entityId()];
-    if (state.instance.lock() != entity || state.epoch != entity->presentationEpoch()) {
+    if (state.instance.lock() != entity || state.epoch != entity->presentation_epoch()) {
       state.instance = entity;
-      state.epoch = entity->presentationEpoch();
+      state.epoch = entity->presentation_epoch();
       state.position.reset(entity->position());
       state.continuous = false;
     } else {
@@ -2544,10 +2544,10 @@ std::expected<void, StarException> WorldClient::update(float dt) {
       // retain an allowance derived from their actual velocity.
       float continuityDistance = 8.0f;
       if (auto mobile = as<MobileEntity>(entity))
-        continuityDistance = std::max(continuityDistance, 4.0f * dt * mobile->movementController().velocity().magnitude());
+        continuityDistance = std::max(continuityDistance, 4.0f * dt * mobile->movement_controller().velocity().magnitude());
       if (!state.position.finish(entity->position(), m_geometry, continuityDistance)) {
         entity->resetPresentation();
-        state.epoch = entity->presentationEpoch();
+        state.epoch = entity->presentation_epoch();
         state.continuous = false;
       }
     }
@@ -2614,7 +2614,7 @@ std::shared_ptr<Entity> WorldClient::entity(EntityId entityId) const {
 std::expected<void, StarException> WorldClient::addEntity(std::shared_ptr<Entity> const& entity, EntityId entityId) {
   if (!entity || !inWorld())
     return {};
-  if (entity->clientEntityMode() != ClientEntityMode::ClientSlaveOnly) {
+  if (entity->client_entity_mode() != ClientEntityMode::ClientSlaveOnly) {
     auto reserved = m_entityMap->reserve_entity_id(entityId);
     if (!reserved)
       return std::unexpected(std::move(reserved.error()));
@@ -2641,7 +2641,7 @@ std::expected<void, StarException> WorldClient::addEntity(std::shared_ptr<Entity
   if (!state)
     return std::unexpected(std::move(state.error()));
   m_outgoingPackets.push_back(
-    std::make_shared<SpawnEntityPacket>(entity->entityType(), std::move(*store), std::move(state->first)));
+    std::make_shared<SpawnEntityPacket>(entity->entity_type(), std::move(*store), std::move(state->first)));
   return {};
 }
 
@@ -3647,7 +3647,7 @@ std::expected<void, StarException> WorldClient::notifyEntityCreate(std::shared_p
     if (!result295)
       return std::unexpected(std::move(result295.error()));
     m_outgoingPackets.push_back(std::make_shared<EntityCreatePacket>(
-      entity->entityType(), (std::move(*result295)), std::move(firstNetState.first), entity->entityId()));
+      entity->entity_type(), (std::move(*result295)), std::move(firstNetState.first), entity->entityId()));
   }
   return {};
 }

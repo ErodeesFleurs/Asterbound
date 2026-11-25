@@ -111,7 +111,7 @@ import star.byte_array;
 import star.algorithm;
 namespace Star {
 
-Object::Object(Root& rootContext) : Entity(rootContext), m_scriptComponent(rootContext), m_scriptedAnimator(rootContext), m_animationTimer(0), m_currentFrame(-1), m_broken(false), m_unbreakable(false), m_orientationIndex(npos), m_animationCenterLine(0), m_clientEntityMode(ClientEntityMode::ClientSlaveOnly) {}
+Object::Object(Root& rootContext) : Entity(rootContext), m_scriptComponent(rootContext), m_scriptedAnimator(rootContext), m_animationTimer(0), m_currentFrame(-1), m_broken(false), m_unbreakable(false), m_orientationIndex(npos), m_animationCenterLine(0), m_client_entity_mode(ClientEntityMode::ClientSlaveOnly) {}
 
 std::expected<std::shared_ptr<Object>, StarException> Object::create(Root& rootContext, std::shared_ptr<ObjectConfig const> config, Json const& parameters) {
   auto object = std::shared_ptr<Object>(new Object(rootContext));
@@ -403,7 +403,7 @@ std::expected<void, StarException> Object::initialize(std::shared_ptr<ObjectConf
   if (!modeResult)
     return std::unexpected(std::move(modeResult.error()));
   auto mode = std::move(*modeResult);
-  m_clientEntityMode = mode.get();
+  m_client_entity_mode = mode.get();
   return {};
 }
 
@@ -427,12 +427,12 @@ std::expected<ByteArray, StarException> Object::net_store(NetCompatibilityRules 
   return ds.take_data();
 }
 
-EntityType Object::entityType() const {
+EntityType Object::entity_type() const {
   return EntityType::Object;
 }
 
-ClientEntityMode Object::clientEntityMode() const {
-  return m_clientEntityMode;
+ClientEntityMode Object::client_entity_mode() const {
+  return m_client_entity_mode;
 }
 
 std::expected<void, StarException> Object::init(World& world, EntityId entityId, EntityMode mode) {
@@ -747,11 +747,11 @@ Vec2F Object::position() const {
   return Vec2F(m_xTilePosition.get(), m_yTilePosition.get());
 }
 
-RectF Object::metaBoundBox() const {
+RectF Object::meta_bound_box() const {
   if (auto orientation = currentOrientation()) {
     // default metaboundbox extends the bounding box of the orientation's
     // spaces by one block
-    return orientation->metaBoundBox.value_or(RectF(Vec2F(orientation->boundBox.min()) - Vec2F(1, 1), Vec2F(orientation->boundBox.max()) + Vec2F(2, 2)));
+    return orientation->meta_bound_box.value_or(RectF(Vec2F(orientation->boundBox.min()) - Vec2F(1, 1), Vec2F(orientation->boundBox.max()) + Vec2F(2, 2)));
   } else {
     return RectF(-1, -1, 1, 1);
   }
@@ -949,7 +949,7 @@ std::expected<void, StarException> Object::render(RenderCallback& render_callbac
   return {};
 }
 
-std::expected<void, StarException> Object::renderLightSources(RenderCallback& render_callback) {
+std::expected<void, StarException> Object::render_light_sources(RenderCallback& render_callback) {
   auto sample = m_networkedAnimator->sample(render_callback.presentation().interpolation());
   auto lightsResult = lightSources(&sample);
   if (!lightsResult)
@@ -993,7 +993,7 @@ std::expected<bool, StarException> Object::checkBroken() {
   return m_broken;
 }
 
-std::expected<bool, StarException> Object::shouldDestroy() const {
+std::expected<bool, StarException> Object::should_destroy() const {
   return m_broken || (m_health.get() <= 0);
 }
 
@@ -1020,10 +1020,10 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
         return std::unexpected(std::move(currentWorldResult.error()));
       auto& currentWorld = currentWorldResult->get();
       auto dropItem = [&](auto const& item) -> std::expected<void, StarException> {
-        auto dropResult = ItemDrop::create_randomized_drop(root(), item, position());
-        if (!dropResult)
-          return std::unexpected(std::move(dropResult.error()));
-        auto drop = std::move(*dropResult);
+        auto drop_result = ItemDrop::create_randomized_drop(root(), item, position());
+        if (!drop_result)
+          return std::unexpected(std::move(drop_result.error()));
+        auto drop = std::move(*drop_result);
         auto operation2 = currentWorld.addEntity(std::move(drop));
         if (!operation2)
           return std::unexpected(std::move(operation2.error()));
@@ -1841,7 +1841,7 @@ std::expected<LuaCallbacks, StarException> Object::makeObjectCallbacks() {
   if (!operation4)
     return std::unexpected(std::move(operation4.error()));
   auto operation5 = callbacks.register_callback("boundBox", [this]() {
-  return metaBoundBox().translated(position());
+  return meta_bound_box().translated(position());
 });
   if (!operation5)
     return std::unexpected(std::move(operation5.error()));
@@ -1970,7 +1970,7 @@ std::expected<LuaCallbacks, StarException> Object::makeObjectCallbacks() {
     return std::unexpected(std::move(currentWorldResult.error()));
   auto& currentWorld = currentWorldResult->get();
   if (auto entity = currentWorld.entity(entityId))
-    return !entity->collisionArea().overlap(volume().bounding_box()).is_empty();
+    return !entity->collision_area().overlap(volume().bounding_box()).is_empty();
   return false;
 });
   if (!operation25)
@@ -2289,11 +2289,11 @@ List<Vec2I> Object::interactiveSpaces() const {
   return spaces();
 }
 
-std::expected<std::optional<LuaValue>, StarException> Object::callScript(String const& func, LuaVariadic<LuaValue> const& args) {
+std::expected<std::optional<LuaValue>, StarException> Object::call_script(String const& func, LuaVariadic<LuaValue> const& args) {
   return recover_lua_script_error(m_scriptComponent.invoke(func, args));
 }
 
-std::expected<std::optional<LuaValue>, StarException> Object::evalScript(String const& code) {
+std::expected<std::optional<LuaValue>, StarException> Object::eval_script(String const& code) {
   return recover_lua_script_error(m_scriptComponent.eval(code));
 }
 
@@ -2487,7 +2487,7 @@ std::expected<void, StarException> Object::collectSounds(RenderCallback& render_
       if (!operation1)
         return std::unexpected(std::move(operation1.error()));
       sound->set_range_multiplier(m_config->soundEffectRangeMultiplier);
-      sound->set_position(metaBoundBox().center() + position());
+      sound->set_position(meta_bound_box().center() + position());
       sound->set_volume(0);
       sound->set_volume(1, 1.0);
       auto operation2 = render_callback.add_audio(sound);

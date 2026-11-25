@@ -61,7 +61,7 @@ struct PlayerConfig {
   List<ItemDescriptor> defaultItems;
   List<ItemDescriptor> defaultBlueprints;
 
-  RectF metaBoundBox;
+  RectF meta_bound_box;
 
   Json movementParameters;
   Json zeroGMovementParameters;

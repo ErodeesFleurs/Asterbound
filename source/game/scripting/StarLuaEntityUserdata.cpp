@@ -184,7 +184,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
     [&](std::shared_ptr<Entity> const& entity, LuaEngine& engine) -> std::expected<LuaString, StarException> {
         if (!EntityTypeNames)
             return std::unexpected(EntityTypeNames.error());
-        auto name = EntityTypeNames->get_right(entity->entityType());
+        auto name = EntityTypeNames->get_right(entity->entity_type());
         if (!name)
           return std::unexpected(std::move(name.error()));
         return engine.create_string(name->get());
@@ -220,7 +220,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
 
     if (auto registration = methods.register_method("metaBoundBox",
     [&](std::shared_ptr<Entity> const& entity) -> std::expected<RectF, StarException> {
-        return entity->metaBoundBox();
+        return entity->meta_bound_box();
     }); !registration)
       return std::unexpected(std::move(registration.error()));
 
@@ -228,7 +228,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "velocity",
           [&](std::shared_ptr<Entity> const& entity) -> std::expected<std::optional<Vec2F>, StarException> {
             if (auto mobileEntity = as_ref<MobileEntity>(*entity))
-              return mobileEntity->get().movementController().velocity();
+              return mobileEntity->get().movement_controller().velocity();
 
             return {};
           });
@@ -304,7 +304,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
             if (!scrEntity || !scrEntity->get().isMaster() || !entity->inWorld())
               return std::unexpected(StarException::format(
                 "Entity {} does not exist or is not a local master scripted entity", entity->entityId()));
-            return scrEntity->get().callScript(function, args);
+            return scrEntity->get().call_script(function, args);
           });
         !registration)
       return std::unexpected(std::move(registration.error()));
@@ -545,7 +545,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "mass",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<float>, StarException> {
             if (auto mobile = as_ref<MobileEntity>(*entity))
-              return mobile->get().movementController().mass();
+              return mobile->get().movement_controller().mass();
             return {};
           });
         !registration)
@@ -554,7 +554,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "boundBox",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<RectF>, StarException> {
             if (auto mobile = as_ref<MobileEntity>(*entity))
-              return mobile->get().movementController().collisionPoly().bounding_box();
+              return mobile->get().movement_controller().collisionPoly().bounding_box();
             return {};
           });
         !registration)
@@ -563,7 +563,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "collisionPoly",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<PolyF>, StarException> {
             if (auto mobile = as_ref<MobileEntity>(*entity))
-              return mobile->get().movementController().collisionPoly();
+              return mobile->get().movement_controller().collisionPoly();
             return {};
           });
         !registration)
@@ -572,7 +572,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "collisionBody",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<PolyF>, StarException> {
             if (auto mobile = as_ref<MobileEntity>(*entity))
-              return mobile->get().movementController().collisionBody();
+              return mobile->get().movement_controller().collisionBody();
             return {};
           });
         !registration)
@@ -581,7 +581,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "collisionBoundBox",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<RectF>, StarException> {
             if (auto mobile = as_ref<MobileEntity>(*entity))
-              return mobile->get().movementController().collisionBody().bounding_box();
+              return mobile->get().movement_controller().collisionBody().bounding_box();
             return {};
           });
         !registration)
@@ -590,7 +590,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "localBoundBox",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<RectF>, StarException> {
             if (auto mobile = as_ref<MobileEntity>(*entity))
-              return mobile->get().movementController().localBoundBox();
+              return mobile->get().movement_controller().localBoundBox();
             return {};
           });
         !registration)
@@ -599,7 +599,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "rotation",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<float>, StarException> {
             if (auto mobile = as_ref<MobileEntity>(*entity))
-              return mobile->get().movementController().rotation();
+              return mobile->get().movement_controller().rotation();
             return {};
           });
         !registration)
@@ -608,7 +608,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "isColliding",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<bool>, StarException> {
             if (auto mobile = as_ref<MobileEntity>(*entity))
-              return mobile->get().movementController().isColliding();
+              return mobile->get().movement_controller().isColliding();
             return {};
           });
         !registration)
@@ -617,7 +617,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "isNullColliding",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<bool>, StarException> {
             if (auto mobile = as_ref<MobileEntity>(*entity))
-              return mobile->get().movementController().isNullColliding();
+              return mobile->get().movement_controller().isNullColliding();
             return {};
           });
         !registration)
@@ -626,7 +626,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "isCollisionStuck",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<bool>, StarException> {
             if (auto mobile = as_ref<MobileEntity>(*entity))
-              return mobile->get().movementController().isCollisionStuck();
+              return mobile->get().movement_controller().isCollisionStuck();
             return {};
           });
         !registration)
@@ -635,7 +635,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "stickingDirection",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<float>, StarException> {
             if (auto mobile = as_ref<MobileEntity>(*entity))
-              return mobile->get().movementController().stickingDirection();
+              return mobile->get().movement_controller().stickingDirection();
             return {};
           });
         !registration)
@@ -644,7 +644,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "liquidPercentage",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<float>, StarException> {
             if (auto mobile = as_ref<MobileEntity>(*entity))
-              return mobile->get().movementController().liquidPercentage();
+              return mobile->get().movement_controller().liquidPercentage();
             return {};
           });
         !registration)
@@ -653,7 +653,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "liquidId",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<std::uint8_t>, StarException> {
             if (auto mobile = as_ref<MobileEntity>(*entity))
-              return mobile->get().movementController().liquidId();
+              return mobile->get().movement_controller().liquidId();
             return {};
           });
         !registration)
@@ -662,7 +662,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "onGround",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<bool>, StarException> {
             if (auto mobile = as_ref<MobileEntity>(*entity))
-              return mobile->get().movementController().onGround();
+              return mobile->get().movement_controller().onGround();
             return {};
           });
         !registration)
@@ -671,7 +671,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "zeroG",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<bool>, StarException> {
             if (auto mobile = as_ref<MobileEntity>(*entity))
-              return mobile->get().movementController().zeroG();
+              return mobile->get().movement_controller().zeroG();
             return {};
           });
         !registration)
@@ -680,7 +680,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "atWorldLimit",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<bool>, StarException> {
             if (auto mobile = as_ref<MobileEntity>(*entity))
-              return mobile->get().movementController().atWorldLimit();
+              return mobile->get().movement_controller().atWorldLimit();
             return {};
           });
         !registration)
@@ -689,7 +689,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "anchorState",
           [&](std::shared_ptr<Entity> entity) -> std::expected<LuaVariadic<LuaValue>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              if (auto anchorState = actor->get().movementController().anchor_state())
+              if (auto anchorState = actor->get().movement_controller().anchor_state())
                 return LuaVariadic<LuaValue>{LuaInt(anchorState->entityId), LuaInt(anchorState->positionIndex)};
             return LuaVariadic<LuaValue>();
           });
@@ -700,7 +700,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "baseMovementParameters",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<Json>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().movementController().base_parameters().to_json();
+              return actor->get().movement_controller().base_parameters().to_json();
             return {};
           });
         !registration)
@@ -710,7 +710,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "movementParameters",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<Json>, StarException> {
             if (auto mobile = as_ref<MobileEntity>(*entity))
-              return mobile->get().movementController().parameters().toJson();
+              return mobile->get().movement_controller().parameters().toJson();
             return {};
           });
         !registration)
@@ -720,7 +720,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "walking",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<bool>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().movementController().walking();
+              return actor->get().movement_controller().walking();
             return {};
           });
         !registration)
@@ -729,7 +729,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "running",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<bool>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().movementController().running();
+              return actor->get().movement_controller().running();
             return {};
           });
         !registration)
@@ -738,7 +738,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "movingDirection",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<int>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return numerical_direction(actor->get().movementController().moving_direction());
+              return numerical_direction(actor->get().movement_controller().moving_direction());
             return {};
           });
         !registration)
@@ -747,7 +747,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "facingDirection",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<int>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return numerical_direction(actor->get().movementController().facing_direction());
+              return numerical_direction(actor->get().movement_controller().facing_direction());
             return {};
           });
         !registration)
@@ -756,7 +756,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "crouching",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<bool>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().movementController().crouching();
+              return actor->get().movement_controller().crouching();
             return {};
           });
         !registration)
@@ -765,7 +765,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "flying",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<bool>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().movementController().flying();
+              return actor->get().movement_controller().flying();
             return {};
           });
         !registration)
@@ -774,7 +774,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "falling",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<bool>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().movementController().falling();
+              return actor->get().movement_controller().falling();
             return {};
           });
         !registration)
@@ -783,7 +783,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "canJump",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<bool>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().movementController().can_jump();
+              return actor->get().movement_controller().can_jump();
             return {};
           });
         !registration)
@@ -792,7 +792,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "jumping",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<bool>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().movementController().jumping();
+              return actor->get().movement_controller().jumping();
             return {};
           });
         !registration)
@@ -801,7 +801,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "groundMovement",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<bool>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().movementController().ground_movement();
+              return actor->get().movement_controller().ground_movement();
             return {};
           });
         !registration)
@@ -810,7 +810,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "liquidMovement",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<bool>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().movementController().liquid_movement();
+              return actor->get().movement_controller().liquid_movement();
             return {};
           });
         !registration)

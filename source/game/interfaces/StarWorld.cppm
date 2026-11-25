@@ -110,9 +110,9 @@ public:
 
   [[nodiscard]] virtual std::expected<void, StarException> forAllEntities(EntityCallback entityCallback) const = 0;
 
-  // Query here is a fuzzy query based on metaBoundBox
+  // Query here is a fuzzy query based on meta_bound_box
   [[nodiscard]] virtual std::expected<void, StarException> forEachEntity(RectF const& boundBox, EntityCallback entityCallback) const = 0;
-  // Fuzzy metaBoundBox query for intersecting the given line.
+  // Fuzzy meta_bound_box query for intersecting the given line.
   [[nodiscard]] virtual std::expected<void, StarException> forEachEntityLine(Vec2F const& begin, Vec2F const& end, EntityCallback entityCallback) const = 0;
   // Performs action for all entities that occupies the given tile position
   // (only entity types laid out in the tile grid).

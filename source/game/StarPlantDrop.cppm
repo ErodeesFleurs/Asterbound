@@ -67,7 +67,7 @@ public:
 
   [[nodiscard]] std::expected<ByteArray, StarException> net_store(NetCompatibilityRules rules = {});
 
-  EntityType entityType() const override;
+  EntityType entity_type() const override;
 
   [[nodiscard]] std::expected<void, StarException> init(World& world, EntityId entityId, EntityMode mode) override;
   [[nodiscard]] std::expected<void, StarException> uninit() override;
@@ -78,13 +78,13 @@ public:
   [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> snapshot_net_state(NetCompatibilityRules rules = {}) const;
   [[nodiscard]] std::expected<void, StarException> read_net_state(ByteArray data, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
 
-  [[nodiscard]] std::expected<void, StarException> enableInterpolation(float extrapolationHint = 0.0f) override;
-  [[nodiscard]] std::expected<void, StarException> disableInterpolation() override;
+  [[nodiscard]] std::expected<void, StarException> enable_interpolation(float extrapolation_hint = 0.0f) override;
+  [[nodiscard]] std::expected<void, StarException> disable_interpolation() override;
 
   Vec2F position() const override;
-  RectF metaBoundBox() const override;
+  RectF meta_bound_box() const override;
 
-  [[nodiscard]] std::expected<bool, StarException> shouldDestroy() const override;
+  [[nodiscard]] std::expected<bool, StarException> should_destroy() const override;
 
   void setPosition();
   void setVelocity(Vec2F const& position);
@@ -93,13 +93,13 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
 
-  std::uint64_t presentationEpoch() const override;
+  std::uint64_t presentation_epoch() const override;
 
   [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& render_callback) override;
 
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback) override;
   
-  MovementController& movementController() override;
+  MovementController& movement_controller() override;
 
 private:
   PlantDrop(Root& rootContext);
@@ -121,7 +121,7 @@ private:
   NetElementTopGroup m_netGroup;
   String m_description;
   float m_time;
-  std::shared_ptr<MovementController> m_movementController;
+  std::shared_ptr<MovementController> m_movement_controller;
   RectF m_collisionRect;
   RectF m_boundingBox;
   float m_rotationRate;

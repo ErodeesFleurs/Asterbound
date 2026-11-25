@@ -143,7 +143,7 @@ std::expected<std::shared_ptr<PlayerConfig>, StarException> PlayerConfig::create
   auto bounds = json_to_rectf(*boundsConfig);
   if (!bounds)
     return std::unexpected(std::move(bounds.error()));
-  config->metaBoundBox = *bounds;
+  config->meta_bound_box = *bounds;
   for (auto const& field : {
       std::pair{std::string_view{"movementParameters"}, std::ref(config->movementParameters)},
       std::pair{std::string_view{"zeroGMovementParameters"}, std::ref(config->zeroGMovementParameters)},

@@ -843,11 +843,11 @@ std::expected<void, StarException> DungeonGeneratorWorld::place_biome_items(Vec2
 }
 
 std::expected<void, StarException> DungeonGeneratorWorld::addDrop(Vec2F const& position, ItemDescriptor const& item) {
-  auto& generationRoot = m_worldServer.root();
+  auto& generation_root = m_worldServer.root();
   {
-    auto operationResult1 = ItemDrop::create_randomized_drop(generationRoot, item, position);
-    if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-    auto operationResult2 = m_worldServer.addEntity((*operationResult1));
+    auto drop_result = ItemDrop::create_randomized_drop(generation_root, item, position);
+    if (!drop_result) return std::unexpected(std::move(drop_result.error()));
+    auto operationResult2 = m_worldServer.addEntity((*drop_result));
     if (!operationResult2) return std::unexpected(std::move(operationResult2.error()));
   }
 

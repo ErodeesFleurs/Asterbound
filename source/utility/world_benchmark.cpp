@@ -230,7 +230,7 @@ static std::expected<void, StarException> run(std::span<String const> argv) {
         entityCount = 0;
         auto signaled = worldServer.forEachEntity(RectF(Vec2F(), Vec2F(worldServer.geometry().size())), [&](auto const& entity) -> std::expected<void, StarException> {
             ++entityCount;
-            auto result = worldServer.signalRegion(RectI::integral(entity->metaBoundBox().translated(entity->position())));
+            auto result = worldServer.signalRegion(RectI::integral(entity->meta_bound_box().translated(entity->position())));
             if (!result)
               return std::unexpected(std::move(result.error()));
             return {};

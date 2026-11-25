@@ -382,7 +382,7 @@ if (!result136) return std::unexpected(std::move(result136.error()));
 if (!ClientEntityModeNames) return std::unexpected(ClientEntityModeNames.error());
 auto result137 = ClientEntityModeNames->get_left(std::move(*result136));
 if (!result137) return std::unexpected(std::move(result137.error()));
-projectileConfig->clientEntityMode = result137->get();
+projectileConfig->client_entity_mode = result137->get();
   auto result138 = config.get_bool("masterOnly", false);
 if (!result138) return std::unexpected(std::move(result138.error()));
 projectileConfig->masterOnly = std::move(*result138);

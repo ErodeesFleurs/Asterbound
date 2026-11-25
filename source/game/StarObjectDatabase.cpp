@@ -462,13 +462,13 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
     auto metaBoxResult = orientationSettings.opt("metaBoundBox");
     if (!metaBoxResult)
       return std::unexpected(std::move(metaBoxResult.error()));
-    auto metaBox = std::move(*metaBoxResult);
-    if (metaBox) {
-      auto metaBoundBoxResult = json_to_rectf(*metaBox);
-      if (!metaBoundBoxResult)
-        return std::unexpected(std::move(metaBoundBoxResult.error()));
-      auto metaBoundBox = std::move(*metaBoundBoxResult);
-      orientation->metaBoundBox = std::move(metaBoundBox);
+    auto meta_box = std::move(*metaBoxResult);
+    if (meta_box) {
+      auto meta_bound_box_result = json_to_rectf(*meta_box);
+      if (!meta_bound_box_result)
+        return std::unexpected(std::move(meta_bound_box_result.error()));
+      auto meta_bound_box = std::move(*meta_bound_box_result);
+      orientation->meta_bound_box = std::move(meta_bound_box);
     }
     auto tilledResult = orientationSettings.get_bool("requireTilledAnchors", false);
     if (!tilledResult)

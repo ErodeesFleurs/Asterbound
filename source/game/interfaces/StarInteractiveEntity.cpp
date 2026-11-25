@@ -26,7 +26,7 @@ import star.rect;
 namespace Star {
 
 RectF InteractiveEntity::interactiveBoundBox() const {
-  return metaBoundBox();
+  return meta_bound_box();
 }
 
 bool InteractiveEntity::isInteractive() const {
