@@ -197,7 +197,7 @@ std::expected<Json, StarException> ArmorWearer::disk_store() const {
     auto const& armor = m_armors[i];
     if (!armor.item)
       continue;
-    auto stored = armor.item->descriptor().diskStore(**versioning);
+    auto stored = armor.item->descriptor().disk_store(**versioning);
     if (!stored)
       return std::unexpected(std::move(stored.error()));
     res[String(slot_keys[i])] = std::move(*stored);

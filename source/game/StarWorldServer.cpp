@@ -27,6 +27,7 @@ import star.rpc_promise;
 import std;
 import star.optional;
 import star.rect;
+import star.small_vector;
 import star.thread;
 import star.worker_pool;
 
@@ -971,7 +972,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           return std::unexpected(std::move(result80.error()));
         continue;
       }
-      auto result81 = collectLiquid(clpacket->tilePositions, clpacket->liquidId);
+      auto result81 = collect_liquid(clpacket->tilePositions, clpacket->liquidId);
       if (!result81)
         return std::unexpected(std::move(result81.error()));
       if (auto item = std::move(*result81))
@@ -2283,57 +2284,89 @@ std::expected<bool, StarException> WorldServer::isPlayerModified(RectI const& re
   return std::move(*result253);
 }
 
-std::expected<ItemDescriptor, StarException> WorldServer::collectLiquid(List<Vec2I> const& tilePositions, LiquidId liquidId) {
-  auto result254 = this->root().assets();
-  if (!result254)
-    return std::unexpected(std::move(result254.error()));
-  auto result255 = std::move(*result254)->json("/items/defaultParameters.config:liquidItems.bucketSize");
-  if (!result255)
-    return std::unexpected(std::move(result255.error()));
-  auto result256 = std::move(*result255).to_float();
-  if (!result256)
-    return std::unexpected(std::move(result256.error()));
-  float bucketSize = std::move(*result256);
-  unsigned drainedUnits = 0;
-  float nextUnit = bucketSize;
-  List<std::reference_wrapper<ServerTile>> maybeDrainTiles;
+std::expected<ItemDescriptor, StarException> WorldServer::collect_liquid(List<Vec2I> const& tile_positions, LiquidId liquid_id) {
+  auto assets = root().assets();
+  if (!assets)
+    return std::unexpected(std::move(assets.error()));
+  auto bucket_config = (*assets)->json("/items/defaultParameters.config:liquidItems.bucketSize");
+  if (!bucket_config)
+    return std::unexpected(std::move(bucket_config.error()));
+  auto bucket_size = bucket_config->to_float();
+  if (!bucket_size)
+    return std::unexpected(std::move(bucket_size.error()));
+  if (tile_positions.empty())
+    return ItemDescriptor();
 
-  for (auto pos : tilePositions) {
-    auto tile = m_tileArray->modify_tile(pos);
-    if (tile->get().liquid.liquid == liquidId && !isTileProtected(pos)) {
-      if (tile->get().liquid.level >= nextUnit) {
-        tile->get().liquid.take(nextUnit);
-        nextUnit = bucketSize;
-        drainedUnits++;
+  auto liquids = root().liquidsDatabase();
+  auto settings = liquids ? (*liquids)->liquidSettings(liquid_id) : nullptr;
+  auto drop_count = settings && settings->itemDrop ? settings->itemDrop.count() : 0;
+  auto max_units = std::numeric_limits<std::uint64_t>::max();
+  if (!liquids)
+    max_units = 0;
+  else if (drop_count > 1)
+    max_units /= drop_count;
 
-        for (auto previousTile : maybeDrainTiles)
-          previousTile.get().liquid.take(previousTile.get().liquid.level);
+  auto drain_tiles = [&]<bool preflight>() {
+    using LiquidCopies = std::unordered_map<Vec2I, LiquidStore, ValueHash<Vec2I>>;
+    std::conditional_t<preflight, LiquidCopies, std::monostate> copies;
+    SmallVector<std::reference_wrapper<LiquidStore>, 8> pending_tiles;
+    std::uint64_t drained_units = 0;
+    float next_unit = *bucket_size;
 
-        maybeDrainTiles.clear();
+    for (auto const& pos : tile_positions) {
+      auto tile = m_tileArray->modify_tile(pos);
+      if (!tile || tile->get().liquid.liquid != liquid_id || isTileProtected(pos))
+        continue;
+
+      std::reference_wrapper<LiquidStore> selected = tile->get().liquid;
+      if constexpr (preflight) {
+        // Duplicate and wrapped positions have to see earlier drains, including
+        // drains of pending tiles. Map entries stay stable across rehashes.
+        selected = copies.try_emplace(m_geometry.xwrap(pos), selected.get()).first->second;
+        if (selected.get().liquid != liquid_id)
+          continue;
+      }
+      auto& liquid = selected.get();
+      if (liquid.level >= next_unit) {
+        ++drained_units;
+        if constexpr (preflight) {
+          if (drained_units > max_units)
+            return drained_units;
+        }
+        liquid.take(next_unit);
+        next_unit = *bucket_size;
+        for (auto pending : pending_tiles)
+          pending.get().take(pending.get().level);
+        pending_tiles.clear();
       }
 
-      if (tile->get().liquid.level > 0) {
-        nextUnit -= tile->get().liquid.level;
-        maybeDrainTiles.push_back(*tile);
+      if (liquid.level > 0) {
+        next_unit -= liquid.level;
+        pending_tiles.push_back(selected);
       }
 
-      for (auto const& pair : m_clientInfo) {
-        if (pair.second->activeSectors.contains(m_tileArray->sector_for(pos)))
-          pair.second->pendingLiquidUpdates.add(pos);
+      if constexpr (!preflight) {
+        for (auto const& [_, client] : m_clientInfo) {
+          if (client->activeSectors.contains(m_tileArray->sector_for(pos)))
+            client->pendingLiquidUpdates.add(pos);
+        }
+        m_liquid_engine->visit_location(pos);
       }
-      m_liquid_engine->visit_location(pos);
     }
+    return drained_units;
+  };
+
+  // At most one bucket is counted per input position. Only an unavailable
+  // payout or a drop large enough to overflow that bound needs a dry run.
+  if (tile_positions.size() > max_units && drain_tiles.operator()<true>() > max_units) {
+    if (!liquids)
+      return std::unexpected(std::move(liquids.error()));
+    return std::unexpected(WorldServerException("Liquid collection item count overflow"));
   }
 
-  if (drainedUnits > 0) {
-    auto result259 = this->root().liquidsDatabase();
-    if (!result259)
-      return std::unexpected(std::move(result259.error()));
-    auto liquidConfig = std::move(*result259)->liquidSettings(liquidId);
-    if (liquidConfig && liquidConfig->itemDrop)
-      return liquidConfig->itemDrop.multiply(drainedUnits);
-  }
-
+  auto drained_units = drain_tiles.operator()<false>();
+  if (drained_units && settings && settings->itemDrop)
+    return settings->itemDrop.with_count(drop_count * drained_units);
   return ItemDescriptor();
 }
 

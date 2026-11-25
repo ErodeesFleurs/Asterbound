@@ -1118,7 +1118,7 @@ std::expected<void, StarException> GiveItemPacket::read_json(Json const& json) {
 
 std::expected<Json, StarException> GiveItemPacket::write_json() const {
   return JsonObject{
-    {"item", item.toJson()}
+    {"item", item.to_json()}
   };
 }
 

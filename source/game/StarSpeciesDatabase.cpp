@@ -290,8 +290,8 @@ std::expected<CharacterCreationResult, StarException> SpeciesDatabase::create_hu
     if (!chest) return std::unexpected(std::move(chest.error()));
     auto legs = ItemDescriptor::create(pants->get(), 1, JsonObject{{"colorIndex", pants_color}});
     if (!legs) return std::unexpected(std::move(legs.error()));
-    result.armor.set(*chest_slot, chest->toJson());
-    result.armor.set(*leg_slot, legs->toJson());
+    result.armor.set(*chest_slot, chest->to_json());
+    result.armor.set(*leg_slot, legs->to_json());
 
     result.humanoid_parameters.set("choices", JsonArray({gender_choice, body_color_choice, alty, hair_choice, heady, shirt_choice, shirt_color, pants_choice, pants_color, personality}));
   }

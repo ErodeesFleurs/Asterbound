@@ -521,7 +521,7 @@ MessageResponseResult ContainerObject::receiveMessage(ConnectionId sendingConnec
     if (!resultResult)
       return std::unexpected(std::move(resultResult.error()));
     auto result = std::move(*resultResult);
-    return ChainableJsonMessageResponse(item_safe_descriptor(result).toJson());
+    return ChainableJsonMessageResponse(item_safe_descriptor(result).to_json());
   }
   auto matches4Result = message.equals_ignore_case("putItems");
   if (!matches4Result)
@@ -548,7 +548,7 @@ MessageResponseResult ContainerObject::receiveMessage(ConnectionId sendingConnec
     if (!resultResult)
       return std::unexpected(std::move(resultResult.error()));
     auto result = std::move(*resultResult);
-    return ChainableJsonMessageResponse(item_safe_descriptor(result).toJson());
+    return ChainableJsonMessageResponse(item_safe_descriptor(result).to_json());
   }
   auto matches5Result = message.equals_ignore_case("takeItems");
   if (!matches5Result)
@@ -575,7 +575,7 @@ MessageResponseResult ContainerObject::receiveMessage(ConnectionId sendingConnec
     if (!resultResult)
       return std::unexpected(std::move(resultResult.error()));
     auto result = std::move(*resultResult);
-    return ChainableJsonMessageResponse(item_safe_descriptor(result).toJson());
+    return ChainableJsonMessageResponse(item_safe_descriptor(result).to_json());
   }
   auto matches6Result = message.equals_ignore_case("swapItems");
   if (!matches6Result)
@@ -607,7 +607,7 @@ MessageResponseResult ContainerObject::receiveMessage(ConnectionId sendingConnec
     if (!resultResult)
       return std::unexpected(std::move(resultResult.error()));
     auto result = std::move(*resultResult);
-    return ChainableJsonMessageResponse(item_safe_descriptor(result).toJson());
+    return ChainableJsonMessageResponse(item_safe_descriptor(result).to_json());
   }
   auto matches7Result = message.equals_ignore_case("applyAugment");
   if (!matches7Result)
@@ -634,7 +634,7 @@ MessageResponseResult ContainerObject::receiveMessage(ConnectionId sendingConnec
     if (!resultResult)
       return std::unexpected(std::move(resultResult.error()));
     auto result = std::move(*resultResult);
-    return ChainableJsonMessageResponse(item_safe_descriptor(result).toJson());
+    return ChainableJsonMessageResponse(item_safe_descriptor(result).to_json());
   }
   auto matches8Result = message.equals_ignore_case("consumeItems");
   if (!matches8Result)
@@ -693,7 +693,7 @@ MessageResponseResult ContainerObject::receiveMessage(ConnectionId sendingConnec
     auto items = std::move(*itemsResult);
     JsonArray result;
     for (auto const& item : items)
-      result.push_back(item_safe_descriptor(item).toJson());
+      result.push_back(item_safe_descriptor(item).to_json());
     return ChainableJsonMessageResponse(std::move(result));
   }
   return Object::receiveMessage(sendingConnection, message, args);
@@ -800,7 +800,7 @@ std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> ContainerObject:
     if (!currentWorldResult)
       return std::unexpected(std::move(currentWorldResult.error()));
     auto currentWorld = std::move(*currentWorldResult);
-    auto promiseResult = currentWorld.get().sendEntityMessage(entityId(), "addItems", {item_safe_descriptor(items).toJson()});
+    auto promiseResult = currentWorld.get().sendEntityMessage(entityId(), "addItems", {item_safe_descriptor(items).to_json()});
     if (!promiseResult)
       return std::unexpected(std::move(promiseResult.error()));
     auto promise = std::move(*promiseResult);
@@ -829,7 +829,7 @@ std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> ContainerObject:
     if (!currentWorldResult)
       return std::unexpected(std::move(currentWorldResult.error()));
     auto currentWorld = std::move(*currentWorldResult);
-    auto promiseResult = currentWorld.get().sendEntityMessage(entityId(), "putItems", {item_safe_descriptor(items).toJson()});
+    auto promiseResult = currentWorld.get().sendEntityMessage(entityId(), "putItems", {item_safe_descriptor(items).to_json()});
     if (!promiseResult)
       return std::unexpected(std::move(promiseResult.error()));
     auto promise = std::move(*promiseResult);
@@ -887,7 +887,7 @@ std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> ContainerObject:
     if (!currentWorldResult)
       return std::unexpected(std::move(currentWorldResult.error()));
     auto currentWorld = std::move(*currentWorldResult);
-    auto promiseResult = currentWorld.get().sendEntityMessage(entityId(), "swapItems", {slot, item_safe_descriptor(items).toJson(), tryCombine});
+    auto promiseResult = currentWorld.get().sendEntityMessage(entityId(), "swapItems", {slot, item_safe_descriptor(items).to_json(), tryCombine});
     if (!promiseResult)
       return std::unexpected(std::move(promiseResult.error()));
     auto promise = std::move(*promiseResult);
@@ -916,7 +916,7 @@ std::expected<RpcPromise<std::shared_ptr<Item>>, StarException> ContainerObject:
     if (!currentWorldResult)
       return std::unexpected(std::move(currentWorldResult.error()));
     auto currentWorld = std::move(*currentWorldResult);
-    auto promiseResult = currentWorld.get().sendEntityMessage(entityId(), "applyAugment", {slot, item_safe_descriptor(augment).toJson()});
+    auto promiseResult = currentWorld.get().sendEntityMessage(entityId(), "applyAugment", {slot, item_safe_descriptor(augment).to_json()});
     if (!promiseResult)
       return std::unexpected(std::move(promiseResult.error()));
     auto promise = std::move(*promiseResult);
@@ -945,7 +945,7 @@ std::expected<RpcPromise<bool>, StarException> ContainerObject::consumeItems(Ite
     if (!currentWorldResult)
       return std::unexpected(std::move(currentWorldResult.error()));
     auto currentWorld = std::move(*currentWorldResult);
-    auto promiseResult = currentWorld.get().sendEntityMessage(entityId(), "consumeItems", {descriptor.toJson()});
+    auto promiseResult = currentWorld.get().sendEntityMessage(entityId(), "consumeItems", {descriptor.to_json()});
     if (!promiseResult)
       return std::unexpected(std::move(promiseResult.error()));
     auto promise = std::move(*promiseResult);
@@ -1260,7 +1260,7 @@ std::expected<ItemRecipe, StarException> ContainerObject::recipeForMaterials(Lis
   }
   auto descriptors = inputItems
       | std::views::filter([](std::shared_ptr<Item> const& item) { return bool(item); })
-      | std::views::transform([](std::shared_ptr<Item> const& item) { return item->descriptor().toJson(); });
+      | std::views::transform([](std::shared_ptr<Item> const& item) { return item->descriptor().to_json(); });
   JsonArray materials;
   materials.reserve(inputItems.size());
   std::ranges::copy(descriptors, std::back_inserter(materials));

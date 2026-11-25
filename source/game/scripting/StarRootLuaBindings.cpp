@@ -1068,7 +1068,7 @@ std::expected<Json, StarException> LuaBindings::RootCallbacks::createItem(ItemDa
   if (!parsed) return std::unexpected(std::move(parsed.error()));
   auto item = database.item(*parsed, level, seed);
   if (!item) return std::unexpected(std::move(item.error()));
-  return (*item)->descriptor().toJson();
+  return (*item)->descriptor().to_json();
 }
 
 std::expected<Json, StarException> LuaBindings::RootCallbacks::tenantConfig(Root& root, String const& tenantName) {
@@ -1172,7 +1172,7 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::createTreasu
   if (!database) return std::unexpected(std::move(database.error()));
   auto treasure = (*database)->createTreasure(pool, level, seed.value_or(root.random().next_u64()), itemCatalog);
   if (!treasure) return std::unexpected(std::move(treasure.error()));
-  return treasure->transformed([](std::shared_ptr<Item> const& item) { return item->descriptor().toJson(); });
+  return treasure->transformed([](std::shared_ptr<Item> const& item) { return item->descriptor().to_json(); });
 }
 
 std::expected<std::optional<String>, StarException> LuaBindings::RootCallbacks::materialMiningSound(

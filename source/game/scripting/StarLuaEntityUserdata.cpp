@@ -851,7 +851,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
 
         if (auto toolUser = as_ref<ToolUserEntity>(*entity)) {
           if (auto item = toolUser->get().handItem(toolHand)) {
-            return item->descriptor().toJson();
+            return item->descriptor().to_json();
           }
         }
 

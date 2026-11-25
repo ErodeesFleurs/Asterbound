@@ -87,6 +87,14 @@ import star.item_drop;
 import star.image_metadata_database;
 import star.rect;
 import star.world_server;
+import star.liquid_types;
+import star.lua;
+import star.lua_root;
+import star.net_packets;
+import star.player_lua_bindings;
+import star.warping;
+import star.world_client_state;
+import star.world_tiles;
 namespace Star {
 
 void PrintTo(ItemDescriptor const& descriptor, std::ostream* stream) {
@@ -365,7 +373,7 @@ const GameTestRegistration itemFallbackDiagnostics(
       auto descriptor = ItemDescriptor::create("missing-item-diagnostics-probe", 37,
           JsonObject{{"scriptStorage", JsonObject{{"savedState", "private-saved-state-marker"}}}});
       ASSERT_TRUE(descriptor);
-      auto storedDescriptor = descriptor->toJson().erase("count");
+      auto storedDescriptor = descriptor->to_json().erase("count");
       ASSERT_TRUE(storedDescriptor);
       for (auto level : {LogLevel::Error, LogLevel::Debug}) {
         sink->set_level(level);
@@ -1052,6 +1060,158 @@ namespace {
 
 }
 
+const GameTestRegistration filtered_lua_consumption("ItemTest", "FilteredLuaConsumptionTargetsLiveStacks", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  auto factory = root.playerFactory();
+  if (!fixture.check(bool(factory), "load player factory")) return;
+  auto player = (*factory)->create();
+  if (!fixture.check(bool(player), "create player")) return;
+  auto inventory = (*player)->inventory();
+
+  auto lua = LuaRoot::create(root);
+  if (!fixture.check(bool(lua), "create Lua root")) return;
+  auto context = (*lua)->create_context(StringList{});
+  if (!fixture.check(bool(context), "create Lua context")) return;
+  auto callbacks = LuaBindings::makePlayerCallbacks(root, **player);
+  if (!fixture.check(bool(callbacks), "create real player callbacks")) return;
+  if (!fixture.check(bool(context->set_callbacks("player", *callbacks)), "register player callbacks")) return;
+
+  // Bag filters resolve the stack's name through the catalog, even for a custom instance.
+  auto database = root.itemDatabase();
+  if (!fixture.check(bool(database), "load catalog for bag filters")) return;
+  auto base = (*database)->item_config("plantfibre", JsonObject{});
+  if (!fixture.check(bool(base), "load vanilla crafting material")) return;
+  auto tagged = base->config.set("itemTags", JsonArray{"asterbound-filtered-consume-tag"});
+  if (!fixture.check(bool(tagged), "prepare tagged material variant")) return;
+  auto stack = [&](bool matched, String marker, std::uint64_t count) -> std::expected<std::shared_ptr<GenericItem>, StarException> {
+    auto item = GenericItem::create(root, matched ? *tagged : base->config, base->directory,
+        JsonObject{{"selected", matched}, {"marker", std::move(marker)}});
+    if (item && (*item)->set_count(count))
+      return std::unexpected(ItemException("Filtered consumption fixture count did not fit"));
+    return item;
+  };
+
+  for (auto const& script : std::array{
+    String(R"(return player.consumeItemWithParameter("selected", true, 5) == nil)"),
+    String(R"(return player.consumeTaggedItem("asterbound-filtered-consume-tag", 5) == nil)")}) {
+    auto unmatched = stack(false, "unmatched", 8);
+    auto first = stack(true, "shared", 3);
+    auto tail = stack(true, "tail", 4);
+    if (!fixture.check(unmatched && first && tail, "create same-name stacks with distinct parameters")) return;
+    auto unmatched_slot = inventoryTestBagSlot(root, *inventory, *unmatched);
+    if (!fixture.check(bool(unmatched_slot), unmatched_slot ? "find a material bag" : unmatched_slot.error().what())) return;
+    auto first_slot = *unmatched_slot;
+    ++first_slot.index;
+    if (!fixture.check(inventory->slot_valid(first_slot), "bag has a second slot")) return;
+    if (!fixture.check(inventory->setItem(*unmatched_slot, *unmatched) == true &&
+        inventory->setItem(first_slot, *first) == true && inventory->setItem(SwapSlot(), *first) == true &&
+        inventory->setItem(TrashSlot(), *tail) == true, "install real stacks and a shared swap alias")) return;
+
+    auto consumed = context->eval<bool>(script);
+    if (!fixture.check(consumed && *consumed, consumed ? std::string_view(script.utf8()) : consumed.error().what())) return;
+    fixture.check((*unmatched)->count() == 8, "same-name nonmatching stack was not consumed");
+    fixture.check((*first)->count() == 0, "matched stack was consumed exactly once across both aliases");
+    fixture.check((*tail)->count() == 2, "only the two remaining items were taken from the last matching stack");
+    auto bag_alias = inventory->itemsAt(first_slot);
+    auto swap_alias = inventory->itemsAt(SwapSlot());
+    fixture.check(bag_alias && !*bag_alias && swap_alias && !*swap_alias, "both exhausted aliases are empty");
+  }
+});
+
+const GameTestRegistration liquid_collection_overflow("ItemTest", "LiquidCollectionPreflightsOverflowWithoutUpdatingTiles", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  if (!fixture.check(bool(directory), "create private root directory")) return;
+  auto cleanup = make_scope_exit([&] { fixture.check(bool(File::remove_all(*directory)), "remove private root directory"); });
+  auto overlay = File::relative_to(*directory, "assets");
+  if (!fixture.check(bool(File::create_directories(File::relative_to(overlay, "items"))), "create liquid fixture assets")) return;
+  if (!fixture.check(bool(File::write_file(String(R"({
+    "liquidId":247, "name":"asterbound-collect-overflow", "tickDelta":1, "color":[1,2,3,255],
+    "itemDrop":{"name":"perfectlygenericitem","count":-1,"parameters":{"fromFixture":true}}
+  })"), File::relative_to(overlay, "collect-overflow.liquid"))), "write liquid with full-width payout")) return;
+  if (!fixture.check(bool(File::write_file(String(R"([
+    {"op":"replace","path":"/liquidItems/bucketSize","value":1}
+  ])"), File::relative_to(overlay, "items/defaultParameters.config.patch"))), "use a precise one-unit bucket")) return;
+  // Advance the real packet loop without incidental cellular simulation.
+  if (!fixture.check(bool(File::write_file(String(R"([
+    {"op":"replace","path":"/fidelitySettings/medium/liquidUpdate","value":[1000000,1]}
+  ])"), File::relative_to(overlay, "worldserver.config.patch"))), "isolate collection from the liquid tick")) return;
+
+  auto settings = fixture.rootSettings();
+  settings.assetSources.push_back(overlay);
+  settings.storageDirectory = File::relative_to(*directory, "storage");
+  settings.runtimeConfigFile = {};
+  settings.logDirectory = {};
+  settings.logFile = {};
+  settings.includeUGC = false;
+  auto root = Root::create(std::move(settings));
+  if (!fixture.check(bool(root), root ? "create private liquid root" : root.error().what())) return;
+  auto storage = File::ephemeral_file((*root)->random());
+  if (!fixture.check(bool(storage), "create ephemeral world storage")) return;
+  constexpr Vec2U world_size(2048, 2048);
+  auto created = WorldServer::create(**root, world_size, *storage);
+  if (!fixture.check(bool(created), created ? "create world" : created.error().what())) return;
+  auto world = *created;
+  auto close = make_scope_exit([&] { fixture.check(bool(world->close()), "close ephemeral world"); });
+  world->setSpawningEnabled(false);
+  world->setTileProtectionEnabled(false);
+  if (!fixture.check(bool(world->generateRegion(RectI(1008, 1008, 1040, 1040))), "load test region")) return;
+
+  constexpr LiquidId liquid_id = 247;
+  std::array const positions{Vec2I(1024, 1024), Vec2I(1025, 1024), Vec2I(1026, 1024), Vec2I(1027, 1024)};
+  std::array const levels{0.375f, 0.75f, 0.75f, 0.25f};
+  for (std::size_t i = 0; i < levels.size(); ++i)
+    if (!fixture.check(bool(world->setLiquid(positions[i], liquid_id, levels[i], 0.875f)), "seed liquid and pressure")) return;
+
+  constexpr auto client_id = min_client_connection_id;
+  NetCompatibilityRules const rules(open_protocol_version);
+  auto state = WorldClientState::create(**root);
+  if (!fixture.check(bool(state), "create fixture client state")) return;
+  (*state)->setNetCompatibilityRules(rules);
+  (*state)->setWindow(RectI(1008, 1008, 1040, 1040));
+  auto delta = (*state)->writeDelta();
+  if (!fixture.check(bool(delta), "create client visibility delta")) return;
+  auto added = world->addClient(client_id, SpawnTargetPosition(Vec2F(1024, 1024)), true, false, rules);
+  if (!fixture.check(added && *added, "attach fixture client")) return;
+  if (!fixture.check(bool(world->handleIncomingPackets(client_id, {
+    std::make_shared<WorldStartAcknowledgePacket>(), std::make_shared<WorldClientStateUpdatePacket>(*delta)
+  })), "acknowledge world and monitor the test region")) return;
+  if (!fixture.check(bool(world->update(1.0f / 60.0f)), "publish initial world snapshot") ||
+      !fixture.check(bool(world->getOutgoingPackets(client_id)), "flush initial packets")) return;
+
+  auto overflow = world->handleIncomingPackets(client_id, {
+    std::make_shared<CollectLiquidPacket>(List<Vec2I>(positions.begin(), positions.end()), liquid_id)
+  });
+  if (!fixture.check(!overflow && overflow.error().is<WorldServerException>(), "two accumulated buckets overflow the payout")) return;
+  for (std::size_t i = 0; i < levels.size(); ++i) {
+    auto tile = world->getServerTile(positions[i]);
+    fixture.check(tile && tile->get().liquid.liquid == liquid_id && tile->get().liquid.level == levels[i] &&
+        tile->get().liquid.pressure == 0.875f, "overflow leaves each tile and its pressure untouched");
+  }
+  if (!fixture.check(bool(world->update(1.0f / 60.0f)), "flush possible collection updates")) return;
+  auto packets = world->getOutgoingPackets(client_id);
+  if (!fixture.check(bool(packets), "read outgoing packets after rejected collection")) return;
+  fixture.check(std::ranges::none_of(*packets, [](std::shared_ptr<Packet> const& packet) {
+    return as<TileLiquidUpdatePacket>(packet) || as<GiveItemPacket>(packet);
+  }), "overflow emits neither a liquid update nor a payout");
+
+  auto const wrapped_first = positions[0] + Vec2I(static_cast<int>(world_size[0]), 0);
+  // Count the repeated pending tile, then observe it empty through a wrapped
+  // spelling. Treating that spelling as a fresh tile would add a second bucket.
+  auto collected = world->collect_liquid({positions[0], positions[0], positions[1], wrapped_first, positions[3]}, liquid_id);
+  if (!fixture.check(collected && collected->count() == std::numeric_limits<std::uint64_t>::max() &&
+      collected->name() == "perfectlygenericitem" && collected->parameters() == JsonObject{{"fromFixture", true}},
+      "one bucket with a wrapped duplicate pays the full descriptor")) return;
+  fixture.check(world->liquidLevel(positions[0]).liquid == EmptyLiquidId &&
+      world->liquidLevel(positions[1]).level == 0.5f && world->liquidLevel(positions[3]).level == 0.25f,
+      "pending drains and remainder follow the supplied input order");
+  if (!fixture.check(bool(world->update(1.0f / 60.0f)), "flush successful liquid updates")) return;
+  packets = world->getOutgoingPackets(client_id);
+  fixture.check(packets && std::ranges::any_of(*packets, [&](std::shared_ptr<Packet> const& packet) {
+    auto update = as<TileLiquidUpdatePacket>(packet);
+    return update && update->position == positions[0];
+  }), "successful collection announces the drained tile to the same client");
+});
+
 const GameTestRegistration crafting_batch_accounting("ItemTest", "CraftingBatchAccounting", [](GameTest& fixture) {
   auto& root = fixture.root();
   auto directory = File::temporary_directory(root.random());
@@ -1096,10 +1256,10 @@ const GameTestRegistration crafting_batch_accounting("ItemTest", "CraftingBatchA
   ASSERT_EQ(inventory.setItem(SwapSlot{}, *plain), true);
   auto plain_id = (*plain)->descriptor().singular();
   auto marked_id = (*marked)->descriptor().singular();
-  auto zero = inventory.takeItems(marked_id.withCount(0), false, true);
+  auto zero = inventory.takeItems(marked_id.with_count(0), false, true);
   ASSERT_TRUE(zero);
   EXPECT_EQ(zero->count(), 0u);
-  EXPECT_EQ(inventory.hasCountOfItem(marked_id.withCount(3), true), 7u);
+  EXPECT_EQ(inventory.hasCountOfItem(marked_id.with_count(3), true), 7u);
   ItemRecipe recipe{};
   recipe.output = *result;
   recipe.inputs = {plain_id, plain_id};
@@ -1124,7 +1284,7 @@ const GameTestRegistration crafting_batch_accounting("ItemTest", "CraftingBatchA
   recipe.matchInputParameters = true;
   recipe.inputs[1] = plain_id;
   auto invalid_output = recipe;
-  invalid_output.output = recipe.output.withCount(0);
+  invalid_output.output = recipe.output.with_count(0);
   fixture.check((*db)->craft_recipe(player, invalid_output, 1) == false, "zero output rejected");
   fixture.check(inventory.currency("money") == 6 && inventory.hasCountOfItem(plain_id, true) == 4,
       "zero output leaves money and ingredients untouched");
@@ -1155,7 +1315,7 @@ const GameTestRegistration crafting_batch_accounting("ItemTest", "CraftingBatchA
   recipe.matchInputParameters = true;
   recipe.currencyInputs.clear();
   stock->by_parameters[plain_id] = maximum;
-  recipe.inputs = {plain_id.withCount(maximum), plain_id};
+  recipe.inputs = {plain_id.with_count(maximum), plain_id};
   EXPECT_EQ(limit(), 0u);
   EXPECT_FALSE(ItemDatabase::can_make_recipe(recipe, *stock, inventory.availableCurrencies()));
   recipe.inputs.clear();
@@ -2964,3 +3124,224 @@ const GameTestRegistration
       }
     }
   });
+
+const GameTestRegistration parameterized_recipe_stock("ItemTest", "ParameterizedRecipeStock", [](GameTest& fixture) {
+  constexpr unsigned variants = 1024;
+  RecipeStock stock;
+  std::vector<ItemDescriptor> inputs;
+  inputs.reserve(variants);
+  for (unsigned grade = 1; grade <= variants; ++grade) {
+    auto input = ItemDescriptor::create("gradedore", grade, JsonObject{{"grade", grade}});
+    if (!fixture.check(input.has_value(), "create graded ingredient"))
+      return;
+    inputs.push_back(std::move(*input));
+    stock.add(inputs.back());
+    stock.add(inputs.back());
+  }
+  for (auto const& input : inputs) {
+    if (!fixture.check(ItemDatabase::get_count_of_item(stock, input, true) == 2 * input.count(),
+        "exact ingredient stock retains each grade's own count"))
+      return;
+  }
+  fixture.check(ItemDatabase::get_count_of_item(stock, inputs.front(), false) == variants * (variants + 1),
+      "name-only ingredient stock sums all grades");
+});
+
+const GameTestRegistration item_descriptor_truncated_wire(
+    "ItemTest", "ItemDescriptorTruncatedWirePreservesDestination", [](GameTest& fixture) {
+  auto original = ItemDescriptor::create("old-item", 7, JsonObject{{"old", true}});
+  auto incoming = ItemDescriptor::create("new-item", 300,
+      JsonObject{{"new", JsonArray{1234, JsonObject{{"nested", "payload"}}}}});
+  if (!fixture.check(original && incoming, "create distinct old and incoming descriptors")) return;
+  DataStreamBuffer encoded;
+  if (!fixture.check(bool(encoded.write(*incoming)), "serialize incoming descriptor")) return;
+
+  auto destination = *original;
+  auto original_hash = ValueHash<ItemDescriptor>{}(*original);
+  for (std::size_t size = 0; size < encoded.span().size(); ++size) {
+    auto read = DataStreamBuffer::deserialize(destination, encoded.span().first(size));
+    if (!fixture.check(!read && read.error().is<EofException>(), "each strict prefix reports EOF")
+        || !fixture.check(destination == *original && ValueHash<ItemDescriptor>{}(destination) == original_hash,
+            "truncation preserves the occupied destination and hash"))
+      return;
+  }
+  fixture.check(DataStreamBuffer::deserialize(destination, encoded.span()) && destination == *incoming,
+      "complete wire value replaces the destination");
+});
+
+const GameTestRegistration item_descriptor_legacy_wire(
+    "ItemTest", "ItemDescriptorLegacyWireAcceptsNonObjectParameters", [](GameTest& fixture) {
+  String const name = "legacy-item";
+  constexpr std::uint64_t count = 19;
+  auto original = ItemDescriptor::create("occupied", 4, JsonObject{{"discard", true}});
+  if (!fixture.check(bool(original), "create occupied destination")) return;
+  for (Json const& parameters : {Json(), Json(false), Json(42), Json(2.5), Json("old"),
+           Json(JsonArray{7, "stored"})}) {
+    // Construct the wire layout directly: the public constructor requires an object.
+    DataStreamBuffer legacy;
+    if (!fixture.check(legacy.write(name) && legacy.write_vlq_u(count) && legacy.write(parameters),
+            "write legacy descriptor fields directly"))
+      return;
+    auto destination = *original;
+    if (!fixture.check(DataStreamBuffer::deserialize(destination, legacy.span())
+            && destination.name() == name && destination.count() == count,
+            "decode legacy non-object parameters into occupied destination"))
+      return;
+    if (parameters.is_null()) {
+      // A null tag historically yields empty parameters in a fresh destination.
+      fixture.check(destination.parameters() == Json(JsonObject{}), "null tag resets parameters to an empty object");
+    } else {
+      DataStreamBuffer encoded;
+      fixture.check(destination.parameters() == parameters && encoded.write(destination)
+              && std::ranges::equal(encoded.span(), legacy.span()),
+          "legacy scalar and array parameters survive byte-for-byte");
+    }
+  }
+});
+
+const GameTestRegistration item_descriptor_value_hash(
+    "ItemTest", "ItemDescriptorValueHashUsesParameterValues", [](GameTest& fixture) {
+  auto left = ItemDescriptor::create("item", 3,
+      JsonObject{{"settings", JsonObject{{"x", 0}, {"y", "sample"}}}, {"level", 42}, {"enabled", true}});
+  auto equal = ItemDescriptor::create("item", 3,
+      JsonObject{{"enabled", true}, {"level", 42.0}, {"settings", JsonObject{{"y", "sample"}, {"x", 0.0}}}});
+  if (!fixture.check(left && equal, "create equal parameters with reordered keys and mixed numeric types")) return;
+  ValueHash<ItemDescriptor> hash;
+  fixture.check(*left == *equal && hash(*left) == hash(*equal), "equal descriptor values have equal hashes");
+
+  HashSet<ItemDescriptor> keys{*left};
+  HashSet<std::size_t> hashes{hash(*left)};
+  for (int level : {43, 44, 45}) {
+    auto variant = left->apply_parameters(JsonObject{{"level", level}});
+    if (!fixture.check(variant && *variant != *left, "different parameters produce a different value")) return;
+    keys.insert(*variant);
+    hashes.insert(hash(*variant));
+  }
+  fixture.check(keys.size() == 4 && keys.contains(*equal), "hash lookup distinguishes values and finds the equal key");
+  fixture.check(hashes.size() > 1, "same-name same-count parameter variants do not all collide");
+
+  auto unchanged = left->apply_parameters({});
+  fixture.check(unchanged && *unchanged == *left, "empty parameter override keeps the descriptor unchanged");
+  auto overridden = left->apply_parameters(JsonObject{{"settings", JsonObject{{"x", 7}}}});
+  auto expected = ItemDescriptor::create("item", 3,
+      JsonObject{{"settings", JsonObject{{"x", 7}}}, {"level", 42}, {"enabled", true}});
+  fixture.check(overridden && expected && *overridden == *expected && *left == *equal,
+      "parameter override replaces the whole nested object, preserving other fields and the original descriptor");
+});
+
+const GameTestRegistration item_descriptor_legacy_json(
+    "ItemTest", "ItemDescriptorLegacyJsonFallbacksAndValidation", [](GameTest& fixture) {
+  Json const data = JsonObject{{"legacy", true}};
+  Json const parameters = JsonObject{{"modern", true}};
+  auto preferred = ItemDescriptor::create(JsonObject{
+      {"name", "preferred"}, {"item", false}, {"data", data}, {"parameters", parameters}});
+  fixture.check(preferred && preferred->name() == "preferred" && preferred->parameters() == parameters,
+      "name takes precedence over item and parameters takes precedence over data");
+
+  auto fallback = ItemDescriptor::create(JsonObject{
+      {"item", "fallback"}, {"count", Json()}, {"data", data}, {"parameters", Json()}});
+  fixture.check(fallback && fallback->name() == "fallback" && fallback->count() == 1 && fallback->parameters() == data,
+      "named null count and parameters use the defaults");
+
+  auto extra_array_entry = ItemDescriptor::create(JsonArray{"array-item", 3.75, parameters, "ignored"});
+  fixture.check(extra_array_entry && extra_array_entry->count() == 3 && extra_array_entry->parameters() == parameters,
+      "the array form truncates fractional counts and ignores extra entries");
+  auto negative_float = ItemDescriptor::create(JsonArray{"array-item", -2.75});
+  fixture.check(negative_float && negative_float->count() == std::numeric_limits<std::uint64_t>::max() - 1,
+      "a negative fractional count truncates as signed before conversion to unsigned");
+
+  struct InvalidSpec {
+    Json value;
+    std::string_view reason;
+  };
+  for (auto const& [spec, reason] : std::initializer_list<InvalidSpec>{
+           {JsonArray{}, "missing array name"},
+           {JsonArray{"array-item", Json()}, "explicit array null count"},
+           {JsonArray{"array-item", 1, Json()}, "explicit array null parameters"},
+           {JsonObject{{"name", Json()}, {"item", "fallback"}}, "explicit null name takes precedence over a valid item"},
+           {JsonObject{{"name", "item"}, {"count", 0x1p63}}, "count float outside signed range"},
+           {JsonObject{{"name", "item"}, {"data", JsonArray{}}, {"parameters", parameters}}, "invalid shadowed legacy data"},
+           {JsonObject{{"name", "item"}, {"data", data}, {"parameters", true}}, "non-object parameters"}}) {
+    auto result = ItemDescriptor::create(spec);
+    fixture.check(!result && result.error().is<JsonException>(), reason);
+  }
+  auto malformed_both = ItemDescriptor::create(
+      JsonObject{{"name", "item"}, {"data", JsonArray{}}, {"parameters", true}});
+  fixture.check(!malformed_both && std::string_view(malformed_both.error().what()).contains("from array"),
+      "invalid legacy data is reported before invalid modern parameters");
+});
+
+const GameTestRegistration item_descriptor_large_count(
+    "ItemTest", "ItemDescriptorLargeCountRoundTripsThroughJsonDiskAndWire", [](GameTest& fixture) {
+  auto versions = fixture.root().versioningDatabase();
+  if (!fixture.check(bool(versions), "load item versioning database")) return;
+  for (auto count : {(std::uint64_t{1} << 63) + 42, std::numeric_limits<std::uint64_t>::max()}) {
+    auto original = ItemDescriptor::create("large-stack", count);
+    if (!fixture.check(bool(original), "create descriptor with count greater than INT64_MAX")) return;
+    auto json = original->to_json();
+    // JSON uses a signed integer carrying the count bits, not a rounded double.
+    fixture.check(json.get_int("count") == std::bit_cast<std::int64_t>(count), "JSON retains the signed count bits");
+    auto json_round_trip = json.repr().and_then(Json::parse).and_then([](Json const& parsed) {
+      return ItemDescriptor::create(parsed);
+    });
+    fixture.check(json_round_trip && *json_round_trip == *original, "large count survives JSON text round trip");
+
+    auto disk_round_trip = original->disk_store(**versions).and_then([&](Json const& stored) {
+      return ItemDescriptor::load_store(**versions, stored);
+    });
+    fixture.check(disk_round_trip && *disk_round_trip == *original, "large count survives disk round trip");
+
+    DataStreamBuffer legacy;
+    DataStreamBuffer encoded;
+    if (!fixture.check(legacy.write(original->name()) && legacy.write_vlq_u(count)
+            && legacy.write(original->parameters()) && encoded.write(*original),
+            "write legacy fields and descriptor at large count"))
+      return;
+    fixture.check(std::ranges::equal(encoded.span(), legacy.span()), "wire retains the unsigned VLQ count layout");
+    ItemDescriptor wire_round_trip;
+    fixture.check(DataStreamBuffer::deserialize(wire_round_trip, legacy.span()) && wire_round_trip == *original,
+        "large count survives wire round trip");
+  }
+});
+
+const GameTestRegistration item_descriptor_disk_envelope(
+    "ItemTest", "ItemDescriptorDiskEnvelopePreservesEmptyStates", [](GameTest& fixture) {
+  auto versions = fixture.root().versioningDatabase();
+  if (!fixture.check(bool(versions), "load item versioning database")) return;
+  Json const parameters = JsonObject{{"keep", 17}};
+  auto named_zero = ItemDescriptor::create("named-zero", 0, parameters);
+  auto nameless = ItemDescriptor::create("", 5, parameters);
+  if (!fixture.check(named_zero && nameless, "create named zero-count and nameless nonzero-count descriptors")) return;
+  ItemDescriptor null;
+  fixture.check(null.is_null() && !null && null.to_json().is_null(), "default descriptor is null");
+  fixture.check(!named_zero->is_null() && bool(*named_zero) && !named_zero->to_json().is_null(),
+      "named descriptor with zero count is not null");
+  fixture.check(nameless->is_null() && !*nameless && nameless->to_json().is_null(),
+      "nameless descriptor is null even with a nonzero count");
+  fixture.check(!ItemDescriptor::load_store(**versions, Json()), "raw JSON null is not a descriptor disk envelope");
+
+  for (auto const& descriptor : {null, *named_zero, *nameless}) {
+    fixture.check(descriptor.is_empty(), "all three descriptor states are empty");
+    auto stored = descriptor.disk_store(**versions);
+    if (!fixture.check(bool(stored), "store an empty descriptor in an Item envelope")) return;
+    auto version = stored->get("version");
+    auto sub_versions = stored->get("subVersions");
+    auto content = stored->get("content");
+    if (!fixture.check(stored->get_string("id") == "Item" && version && version->is_type(Json::Type::Int)
+            && sub_versions && sub_versions->is_type(Json::Type::Object) && content,
+            "disk envelope retains Item metadata and content"))
+      return;
+    Json expected = JsonObject{{"name", descriptor.name()}, {"count", descriptor.count()},
+        {"parameters", descriptor.parameters()}};
+    fixture.check(*content == expected, "disk content retains all descriptor fields even when plain JSON is null");
+    auto loaded = ItemDescriptor::load_store(**versions, *stored);
+    fixture.check(loaded && *loaded == descriptor, "current disk envelope restores the exact empty state");
+
+    Json legacy = JsonObject{{"__id", "Item"}, {"__version", *version}, {"__content", *content},
+        {"subVersions", *sub_versions}};
+    auto legacy_loaded = ItemDescriptor::load_store(**versions, legacy);
+    fixture.check(legacy_loaded && *legacy_loaded == descriptor, "legacy disk envelope restores the exact empty state");
+    auto wrong_id = stored->set("id", "Player");
+    fixture.check(wrong_id && !ItemDescriptor::load_store(**versions, *wrong_id), "reject another disk envelope type");
+  }
+});

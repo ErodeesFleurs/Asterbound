@@ -999,12 +999,12 @@ void exercise_merchant_purchase(GameTest& fixture, Application const& applicatio
   auto item = ItemDescriptor::create("merchantprobeitem", 5, parameters);
   ASSERT_TRUE(item);
   JsonObject settings{{"buyFactor", 1.0}, {"items", JsonArray{
-      JsonObject{{"item", item->toJson()}, {"price", wide_price}},
-      JsonObject{{"item", item->toJson()}, {"price", 0}},
+      JsonObject{{"item", item->to_json()}, {"price", wide_price}},
+      JsonObject{{"item", item->to_json()}, {"price", 0}},
       JsonObject{{"item", JsonArray{item->name(), 0, parameters}}, {"price", 1}},
       JsonObject{{"item", JsonArray{item->name(), 5, JsonObject{{"maxStack", 0}}}}, {"price", 1}},
       JsonObject{{"item", JsonArray{item->name(), huge_bundle, JsonObject{{"maxStack", huge_bundle}}}}, {"price", 1}},
-      JsonObject{{"item", item->toJson()}, {"price", huge_bundle}},
+      JsonObject{{"item", item->to_json()}, {"price", huge_bundle}},
   }}};
   auto created = MerchantPane::create(**context, client->worldClient(), player, settings, player->entityId());
   ASSERT_TRUE(created) << created.error().what();
@@ -1039,7 +1039,7 @@ void exercise_merchant_purchase(GameTest& fixture, Application const& applicatio
   EXPECT_EQ(received, (std::vector<std::uint64_t>{5, 10}));
   auto status = report();
   ASSERT_TRUE(status && *status);
-  auto summary = JsonObject{{"item", item->withCount(15).toJson()}, {"total", 3 * wide_price}};
+  auto summary = JsonObject{{"item", item->with_count(15).to_json()}, {"total", 3 * wide_price}};
   EXPECT_EQ(**status, (JsonObject{{"calls", 1}, {"summary", std::move(summary)}})) << (**status).repr().value().utf8();
 
   // Exercise the callback itself even for the invalid rows that disable the button.

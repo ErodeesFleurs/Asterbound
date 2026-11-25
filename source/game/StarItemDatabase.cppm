@@ -275,7 +275,7 @@ private:
 template <loadable_item ItemT>
 [[nodiscard]]
 std::expected<bool, StarException> ItemDatabase::load_item(ItemDescriptor const& descriptor, std::shared_ptr<ItemT>& slot) const {
-  if (descriptor.isNull())
+  if (descriptor.is_null())
     return static_cast<bool>(std::exchange(slot, {}));
   if (slot && slot->matches(descriptor, true)) {
     auto previous = slot->count();

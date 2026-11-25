@@ -7,27 +7,19 @@ import star.hash;
 import star.json;
 
 import star.data_stream;
-import star.bi_map;
 
 namespace Star {
 
 class Item;
-struct VersionedJson;
 class VersioningDatabase;
 
 class ItemDescriptor {
 public:
-  // Loads ItemDescriptor from store format.
-  [[nodiscard]]
-  static std::expected<ItemDescriptor, StarException> loadStore(VersioningDatabase const& versioningDatabase, Json const& store);
+  [[nodiscard]] static std::expected<ItemDescriptor, StarException> load_store(VersioningDatabase const& versioning_database, Json const& store);
 
   ItemDescriptor();
   [[nodiscard]]
   static std::expected<ItemDescriptor, StarException> create(String name, std::uint64_t count, Json parameters = Json());
-  ItemDescriptor(ItemDescriptor const&) = default;
-  ItemDescriptor& operator=(ItemDescriptor const&) = default;
-  ItemDescriptor(ItemDescriptor&& rhs) noexcept(std::is_nothrow_move_constructible_v<String> && std::is_nothrow_move_constructible_v<Json>);
-  ItemDescriptor& operator=(ItemDescriptor&& rhs) noexcept(std::is_nothrow_move_assignable_v<String> && std::is_nothrow_move_assignable_v<Json>);
 
   // Populate from a configuration JsonArray containing up to 3 elements, the
   // name, count, and then any item parameters.  If the json is a map, looks
@@ -35,60 +27,56 @@ public:
   [[nodiscard]]
   static std::expected<ItemDescriptor, StarException> create(Json const& spec);
 
-  String const& name() const;
+  String const& name() const&;
+  String name() &&;
+  String name() const&& = delete;
   std::uint64_t count() const;
-  Json const& parameters() const;
+  Json const& parameters() const&;
+  Json parameters() &&;
+  Json parameters() const&& = delete;
 
   ItemDescriptor singular() const;
-  ItemDescriptor withCount(std::uint64_t count) const;
-  ItemDescriptor multiply(std::uint64_t count) const;
+  ItemDescriptor with_count(std::uint64_t count) const&;
+  ItemDescriptor with_count(std::uint64_t count) &&;
   [[nodiscard]]
-  std::expected<ItemDescriptor, StarException> applyParameters(JsonObject const& parameters) const;
+  std::expected<ItemDescriptor, StarException> apply_parameters(JsonObject const& overrides) const;
 
-  // Descriptor is the default constructed ItemDescriptor()
-  bool isNull() const;
+  // Nullness depends on the name, not the stack count.
+  bool is_null() const;
 
   // Descriptor is not null
   explicit operator bool() const;
 
   // True if descriptor is null OR if descriptor is size 0
-  bool isEmpty() const;
+  bool is_empty() const;
 
-  bool operator==(ItemDescriptor const& rhs) const;
-  bool operator!=(ItemDescriptor const& rhs) const;
+  bool operator==(ItemDescriptor const&) const = default;
 
-  bool matches(ItemDescriptor const& other, bool exactMatch = false) const;
-  bool matches(Item const& other, bool exactMatch = false) const;
+  bool matches(ItemDescriptor const& other, bool exact_match = false) const;
+  bool matches(Item const& other, bool exact_match = false) const;
 
   // Stores ItemDescriptor to versioned structure not meant for human reading / writing.
   [[nodiscard]]
-  std::expected<Json, StarException> diskStore(VersioningDatabase const& versioningDatabase) const;
+  std::expected<Json, StarException> disk_store(VersioningDatabase const& versioning_database) const;
 
   // Converts ItemDescriptor to spec format
-  Json toJson() const;
+  Json to_json() const;
 
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ItemDescriptor& itemDescriptor);
-  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ItemDescriptor const& itemDescriptor);
-
-  friend std::expected<void, StarException> write_text(TextBuffer& output, ItemDescriptor const& descriptor);
-
-  friend struct ValueHash<ItemDescriptor>;
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ItemDescriptor& descriptor);
+  friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ItemDescriptor const& descriptor);
 
 private:
   friend class Item;
-  friend class ItemDatabase;
-  ItemDescriptor(String name, std::uint64_t count, Json parameters, std::optional<std::size_t> parametersHash);
-
-  std::size_t parametersHash() const;
+  ItemDescriptor(String name, std::uint64_t count, Json parameters);
+  Json fields() const;
 
   String m_name;
   std::uint64_t m_count;
   Json m_parameters;
-  mutable std::optional<std::size_t> m_parametersHash;
 };
 
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ItemDescriptor& itemDescriptor);
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ItemDescriptor const& itemDescriptor);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, ItemDescriptor& descriptor);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, ItemDescriptor const& descriptor);
 [[nodiscard]] std::expected<void, StarException> write_text(TextBuffer& output, ItemDescriptor const& descriptor);
 
 template <>
@@ -103,13 +91,7 @@ export module star.item_descriptor;
 export namespace Star {
   template <>
   struct ValueHash<ItemDescriptor>;
-}
-
-
-
-export namespace Star {
   using ::Star::ItemDescriptor;
   using ::Star::write_text;
   using ::Star::Item;
-  using ::Star::VersionedJson;
 }

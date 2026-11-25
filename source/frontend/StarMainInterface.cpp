@@ -1924,7 +1924,7 @@ std::expected<void, StarException> MainInterface::queueJoinRequest(std::pair<Str
 
 std::expected<void, StarException> MainInterface::queueItemPickupText(std::shared_ptr<Item> const& item) {
   return sendPaneEvent("Notifications", "pickup", JsonObject{
-      {"descriptor", item->descriptor().singular().toJson()},
+      {"descriptor", item->descriptor().singular().to_json()},
       {"name", item->friendly_name()}, {"count", item->count()}});
 }
 

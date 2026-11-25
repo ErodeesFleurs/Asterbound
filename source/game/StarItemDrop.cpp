@@ -148,7 +148,7 @@ std::expected<std::shared_ptr<ItemDrop>, StarException> ItemDrop::createRandomiz
 }
 
 std::expected<std::shared_ptr<ItemDrop>, StarException> ItemDrop::createRandomizedDrop(Root& rootContext, ItemDescriptor const& descriptor, Vec2F const& position, bool eternal) {
-  if (!descriptor || descriptor.isEmpty())
+  if (!descriptor || descriptor.is_empty())
     return std::shared_ptr<ItemDrop>();
   auto database = rootContext.itemDatabase();
   if (!database)
@@ -191,7 +191,7 @@ std::expected<std::shared_ptr<ItemDrop>, StarException> ItemDrop::throwDrop(Root
 }
 
 std::expected<std::shared_ptr<ItemDrop>, StarException> ItemDrop::throwDrop(Root& rootContext, ItemDescriptor const& descriptor, Vec2F const& position, Vec2F const& velocity, Vec2F const& direction, bool eternal) {
-  if (!descriptor || descriptor.isEmpty())
+  if (!descriptor || descriptor.is_empty())
     return std::shared_ptr<ItemDrop>();
   auto database = rootContext.itemDatabase();
   if (!database)

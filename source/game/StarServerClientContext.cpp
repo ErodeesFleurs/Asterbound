@@ -145,7 +145,7 @@ std::expected<void, StarException> ServerClientContext::initialize() {
       if (!executed)
         return std::unexpected(std::move(executed.error()));
     }
-    return Json(overflow.transformed(std::mem_fn(&ItemDescriptor::toJson)));
+    return Json(overflow.transformed(std::mem_fn(&ItemDescriptor::to_json)));
   });
   if (!container_handler)
     return std::unexpected(std::move(container_handler.error()));

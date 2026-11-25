@@ -3004,7 +3004,7 @@ std::shared_ptr<PlayerBlueprints> Player::blueprints() const {
 }
 
 std::expected<bool, StarException> Player::addBlueprint(ItemDescriptor const& descriptor, bool showFailure) {
-  if (descriptor.isNull())
+  if (descriptor.is_null())
     return false;
   bool const known = m_blueprints->isKnown(descriptor);
   if (known && !showFailure)
@@ -3059,7 +3059,7 @@ std::expected<bool, StarException> Player::addBlueprint(ItemDescriptor const& de
 }
 
 bool Player::blueprintKnown(ItemDescriptor const& descriptor) const {
-  if (descriptor.isNull())
+  if (descriptor.is_null())
     return false;
 
   return m_blueprints->isKnown(descriptor);
@@ -4031,7 +4031,7 @@ std::expected<void, StarException> Player::setNetArmorSecret(EquipmentSlot slot,
   if (!versioningResult)
     return std::unexpected(std::move(versioningResult.error()));
   auto versioning = std::move(*versioningResult);
-  auto storeResult = descriptor.diskStore(*versioning);
+  auto storeResult = descriptor.disk_store(*versioning);
   if (!storeResult)
     return std::unexpected(std::move(storeResult.error()));
   auto store = std::move(*storeResult);

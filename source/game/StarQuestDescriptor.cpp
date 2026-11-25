@@ -115,7 +115,7 @@ std::expected<QuestParam, StarException> QuestParam::fromJson(Json const& json) 
   if (*type == "item") {
     auto spec = json.get("item");
     if (!spec) return std::unexpected(std::move(spec.error()));
-    auto item = ItemDescriptor::loadStore(**database, *spec);
+    auto item = ItemDescriptor::load_store(**database, *spec);
     if (!item) return std::unexpected(std::move(item.error()));
     return QuestParamDetail(QuestItem{item->name(), item->parameters()});
   }
@@ -123,7 +123,7 @@ std::expected<QuestParam, StarException> QuestParam::fromJson(Json const& json) 
   if (!specs) return std::unexpected(std::move(specs.error()));
   QuestItemList items;
   for (auto const& spec : *specs) {
-    auto item = ItemDescriptor::loadStore(**database, spec);
+    auto item = ItemDescriptor::load_store(**database, spec);
     if (!item) return std::unexpected(std::move(item.error()));
     items.push_back(std::move(*item));
   }
@@ -144,12 +144,12 @@ std::expected<QuestParam, StarException> QuestParam::diskLoad(Root& root, Json c
   if (std::holds_alternative<QuestItem>(detail)) {
     auto descriptor = std::get<QuestItem>(detail).descriptor();
     if (!descriptor) return std::unexpected(std::move(descriptor.error()));
-    return JsonObject{{"type", "item"}, {"item", descriptor->toJson()}};
+    return JsonObject{{"type", "item"}, {"item", descriptor->to_json()}};
   } else if (std::holds_alternative<QuestItemTag>(detail)) return JsonObject{{"type", "itemTag"}, {"tag", std::get<QuestItemTag>(detail)}};
   else if (std::holds_alternative<QuestItemList>(detail)) {
     JsonArray array;
     for (auto const& item : std::get<QuestItemList>(detail))
-      array.push_back(item.toJson());
+      array.push_back(item.to_json());
     return JsonObject{{"type", "itemList"}, {"items", std::move(array)}};
   } else if (std::holds_alternative<QuestEntity>(detail)) {
     auto const& entity = std::get<QuestEntity>(detail);
@@ -180,13 +180,13 @@ std::expected<QuestParam, StarException> QuestParam::diskLoad(Root& root, Json c
   if (std::holds_alternative<QuestItem>(detail)) {
     auto descriptor = std::get<QuestItem>(detail).descriptor();
     if (!descriptor) return std::unexpected(std::move(descriptor.error()));
-    auto store = descriptor->diskStore(**database);
+    auto store = descriptor->disk_store(**database);
     if (!store) return std::unexpected(std::move(store.error()));
     return JsonObject{{"type", "item"}, {"item", *store}};
   }
   JsonArray array;
   for (auto const& item : std::get<QuestItemList>(detail)) {
-    auto store = item.diskStore(**database);
+    auto store = item.disk_store(**database);
     if (!store) return std::unexpected(std::move(store.error()));
     array.push_back(std::move(*store));
   }

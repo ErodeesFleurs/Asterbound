@@ -36,7 +36,7 @@ std::expected<Json, StarException> ItemRecipe::toJson() const {
   JsonArray inputList;
   inputList.reserve(inputs.size());
   for (auto const& input : inputs)
-    inputList.push_back(input.toJson());
+    inputList.push_back(input.to_json());
   auto currencies = json_from_map(currencyInputs);
   if (!currencies)
     return std::unexpected(std::move(currencies.error()));
@@ -46,7 +46,7 @@ std::expected<Json, StarException> ItemRecipe::toJson() const {
   return Json(JsonObject{
       {"currencyInputs", std::move(*currencies)},
       {"input", std::move(inputList)},
-      {"output", output.toJson()},
+      {"output", output.to_json()},
       {"duration", duration},
       {"groups", json_from_string_set(groups)},
       {"collectables", std::move(*collectableJson)},
@@ -64,7 +64,7 @@ void RecipeStock::add(ItemDescriptor const& item) {
   add_count(by_parameters[item.singular()]);
 }
 
-bool ItemRecipe::isNull() const { return currencyInputs.empty() && inputs.empty() && output.isNull(); }
+bool ItemRecipe::isNull() const { return currencyInputs.empty() && inputs.empty() && output.is_null(); }
 
 bool ItemRecipe::operator==(ItemRecipe const& rhs) const {
   return matchInputParameters == rhs.matchInputParameters && std::tie(currencyInputs, inputs, output) == std::tie(rhs.currencyInputs, rhs.inputs, rhs.output);

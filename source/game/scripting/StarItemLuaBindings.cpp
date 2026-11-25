@@ -267,7 +267,7 @@ bool LuaBindings::ItemCallbacks::empty(Item& item) {
 //
 // @return a table containing a serialized item descriptor
 Json LuaBindings::ItemCallbacks::descriptor(Item& item) {
-  return item.descriptor().toJson();
+  return item.descriptor().to_json();
 }
 
 // Returns the item description
@@ -398,7 +398,7 @@ float LuaBindings::ItemCallbacks::time_to_live(Item& item) {
 // @return a list of tables containing serialize item descriptors
 std::expected<Json, StarException> LuaBindings::ItemCallbacks::learn_blueprints_on_pickup(Item& item) {
   return json_from_list<ItemDescriptor>(
-      item.learn_blueprints_on_pickup(), [](ItemDescriptor const& descriptor) { return descriptor.toJson(); });
+      item.learn_blueprints_on_pickup(), [](ItemDescriptor const& descriptor) { return descriptor.to_json(); });
 }
 
 // Returns whether or not this items has a specific item tag

@@ -454,7 +454,7 @@ bool matchColorIndices = std::move(*result65);
                     randomColorIndex = std::move(*result76);
     }
 
-                  auto result77 = item.applyParameters({{"colorIndex", randomColorIndex}});
+                  auto result77 = item.apply_parameters({{"colorIndex", randomColorIndex}});
     if (!result77) return std::unexpected(std::move(result77.error()));
     item = std::move(*result77);
                 }
@@ -743,7 +743,7 @@ auto versioningDatabase = std::move(*result152);
   auto result153 = variant.humanoid_identity.to_json();
 if (!result153) return std::unexpected(std::move(result153.error()));
 auto result154 = json_from_map_v<StringMap<ItemDescriptor>>(variant.items, [&versioningDatabase](ItemDescriptor const& descriptor) {
-      return descriptor.diskStore(*versioningDatabase);
+      return descriptor.disk_store(*versioningDatabase);
     });
 if (!result154) return std::unexpected(std::move(result154.error()));
 auto damageTeamName = enum_name<TeamTypeNames>(variant.damageTeamType);
@@ -895,7 +895,7 @@ auto versioningDatabase = std::move(*result191);
   auto result192 = data.get("items");
 if (!result192) return std::unexpected(std::move(result192.error()));
 auto result193 = json_to_map_v<StringMap<ItemDescriptor>>(std::move(*result192), [&versioningDatabase](Json const& descriptor) {
-    return ItemDescriptor::loadStore(*versioningDatabase, descriptor);
+    return ItemDescriptor::load_store(*versioningDatabase, descriptor);
   });
 if (!result193) return std::unexpected(std::move(result193.error()));
 variant.items = std::move(*result193);

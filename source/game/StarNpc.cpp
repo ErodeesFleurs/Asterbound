@@ -1880,22 +1880,22 @@ if (!result407) return std::unexpected(std::move(result407.error()));
   auto result408 = maybe_enum_value<equipment_slot_names>(entry);
   if (!result408) return std::unexpected(std::move(result408.error()));
   if (auto equipmentSlot = std::move(*result408)) {
-    return m_armor->item_descriptor(static_cast<std::uint8_t>(*equipmentSlot)).toJson();
+    return m_armor->item_descriptor(static_cast<std::uint8_t>(*equipmentSlot)).to_json();
         } else {
     auto result409 = entry.equals_ignore_case("primary");
     if (!result409) return std::unexpected(std::move(result409.error()));
     if (std::move(*result409))
-            return m_tools->primaryHandItemDescriptor().toJson();
+            return m_tools->primaryHandItemDescriptor().to_json();
           else {
       auto result410 = entry.equals_ignore_case("alt");
       if (!result410) return std::unexpected(std::move(result410.error()));
       if (std::move(*result410))
-              return m_tools->altHandItemDescriptor().toJson();
+              return m_tools->altHandItemDescriptor().to_json();
             else if (m_npcVariant.items.contains(entry))
               {
         auto result411 = m_npcVariant.items.get(entry);
         if (!result411) return std::unexpected(std::move(result411.error()));
-        return result411->get().toJson();
+        return result411->get().to_json();
       }
     }
   }

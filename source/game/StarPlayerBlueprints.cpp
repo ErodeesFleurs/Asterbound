@@ -33,8 +33,8 @@ std::expected<PlayerBlueprints, StarException> PlayerBlueprints::create(Json con
 }
 
 Json PlayerBlueprints::toJson() const {
-  return JsonObject{{"knownBlueprints", transform<JsonArray>(m_knownBlueprints, std::mem_fn(&ItemDescriptor::toJson))},
-      {"newBlueprints", transform<JsonArray>(m_newBlueprints, std::mem_fn(&ItemDescriptor::toJson))}};
+  return JsonObject{{"knownBlueprints", transform<JsonArray>(m_knownBlueprints, std::mem_fn(&ItemDescriptor::to_json))},
+      {"newBlueprints", transform<JsonArray>(m_newBlueprints, std::mem_fn(&ItemDescriptor::to_json))}};
 }
 
 bool PlayerBlueprints::isKnown(ItemDescriptor const& itemDescriptor) const {

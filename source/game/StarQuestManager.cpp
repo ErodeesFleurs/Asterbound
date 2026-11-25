@@ -229,7 +229,7 @@ std::expected<Json, StarException> QuestManager::dialogView(std::uint64_t token,
   if (!objectiveJson) return std::unexpected(std::move(objectiveJson.error()));
   JsonArray rewards;
   rewards.reserve(quest.rewards().size());
-  for (auto const& item : quest.rewards()) rewards.emplace_back(item->descriptor().toJson());
+  for (auto const& item : quest.rewards()) rewards.emplace_back(item->descriptor().to_json());
   bool canDecline = false;
   if (lease.kind == "offer") {
     auto allowed = quest.canBeAbandoned();

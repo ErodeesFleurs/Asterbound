@@ -871,8 +871,8 @@ std::expected<void, StarException> MerchantPane::buy() {
   }
 
   if (m_sourceEntityId != null_entity_id) {
-    auto descriptor = m_selectedItem->descriptor().withCount(total_items);
-    auto summary = JsonObject{{"item", descriptor.toJson()}, {"total", m_buy_total}};
+    auto descriptor = m_selectedItem->descriptor().with_count(total_items);
+    auto summary = JsonObject{{"item", descriptor.to_json()}, {"total", m_buy_total}};
     auto sent = m_worldClient->sendEntityMessage(m_sourceEntityId, "onBuy", {std::move(summary)});
     if (!sent)
       return std::unexpected(std::move(sent.error()));

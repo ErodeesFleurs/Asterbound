@@ -1928,7 +1928,7 @@ const GameTestRegistration questTemplateItemBoundaries("RootTest", "QuestTemplat
   EXPECT_EQ((*quest)->rewards[1][1].count(), 2u);
   EXPECT_EQ((*quest)->rewards[1][1].parameters().get_int("colorIndex"), 4);
   ASSERT_EQ((*quest)->requiredItems.size(), 2u);
-  EXPECT_TRUE((*quest)->requiredItems[0].isNull());
+  EXPECT_TRUE((*quest)->requiredItems[0].is_null());
   EXPECT_EQ((*quest)->requiredItems[1].count(), 5u);
   for (auto const& fields : {JsonObject{{"rewards", false}}, JsonObject{{"rewards", JsonArray{Json()}}},
                              JsonObject{{"rewards", JsonArray{JsonArray{false}}}}, JsonObject{{"requiredItems", false}},
@@ -2773,7 +2773,7 @@ const GameTestRegistration item_shared_builder_seeds("ItemDatabaseTest", "Shared
   auto other_seed = db.item_shared(*ignore, {}, 1);
   GameTest::check(valid_item(other_seed) && *other_seed != *ignored && db.item_shared(*ignore, {}, 1) == *other_seed,
       "distinct explicit seeds do not alias even when the builder ignores them");
-  auto other_count = db.item_shared(ignore->withCount(2), {}, 0);
+  auto other_count = db.item_shared(ignore->with_count(2), {}, 0);
   GameTest::check(valid_item(other_count) && *other_count != *ignored && (*other_count)->count() == 2 && (*ignored)->count() == 1,
       "shared requests with different counts do not alias");
   auto other_level = db.item_shared(*ignore, 2.0f, 0);
@@ -2934,14 +2934,14 @@ const GameTestRegistration hudInventoryLinks("HudDomainTest", "InventoryLinksPre
       return;
     }
     ASSERT_TRUE(*actual);
-    EXPECT_EQ((*actual)->descriptor().toJson(), descriptor);
+    EXPECT_EQ((*actual)->descriptor().to_json(), descriptor);
   };
   auto oneHanded = hudAuthoredItem(**database, ItemType::Consumable, false);
   ASSERT_TRUE(oneHanded) << oneHanded.error().what();
   auto twoHanded = hudAuthoredItem(**database, ItemType::MiningTool, true);
   ASSERT_TRUE(twoHanded) << twoHanded.error().what();
-  Json const oneDescriptor = (*oneHanded)->descriptor().toJson();
-  Json const twoDescriptor = (*twoHanded)->descriptor().toJson();
+  Json const oneDescriptor = (*oneHanded)->descriptor().to_json();
+  Json const twoDescriptor = (*twoHanded)->descriptor().to_json();
   auto oneSlot = hudItemBagSlot(root, inventory, *oneHanded);
   auto twoSlot = hudItemBagSlot(root, inventory, *twoHanded);
   ASSERT_TRUE(oneSlot) << oneSlot.error().what();

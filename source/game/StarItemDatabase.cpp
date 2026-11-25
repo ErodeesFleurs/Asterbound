@@ -184,7 +184,7 @@ std::expected<String, StarException> ItemDatabase::gui_filter_string(std::shared
 }
 
 std::expected<bool, StarException> ItemDatabase::craft_recipe(Player& player, ItemRecipe const& recipe, std::uint64_t batches) const {
-  if (!batches || recipe.output.isEmpty() || recipe.output.count() > std::numeric_limits<std::uint64_t>::max() / batches)
+  if (!batches || recipe.output.is_empty() || recipe.output.count() > std::numeric_limits<std::uint64_t>::max() / batches)
     return false;
   if (!player.isAdmin()) {
     auto consumed = player.inventory()->consume_recipe(recipe, batches);
@@ -193,7 +193,7 @@ std::expected<bool, StarException> ItemDatabase::craft_recipe(Player& player, It
   }
   auto remaining = recipe.output.count() * batches;
   while (remaining) {
-    auto product = item(recipe.output.withCount(remaining));
+    auto product = item(recipe.output.with_count(remaining));
     if (!product)
       return std::unexpected(std::move(product.error()));
     if (!*product || !(*product)->count() || (*product)->count() > remaining)
@@ -257,7 +257,7 @@ std::expected<ItemDescriptor, StarException> ItemDatabase::load_descriptor(Json 
   auto versioning = m_root.versioningDatabase();
   if (!versioning)
     return std::unexpected(std::move(versioning.error()));
-  return ItemDescriptor::loadStore(**versioning, store);
+  return ItemDescriptor::load_store(**versioning, store);
 }
 
 std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::disk_load(Json const& store) const {
@@ -282,12 +282,12 @@ std::expected<Json, StarException> ItemDatabase::disk_store(std::shared_ptr<Item
   auto versioning = m_root.versioningDatabase();
   if (!versioning)
     return std::unexpected(std::move(versioning.error()));
-  return item->descriptor().diskStore(**versioning);
+  return item->descriptor().disk_store(**versioning);
 }
 
 Json ItemDatabase::to_json(std::shared_ptr<Item const> const& item) const {
   if (item)
-    return item->descriptor().toJson();
+    return item->descriptor().to_json();
   else
     return Json();
 }
@@ -423,7 +423,7 @@ HashSet<ItemRecipe> ItemDatabase::recipes_from_bag_contents(RecipeStock const& b
 }
 
 std::uint64_t ItemDatabase::max_craftable_in_bag(RecipeStock const& stock, StringMap<std::uint64_t> const& currencies, ItemRecipe const& recipe) {
-  if (recipe.output.isEmpty())
+  if (recipe.output.is_empty())
     return 0;
   auto limit = std::numeric_limits<std::uint64_t>::max() / recipe.output.count();
   for (auto const& [name, amount] : recipe.currencyInputs) {
@@ -527,7 +527,7 @@ std::expected<ItemRecipe, StarException> ItemDatabase::parse_recipe(Json const& 
     auto output = ItemDescriptor::create(*output_config);
     if (!output)
       return std::unexpected(std::move(output.error()));
-    if (output->isEmpty())
+    if (output->is_empty())
       return std::unexpected(RecipeException("Recipe requires a nonempty output"));
     res.output = std::move(*output);
     auto assets = m_root.assets();
@@ -620,7 +620,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::apply_augment(
   if (!setup)
     return std::unexpected(std::move(setup.error()));
   auto lua_result = invoke_item_script<LuaTupleReturn<Json, std::optional<std::uint64_t>>>(script, [&] {
-    return script.invoke<LuaTupleReturn<Json, std::optional<std::uint64_t>>>("apply", item->descriptor().toJson());
+    return script.invoke<LuaTupleReturn<Json, std::optional<std::uint64_t>>>("apply", item->descriptor().to_json());
   });
   locker.unlock();
   if (!lua_result)
@@ -662,7 +662,7 @@ std::expected<bool, StarException> ItemDatabase::age_item(std::shared_ptr<Item>&
   if (auto set = script.set_scripts((*data)->aging_scripts); !set)
     return std::unexpected(std::move(set.error()));
   auto aged_json =
-    invoke_item_script<Json>(script, [&] { return script.invoke<Json>("ageItem", original.toJson(), aging); });
+    invoke_item_script<Json>(script, [&] { return script.invoke<Json>("ageItem", original.to_json(), aging); });
   locker.unlock();
   if (!aged_json)
     return std::unexpected(std::move(aged_json.error()));
@@ -757,7 +757,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::try_create_ite
     return initial;
   StarException original_error = std::move(initial.error());
   std::shared_ptr<Item> result;
-  auto rebuilt = m_rebuilder->rebuild(descriptor.toJson(), original_error, [&](Json const& store) -> std::expected<void, StarException> {
+  auto rebuilt = m_rebuilder->rebuild(descriptor.to_json(), original_error, [&](Json const& store) -> std::expected<void, StarException> {
     auto recovered_descriptor = ItemDescriptor::create(store);
     if (!recovered_descriptor)
       return std::unexpected(std::move(recovered_descriptor.error()));
@@ -780,7 +780,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::try_create_ite
   if (!logged)
     return std::unexpected(std::move(logged.error()));
   if (m_root.logger().loggable(LogLevel::Debug)) {
-    auto descriptor_text = descriptor.toJson().repr();
+    auto descriptor_text = descriptor.to_json().repr();
     if (!descriptor_text)
       return std::unexpected(std::move(descriptor_text.error()));
     if (auto details = m_root.logger().debug("Item descriptor: {}", *descriptor_text); !details)
@@ -793,7 +793,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::try_create_ite
   auto fallback_level = level;
   auto fallback_seed = seed;
   if (descriptor.name() != "perfectlygenericitem") {
-    auto stored = descriptor.toJson().erase("count");
+    auto stored = descriptor.to_json().erase("count");
     if (!stored)
       return std::unexpected(std::move(stored.error()));
     fallback_parameters = JsonObject{
@@ -1047,7 +1047,7 @@ std::expected<void, StarException> ItemDatabase::add_blueprints() {
       if (!short_description)
         return std::unexpected(std::move(short_description.error()));
       JsonObject config{
-          {"recipe", base_desc.singular().toJson()},
+          {"recipe", base_desc.singular().to_json()},
           {"description", std::move(*description)},
           {"shortdescription", *short_description},
           {"category", (*defaults)->category},

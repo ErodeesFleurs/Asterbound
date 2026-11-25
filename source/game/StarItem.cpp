@@ -317,7 +317,7 @@ bool Item::empty() const {
 }
 
 ItemDescriptor Item::descriptor() const {
-  return ItemDescriptor(m_name, m_count, m_parameters, {});
+  return ItemDescriptor(m_name, m_count, m_parameters);
 }
 
 String Item::description() const {

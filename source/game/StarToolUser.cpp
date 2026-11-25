@@ -195,7 +195,7 @@ ToolUser::ToolUser(Root& root)
   if (!versioning) return std::unexpected(std::move(versioning.error()));
   for (auto const& entry : {std::pair{std::string_view("primaryHandItem"), m_primaryHandItem.get()}, {"altHandItem", m_altHandItem.get()}}) {
     if (entry.second) {
-      auto stored = entry.second->descriptor().diskStore(**versioning);
+      auto stored = entry.second->descriptor().disk_store(**versioning);
       if (!stored) return std::unexpected(std::move(stored.error()));
       data[entry.first] = std::move(*stored);
     }

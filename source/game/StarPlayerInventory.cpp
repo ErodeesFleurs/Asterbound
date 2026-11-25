@@ -532,7 +532,7 @@ bool PlayerInventory::consumeItems(ItemDescriptor const& descriptor, bool exactM
     return false;
   for (auto const& bag : m_bags) {
     auto take = std::min(remaining, bag.second->matching_count(descriptor, exactMatch));
-    if (take && !bag.second->consume_items(descriptor.withCount(take), exactMatch))
+    if (take && !bag.second->consume_items(descriptor.with_count(take), exactMatch))
       return false;
     remaining -= take;
     if (!remaining)
@@ -563,7 +563,7 @@ std::expected<bool, StarException> PlayerInventory::consume_recipe(ItemRecipe co
     return false;
   // Each product is bounded by the division in max_craftable_in_bag.
   for (auto const& input : recipe.inputs) {
-    if (!consumeItems(input.withCount(input.count() * batches), recipe.matchInputParameters))
+    if (!consumeItems(input.with_count(input.count() * batches), recipe.matchInputParameters))
       return std::unexpected(InventoryException("Recipe inventory changed during consumption"));
   }
   for (auto const& [name, amount] : recipe.currencyInputs) {
@@ -577,7 +577,7 @@ std::expected<bool, StarException> PlayerInventory::consume_recipe(ItemRecipe co
   std::uint64_t hasCount = hasCountOfItem(descriptor, exactMatch);
 
   if (hasCount >= descriptor.count() || (takePartial && hasCount > 0)) {
-    ItemDescriptor consumeDescriptor = descriptor.withCount(std::min(descriptor.count(), hasCount));
+    ItemDescriptor consumeDescriptor = descriptor.with_count(std::min(descriptor.count(), hasCount));
     consumeItems(consumeDescriptor, exactMatch);
     return consumeDescriptor;
   }

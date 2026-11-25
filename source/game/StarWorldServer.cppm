@@ -361,7 +361,7 @@ public:
 
   [[nodiscard]] std::expected<bool, StarException> isPlayerModified(RectI const& region) const;
 
-  [[nodiscard]] std::expected<ItemDescriptor, StarException> collectLiquid(List<Vec2I> const& tilePositions, LiquidId liquidId);
+  [[nodiscard]] std::expected<ItemDescriptor, StarException> collect_liquid(List<Vec2I> const& tile_positions, LiquidId liquid_id);
 
   [[nodiscard]] std::expected<bool, StarException> placeDungeon(String const& dungeonName, Vec2I const& position, std::optional<DungeonId> dungeonId = {}, bool forcePlacement = true);
 

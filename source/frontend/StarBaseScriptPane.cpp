@@ -360,7 +360,7 @@ std::expected<std::optional<String>, StarException> BaseScriptPane::cursorOverri
 }
 
 std::expected<std::optional<std::shared_ptr<Item>>, StarException> BaseScriptPane::shiftItemFromInventory(std::shared_ptr<Item> const& input) {
-  auto result = recover_lua_script_error(m_script.invoke<Json>("shiftItemFromInventory", input->descriptor().toJson()));
+  auto result = recover_lua_script_error(m_script.invoke<Json>("shiftItemFromInventory", input->descriptor().to_json()));
   if (!result)
     return std::unexpected(std::move(result.error()));
   if (!*result || (**result).is_null())

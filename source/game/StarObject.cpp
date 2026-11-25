@@ -1125,7 +1125,7 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
               return std::unexpected(std::move(storageResult.error()));
             auto storage = std::move(*storageResult);
             parameters["scriptStorage"] = std::move(storage);
-            auto retained = item.applyParameters(parameters);
+            auto retained = item.apply_parameters(parameters);
             if (!retained)
               return std::unexpected(std::move(retained.error()));
             item = std::move(*retained);

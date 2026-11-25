@@ -82,7 +82,7 @@ std::expected<Json, StarException> ItemBag::to_json() const {
   JsonArray entries;
   entries.reserve(m_items.size());
   for (auto const& item : m_items)
-    entries.push_back(item ? item->descriptor().toJson() : Json());
+    entries.push_back(item ? item->descriptor().to_json() : Json());
   return Json(std::move(entries));
 }
 
@@ -97,7 +97,7 @@ std::expected<Json, StarException> ItemBag::disk_store() const {
       entries.push_back(Json());
       continue;
     }
-    auto stored = item->descriptor().diskStore(**database);
+    auto stored = item->descriptor().disk_store(**database);
     if (!stored)
       return std::unexpected(std::move(stored.error()));
     entries.push_back(std::move(*stored));

@@ -1908,7 +1908,7 @@ namespace LuaBindings {
       return std::unexpected(std::move(result.error()));
     if (auto result = callbacks.register_callback("itemDropItem", [&world](EntityId const& entityId) -> Json {
         if (auto itemDrop = world.get<ItemDrop>(entityId))
-          return itemDrop->item()->descriptor().toJson();
+          return itemDrop->item()->descriptor().to_json();
         return {};
       }); !result)
       return std::unexpected(std::move(result.error()));
@@ -2950,7 +2950,7 @@ namespace LuaBindings {
       if (!itemResult)
         return std::unexpected(std::move(itemResult.error()));
       if (*itemResult)
-        return (*itemResult)->descriptor().toJson();
+        return (*itemResult)->descriptor().to_json();
     }
     return Json();
   }
@@ -3428,7 +3428,7 @@ namespace LuaBindings {
 
     if (auto entity = world.get<ToolUserEntity>(entityId)) {
       if (auto item = entity->handItem(toolHand)) {
-        return item->descriptor().toJson();
+        return item->descriptor().to_json();
       }
     }
 

@@ -947,7 +947,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
   if (auto registered = callbacks.register_callback("itemSlotItem", [parentWidget](String const& widgetName) -> std::expected<std::optional<Json>, StarException> {
     return withWidget<ItemSlotWidget>(parentWidget, widgetName, [&](std::shared_ptr<ItemSlotWidget> widget) -> std::expected<std::optional<Json>, StarException> {
       if (auto item = widget->item())
-        return item->descriptor().toJson();
+        return item->descriptor().to_json();
       return {};
     });
   }); !registered)
