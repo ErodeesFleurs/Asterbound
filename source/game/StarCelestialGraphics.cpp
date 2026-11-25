@@ -80,7 +80,7 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto liquids_database = root.liquidsDatabase();
+  auto liquids_database = root.liquids_database();
   if (!liquids_database)
     return std::unexpected(std::move(liquids_database.error()));
   auto const& shadow_parameters = override_shadow_parameters ? *override_shadow_parameters : celestial_parameters;
@@ -123,7 +123,7 @@ std::expected<List<std::pair<String, float>>, StarException> CelestialGraphics::
       return std::unexpected(std::move(image_scale.error()));
 
     if (terrestrial_parameters->primarySurfaceLiquid != EmptyLiquidId && !liquid_images->empty()) {
-      auto liquid_name = (*liquids_database)->liquidName(terrestrial_parameters->primarySurfaceLiquid);
+      auto liquid_name = (*liquids_database)->liquid_name(terrestrial_parameters->primarySurfaceLiquid);
       if (!liquid_name)
         return std::unexpected(std::move(liquid_name.error()));
       auto image = liquid_images->replace("<liquid>", *liquid_name);
@@ -283,7 +283,7 @@ std::expected<List<std::pair<String, String>>, StarException> CelestialGraphics:
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto liquids_database = root.liquidsDatabase();
+  auto liquids_database = root.liquids_database();
   if (!liquids_database)
     return std::unexpected(std::move(liquids_database.error()));
   auto get_lr = [](String const& base) -> std::expected<std::pair<String, String>, StarException> {
@@ -348,7 +348,7 @@ std::expected<List<std::pair<String, String>>, StarException> CelestialGraphics:
           return std::unexpected(std::move(mask.error()));
         masks.push_back(*mask);
       }
-      auto liquid_name = (*liquids_database)->liquidName(terrestrial_parameters->primarySurfaceLiquid);
+      auto liquid_name = (*liquids_database)->liquid_name(terrestrial_parameters->primarySurfaceLiquid);
       if (!liquid_name)
         return std::unexpected(std::move(liquid_name.error()));
       auto liquid_base = liquid_textures->replace("<liquid>", *liquid_name).and_then(get_lr);

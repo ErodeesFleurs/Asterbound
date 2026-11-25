@@ -161,7 +161,7 @@ void gatherTileOracle(CellularLightingCalculator& calculator, ClientTileSectorAr
       if (tile.foreground != EmptyMaterialId || tile.foregroundMod != NoModId)
         emission += materials.radiantLight(tile.foreground, tile.foregroundMod);
       if (tile.liquid.liquid != EmptyLiquidId && tile.liquid.level != 0.0f)
-        emission += liquids.radiantLight(tile.liquid);
+        emission += liquids.radiant_light(tile.liquid);
       if (tile.foregroundLightTransparent) {
         if (tile.background != EmptyMaterialId || tile.backgroundMod != NoModId)
           emission += materials.radiantLight(tile.background, tile.backgroundMod);
@@ -176,7 +176,7 @@ void gatherTileOracle(CellularLightingCalculator& calculator, ClientTileSectorAr
 void checkWideLightingSnapshot(GameTest& fixture, RectI const& query) {
   auto materials = fixture.root().materialDatabase();
   ASSERT_TRUE(materials);
-  auto liquids = fixture.root().liquidsDatabase();
+  auto liquids = fixture.root().liquids_database();
   ASSERT_TRUE(liquids);
   auto assets = fixture.root().assets();
   ASSERT_TRUE(assets);
@@ -198,18 +198,18 @@ void checkWideLightingSnapshot(GameTest& fixture, RectI const& query) {
     }
   }
   ASSERT_TRUE(radiantMaterial);
-  std::optional<LiquidId> radiantLiquid;
-  auto liquidNames = (*liquids)->liquidNames();
-  std::ranges::sort(liquidNames);
-  for (auto const& name : liquidNames) {
-    auto id = (*liquids)->liquidId(name);
+  std::optional<LiquidId> radiant_liquid;
+  auto liquid_names = (*liquids)->liquid_names();
+  std::ranges::sort(liquid_names);
+  for (auto const& name : liquid_names) {
+    auto id = (*liquids)->liquid_id(name);
     ASSERT_TRUE(id);
-    if ((*liquids)->radiantLight(LiquidLevel{*id, 1.0f}).max() > 0.0f) {
-      radiantLiquid = *id;
+    if ((*liquids)->radiant_light(LiquidLevel{*id, 1.0f}).max() > 0.0f) {
+      radiant_liquid = *id;
       break;
     }
   }
-  ASSERT_TRUE(radiantLiquid);
+  ASSERT_TRUE(radiant_liquid);
 
   ClientTileSectorArray tiles({64, 64});
   tiles.load_default_sector({0, 0});
@@ -225,7 +225,7 @@ void checkWideLightingSnapshot(GameTest& fixture, RectI const& query) {
       tile.backgroundMod = NoModId;
       tile.foregroundLightTransparent = pos[0] % 13 != 0 || pos[1] % 7 == 0;
       tile.backgroundLightTransparent = key % 5 != 0;
-      tile.liquid = key % 7 == 0 ? LiquidLevel{*radiantLiquid, (key % 5) * 0.25f} : LiquidLevel();
+      tile.liquid = key % 7 == 0 ? LiquidLevel{*radiant_liquid, (key % 5) * 0.25f} : LiquidLevel();
       return {};
     }));
 
@@ -581,7 +581,7 @@ const GameTestRegistration
   clientLightingGatherMatchesTileSnapshot("ClientLighting", "GatherMatchesTileSnapshot", [](GameTest& fixture) {
     auto materials = fixture.root().materialDatabase();
     ASSERT_TRUE(materials);
-    auto liquids = fixture.root().liquidsDatabase();
+    auto liquids = fixture.root().liquids_database();
     ASSERT_TRUE(liquids);
     auto assets = fixture.root().assets();
     ASSERT_TRUE(assets);
@@ -603,18 +603,18 @@ const GameTestRegistration
       }
     }
     ASSERT_TRUE(radiantMaterial);
-    auto liquidNames = (*liquids)->liquidNames();
-    std::ranges::sort(liquidNames);
-    std::optional<LiquidId> radiantLiquid;
-    for (auto const& name : liquidNames) {
-      auto id = (*liquids)->liquidId(name);
+    auto liquid_names = (*liquids)->liquid_names();
+    std::ranges::sort(liquid_names);
+    std::optional<LiquidId> radiant_liquid;
+    for (auto const& name : liquid_names) {
+      auto id = (*liquids)->liquid_id(name);
       ASSERT_TRUE(id);
-      if ((*liquids)->radiantLight(LiquidLevel{*id, 1.0f}).max() > 0.0f) {
-        radiantLiquid = *id;
+      if ((*liquids)->radiant_light(LiquidLevel{*id, 1.0f}).max() > 0.0f) {
+        radiant_liquid = *id;
         break;
       }
     }
-    ASSERT_TRUE(radiantLiquid);
+    ASSERT_TRUE(radiant_liquid);
     std::optional<ModId> radiantMod;
     auto modNames = (*materials)->modNames();
     std::ranges::sort(modNames);
@@ -652,7 +652,7 @@ const GameTestRegistration
                                  tile.foregroundLightTransparent = pos[0] % 13 != 0 || pos[1] % 7 == 0;
                                  tile.backgroundLightTransparent = key % 5 != 0;
                                  tile.liquid =
-                                   key % 7 == 0 ? LiquidLevel{*radiantLiquid, (key % 5) * 0.25f} : LiquidLevel();
+                                   key % 7 == 0 ? LiquidLevel{*radiant_liquid, (key % 5) * 0.25f} : LiquidLevel();
                                  return {};
                                }));
 

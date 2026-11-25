@@ -133,7 +133,7 @@ std::expected<TileFixture, StarException> makeFixture(Root& root) {
   auto materials = root.materialDatabase();
   if (!materials)
     return std::unexpected(std::move(materials.error()));
-  auto liquids = root.liquidsDatabase();
+  auto liquids = root.liquids_database();
   if (!liquids)
     return std::unexpected(std::move(liquids.error()));
   auto dirt = (*materials)->materialId("dirt");
@@ -145,7 +145,7 @@ std::expected<TileFixture, StarException> makeFixture(Root& root) {
   auto grass = (*materials)->modId("grass");
   if (!grass)
     return std::unexpected(std::move(grass.error()));
-  auto water = (*liquids)->liquidId("water");
+  auto water = (*liquids)->liquid_id("water");
   if (!water)
     return std::unexpected(std::move(water.error()));
   TileFixture fixture{{}, {}, *dirt, *stone, *grass, *water};

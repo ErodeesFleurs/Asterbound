@@ -436,12 +436,12 @@ std::expected<InspectionTool::InspectionResult, StarException> InspectionTool::i
       return InspectionResult{.message = std::move(message), .objectName = {}};
     });
   }
-  auto liquidLevel = itemWorld->get().liquidLevel(Vec2I::floor(position));
-  auto liquidsDatabase = root().liquidsDatabase();
-  if (!liquidsDatabase)
-    return std::unexpected(std::move(liquidsDatabase.error()));
-  if (liquidLevel.liquid != EmptyLiquidId)
-    return (*liquidsDatabase)->liquidDescription(liquidLevel.liquid, species).transform([](String message) {
+  auto liquid_level = itemWorld->get().liquidLevel(Vec2I::floor(position));
+  auto liquids_database = root().liquids_database();
+  if (!liquids_database)
+    return std::unexpected(std::move(liquids_database.error()));
+  if (liquid_level.liquid != EmptyLiquidId)
+    return (*liquids_database)->liquid_description(liquid_level.liquid, species).transform([](String message) {
       return InspectionResult{.message = std::move(message), .objectName = {}};
     });
   MaterialId bgMaterial = itemWorld->get().material(Vec2I::floor(position), TileLayer::Background);

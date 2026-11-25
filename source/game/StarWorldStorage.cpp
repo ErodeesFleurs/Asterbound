@@ -841,9 +841,8 @@ std::expected<WorldStorage::TileSectorStore, StarException> WorldStorage::readTi
   auto automatDatabaseResult1 = root.materialDatabase();
   if (!automatDatabaseResult1) return std::unexpected(std::move(automatDatabaseResult1.error()));
   auto matDatabase = std::move((*automatDatabaseResult1));
-  auto autoliqDatabaseResult1 = root.liquidsDatabase();
-  if (!autoliqDatabaseResult1) return std::unexpected(std::move(autoliqDatabaseResult1.error()));
-  auto liqDatabase = std::move((*autoliqDatabaseResult1));
+  auto liquids_database = root.liquids_database();
+  if (!liquids_database) return std::unexpected(std::move(liquids_database.error()));
   auto autostorageConfigResult1 = root.assets();
   if (!autostorageConfigResult1) return std::unexpected(std::move(autostorageConfigResult1.error()));
   auto autostorageConfigResult2 = (*autostorageConfigResult1)->json("/worldstorage.config");
@@ -893,7 +892,7 @@ std::expected<WorldStorage::TileSectorStore, StarException> WorldStorage::readTi
         if (!tilebackgroundModResult1) return std::unexpected(std::move(tilebackgroundModResult1.error()));
         tile.backgroundMod = std::move((*tilebackgroundModResult1));
       }
-      if (!liqDatabase->isValidLiquidId(tile.liquid.liquid)) {
+      if (!(*liquids_database)->is_valid_liquid_id(tile.liquid.liquid)) {
         auto LiquidIdreplacementLiquidResult1 = storageConfig.get_uint("replacementLiquidId");
         if (!LiquidIdreplacementLiquidResult1) return std::unexpected(std::move(LiquidIdreplacementLiquidResult1.error()));
         LiquidId replacementLiquid = std::move((*LiquidIdreplacementLiquidResult1));

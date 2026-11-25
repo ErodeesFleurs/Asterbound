@@ -3091,7 +3091,7 @@ std::expected<void, StarException> gatherClientLightingTiles(CellularLightingCal
       if (tile.foreground != EmptyMaterialId || tile.foregroundMod != NoModId)
         light += materials.radiantLight(tile.foreground, tile.foregroundMod);
       if (tile.liquid.liquid != EmptyLiquidId && tile.liquid.level != 0.0f)
-        light += liquids.radiantLight(tile.liquid);
+        light += liquids.radiant_light(tile.liquid);
       if (tile.foregroundLightTransparent) {
         if (tile.background != EmptyMaterialId || tile.backgroundMod != NoModId)
           light += materials.radiantLight(tile.background, tile.backgroundMod);
@@ -3143,10 +3143,9 @@ std::expected<void, StarException> WorldClient::lightingTileGather() {
   auto start = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
   Vec3F environmentLight = m_sky->environmentLight().to_rgb_f();
   float undergroundLevel = m_worldTemplate->undergroundLevel();
-  auto result234 = this->root().liquidsDatabase();
-  if (!result234)
-    return std::unexpected(std::move(result234.error()));
-  auto liquidsDatabase = (std::move(*result234));
+  auto liquids_database = this->root().liquids_database();
+  if (!liquids_database)
+    return std::unexpected(std::move(liquids_database.error()));
   auto result235 = this->root().materialDatabase();
   if (!result235)
     return std::unexpected(std::move(result235.error()));
@@ -3156,7 +3155,7 @@ std::expected<void, StarException> WorldClient::lightingTileGather() {
   if (!result236)
     return std::unexpected(std::move(result236.error()));
   auto result237 = gatherClientLightingTiles(m_lighting_calculator, *m_tileArray, result236->get(), *materialDatabase,
-                                             *liquidsDatabase, environmentLight, undergroundLevel);
+                                             **liquids_database, environmentLight, undergroundLevel);
   if (!result237)
     return std::unexpected(std::move(result237.error()));
   this->root().logMap().set("client_render_world_async_light_gather", Star::format("{:05d}\u00b5s", (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - start).count()));

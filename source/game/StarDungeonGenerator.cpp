@@ -640,13 +640,13 @@ namespace Dungeon {
     return {};
   }
 
-  LiquidBrush::LiquidBrush(String const& liquidName, float quantity, bool source)
-    : m_liquid(liquidName), m_quantity(quantity), m_source(source) {}
+  LiquidBrush::LiquidBrush(String const& liquid_name, float quantity, bool source)
+    : m_liquid(liquid_name), m_quantity(quantity), m_source(source) {}
 
   std::expected<void, StarException> LiquidBrush::paint(Vec2I position, Phase phase, DungeonGeneratorWriter& writer) const {
-    auto database = writer.root().liquidsDatabase();
+    auto database = writer.root().liquids_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    auto id = (*database)->liquidId(m_liquid);
+    auto id = (*database)->liquid_id(m_liquid);
     if (!id) return std::unexpected(std::move(id.error()));
     LiquidStore liquid(*id, m_quantity, 1.0f, m_source);
     if (phase == Phase::WallPhase) writer.requestLiquid(position, liquid);

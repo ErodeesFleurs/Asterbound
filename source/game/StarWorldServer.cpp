@@ -901,10 +901,9 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
 
       clientInfo->pendingSectors.insert_range(clientInfo->activeSectors.difference(oldSectors));
     } else if (auto mtpacket = as<ModifyTileListPacket>(packet)) {
-      auto result72 = this->root().liquidsDatabase();
-      if (!result72)
-        return std::unexpected(std::move(result72.error()));
-      auto liquidsDb = std::move(*result72);
+      auto liquids_database = this->root().liquids_database();
+      if (!liquids_database)
+        return std::unexpected(std::move(liquids_database.error()));
       auto result73 = this->root().materialDatabase();
       if (!result73)
         return std::unexpected(std::move(result73.error()));
@@ -915,7 +914,8 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       for (auto const& pair : mtpacket->modifications) {
         bool ok = true;
         if (std::holds_alternative<PlaceLiquid>(pair.second))
-          ok = liquidsDb->isValidLiquidId(std::get<PlaceLiquid>(pair.second).liquid); else if (std::holds_alternative<PlaceMaterial>(pair.second))
+          ok = (*liquids_database)->is_valid_liquid_id(std::get<PlaceLiquid>(pair.second).liquid);
+        else if (std::holds_alternative<PlaceMaterial>(pair.second))
           ok = materialDb->isValidMaterialId(std::get<PlaceMaterial>(pair.second).material); else if (std::holds_alternative<PlaceMod>(pair.second))
           ok = materialDb->isValidModId(std::get<PlaceMod>(pair.second).mod);
         if (ok)
@@ -963,10 +963,10 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       if (!result78)
         return std::unexpected(std::move(result78.error()));
     } else if (auto clpacket = as<CollectLiquidPacket>(packet)) {
-      auto result79 = this->root().liquidsDatabase();
-      if (!result79)
-        return std::unexpected(std::move(result79.error()));
-      if (!std::move(*result79)->isValidLiquidId(clpacket->liquidId)) {
+      auto liquids_database = this->root().liquids_database();
+      if (!liquids_database)
+        return std::unexpected(std::move(liquids_database.error()));
+      if (!(*liquids_database)->is_valid_liquid_id(clpacket->liquidId)) {
         auto result80 = this->root().logger().warn("WorldServer: dropped CollectLiquid with invalid liquid id {} from client {}", clpacket->liquidId, clientId);
         if (!result80)
           return std::unexpected(std::move(result80.error()));
@@ -2291,9 +2291,9 @@ std::expected<ItemDescriptor, StarException> WorldServer::collect_liquid(List<Ve
   if (tile_positions.empty())
     return ItemDescriptor();
 
-  auto liquids = root().liquidsDatabase();
-  auto settings = liquids ? (*liquids)->liquidSettings(liquid_id) : nullptr;
-  auto drop_count = settings && settings->itemDrop ? settings->itemDrop.count() : 0;
+  auto liquids = root().liquids_database();
+  auto settings = liquids ? (*liquids)->liquid_settings(liquid_id) : std::nullopt;
+  auto drop_count = settings && settings->get().item_drop ? settings->get().item_drop.count() : 0;
   auto max_units = std::numeric_limits<std::uint64_t>::max();
   if (!liquids)
     max_units = 0;
@@ -2359,8 +2359,8 @@ std::expected<ItemDescriptor, StarException> WorldServer::collect_liquid(List<Ve
   }
 
   auto drained_units = drain_tiles.operator()<false>();
-  if (drained_units && settings && settings->itemDrop)
-    return settings->itemDrop.with_count(drop_count * drained_units);
+  if (drained_units && settings && settings->get().item_drop)
+    return settings->get().item_drop.with_count(drop_count * drained_units);
   return ItemDescriptor();
 }
 
@@ -2734,10 +2734,9 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
   if (!result302)
     return std::unexpected(std::move(result302.error()));
   auto assets = std::move(*result302);
-  auto result303 = root.liquidsDatabase();
-  if (!result303)
-    return std::unexpected(std::move(result303.error()));
-  auto liquidsDatabase = std::move(*result303);
+  auto liquids_database = root.liquids_database();
+  if (!liquids_database)
+    return std::unexpected(std::move(liquids_database.error()));
 
   auto result304 = assets->json("/worldserver.config");
   if (!result304)
@@ -2804,9 +2803,9 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
   auto liquid_world = LiquidWorld::create(*this);
   if (!liquid_world)
     return std::unexpected(std::move(liquid_world.error()));
-  m_liquid_engine = std::make_shared<LiquidCellEngine<LiquidId>>(liquid_seed, liquidsDatabase->liquid_engine_parameters(), std::move(*liquid_world));
-  for (auto const& liquid_settings : liquidsDatabase->allLiquidSettings())
-    m_liquid_engine->set_liquid_tick_delta(liquid_settings->id, liquid_settings->tickDelta);
+  m_liquid_engine = std::make_shared<LiquidCellEngine<LiquidId>>(liquid_seed, (*liquids_database)->liquid_engine_parameters(), std::move(*liquid_world));
+  for (auto const& liquid_settings : (*liquids_database)->all_liquid_settings())
+    m_liquid_engine->set_liquid_tick_delta(liquid_settings.id, liquid_settings.tick_delta);
 
   auto falling_world = FallingBlocksWorld::create(*this);
   if (!falling_world)
@@ -3123,10 +3122,10 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
         return std::unexpected(std::move(result351.error()));
     } else if (std::holds_alternative<PlaceLiquid>(modification)) {
       auto const& plpacket = std::get<PlaceLiquid>(modification);
-      auto result352 = this->root().liquidsDatabase();
-      if (!result352)
-        return std::unexpected(std::move(result352.error()));
-      if (!std::move(*result352)->isValidLiquidId(plpacket.liquid)) {
+      auto liquids_database = this->root().liquids_database();
+      if (!liquids_database)
+        return std::unexpected(std::move(liquids_database.error()));
+      if (!(*liquids_database)->is_valid_liquid_id(plpacket.liquid)) {
         auto result353 =
           this->root().logger().warn("WorldServer: rejected PlaceLiquid with invalid liquid id {} at ({}, {})",
                                      static_cast<int>(plpacket.liquid), pos[0], pos[1]);

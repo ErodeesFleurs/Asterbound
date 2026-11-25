@@ -540,7 +540,7 @@ namespace Dungeon {
 
   class LiquidBrush : public Brush {
   public:
-    LiquidBrush(String const& liquidName, float quantity, bool source);
+    LiquidBrush(String const& liquid_name, float quantity, bool source);
 
     [[nodiscard]] std::expected<void, StarException> paint(Vec2I position, Phase phase,
                                                            DungeonGeneratorWriter& writer) const override;

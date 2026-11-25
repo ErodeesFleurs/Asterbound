@@ -362,21 +362,21 @@ std::expected<void, StarException> scanObjects(Root& root, TilesetUpdater& updat
 
 [[nodiscard]]
 std::expected<void, StarException> scanLiquids(Root& root, TilesetUpdater& updater) {
-  auto liquids = root.liquidsDatabase();
+  auto liquids = root.liquids_database();
   if (!liquids)
     return std::unexpected(std::move(liquids.error()));
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
   Vec2U imageSize(tile_pixels, tile_pixels);
-  for (auto const& liquid : (*liquids)->allLiquidSettings()) {
+  for (auto const& liquid : (*liquids)->all_liquid_settings()) {
     auto image = std::make_shared<Image>(imageSize, PixelFormat::RGBA32);
-    image->fill(liquid->liquidColor);
-    auto assetSource = (*assets)->asset_source(liquid->path);
-    if (!assetSource)
-      return std::unexpected(std::move(assetSource.error()));
-    JsonObject properties{{"liquid", liquid->name}, {"//name", liquid->name}};
-    updater.defineTile(std::make_shared<Tile>(Tile{*assetSource, "liquids", "liquids", liquid->name, image, properties}));
+    image->fill(liquid.liquid_color);
+    auto asset_source = (*assets)->asset_source(liquid.path);
+    if (!asset_source)
+      return std::unexpected(std::move(asset_source.error()));
+    JsonObject properties{{"liquid", liquid.name}, {"//name", liquid.name}};
+    updater.defineTile(std::make_shared<Tile>(Tile{*asset_source, "liquids", "liquids", liquid.name, image, properties}));
     auto sourceImage = std::make_shared<Image>(imageSize, PixelFormat::RGBA32);
     auto copied = sourceImage->copy_into(Vec2U(), *image);
     if (!copied)
@@ -387,11 +387,11 @@ std::expected<void, StarException> scanLiquids(Root& root, TilesetUpdater& updat
     auto vertical = sourceImage->fill_rect(Vec2U(), Vec2U(1, image->height()), SourceLiquidBorderColor);
     if (!vertical)
       return std::unexpected(std::move(vertical.error()));
-    String sourceName = liquid->name + "_source";
+    String source_name = liquid.name + "_source";
     properties["source"] = "true";
-    properties["//name"] = sourceName;
-    properties["//shortdescription"] = "Endless " + liquid->name;
-    updater.defineTile(std::make_shared<Tile>(Tile{*assetSource, "liquids", "liquids", sourceName, sourceImage, properties}));
+    properties["//name"] = source_name;
+    properties["//shortdescription"] = "Endless " + liquid.name;
+    updater.defineTile(std::make_shared<Tile>(Tile{*asset_source, "liquids", "liquids", source_name, sourceImage, properties}));
   }
   return {};
 }

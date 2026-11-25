@@ -5,17 +5,9 @@ import star.format;
 import star.json;
 import star.either;
 import star.vector;
-import star.game_types;
 import star.liquid_types;
 import star.material_types;
-import star.list;
 import star.map;
-import star.ordered_set;
-import star.random;
-import star.data_stream;
-import star.bi_map;
-
-
 import star.cellular_liquid;
 import star.item_descriptor;
 
@@ -31,92 +23,94 @@ using LiquidException = StarError<LiquidExceptionTag, StarException>;
 using LiquidInteractionResult = Either<MaterialId, LiquidId>;
 
 struct LiquidSettings {
-  LiquidSettings();
-
   String name;
-  LiquidId id;
+  LiquidId id = EmptyLiquidId;
   String path;
   Json config;
-  Json descriptions;
+  String description;
 
-  unsigned tickDelta;
-  Vec4B liquidColor;
-  Vec3F radiantLightLevel;
-  ItemDescriptor itemDrop;
-  JsonArray statusEffects;
+  unsigned tick_delta = 0;
+  Vec4B liquid_color;
+  Vec3F radiant_light_level;
+  ItemDescriptor item_drop;
+  JsonArray status_effects;
 
-  HashMap<LiquidId, std::optional<LiquidInteractionResult>> interactions;
+  HashMap<LiquidId, LiquidInteractionResult> interactions;
 };
 
 class LiquidsDatabase {
 public:
   [[nodiscard]]
-  static std::expected<std::shared_ptr<LiquidsDatabase>, StarException> create(std::shared_ptr<Assets const> const& assets, std::shared_ptr<MaterialDatabase const> const& materialDatabase);
+  static std::expected<std::shared_ptr<LiquidsDatabase>, StarException> create(Assets const& assets, MaterialDatabase const& material_database);
 
   LiquidCellEngineParameters liquid_engine_parameters() const;
-  float backgroundDrain() const;
+  float background_drain() const;
 
-  StringList liquidNames() const;
+  StringList liquid_names() const;
 
-  // Returns settings object for all liquids except "empty"
-  List<std::shared_ptr<LiquidSettings const>> allLiquidSettings() const;
+  // Borrows this database's settings in ascending ID order, excluding "empty".
+  [[nodiscard]] std::span<LiquidSettings const> all_liquid_settings() const &;
+  std::span<LiquidSettings const> all_liquid_settings() const && = delete;
 
-  bool isLiquidName(String const& name) const;
-  bool isValidLiquidId(LiquidId liquidId) const;
+  bool is_liquid_name(String const& name) const;
+  bool is_valid_liquid_id(LiquidId liquid_id) const;
 
   [[nodiscard]]
-  std::expected<LiquidId, StarException> liquidId(String const& str) const;
+  std::expected<LiquidId, StarException> liquid_id(String const& name) const;
   [[nodiscard]]
-  std::expected<String, StarException> liquidName(LiquidId liquidId) const;
+  std::expected<String, StarException> liquid_name(LiquidId liquid_id) const;
   [[nodiscard]]
-  std::expected<String, StarException> liquidDescription(LiquidId liquidId, String const& species) const;
+  std::expected<String, StarException> liquid_description(LiquidId liquid_id, String const& species) const;
   [[nodiscard]]
-  std::expected<String, StarException> liquidDescription(LiquidId liquidId) const;
-  [[nodiscard]]
-  std::expected<std::optional<String>, StarException> liquidPath(LiquidId liquidId) const;
-  [[nodiscard]]
-  std::expected<std::optional<Json>, StarException> liquidConfig(LiquidId liquidId) const;
+  std::expected<String, StarException> liquid_description(LiquidId liquid_id) const;
 
-  // Returns null on EmptyLiquidId or invalid liquid id
-  std::shared_ptr<LiquidSettings const> liquidSettings(LiquidId liquidId) const;
+  // Borrows from this database; absent for EmptyLiquidId and unregistered IDs.
+  [[nodiscard]] std::optional<std::reference_wrapper<LiquidSettings const>> liquid_settings(LiquidId liquid_id) const &;
+  std::optional<std::reference_wrapper<LiquidSettings const>> liquid_settings(LiquidId liquid_id) const && = delete;
 
-  Vec3F radiantLight(LiquidLevel level) const;
+  Vec3F radiant_light(LiquidLevel level) const;
 
   std::optional<LiquidInteractionResult> interact(LiquidId target, LiquidId other) const;
 
 private:
   LiquidsDatabase() = default;
+  LiquidsDatabase(LiquidsDatabase const&) = delete;
+  LiquidsDatabase& operator=(LiquidsDatabase const&) = delete;
+
   LiquidCellEngineParameters m_liquid_engine_parameters;
-  float m_backgroundDrain;
-  List<std::shared_ptr<LiquidSettings const>> m_settings;
-  StringMap<LiquidId> m_liquidNames;
+  float m_background_drain = 0;
+  std::vector<LiquidSettings> m_settings;
+  // Dense slots are numbered from 1; zero means the ID has no settings.
+  std::array<LiquidId, std::size_t{1} + std::numeric_limits<LiquidId>::max()> m_setting_slots{};
+  StringMap<LiquidId> m_liquid_names;
 };
 
-inline float LiquidsDatabase::backgroundDrain() const {
-  return m_backgroundDrain;
+inline float LiquidsDatabase::background_drain() const {
+  return m_background_drain;
 }
 
-inline bool LiquidsDatabase::isLiquidName(String const& name) const {
-  return m_liquidNames.contains(name);
+inline std::span<LiquidSettings const> LiquidsDatabase::all_liquid_settings() const & {
+  return m_settings;
 }
 
-inline bool LiquidsDatabase::isValidLiquidId(LiquidId liquidId) const {
-  return liquidId == EmptyLiquidId || (liquidId < m_settings.size() && m_settings[liquidId]);
+inline bool LiquidsDatabase::is_liquid_name(String const& name) const {
+  return m_liquid_names.contains(name);
 }
 
-inline std::shared_ptr<LiquidSettings const> LiquidsDatabase::liquidSettings(LiquidId liquidId) const {
-  if (liquidId >= m_settings.size())
-    return {};
-  return m_settings[liquidId];
+inline bool LiquidsDatabase::is_valid_liquid_id(LiquidId liquid_id) const {
+  return liquid_id == EmptyLiquidId || m_setting_slots[liquid_id] != 0;
 }
 
-inline Vec3F LiquidsDatabase::radiantLight(LiquidLevel level) const {
-  if (level.liquid < m_settings.size()) {
-    if (auto const& settings = m_settings[level.liquid])
-      return settings->radiantLightLevel * level.level;
-  }
+inline std::optional<std::reference_wrapper<LiquidSettings const>> LiquidsDatabase::liquid_settings(LiquidId liquid_id) const & {
+  if (auto slot = m_setting_slots[liquid_id])
+    return std::cref(m_settings[slot - 1]);
+  return std::nullopt;
+}
 
-  return Vec3F();
+inline Vec3F LiquidsDatabase::radiant_light(LiquidLevel level) const {
+  if (auto settings = liquid_settings(level.liquid))
+    return settings->get().radiant_light_level * level.level;
+  return {};
 }
 
 }

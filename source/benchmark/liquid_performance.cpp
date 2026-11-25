@@ -157,13 +157,13 @@ struct LiquidRun {
 }// namespace
 
 std::expected<void, StarException> register_liquid_performance_benchmarks(PerformanceBenchmarkSession& session) {
-  auto database = session.root.liquidsDatabase();
+  auto database = session.root.liquids_database();
   if (!database)
     return std::unexpected(std::move(database.error()));
-  auto water = (*database)->liquidId("water");
+  auto water = (*database)->liquid_id("water");
   if (!water)
     return std::unexpected(std::move(water.error()));
-  auto lava = (*database)->liquidId("lava");
+  auto lava = (*database)->liquid_id("lava");
   if (!lava)
     return std::unexpected(std::move(lava.error()));
   auto parameters = (*database)->liquid_engine_parameters();

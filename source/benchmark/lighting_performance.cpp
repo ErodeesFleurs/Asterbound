@@ -43,7 +43,7 @@ std::expected<std::shared_ptr<LightingFixture>, StarException> prepareLighting(R
   auto materials = root.materialDatabase();
   if (!materials)
     return std::unexpected(std::move(materials.error()));
-  auto liquids = root.liquidsDatabase();
+  auto liquids = root.liquids_database();
   if (!liquids)
     return std::unexpected(std::move(liquids.error()));
   auto assets = root.assets();
@@ -90,17 +90,17 @@ std::expected<std::shared_ptr<LightingFixture>, StarException> prepareLighting(R
       return std::unexpected(std::move(id.error()));
     mods.push_back(*id);
   }
-  std::vector<LiquidId> liquidIds;
-  auto liquidNames = fixture->liquids->liquidNames();
-  std::ranges::sort(liquidNames);
-  for (auto const& name : liquidNames) {
-    auto id = fixture->liquids->liquidId(name);
+  std::vector<LiquidId> liquid_ids;
+  auto liquid_names = fixture->liquids->liquid_names();
+  std::ranges::sort(liquid_names);
+  for (auto const& name : liquid_names) {
+    auto id = fixture->liquids->liquid_id(name);
     if (!id)
       return std::unexpected(std::move(id.error()));
     if (*id != EmptyLiquidId)
-      liquidIds.push_back(*id);
+      liquid_ids.push_back(*id);
   }
-  if (samples.empty() || radiantSamples.empty() || liquidIds.empty())
+  if (samples.empty() || radiantSamples.empty() || liquid_ids.empty())
     return std::unexpected(StarException("Lighting benchmarks need real materials, radiant materials and liquids"));
 
   auto sectors = fixture->tiles.valid_sectors_for(RectI(0, 0, 384, 192));
@@ -129,7 +129,7 @@ std::expected<std::shared_ptr<LightingFixture>, StarException> prepareLighting(R
       tile.foregroundHueShift = static_cast<MaterialHue>(key);
       tile.backgroundHueShift = static_cast<MaterialHue>(key / 3);
       tile.liquid =
-        key % 9 == 0 ? LiquidLevel(liquidIds[(key / 9) % liquidIds.size()], (key % 5) * 0.25f) : LiquidLevel();
+        key % 9 == 0 ? LiquidLevel(liquid_ids[(key / 9) % liquid_ids.size()], (key % 5) * 0.25f) : LiquidLevel();
       return {};
     });
   if (!filled)
@@ -152,7 +152,7 @@ std::expected<void, StarException> gatherReference(LightingFixture const& fixtur
       if (tile.foreground != EmptyMaterialId || tile.foregroundMod != NoModId)
         light += fixture.materials->radiantLight(tile.foreground, tile.foregroundMod);
       if (tile.liquid.liquid != EmptyLiquidId && tile.liquid.level != 0.0f)
-        light += fixture.liquids->radiantLight(tile.liquid);
+        light += fixture.liquids->radiant_light(tile.liquid);
       if (tile.foregroundLightTransparent) {
         if (tile.background != EmptyMaterialId || tile.backgroundMod != NoModId)
           light += fixture.materials->radiantLight(tile.background, tile.backgroundMod);

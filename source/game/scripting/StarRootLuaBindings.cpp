@@ -167,7 +167,7 @@ namespace Star::LuaBindings {
     [[nodiscard]] std::expected<Json, StarException> createItem(ItemDatabase const& database, Json const& descriptor, std::optional<float> const& level, std::optional<std::uint64_t> const& seed);
     [[nodiscard]] std::expected<Json, StarException> tenantConfig(Root& root, String const& tenantName);
     [[nodiscard]] std::expected<JsonArray, StarException> getMatchingTenants(Root& root, StringMap<unsigned> const& colonyTags);
-    [[nodiscard]] std::expected<Json, StarException> liquidStatusEffects(Root& root, LiquidId arg1);
+    [[nodiscard]] std::expected<Json, StarException> liquid_status_effects(Root& root, LiquidId liquid_id);
     [[nodiscard]] std::expected<String, StarException> generateName(Root& root, String const& rulesAsset, std::optional<std::uint64_t> seed);
     [[nodiscard]] std::expected<Json, StarException> questConfig(Root& root, String const& templateId);
     [[nodiscard]] std::expected<JsonArray, StarException> npcPortrait(Root& root, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog,
@@ -383,7 +383,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
       !r)
     return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.register_callback_with_signature<std::expected<Json, StarException>, LiquidId>(
-        "liquidStatusEffects", [&root](LiquidId liquid) { return RootCallbacks::liquidStatusEffects(root, liquid); });
+        "liquidStatusEffects", [&root](LiquidId liquid_id) { return RootCallbacks::liquid_status_effects(root, liquid_id); });
       !r)
     return std::unexpected(std::move(r.error()));
   if (auto r =
@@ -613,41 +613,38 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
     return JsonObject{{"path", **path}, {"config", **config}};
   }); !r) return std::unexpected(std::move(r.error()));
 
-  if (auto r = callbacks.register_callback("liquidConfig", [&root](LuaEngine& engine, LuaValue nameOrId) -> std::expected<Json, StarException> {
-    auto database = root.liquidsDatabase();
+  if (auto r = callbacks.register_callback("liquidConfig", [&root](LuaEngine& engine, LuaValue name_or_id) -> std::expected<Json, StarException> {
+    auto database = root.liquids_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    LiquidId liquidId;
-    auto id = engine.lua_maybe_to<std::uint8_t>(nameOrId);
+    LiquidId liquid_id;
+    auto id = engine.lua_maybe_to<LiquidId>(name_or_id);
     if (!id) return std::unexpected(std::move(id.error()));
     if (*id) {
-      liquidId = **id;
+      liquid_id = **id;
     } else {
-      auto name = engine.lua_maybe_to<String>(nameOrId);
+      auto name = engine.lua_maybe_to<String>(name_or_id);
       if (!name) return std::unexpected(std::move(name.error()));
       if (!*name) return Json();
-      auto namedId = (*database)->liquidId(**name);
-      if (!namedId) return std::unexpected(std::move(namedId.error()));
-      liquidId = *namedId;
+      auto named_id = (*database)->liquid_id(**name);
+      if (!named_id) return std::unexpected(std::move(named_id.error()));
+      liquid_id = *named_id;
     }
-    auto path = (*database)->liquidPath(liquidId);
-    if (!path) return std::unexpected(std::move(path.error()));
-    if (!*path) return Json();
-    auto config = (*database)->liquidConfig(liquidId);
-    if (!config) return std::unexpected(std::move(config.error()));
-    if (!*config) return std::unexpected(StarException("Liquid path has no configuration"));
-    return JsonObject{{"path", **path}, {"config", **config}};
+    auto settings = (*database)->liquid_settings(liquid_id);
+    if (!settings) return Json();
+    auto const& liquid = settings->get();
+    return JsonObject{{"path", liquid.path}, {"config", liquid.config}};
   }); !r) return std::unexpected(std::move(r.error()));
 
-  if (auto r = callbacks.register_callback("liquidName", [&root](LiquidId liquidId) -> std::expected<String, StarException> {
-    auto database = root.liquidsDatabase();
+  if (auto r = callbacks.register_callback("liquidName", [&root](LiquidId liquid_id) -> std::expected<String, StarException> {
+    auto database = root.liquids_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    return (*database)->liquidName(liquidId);
+    return (*database)->liquid_name(liquid_id);
   }); !r) return std::unexpected(std::move(r.error()));
 
-  if (auto r = callbacks.register_callback("liquidId", [&root](String liquidName) -> std::expected<LiquidId, StarException> {
-    auto database = root.liquidsDatabase();
+  if (auto r = callbacks.register_callback("liquidId", [&root](String const& liquid_name) -> std::expected<LiquidId, StarException> {
+    auto database = root.liquids_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    return (*database)->liquidId(liquidName);
+    return (*database)->liquid_id(liquid_name);
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.register_callback("monsterSkillParameter", [&root](String const& skillName, String const& configParameterName) -> std::expected<Json, StarException> {
@@ -1087,10 +1084,10 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::getMatchingT
   return tenants->transformed([](std::shared_ptr<Tenant> const& tenant) { return tenant->config; });
 }
 
-std::expected<Json, StarException> LuaBindings::RootCallbacks::liquidStatusEffects(Root& root, LiquidId arg1) {
-  auto database = root.liquidsDatabase();
+std::expected<Json, StarException> LuaBindings::RootCallbacks::liquid_status_effects(Root& root, LiquidId liquid_id) {
+  auto database = root.liquids_database();
   if (!database) return std::unexpected(std::move(database.error()));
-  if (auto settings = (*database)->liquidSettings(arg1)) return settings->statusEffects;
+  if (auto settings = (*database)->liquid_settings(liquid_id)) return settings->get().status_effects;
   return Json();
 }
 

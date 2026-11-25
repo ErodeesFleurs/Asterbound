@@ -533,7 +533,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
     ASSERT_NO_FATAL_FAILURE(expectCatalog("materialDatabase", root.materialDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("terrainDatabase", root.terrainDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("biome_database", root.biome_database()));
-    ASSERT_NO_FATAL_FAILURE(expectCatalog("liquidsDatabase", root.liquidsDatabase()));
+    ASSERT_NO_FATAL_FAILURE(expectCatalog("liquids_database", root.liquids_database()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("statusEffectDatabase", root.statusEffectDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("damageDatabase", root.damageDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("particleDatabase", root.particleDatabase()));
@@ -689,6 +689,23 @@ const GameTestRegistration codex_catalog("CodexCatalog", "EmptyDefaultsRelativeI
   }
   return std::move(*lua);
 }
+
+const GameTestRegistration liquid_config_binding("LiquidsDatabaseTest", "LuaLookupPreservesNameAndIdSemantics", [](GameTest& fixture) {
+  auto lua = isolationLua(fixture.root());
+  if (!fixture.check(bool(lua), "create Lua root")) return;
+  auto context = (*lua)->create_context(StringList{});
+  if (!fixture.check(bool(context), "create liquid lookup context")) return;
+  auto checked = context->eval<bool>(R"LUA(
+    local id = root.liquidId("water")
+    local named, numbered = root.liquidConfig("water"), root.liquidConfig(id)
+    assert(named.path == numbered.path and root.assetJson(named.path).liquidId == id)
+    assert(named.config.name == "water" and numbered.config.liquidId == id)
+    assert(root.liquidConfig("empty") == nil and root.liquidConfig(0) == nil)
+    assert(not pcall(root.liquidConfig, "missing_liquid_lookup_fixture"))
+    return root.liquidName(id) == "water"
+  )LUA");
+  fixture.check(checked && *checked, checked ? "liquid name round-trip" : checked.error().what());
+});
 
 [[nodiscard]] std::expected<bool, StarException> isolationLogContains(String const& path, String const& text) {
   auto content = File::read_file_string(path);

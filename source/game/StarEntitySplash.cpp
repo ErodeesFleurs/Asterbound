@@ -123,14 +123,14 @@ std::expected<List<Particle>, StarException> EntitySplashConfig::generate_partic
     ? bottom_liquid.liquid : top_liquid.liquid;
   if (liquid == EmptyLiquidId) return particles;
   auto& root = world.root();
-  auto database = root.liquidsDatabase();
+  auto database = root.liquids_database();
   if (!database) return std::unexpected(std::move(database.error()));
-  auto settings = (*database)->liquidSettings(liquid);
+  auto settings = (*database)->liquid_settings(liquid);
   if (!settings)
     return std::unexpected(LiquidException::format("Unknown splash liquid {} at probes bottom ({}, {}), top ({}, {})",
       liquid, bottom[0], bottom[1], top[0], top[1]));
 
-  auto const color = Color::rgba(settings->liquidColor);
+  auto const color = Color::rgba(settings->get().liquid_color);
   auto const y_velocity = speed * splash_y_velocity_factor;
   particles.reserve(static_cast<std::size_t>(num_splash_particles));
   for (int i = 0; i < num_splash_particles; ++i) {

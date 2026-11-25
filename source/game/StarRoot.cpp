@@ -381,7 +381,7 @@ std::expected<void, StarException> Root::reload() {
     std::lock_guard statisticsDatabaseLock(m_statisticsDatabaseMutex);
 
     // Liquids database depends on the materials database
-    std::lock_guard liquidsDatabaseLock(m_liquidsDatabaseMutex);
+    std::lock_guard liquids_database_lock(m_liquids_database_mutex);
 
     // Material database depends on particle database
     std::lock_guard materialDatabaseLock(m_materialDatabaseMutex);
@@ -434,7 +434,7 @@ std::expected<void, StarException> Root::reload() {
     m_dungeonDefinitions.reset();
     m_tilesetDatabase.reset();
     m_statisticsDatabase.reset();
-    m_liquidsDatabase.reset();
+    m_liquids_database.reset();
     m_materialDatabase.reset();
     m_damageDatabase.reset();
     m_effectSourceDatabase.reset();
@@ -533,7 +533,7 @@ std::expected<void, StarException> Root::fullyLoad() {
   add(&Root::playerFactory);
   add(&Root::entityFactory);
   add(&Root::biome_database);
-  add(&Root::liquidsDatabase);
+  add(&Root::liquids_database);
   add(&Root::dungeonDefinitions);
   add(&Root::tilesetDatabase);
 
@@ -801,14 +801,14 @@ std::expected<std::shared_ptr<BiomeDatabase const>, StarException> Root::biome_d
   return loadMember(m_biome_database, m_biome_database_mutex, "BiomeDatabase", *this);
 }
 
-std::expected<std::shared_ptr<LiquidsDatabase const>, StarException> Root::liquidsDatabase() {
-  return loadMemberFunction<LiquidsDatabase>(m_liquidsDatabase, m_liquidsDatabaseMutex, "LiquidsDatabase",
+std::expected<std::shared_ptr<LiquidsDatabase const>, StarException> Root::liquids_database() {
+  return loadMemberFunction<LiquidsDatabase>(m_liquids_database, m_liquids_database_mutex, "LiquidsDatabase",
     [this]() -> std::expected<std::shared_ptr<LiquidsDatabase>, StarException> {
-      auto a = assets();
-      if (!a) return std::unexpected(std::move(a.error()));
+      auto asset_database = assets();
+      if (!asset_database) return std::unexpected(std::move(asset_database.error()));
       auto materials = materialDatabase();
       if (!materials) return std::unexpected(std::move(materials.error()));
-      return LiquidsDatabase::create(*a, *materials);
+      return LiquidsDatabase::create(**asset_database, **materials);
     });
 }
 

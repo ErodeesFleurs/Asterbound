@@ -4,6 +4,7 @@ import star.assets;
 import star.cellular_liquid;
 import star.dungeon_generator;
 import star.map;
+import star.either;
 import star.format;
 import star.file;
 import star.game_test;
@@ -11,6 +12,7 @@ import star.hash;
 import star.liquids_database;
 import star.json;
 import star.logging;
+import star.material_database;
 import star.rect;
 import star.root;
 import star.vector;
@@ -118,10 +120,10 @@ const GameTestRegistration splash_world_cases("EntitySplashTest", "WorldSensorsP
   Vec2F position(1024.25f, 1024.75f);
   Vec2I bottom(1023, 1024), top(1024, 1025);
   ASSERT_TRUE(world.generateRegion(RectI::with_size(bottom, Vec2I(4, 4))));
-  auto database = root.liquidsDatabase();
+  auto database = root.liquids_database();
   ASSERT_TRUE(database);
-  auto water = (*database)->liquidId("water");
-  auto lava = (*database)->liquidId("lava");
+  auto water = (*database)->liquid_id("water");
+  auto lava = (*database)->liquid_id("lava");
   ASSERT_TRUE(water && lava);
   auto config = EntitySplashConfig::create(root, splash_config());
   ASSERT_TRUE(config) << config.error().what();
@@ -150,13 +152,13 @@ const GameTestRegistration splash_world_cases("EntitySplashTest", "WorldSensorsP
       reference.uniform_float();
     EXPECT_EQ(next_draw, reference.next_u32());
     root.random().seed(seed);
-    auto settings = (*database)->liquidSettings(id);
+    auto settings = (*database)->liquid_settings(id);
     ASSERT_TRUE(settings);
     for (auto const& particle : *particles) {
       auto expected = config->splash_particle;
       expected.position = position;
       expected.velocity = {3, std::fabs(speed) * 2};
-      expected.color = Color::rgba(settings->liquidColor);
+      expected.color = Color::rgba(settings->get().liquid_color);
       expected.applyVariance(root, config->splash_particle_variance);
       auto expected_json = expected.toJson();
       auto actual_json = particle.toJson();
@@ -182,7 +184,7 @@ const GameTestRegistration splash_world_cases("EntitySplashTest", "WorldSensorsP
   config->splash_min_water_level = -0.25f;
   expect_batch(4, *lava);
   auto unknown = std::numeric_limits<LiquidId>::max();
-  ASSERT_FALSE((*database)->isValidLiquidId(unknown));
+  ASSERT_FALSE((*database)->is_valid_liquid_id(unknown));
   ASSERT_TRUE(world.setLiquid(bottom, unknown, 1, 1));
   auto failed = config->generate_particles(position, {0, 4}, world);
   EXPECT_FALSE(failed);
@@ -238,8 +240,9 @@ struct LiquidReadbackFailureTag {
 };
 using LiquidReadbackFailure = StarError<LiquidReadbackFailureTag, StarException>;
 
-std::expected<std::shared_ptr<LiquidsDatabase>, StarException>
-liquids_fixture(GameTest& fixture, String const& directory, Json const& config) {
+std::expected<std::shared_ptr<LiquidsDatabase>, StarException> liquids_fixture(
+    GameTest& fixture, String const& directory, Json const& config,
+    std::initializer_list<std::pair<String, Json>> liquids = {}) {
   auto created = File::create_directories(directory);
   if (!created)
     return std::unexpected(std::move(created.error()));
@@ -252,6 +255,14 @@ liquids_fixture(GameTest& fixture, String const& directory, Json const& config) 
   auto written = File::write_file(*contents, File::relative_to(directory, "liquids.config"));
   if (!written)
     return std::unexpected(std::move(written.error()));
+  for (auto const& [filename, liquid] : liquids) {
+    auto contents = liquid.print_json();
+    if (!contents)
+      return std::unexpected(std::move(contents.error()));
+    auto written = File::write_file(*contents, File::relative_to(directory, filename));
+    if (!written)
+      return std::unexpected(std::move(written.error()));
+  }
   Assets::Settings settings{};
   settings.worker_pool_size = 1;
   settings.asset_time_to_live = 10;
@@ -262,41 +273,47 @@ liquids_fixture(GameTest& fixture, String const& directory, Json const& config) 
   auto materials = fixture.root().materialDatabase();
   if (!materials)
     return std::unexpected(std::move(materials.error()));
-  return LiquidsDatabase::create(*assets, *materials);
+  return LiquidsDatabase::create(**assets, **materials);
+}
+
+Json liquid_engine_config() {
+  return JsonObject{{"lateralMoveFactor", 1},
+                    {"spreadOverfillUpFactor", 2},
+                    {"spreadOverfillLateralFactor", 3},
+                    {"spreadOverfillDownFactor", 4},
+                    {"pressureEqualizeFactor", 5},
+                    {"pressureMoveFactor", 6},
+                    {"maximumPressureLevelImbalance", 7},
+                    {"minimumLivenPressureChange", 8},
+                    {"minimumLivenLevelChange", 9},
+                    {"minimumLiquidLevel", 10},
+                    {"interactTransformationLevel", 11}};
 }
 
 const GameTestRegistration
-  liquid_engine_config("LiquidsDatabaseTest", "RequiredFloatFieldsUseAssetConfiguration", [](GameTest& fixture) {
+  liquid_engine_fields("LiquidsDatabaseTest", "RequiredFloatFieldsUseAssetConfiguration", [](GameTest& fixture) {
     auto directory = File::temporary_directory(fixture.root().random());
-    ASSERT_TRUE(directory);
-    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-    Json engine = JsonObject{{"lateralMoveFactor", 1},
-                             {"spreadOverfillUpFactor", 2},
-                             {"spreadOverfillLateralFactor", 3},
-                             {"spreadOverfillDownFactor", 4},
-                             {"pressureEqualizeFactor", 5},
-                             {"pressureMoveFactor", 6},
-                             {"maximumPressureLevelImbalance", 7},
-                             {"minimumLivenPressureChange", 8},
-                             {"minimumLivenLevelChange", 9},
-                             {"minimumLiquidLevel", 10},
-                             {"interactTransformationLevel", 11}};
+    if (!fixture.check(bool(directory), "create isolated liquid test directory"))
+      return;
+    auto cleanup = make_scope_exit([&] { fixture.check(bool(File::remove_all(*directory)), "remove liquid test directory"); });
+    auto engine = liquid_engine_config();
     auto valid = liquids_fixture(fixture, File::relative_to(*directory, "valid"),
                                 JsonObject{{"liquidEngineParameters", engine}, {"backgroundDrain", 12}});
-    ASSERT_TRUE(valid) << valid.error().what();
+    if (!fixture.check(bool(valid), valid ? "load liquid engine fields" : valid.error().what()))
+      return;
     auto parameters = (*valid)->liquid_engine_parameters();
-    EXPECT_FLOAT_EQ(parameters.lateral_move_factor, 1);
-    EXPECT_FLOAT_EQ(parameters.spread_overfill_up_factor, 2);
-    EXPECT_FLOAT_EQ(parameters.spread_overfill_lateral_factor, 3);
-    EXPECT_FLOAT_EQ(parameters.spread_overfill_down_factor, 4);
-    EXPECT_FLOAT_EQ(parameters.pressure_equalize_factor, 5);
-    EXPECT_FLOAT_EQ(parameters.pressure_move_factor, 6);
-    EXPECT_FLOAT_EQ(parameters.maximum_pressure_level_imbalance, 7);
-    EXPECT_FLOAT_EQ(parameters.minimum_liven_pressure_change, 8);
-    EXPECT_FLOAT_EQ(parameters.minimum_liven_level_change, 9);
-    EXPECT_FLOAT_EQ(parameters.minimum_liquid_level, 10);
-    EXPECT_FLOAT_EQ(parameters.interact_transformation_level, 11);
-    EXPECT_FLOAT_EQ((*valid)->backgroundDrain(), 12);
+    fixture.check(parameters.lateral_move_factor == 1, "read lateralMoveFactor");
+    fixture.check(parameters.spread_overfill_up_factor == 2, "read spreadOverfillUpFactor");
+    fixture.check(parameters.spread_overfill_lateral_factor == 3, "read spreadOverfillLateralFactor");
+    fixture.check(parameters.spread_overfill_down_factor == 4, "read spreadOverfillDownFactor");
+    fixture.check(parameters.pressure_equalize_factor == 5, "read pressureEqualizeFactor");
+    fixture.check(parameters.pressure_move_factor == 6, "read pressureMoveFactor");
+    fixture.check(parameters.maximum_pressure_level_imbalance == 7, "read maximumPressureLevelImbalance");
+    fixture.check(parameters.minimum_liven_pressure_change == 8, "read minimumLivenPressureChange");
+    fixture.check(parameters.minimum_liven_level_change == 9, "read minimumLivenLevelChange");
+    fixture.check(parameters.minimum_liquid_level == 10, "read minimumLiquidLevel");
+    fixture.check(parameters.interact_transformation_level == 11, "read interactTransformationLevel");
+    fixture.check((*valid)->background_drain() == 12, "read backgroundDrain");
 
     constexpr std::string_view fields[] = {"lateralMoveFactor",
                                            "spreadOverfillUpFactor",
@@ -311,15 +328,15 @@ const GameTestRegistration
                                            "interactTransformationLevel"};
     unsigned index = 0;
     for (auto name : fields) {
-      SCOPED_TRACE(name);
+      auto field = std::string(name);
       for (bool missing : {true, false}) {
-        SCOPED_TRACE(missing);
         auto changed = missing ? engine.erase(name) : engine.set(name, "not a float");
-        ASSERT_TRUE(changed);
+        if (!fixture.check(bool(changed), field))
+          return;
         auto loaded = liquids_fixture(fixture, File::relative_to(*directory, Star::format("case{}", index++)),
                                      JsonObject{{"liquidEngineParameters", *changed}, {"backgroundDrain", 12}});
-        ASSERT_FALSE(loaded);
-        EXPECT_TRUE(loaded.error().is<JsonException>());
+        fixture.check(!loaded && loaded.error().is<JsonException>(),
+                      (missing ? "missing " : "wrong type for ") + field);
       }
     }
 
@@ -328,10 +345,142 @@ const GameTestRegistration
                             : Json(JsonObject{{"liquidEngineParameters", engine}, {"backgroundDrain", false}});
       auto outer = liquids_fixture(
         fixture, File::relative_to(*directory, missing ? String("outerMissing") : String("outerType")), config);
-      ASSERT_FALSE(outer);
-      EXPECT_TRUE(outer.error().is<JsonException>());
+      fixture.check(!outer && outer.error().is<JsonException>(),
+                    missing ? "missing backgroundDrain" : "wrong type for backgroundDrain");
     }
   });
+
+JsonObject liquid_asset(std::int64_t id, String name, std::int64_t tick_delta = 1, JsonArray interactions = {}) {
+  return JsonObject{{"liquidId", id},
+                    {"name", std::move(name)},
+                    {"tickDelta", tick_delta},
+                    {"color", JsonArray{0, 0, 0, 255}},
+                    {"interactions", std::move(interactions)}};
+}
+
+const GameTestRegistration liquid_catalog_identity(
+    "LiquidsDatabaseTest", "RejectsDuplicateAndReservedIdentities", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  if (!fixture.check(bool(directory), "create isolated liquid test directory"))
+    return;
+  auto cleanup = make_scope_exit([&] { fixture.check(bool(File::remove_all(*directory)), "remove liquid test directory"); });
+  Json config = JsonObject{{"liquidEngineParameters", liquid_engine_config()}, {"backgroundDrain", 0}};
+  auto expect_rejected = [&](String const& reason, Json first, Json second) {
+    auto catalog = liquids_fixture(fixture, File::relative_to(*directory, reason), config,
+                                   {{"a.liquid", std::move(first)}, {"b.liquid", std::move(second)}});
+    fixture.check(!catalog && catalog.error().is<LiquidException>(), reason.utf8());
+  };
+  expect_rejected("duplicate-id", liquid_asset(1, "first"), liquid_asset(1, "second"));
+  expect_rejected("duplicate-name", liquid_asset(1, "first"), liquid_asset(2, "first"));
+  expect_rejected("duplicate-pair", liquid_asset(1, "first"), liquid_asset(1, "first"));
+  expect_rejected("reserved-id", liquid_asset(1, "first"), liquid_asset(0, "notempty"));
+  expect_rejected("reserved-name", liquid_asset(1, "first"), liquid_asset(2, "empty"));
+});
+
+const GameTestRegistration liquid_catalog_widths(
+    "LiquidsDatabaseTest", "RejectsOutOfRangeLiquidIdsAndTickDelta", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  if (!fixture.check(bool(directory), "create isolated liquid test directory"))
+    return;
+  auto cleanup = make_scope_exit([&] { fixture.check(bool(File::remove_all(*directory)), "remove liquid test directory"); });
+  Json config = JsonObject{{"liquidEngineParameters", liquid_engine_config()}, {"backgroundDrain", 0}};
+  auto expect_rejected = [&](String const& reason, Json liquid) {
+    auto catalog = liquids_fixture(fixture, File::relative_to(*directory, reason), config,
+                                   {{"test.liquid", std::move(liquid)}});
+    fixture.check(!catalog && catalog.error().is<LiquidException>(), reason.utf8());
+  };
+  expect_rejected("liquid-id-overflow", liquid_asset(256, "test"));
+  expect_rejected("interaction-target-overflow",
+                  liquid_asset(1, "test", 1, {JsonObject{{"liquid", 256}, {"liquidResult", 1}}}));
+  expect_rejected("interaction-result-overflow",
+                  liquid_asset(1, "test", 1, {JsonObject{{"liquid", 1}, {"liquidResult", 256}}}));
+  expect_rejected("negative-interaction-target",
+                  liquid_asset(1, "test", 1, {JsonObject{{"liquid", -1}, {"liquidResult", 1}}}));
+  expect_rejected("negative-interaction-result",
+                  liquid_asset(1, "test", 1, {JsonObject{{"liquid", 1}, {"liquidResult", -1}}}));
+  constexpr auto overflow = std::int64_t{std::numeric_limits<unsigned>::max()} + 1;
+  expect_rejected("tick-delta-overflow", liquid_asset(1, "test", overflow));
+});
+
+const GameTestRegistration liquid_catalog_lookup(
+    "LiquidsDatabaseTest", "SparseLookupPreservesInteractionsAndLazyDescriptions", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  if (!fixture.check(bool(directory), "create isolated liquid test directory"))
+    return;
+  auto cleanup = make_scope_exit([&] { fixture.check(bool(File::remove_all(*directory)), "remove liquid test directory"); });
+  auto materials = fixture.root().materialDatabase();
+  if (!fixture.check(bool(materials), materials ? "load materials" : materials.error().what()))
+    return;
+  auto dirt = (*materials)->materialId("dirt");
+  if (!fixture.check(bool(dirt), dirt ? "resolve dirt material" : dirt.error().what()))
+    return;
+
+  auto source = liquid_asset(17, "source", 0, {
+    JsonObject{{"liquid", 255}, {"liquidResult", 2}},
+    JsonObject{{"liquid", 91}, {"liquidResult", 2}},
+    JsonObject{{"liquid", 91}, {"liquidResult", 255}},
+    JsonObject{{"liquid", 2}, {"materialResult", "dirt"}, {"liquidResult", 255}},
+    JsonObject{{"liquid", 92}, {"liquidResult", 93}},
+    JsonObject{{"liquid", 0}, {"liquidResult", 0}},
+  });
+  source["description"] = "Default description";
+  source["humanDescription"] = "Human description";
+  source["avianDescription"] = false;
+  Json config = JsonObject{{"liquidEngineParameters", liquid_engine_config()}, {"backgroundDrain", 0}};
+  auto loaded = liquids_fixture(fixture, *directory, config,
+      {{"a-source.liquid", std::move(source)},
+       {"b-high.liquid", liquid_asset(255, "high", 1, {JsonObject{{"liquid", 17}, {"liquidResult", 17}}})},
+       {"z-low.liquid", liquid_asset(2, "low")}});
+  if (!fixture.check(bool(loaded), loaded ? "load sparse catalog" : loaded.error().what()))
+    return;
+  auto const& catalog = **loaded;
+
+  auto settings = catalog.all_liquid_settings();
+  static_assert(std::same_as<std::ranges::range_reference_t<decltype(settings)>, LiquidSettings const&>);
+  std::vector<LiquidId> ids;
+  for (auto const& entry : settings)
+    ids.push_back(entry.id);
+  fixture.check(ids == std::vector<LiquidId>{2, 17, 255}, "settings contain only registered IDs in ascending order");
+  fixture.check(catalog.liquid_id("source") == LiquidId{17} && catalog.liquid_name(255) == String("high"),
+                "look up registered IDs and names");
+  fixture.check(catalog.is_valid_liquid_id(EmptyLiquidId) && catalog.is_liquid_name("empty")
+                  && catalog.liquid_id("empty") == EmptyLiquidId
+                  && catalog.liquid_name(EmptyLiquidId) == String("empty")
+                  && !catalog.liquid_settings(EmptyLiquidId),
+                "empty is a reserved name and ID, not a catalog entry");
+  fixture.check(!catalog.is_valid_liquid_id(91) && !catalog.liquid_settings(91),
+                "an unregistered interaction target does not fill a catalog hole");
+  auto entry = catalog.liquid_settings(17);
+  fixture.check(entry && entry->get().tick_delta == 0, "zero tickDelta disables scheduling");
+
+  auto forward = catalog.interact(17, 255);
+  auto backwards = catalog.interact(255, 17);
+  // Mutual references guarantee a forward reference regardless of asset scan order.
+  fixture.check(forward && forward->maybe_right() == LiquidId{2}
+                  && backwards && backwards->maybe_right() == LiquidId{17},
+                "resolve forward target and result IDs");
+  auto repeated = catalog.interact(17, 91);
+  fixture.check(repeated && repeated->maybe_right() == LiquidId{255}, "last interaction for a target wins");
+  auto material = catalog.interact(17, 2);
+  fixture.check(material && material->maybe_left() == *dirt, "materialResult takes precedence over liquidResult");
+  fixture.check(!catalog.interact(2, 17), "interactions do not install a reverse rule");
+  auto unregistered = catalog.interact(17, 92);
+  fixture.check(unregistered && unregistered->maybe_right() == LiquidId{93},
+                "in-range targets and results need not be registered");
+  auto empty = catalog.interact(17, EmptyLiquidId);
+  fixture.check(empty && empty->maybe_right() == EmptyLiquidId, "interaction IDs may be zero");
+
+  fixture.check(catalog.liquid_description(17, "human") == String("Human description"), "use species description");
+  fixture.check(catalog.liquid_description(17, "floran") == String("Default description")
+                  && catalog.liquid_description(17) == String("Default description"),
+                "fall back to generic description when species has no override");
+  auto malformed = catalog.liquid_description(17, "avian");
+  fixture.check(!malformed && malformed.error().is<JsonException>(),
+                "malformed species description fails only when requested");
+  fixture.check(catalog.liquid_description(2, "avian") == String()
+                  && catalog.liquid_description(EmptyLiquidId) == String(),
+                "missing descriptions and empty liquid yield empty text");
+});
 
 template <int basin_width, int basin_height>
 class SizedLiquidBasin : public CellularLiquidWorld<LiquidId> {
@@ -372,9 +521,9 @@ public:
 using LiquidBasin = SizedLiquidBasin<5, 3>;
 
 const GameTestRegistration liquid_borrow_recovery("LiquidEngine", "WrappedFlowConservesMassAfterReadFailure", [](GameTest& fixture) {
-  auto database = fixture.root().liquidsDatabase();
+  auto database = fixture.root().liquids_database();
   ASSERT_TRUE(database) << database.error().what();
-  auto water = (*database)->liquidId("water");
+  auto water = (*database)->liquid_id("water");
   ASSERT_TRUE(water) << water.error().what();
   auto parameters = (*database)->liquid_engine_parameters();
   // A closed basin has no drain or sub-threshold evaporation.
@@ -459,11 +608,11 @@ public:
 
 const GameTestRegistration liquid_callback_recovery(
     "LiquidEngine", "PhaseStorageSurvivesSourceAndCallbackFailures", [](GameTest& fixture) {
-  auto database = fixture.root().liquidsDatabase();
+  auto database = fixture.root().liquids_database();
   ASSERT_TRUE(database) << database.error().what();
-  auto water = (*database)->liquidId("water");
+  auto water = (*database)->liquid_id("water");
   ASSERT_TRUE(water) << water.error().what();
-  auto lava = (*database)->liquidId("lava");
+  auto lava = (*database)->liquid_id("lava");
   ASSERT_TRUE(lava) << lava.error().what();
   for (char failure : {'w', 'i', 'c'}) {
     SCOPED_TRACE(failure);
@@ -565,11 +714,11 @@ public:
 
 const GameTestRegistration
   liquid_budget_ordering("LiquidEngine", "UnlimitedCellsAfterBudgetAndOverlappingRegions", [](GameTest& fixture) {
-    auto database = fixture.root().liquidsDatabase();
+    auto database = fixture.root().liquids_database();
     ASSERT_TRUE(database) << database.error().what();
-    auto water = (*database)->liquidId("water");
+    auto water = (*database)->liquid_id("water");
     ASSERT_TRUE(water) << water.error().what();
-    auto lava = (*database)->liquidId("lava");
+    auto lava = (*database)->liquid_id("lava");
     ASSERT_TRUE(lava) << lava.error().what();
     // Isolated cells have no flow or pressure changes, so processing a cell
     // retires it. Active selection is observable without solver instrumentation.
@@ -648,9 +797,9 @@ const GameTestRegistration
 
 const GameTestRegistration
   liquid_partial_read_recovery("LiquidEngine", "LateReadFailurePreservesRetirementAndBudgetOrder", [](GameTest& fixture) {
-    auto database = fixture.root().liquidsDatabase();
+    auto database = fixture.root().liquids_database();
     ASSERT_TRUE(database) << database.error().what();
-    auto water = (*database)->liquidId("water");
+    auto water = (*database)->liquid_id("water");
     ASSERT_TRUE(water) << water.error().what();
     // Fail inside the ordinary prefix, then at two different positions in the
     // unlimited suffix after the ordinary budget has already been exhausted.
@@ -714,9 +863,9 @@ const GameTestRegistration
   });
 const GameTestRegistration liquid_cache_moves(
     "LiquidEngine", "WorkingCacheSurvivesMovesAndRepeatedPhaseFailures", [](GameTest& fixture) {
-      auto database = fixture.root().liquidsDatabase();
+      auto database = fixture.root().liquids_database();
       ASSERT_TRUE(database) << database.error().what();
-      auto water = (*database)->liquidId("water");
+      auto water = (*database)->liquid_id("water");
       ASSERT_TRUE(water) << water.error().what();
       auto parameters = (*database)->liquid_engine_parameters();
       parameters.minimum_liquid_level = 0;
@@ -748,9 +897,9 @@ const GameTestRegistration liquid_cache_moves(
 
 const GameTestRegistration liquid_readback_scales(
     "LiquidEngine", "ReadbackScaleChangesRecoverFromLateReadFailure", [](GameTest& fixture) {
-      auto database = fixture.root().liquidsDatabase();
+      auto database = fixture.root().liquids_database();
       ASSERT_TRUE(database) << database.error().what();
-      auto water = (*database)->liquidId("water");
+      auto water = (*database)->liquid_id("water");
       ASSERT_TRUE(water) << water.error().what();
       struct Basin : SizedLiquidBasin<8194, 1> {
         mutable std::optional<unsigned> reads_before_failure;

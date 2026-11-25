@@ -1077,16 +1077,14 @@ if (!result766) return std::unexpected(std::move(result766.error()));
     if (isSlave())
       return {};
 
-    auto result767 = parameters.get_float("quantity", 1.0f);
-if (!result767) return std::unexpected(std::move(result767.error()));
-float waterAmount = std::move(*result767);
-    auto result768 = this->root().liquidsDatabase();
-if (!result768) return std::unexpected(std::move(result768.error()));
-auto result769 = parameters.get_string("liquid");
-if (!result769) return std::unexpected(std::move(result769.error()));
-auto result770 = std::move(*result768)->liquidId(std::move(*result769));
-if (!result770) return std::unexpected(std::move(result770.error()));
-LiquidId liquid = std::move(*result770);
+    auto quantity = parameters.get_float("quantity", 1.0f);
+    if (!quantity) return std::unexpected(std::move(quantity.error()));
+    auto liquids_database = this->root().liquids_database();
+    if (!liquids_database) return std::unexpected(std::move(liquids_database.error()));
+    auto liquid_name = parameters.get_string("liquid");
+    if (!liquid_name) return std::unexpected(std::move(liquid_name.error()));
+    auto liquid_id = (*liquids_database)->liquid_id(*liquid_name);
+    if (!liquid_id) return std::unexpected(std::move(liquid_id.error()));
     auto result771 = world();
 if (!result771) return std::unexpected(std::move(result771.error()));
 auto result772 = parameters.get_int("radius", 5);
@@ -1104,11 +1102,11 @@ if (std::move(*result775))
 
       auto result776 = world();
 if (!result776) return std::unexpected(std::move(result776.error()));
-auto liquidLevel = result776->get().liquidLevel(pos);
-      if (liquidLevel.liquid == EmptyLiquidId || liquidLevel.liquid == liquid) {
+      auto liquid_level = result776->get().liquidLevel(pos);
+      if (liquid_level.liquid == EmptyLiquidId || liquid_level.liquid == *liquid_id) {
         auto result777 = world();
 if (!result777) return std::unexpected(std::move(result777.error()));
-auto result778 = result777->get().modifyTile(pos, PlaceLiquid{liquid, waterAmount}, true);
+        auto result778 = result777->get().modifyTile(pos, PlaceLiquid{*liquid_id, *quantity}, true);
 if (!result778) return std::unexpected(std::move(result778.error()));
         break;
       }

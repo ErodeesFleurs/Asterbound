@@ -670,10 +670,10 @@ std::expected<void, StarException> StatusController::tickMaster(float dt) {
   m_recent_damage_taken.tick();
   bool statusImmune = statPositive("statusImmunity");
   if (!statusImmune && m_movement_controller->get().liquidPercentage() > m_minimumLiquidStatusEffectPercentage) {
-    auto database = m_root.liquidsDatabase();
+    auto database = m_root.liquids_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    if (auto settings = (*database)->liquidSettings(m_movement_controller->get().liquidId())) {
-      for (auto const& value : settings->statusEffects) {
+    if (auto settings = (*database)->liquid_settings(m_movement_controller->get().liquidId())) {
+      for (auto const& value : settings->get().status_effects) {
         auto effect = jsonToEphemeralStatusEffect(value);
         if (!effect) return std::unexpected(std::move(effect.error()));
         if (auto result = addEphemeralEffect(*effect, {}); !result) return std::unexpected(std::move(result.error()));

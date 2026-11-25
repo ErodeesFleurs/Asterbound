@@ -61,7 +61,7 @@ struct WorldServerTestAccess {
         }
       }
     }
-    auto database = root.liquidsDatabase();
+    auto database = root.liquids_database();
     if (!database)
       return std::unexpected(std::move(database.error()));
     auto liquid_world = LiquidWorld::create(world);
@@ -69,8 +69,8 @@ struct WorldServerTestAccess {
       return std::unexpected(std::move(liquid_world.error()));
     auto engine = std::make_shared<LiquidCellEngine<LiquidId>>(seed, (*database)->liquid_engine_parameters(),
                                                                std::move(*liquid_world));
-    for (auto const& settings : (*database)->allLiquidSettings())
-      engine->set_liquid_tick_delta(settings->id, settings->tickDelta);
+    for (auto const& settings : (*database)->all_liquid_settings())
+      engine->set_liquid_tick_delta(settings.id, settings.tick_delta);
     // World generation schedules visits even for empty sectors. Replay those
     // visits so replacing the empty engine does not remove the queued scan.
     for (auto const& sector : sectors)

@@ -910,14 +910,14 @@ std::expected<String, StarException> CommandProcessor::spawn_liquid(ConnectionId
     auto required_argument = arguments.at(0);
     if (!required_argument) return std::unexpected(std::move(required_argument.error()));
 
-    auto liquids_database_result = m_root.liquidsDatabase();
+    auto liquids_database_result = m_root.liquids_database();
     if (!liquids_database_result) return std::unexpected(std::move(liquids_database_result.error()));
     auto liquids_database = std::move(*liquids_database_result);
 
-    if (!liquids_database->isLiquidName(arguments[0]))
+    if (!liquids_database->is_liquid_name(arguments[0]))
       return Star::format("No such liquid {}", arguments[0]);
 
-    auto liquid_result = liquids_database->liquidId(arguments[0]);
+    auto liquid_result = liquids_database->liquid_id(arguments[0]);
     if (!liquid_result) return std::unexpected(std::move(liquid_result.error()));
     LiquidId liquid = *liquid_result;
 

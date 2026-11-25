@@ -232,7 +232,7 @@ std::expected<std::shared_ptr<LiquidWorld>, StarException> LiquidWorld::create(W
   struct MakeShared final : LiquidWorld {
     explicit MakeShared(WorldServer& world) : LiquidWorld(world) {}
   };
-  auto liquids = world.root().liquidsDatabase();
+  auto liquids = world.root().liquids_database();
   if (!liquids) return std::unexpected(std::move(liquids.error()));
   auto materials = world.root().materialDatabase();
   if (!materials) return std::unexpected(std::move(materials.error()));
@@ -261,10 +261,10 @@ std::expected<float, StarException> LiquidWorld::drain_level(Vec2I const& locati
   auto const& below_tile = below->get();
   auto background_blocks = m_material_database->blocksLiquidFlow(below_tile.background);
   if (!background_blocks) return std::unexpected(std::move(background_blocks.error()));
-  if (*background_blocks) return m_liquids_database->backgroundDrain();
+  if (*background_blocks) return m_liquids_database->background_drain();
   auto foreground_blocks = m_material_database->blocksLiquidFlow(below_tile.foreground);
   if (!foreground_blocks) return std::unexpected(std::move(foreground_blocks.error()));
-  return *foreground_blocks || below_tile.liquid.source ? m_liquids_database->backgroundDrain() : 0.0f;
+  return *foreground_blocks || below_tile.liquid.source ? m_liquids_database->background_drain() : 0.0f;
 }
 
 std::expected<CellularLiquidCell<LiquidId>, StarException> LiquidWorld::cell(Vec2I const& location) const {

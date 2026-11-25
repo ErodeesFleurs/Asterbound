@@ -151,13 +151,13 @@ std::expected<std::shared_ptr<LiquidItem>, StarException> LiquidItem::create(Roo
   auto beam = item->initializeBeam(config);
   if (!beam)
     return std::unexpected(std::move(beam.error()));
-  auto database = root.liquidsDatabase();
+  auto database = root.liquids_database();
   if (!database)
     return std::unexpected(std::move(database.error()));
   auto liquid = config.get_string("liquid");
   if (!liquid)
     return std::unexpected(std::move(liquid.error()));
-  auto id = (*database)->liquidId(*liquid);
+  auto id = (*database)->liquid_id(*liquid);
   if (!id)
     return std::unexpected(std::move(id.error()));
   item->m_liquidId = *id;

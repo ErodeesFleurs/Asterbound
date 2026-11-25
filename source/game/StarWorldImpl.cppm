@@ -723,7 +723,7 @@ namespace WorldImpl {
     auto materials = root.materialDatabase();
     if (!materials)
       return std::unexpected(std::move(materials.error()));
-    auto liquids = root.liquidsDatabase();
+    auto liquids = root.liquids_database();
     if (!liquids)
       return std::unexpected(std::move(liquids.error()));
 
@@ -747,7 +747,7 @@ namespace WorldImpl {
           bool foreground_transparent = *foreground_transparency && tile.getCollision() != CollisionKind::Dynamic;
 
           cell = {(*materials)->radiantLight(tile.foreground, tile.foregroundMod).sum() / 3.0f, !foreground_transparent};
-          cell.light += (*liquids)->radiantLight(tile.liquid).sum() / 3.0f;
+          cell.light += (*liquids)->radiant_light(tile.liquid).sum() / 3.0f;
           if (foreground_transparent) {
             cell.light += (*materials)->radiantLight(tile.background, tile.backgroundMod).sum() / 3.0f;
             if (*background_transparent && pos[1] > underground_level)

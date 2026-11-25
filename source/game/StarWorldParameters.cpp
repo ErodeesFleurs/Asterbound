@@ -1227,9 +1227,8 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
   auto autoassetsResult1 = root.assets();
   if (!autoassetsResult1) return std::unexpected(std::move(autoassetsResult1.error()));
   auto assets = std::move((*autoassetsResult1));
-  auto autoliquidsDatabaseResult1 = root.liquidsDatabase();
-  if (!autoliquidsDatabaseResult1) return std::unexpected(std::move(autoliquidsDatabaseResult1.error()));
-  auto liquidsDatabase = std::move((*autoliquidsDatabaseResult1));
+  auto liquids_database = root.liquids_database();
+  if (!liquids_database) return std::unexpected(std::move(liquids_database.error()));
   auto biome_database_result = root.biome_database();
   if (!biome_database_result) return std::unexpected(std::move(biome_database_result.error()));
   auto biome_database = std::move((*biome_database_result));
@@ -1275,7 +1274,7 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     static_random_double(seed, "ThreatLevel") * (threatLevelRange[1] - threatLevelRange[0]) + threatLevelRange[0]));
   auto surfaceBiomeSeed = std::move(static_random_u64(seed, "SurfaceBiomeSeed"));
 
-  auto readRegion = [liquidsDatabase, threatLevel, seed](Json const& regionConfig, String const& layerName, int layerBaseHeight) -> std::expected<TerrestrialWorldParameters::TerrestrialRegion, StarException> {
+  auto readRegion = [&liquids = **liquids_database, threatLevel, seed](Json const& regionConfig, String const& layerName, int layerBaseHeight) -> std::expected<TerrestrialWorldParameters::TerrestrialRegion, StarException> {
     auto layerNameSeed = std::string_view(layerName.utf8());
     // These seeds historically hashed C text, stopping at the first NUL byte.
     layerNameSeed = layerNameSeed.substr(0, layerNameSeed.find('\0'));
@@ -1365,16 +1364,15 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     auto cave_liquid_name = selected_cave_liquid->opt_string();
     if (!cave_liquid_name)
       return std::unexpected(std::move(cave_liquid_name.error()));
-    auto caveLiquid = std::move((*cave_liquid_name));
-    if (caveLiquid) {
+    if (*cave_liquid_name) {
       auto autocaveLiquidSeedDensityRangeResult1 = regionConfig.get("caveLiquidSeedDensityRange");
       if (!autocaveLiquidSeedDensityRangeResult1) return std::unexpected(std::move(autocaveLiquidSeedDensityRangeResult1.error()));
       auto autocaveLiquidSeedDensityRangeResult2 = json_to_vec2f((*autocaveLiquidSeedDensityRangeResult1));
       if (!autocaveLiquidSeedDensityRangeResult2) return std::unexpected(std::move(autocaveLiquidSeedDensityRangeResult2.error()));
       auto caveLiquidSeedDensityRange = std::move((*autocaveLiquidSeedDensityRangeResult2));
-      auto regioncaveLiquidResult1 = liquidsDatabase->liquidId(*caveLiquid);
-      if (!regioncaveLiquidResult1) return std::unexpected(std::move(regioncaveLiquidResult1.error()));
-      region.caveLiquid = std::move((*regioncaveLiquidResult1));
+      auto cave_liquid_id = liquids.liquid_id(**cave_liquid_name);
+      if (!cave_liquid_id) return std::unexpected(std::move(cave_liquid_id.error()));
+      region.caveLiquid = *cave_liquid_id;
       auto cave_liquid_density = static_random_float_range(caveLiquidSeedDensityRange[0], caveLiquidSeedDensityRange[1],
                                                            seed, "caveLiquidSeedDensity", layerNameSeed);
       if (!cave_liquid_density)
@@ -1393,11 +1391,10 @@ std::expected<std::shared_ptr<TerrestrialWorldParameters>, StarException> genera
     auto ocean_liquid_name = selected_ocean_liquid->opt_string();
     if (!ocean_liquid_name)
       return std::unexpected(std::move(ocean_liquid_name.error()));
-    auto oceanLiquid = std::move((*ocean_liquid_name));
-    if (oceanLiquid) {
-      auto regionoceanLiquidResult1 = liquidsDatabase->liquidId(*oceanLiquid);
-      if (!regionoceanLiquidResult1) return std::unexpected(std::move(regionoceanLiquidResult1.error()));
-      region.oceanLiquid = std::move((*regionoceanLiquidResult1));
+    if (*ocean_liquid_name) {
+      auto ocean_liquid_id = liquids.liquid_id(**ocean_liquid_name);
+      if (!ocean_liquid_id) return std::unexpected(std::move(ocean_liquid_id.error()));
+      region.oceanLiquid = *ocean_liquid_id;
       auto regionoceanLiquidLevelResult1 = regionConfig.get_int("oceanLevelOffset", 0);
       if (!regionoceanLiquidLevelResult1) return std::unexpected(std::move(regionoceanLiquidLevelResult1.error()));
       region.oceanLiquidLevel = std::move(static_cast<int>((*regionoceanLiquidLevelResult1) + layerBaseHeight));
