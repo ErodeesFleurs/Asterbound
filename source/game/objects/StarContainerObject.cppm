@@ -90,7 +90,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) override;
   [[nodiscard]] std::expected<InteractAction, StarException> interact(InteractRequest const& request) override;
 
-  [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) override;
+  [[nodiscard]] MessageResponseResult receive_message(ConnectionId sending_connection, String const& message, JsonArray const& args) override;
 
   [[nodiscard]] std::expected<Json, StarException> containerGuiConfig() const override;
   [[nodiscard]] std::expected<String, StarException> containerDescription() const override;

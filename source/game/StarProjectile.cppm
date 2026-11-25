@@ -123,7 +123,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback) override;
   [[nodiscard]] std::expected<void, StarException> render_light_sources(RenderCallback& render_callback) override;
 
-  [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) override;
+  [[nodiscard]] MessageResponseResult receive_message(ConnectionId sending_connection, String const& message, JsonArray const& args) override;
 
   [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> call_script(String const& func, LuaVariadic<LuaValue> const& args) override;
   [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> eval_script(String const& code) override;

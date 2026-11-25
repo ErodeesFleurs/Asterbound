@@ -85,7 +85,7 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> dismissCompanion(String const& category, Uuid const& podUuid);
 
-  [[nodiscard]] MessageResponseResult receiveMessage(String const& message, bool localMessage, JsonArray const& args = {});
+  [[nodiscard]] MessageResponseResult receive_message(String const& message, bool local_message, JsonArray const& args = {});
   [[nodiscard]] std::expected<void, StarException> update(float dt);
 
 private:

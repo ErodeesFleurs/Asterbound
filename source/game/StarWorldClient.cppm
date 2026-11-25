@@ -5,6 +5,7 @@ import star.json;
 import star.id_map;
 import star.game_types;
 import star.message_types;
+import star.entity_message_promise_queue;
 import star.material_types;
 import star.image;
 import star.list;
@@ -269,7 +270,7 @@ public:
   float timeOfDay() const override;
   std::shared_ptr<LuaRoot> luaRoot() override;
   [[nodiscard]] std::expected<RpcPromise<Vec2F>, StarException> findUniqueEntity(String const& uniqueId) override;
-  [[nodiscard]] std::expected<RpcPromise<Json>, StarException> sendEntityMessage(std::variant<EntityId, String> const& entity, String const& message, JsonArray const& args = {}) override;
+  [[nodiscard]] std::expected<RpcPromise<Json>, StarException> send_entity_message(std::variant<EntityId, String> const& entity, String const& message, JsonArray const& args = {}) override;
   bool isTileProtected(Vec2I const& pos) const override;
   [[nodiscard]] std::expected<StringMap<LuaCallbacks>, StarException> luaThreadCallbacks() const override;
 
@@ -326,7 +327,7 @@ public:
   RectI clientWindow() const;
   WorldClientState& clientState();
 
-  [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId fromConnection, String const& message, JsonArray const& args);
+  [[nodiscard]] MessageResponseResult receive_message(ConnectionId from_connection, String const& message, JsonArray const& args);
 
   std::shared_ptr<WorldClient::ScriptComponent> scriptContext(String const& contextName);
 
@@ -609,7 +610,7 @@ private:
 
   HashMap<String, List<RpcPromiseKeeper<Vec2F>>> m_findUniqueEntityResponses;
   HashMap<Uuid, RpcPromiseKeeper<Json>> m_entityMessageResponses;
-  HashMap<Uuid, RpcPromise<Json>> m_entityMessagePromises;
+  EntityMessagePromiseQueue<Uuid> m_entity_message_promises;
   HashMap<Uuid, RpcPromiseKeeper<InteractAction>> m_entity_interaction_responses;
 
   List<PhysicsForceRegion> m_force_regions;

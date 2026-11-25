@@ -104,7 +104,7 @@ public:
 
   void suppressItems(bool suppress);
 
-  [[nodiscard]] MessageResponseResult receiveMessage(String const& message, bool localMessage, JsonArray const& args = {});
+  [[nodiscard]] MessageResponseResult receive_message(String const& message, bool local_message, JsonArray const& args = {});
 
   [[nodiscard]] std::expected<float, StarException> beamGunRadius() const;
 

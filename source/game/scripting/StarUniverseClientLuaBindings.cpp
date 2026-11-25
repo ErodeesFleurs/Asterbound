@@ -316,7 +316,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeUniverseClientCallba
       return std::unexpected(std::move(registration.error()));
   
   if (auto registration = callbacks.register_callback("sendMainWorldMessage", [&universe](String const& message, LuaVariadic<Json> args) -> std::expected<RpcPromise<Json>, StarException> {
-    return universe.sendMainWorldMessage(message, JsonArray::from(std::move(args)));
+    return universe.send_main_world_message(message, JsonArray::from(std::move(args)));
   }); !registration)
       return std::unexpected(std::move(registration.error()));
   

@@ -94,7 +94,7 @@ public:
 
   [[nodiscard]] std::expected<Json, StarException> configValue(String const& name, Json const& def = Json()) const;
 
-  [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) override;
+  [[nodiscard]] MessageResponseResult receive_message(ConnectionId sending_connection, String const& message, JsonArray const& args) override;
 
   using Entity::setUniqueId;
 

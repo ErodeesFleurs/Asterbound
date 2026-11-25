@@ -820,15 +820,15 @@ List<Particle> StatusController::pullNewParticles() {
   return newParticles;
 }
 
-MessageResponseResult StatusController::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
-  auto result = m_primaryScript.handle_message(message, localMessage, args);
+MessageResponseResult StatusController::receive_message(String const& message, bool local_message, JsonArray const& args) {
+  auto result = m_primaryScript.handle_message(message, local_message, args);
   if (!result) {
     if (!result.error().is<LuaScriptError>()) return std::unexpected(std::move(result.error()));
     result = std::optional<ChainableJsonMessageResponse>{};
   }
   for (auto effects = effect_snapshot(); auto const& instance : *effects) {
     if (!instance->active) continue;
-    auto response = dispatch_effect(*instance, [&] { return instance->script.handle_message(message, localMessage, args); });
+    auto response = dispatch_effect(*instance, [&] { return instance->script.handle_message(message, local_message, args); });
     if (!response) {
       if (!response.error().is<LuaScriptError>()) return std::unexpected(std::move(response.error()));
       continue;

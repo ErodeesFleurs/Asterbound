@@ -92,7 +92,7 @@ public:
   // Handled at this level to allow multiple active quests to specify interestingObjects
   [[nodiscard]] std::expected<StringSet, StarException> interestingObjects();
 
-  [[nodiscard]] MessageResponseResult receiveMessage(String const& message, bool localMessage, JsonArray const& args = {});
+  [[nodiscard]] MessageResponseResult receive_message(String const& message, bool local_message, JsonArray const& args = {});
   [[nodiscard]] std::expected<void, StarException> update(float dt);
 
 private:

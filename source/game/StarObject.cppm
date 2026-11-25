@@ -215,7 +215,7 @@ public:
   [[nodiscard]] std::expected<StringSet, StarException> turnInQuests() const override;
   [[nodiscard]] std::expected<Vec2F, StarException> questIndicatorPosition() const override;
 
-  [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args = {}) override;
+  [[nodiscard]] MessageResponseResult receive_message(ConnectionId sending_connection, String const& message, JsonArray const& args = {}) override;
 
   // Check, in order, the passed in object parameters, the config parameters,
   // and then the orientation parameters for the given key.  Returns 'def' if

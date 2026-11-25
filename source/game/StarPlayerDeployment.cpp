@@ -200,8 +200,8 @@ std::expected<void, StarException> PlayerDeployment::teleportOut() {
   return {};
 }
 
-MessageResponseResult PlayerDeployment::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
-  return recover_lua_script_error(m_scriptComponent.handle_message(message, localMessage, args));
+MessageResponseResult PlayerDeployment::receive_message(String const& message, bool local_message, JsonArray const& args) {
+  return recover_lua_script_error(m_scriptComponent.handle_message(message, local_message, args));
 }
 
 std::expected<void, StarException> PlayerDeployment::update(float dt) {

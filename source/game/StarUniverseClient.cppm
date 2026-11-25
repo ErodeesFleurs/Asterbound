@@ -243,14 +243,14 @@ public:
   [[nodiscard]] std::expected<void, StarException> destroySubWorldOnWorld(WorldId worldId);
 
   [[nodiscard]] std::expected<RpcPromise<Json>, StarException> sendSubWorldOnWorldMessage(WorldId const& worldId, String const& message, JsonArray const& args = {});
-  [[nodiscard]] std::expected<RpcPromise<Json>, StarException> sendMainWorldMessage(String const& message, JsonArray const& args = {});
+  [[nodiscard]] std::expected<RpcPromise<Json>, StarException> send_main_world_message(String const& message, JsonArray const& args = {});
 
   bool paused() const;
   
   [[nodiscard]] std::expected<void, StarException> passMessage(Universe::Message&& message) override;
   [[nodiscard]] std::expected<RpcPromise<Json>, StarException> sendUniverseMessage(ConnectionId const& connectionId, String const& message, JsonArray const& args = {}) override;
   
-  [[nodiscard]] MessageResponseResult receiveMessage(String const& message, bool const& local, JsonArray const& args) override;
+  [[nodiscard]] MessageResponseResult receive_message(String const& message, bool const& local, JsonArray const& args) override;
 
 private:
   explicit UniverseClient(Root& root);

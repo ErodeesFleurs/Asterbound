@@ -116,6 +116,11 @@ public:
   [[nodiscard]] std::expected<std::optional<Error>, StarException> error() const
     requires std::constructible_from<Error, Error const&>;
 
+  // Pending has no reply; a terminal reply contains either the result or the
+  // remote failure/cancellation. Observation diagnostics stay outside it.
+  [[nodiscard]] std::expected<std::optional<std::expected<Result, Error>>, StarException> poll_result() const
+    requires std::constructible_from<Result, Result const&> && std::constructible_from<Error, Error const&>;
+
   // Evaluation is lazy and successful values are cached for every observer.
   // The callback returns expected<T, StarException>. A diagnostic leaves the
   // wrapper unevaluated, so a later query retries it.
@@ -572,6 +577,22 @@ template <typename Result, typename Error>
       return Query(std::in_place, std::in_place, std::get<Failed>(outcome).value);
     if (std::holds_alternative<Cancelled>(outcome))
       return Query(std::in_place, std::in_place, std::get<Cancelled>(outcome).value);
+    return Query(std::in_place);
+  });
+}
+
+template <typename Result, typename Error>
+[[nodiscard]] std::expected<std::optional<std::expected<Result, Error>>, StarException>
+RpcPromise<Result, Error>::poll_result() const
+  requires std::constructible_from<Result, Result const&> && std::constructible_from<Error, Error const&> {
+  using Query = std::expected<std::optional<std::expected<Result, Error>>, StarException>;
+  return observe([](Outcome const& outcome) -> Query {
+    if (std::holds_alternative<Fulfilled>(outcome))
+      return Query(std::in_place, std::in_place, std::in_place, std::get<Fulfilled>(outcome).value);
+    if (std::holds_alternative<Failed>(outcome))
+      return Query(std::in_place, std::in_place, std::unexpect, std::get<Failed>(outcome).value);
+    if (std::holds_alternative<Cancelled>(outcome))
+      return Query(std::in_place, std::in_place, std::unexpect, std::get<Cancelled>(outcome).value);
     return Query(std::in_place);
   });
 }

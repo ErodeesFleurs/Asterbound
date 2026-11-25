@@ -859,15 +859,15 @@ void ToolUser::suppressItems(bool suppress) {
   m_suppress.set(suppress);
 }
 
-[[nodiscard]] MessageResponseResult ToolUser::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
+[[nodiscard]] MessageResponseResult ToolUser::receive_message(String const& message, bool local_message, JsonArray const& args) {
   for (auto const& item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
     if (auto active = as<ActiveItem>(item)) {
-      auto result = active->receiveMessage(message, localMessage, args);
-      if (!result) return std::unexpected(std::move(result.error()));
-      if (*result) return std::move(*result);
+      auto result = active->receive_message(message, local_message, args);
+      if (!result || *result)
+        return result;
     }
   }
-  return std::optional<ChainableJsonMessageResponse>();
+  return std::nullopt;
 }
 
 [[nodiscard]] std::expected<float, StarException> ToolUser::beamGunRadius() const {

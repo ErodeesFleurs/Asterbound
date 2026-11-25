@@ -1560,7 +1560,7 @@ std::expected<void, StarException> MainInterface::handle_interact_action(Interac
     auto owner = connection_for_entity(interact_action.entity_id);
     if (!owner)
       return context().root().logger().warn("Ignoring interaction message from unowned entity {}", interact_action.entity_id);
-    auto received = m_client->mainPlayer()->receiveMessage(*owner, *type, *arguments);
+    auto received = m_client->mainPlayer()->receive_message(*owner, *type, *arguments);
     if (!received)
       return std::unexpected(std::move(received.error()));
   }

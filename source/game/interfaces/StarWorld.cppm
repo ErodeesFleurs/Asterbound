@@ -209,7 +209,7 @@ public:
   // Send a message to a local or remote scripted entity.  If the target is
   // local, the promise will be finished before being returned.  Entity id can
   // either be EntityId or a uniqueId.
-  [[nodiscard]] virtual std::expected<RpcPromise<Json>, StarException> sendEntityMessage(std::variant<EntityId, String> const& entity, String const& message, JsonArray const& args = {}) = 0;
+  [[nodiscard]] virtual std::expected<RpcPromise<Json>, StarException> send_entity_message(std::variant<EntityId, String> const& entity, String const& message, JsonArray const& args = {}) = 0;
 
   // Helper non-virtual methods.
 
@@ -351,7 +351,7 @@ template <typename EntityT>
 // dispatch, but every keeper in this extracted batch must still be settled.
 template <typename Message, typename Receiver>
 [[nodiscard]] std::expected<void, StarException> settleWorldMessageBatch(
-    List<Message>& messages, Receiver&& receiveMessage) {
+    List<Message>& messages, Receiver&& receive_message) {
   std::optional<StarException> error;
   for (auto& message : messages) {
     if (error) {
@@ -359,7 +359,7 @@ template <typename Message, typename Receiver>
         *error = error->with_related(failed.error(), "World message drain also failed");
       continue;
     }
-    auto response = receiveMessage(message.message, message.args);
+    auto response = receive_message(message.message, message.args);
     std::expected<void, StarException> completion;
     if (!response) {
       error = std::move(response.error());

@@ -317,7 +317,7 @@ std::expected<void, StarException> ConsumableItem::maybeConsume() {
     auto itemOwner = owner();
     if (!itemOwner)
       return std::unexpected(std::move(itemOwner.error()));
-    auto sent = itemWorld->get().sendEntityMessage(itemOwner->get().entityId(), "recordEvent", {"useItem", JsonObject{{"itemType", name()}}});
+    auto sent = itemWorld->get().send_entity_message(itemOwner->get().entityId(), "recordEvent", {"useItem", JsonObject{{"itemType", name()}}});
     if (!sent)
       return std::unexpected(std::move(sent.error()));
     if (count())

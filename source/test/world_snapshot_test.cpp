@@ -10,6 +10,7 @@ import star.rect;
 import star.vector;
 import star.game_types;
 import star.message_types;
+import star.entity_message_promise_queue;
 import star.material_types;
 import star.color;
 import star.bi_map;
@@ -133,6 +134,125 @@ import star.celestial_database;
 import star.algorithm;
 import star.game_test;
 using namespace Star;
+
+namespace {
+
+const GameTestRegistration reentrant_replacement("WorldEntityMessageQueue", "ReentrantReplacementSurvivesNestedDrainAndGrowth",
+[](GameTest& fixture) {
+  EntityMessagePromiseQueue<Uuid> queue;
+  auto const key = Uuid::nil();
+  auto pending = RpcPromise<Json>::make_pair().first;
+  std::vector<Json> replies;
+  auto deliver = [&](Uuid const& uuid, std::expected<Json, String> reply) {
+    fixture.check(uuid == key, "reply has the original UUID");
+    if (fixture.check(reply.has_value(), "reply succeeds"))
+      replies.push_back(std::move(*reply));
+  };
+  int calls = 0;
+  auto original = RpcPromise<Json>::make_fulfilled(Json(1)).wrap([&](Json value) -> std::expected<Json, StarException> {
+    ++calls;
+    for (char byte = 1; byte <= 64; ++byte) {
+      std::array<char, uuid_size> bytes{};
+      bytes.front() = byte;
+      auto another_key = Uuid::from_bytes(bytes);
+      if (!another_key)
+        return std::unexpected(std::move(another_key.error()));
+      queue.insert_or_assign(*another_key, pending);
+    }
+    queue.insert_or_assign(key, RpcPromise<Json>::make_fulfilled(Json(2)));
+    fixture.check(queue.drain(deliver).has_value(), "nested drain does not poll");
+    return value;
+  });
+  if (!fixture.check(original.has_value(), "wrap original promise"))
+    return;
+  queue.insert_or_assign(key, std::move(*original));
+
+  fixture.check(queue.drain(deliver).has_value(), "drain original snapshot");
+  fixture.check(calls == 1, "observe original once");
+  fixture.check(replies.empty(), "do not deliver old or new reply in the original snapshot");
+  fixture.check(queue.drain(deliver).has_value(), "drain replacement");
+  fixture.check(replies == std::vector<Json>{Json(2)}, "only the replacement reply was delivered");
+  queue.clear();
+  fixture.check(queue.empty(), "clear removes the pending registrations");
+});
+
+const GameTestRegistration disconnect_cleanup("WorldEntityMessageQueue", "DisconnectInvalidatesOldRegistrationButNotOtherClient",
+[](GameTest& fixture) {
+  using Key = std::pair<ConnectionId, Uuid>;
+  EntityMessagePromiseQueue<Key> queue;
+  auto const uuid = Uuid::nil();
+  Key const disconnected{1, uuid};
+  Key const other{2, uuid};
+  auto [pending, keeper] = RpcPromise<Json>::make_pair();
+  queue.insert_or_assign(other, std::move(pending));
+  auto original = RpcPromise<Json>::make_fulfilled(Json(1)).wrap([&](Json value) -> std::expected<Json, StarException> {
+    queue.discard_if([&](Key const& key) { return key.first == disconnected.first; });
+    queue.insert_or_assign(disconnected, RpcPromise<Json>::make_fulfilled(Json(2)));
+    return value;
+  });
+  if (!fixture.check(original.has_value(), "wrap original client's promise"))
+    return;
+  queue.insert_or_assign(disconnected, std::move(*original));
+
+  std::optional<Json> disconnected_reply;
+  std::optional<Json> other_reply;
+  auto deliver = [&](Key const& key, std::expected<Json, String> reply) {
+    if (!fixture.check(reply.has_value() && key.second == uuid, "reply succeeds with the shared UUID")
+        || !fixture.check(key == disconnected || key == other, "reply targets one of the registered clients"))
+      return;
+    auto& slot = key == disconnected ? disconnected_reply : other_reply;
+    fixture.check(!slot, "reply delivered only once");
+    slot = std::move(*reply);
+  };
+  fixture.check(queue.drain(deliver).has_value(), "drain across disconnect");
+  fixture.check(!disconnected_reply && !other_reply, "no stale or still pending reply delivered");
+  fixture.check(keeper.fulfill(Json(3)).has_value(), "fulfill other client's reply");
+  fixture.check(queue.drain(deliver).has_value(), "drain both completed registrations");
+  fixture.check(disconnected_reply == Json(2), "reused connection receives only its own reply");
+  fixture.check(other_reply == Json(3), "other client retains its registration for the same UUID");
+  fixture.check(queue.empty(), "completed registrations are removed");
+});
+
+const GameTestRegistration diagnostics_retry("WorldEntityMessageQueue", "DiagnosticsRetryUnlessClearedDuringObservation",
+[](GameTest& fixture) {
+  EntityMessagePromiseQueue<Uuid> queue;
+  auto const key = Uuid::nil();
+  int calls = 0;
+  auto retry = RpcPromise<Json>::make_fulfilled(Json()).wrap([&](Json value) -> std::expected<Json, StarException> {
+    if (++calls == 1)
+      return std::unexpected(StarException("transient diagnostic"));
+    return value;
+  });
+  if (!fixture.check(retry.has_value(), "wrap retryable promise"))
+    return;
+  queue.insert_or_assign(key, std::move(*retry));
+  int replies = 0;
+  auto deliver = [&](Uuid const& uuid, std::expected<Json, String> reply) {
+    fixture.check(uuid == key, "reply has the registered UUID");
+    fixture.check(reply && *reply == Json(), "reply is a successful JSON null");
+    ++replies;
+  };
+  auto diagnostic = queue.drain(deliver);
+  fixture.check(!diagnostic, "current diagnostic is reported");
+  fixture.check(!queue.empty() && calls == 1 && replies == 0, "diagnostic keeps registration for retry");
+  fixture.check(queue.drain(deliver).has_value(), "next drain retries");
+  fixture.check(calls == 2 && replies == 1, "retry delivers exactly one reply");
+
+  auto stale = RpcPromise<Json>::make_fulfilled(Json()).wrap([&](Json) -> std::expected<Json, StarException> {
+    queue.clear();
+    queue.insert_or_assign(key, RpcPromise<Json>::make_fulfilled(Json()));
+    return std::unexpected(StarException("obsolete diagnostic"));
+  });
+  if (!fixture.check(stale.has_value(), "wrap promise that clears the queue"))
+    return;
+  queue.insert_or_assign(key, std::move(*stale));
+  fixture.check(queue.drain(deliver).has_value(), "diagnostic for cleared registration is discarded");
+  fixture.check(replies == 1, "replacement survives until the next drain");
+  fixture.check(queue.drain(deliver).has_value(), "next drain delivers replacement");
+  fixture.check(replies == 2 && queue.empty(), "replacement is delivered once and removed");
+});
+
+}
 
 TEST(PacketWire, PauseUsesStreamVersionThroughBaseInterface) {
   PausePacket original(true, 0.5f);

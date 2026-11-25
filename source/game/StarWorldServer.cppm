@@ -14,6 +14,7 @@ import star.vector;
 import star.thread;
 import star.game_types;
 import star.message_types;
+import star.entity_message_promise_queue;
 import star.material_types;
 import star.io_device;
 import star.lua;
@@ -208,7 +209,7 @@ public:
   [[nodiscard]] std::expected<List<std::shared_ptr<Packet>>, StarException> getOutgoingPackets(ConnectionId clientId);
   bool sendPacket(ConnectionId clientId, std::shared_ptr<Packet> const& packet);
 
-  [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId fromConnection, String const& message, JsonArray const& args);
+  [[nodiscard]] MessageResponseResult receive_message(ConnectionId from_connection, String const& message, JsonArray const& args);
 
   [[nodiscard]] std::expected<void, StarException> startFlyingSky(bool enterHyperspace, bool startInWarp, Json settings = {});
   [[nodiscard]] std::expected<void, StarException> stopFlyingSkyAt(SkyParameters const& destination);
@@ -284,7 +285,7 @@ public:
   float timeOfDay() const override;
   std::shared_ptr<LuaRoot> luaRoot() override;
   [[nodiscard]] std::expected<RpcPromise<Vec2F>, StarException> findUniqueEntity(String const& uniqueId) override;
-  [[nodiscard]] std::expected<RpcPromise<Json>, StarException> sendEntityMessage(std::variant<EntityId, String> const& entity, String const& message, JsonArray const& args = {}) override;
+  [[nodiscard]] std::expected<RpcPromise<Json>, StarException> send_entity_message(std::variant<EntityId, String> const& entity, String const& message, JsonArray const& args = {}) override;
   bool isTileProtected(Vec2I const& pos) const override;
   
   [[nodiscard]] std::expected<StringMap<LuaCallbacks>, StarException> luaThreadCallbacks() const override;
@@ -420,6 +421,7 @@ private:
     std::shared_ptr<WorldClientState> clientState;
     bool pendingForward;
     bool started;
+    bool detached = false;
     bool local;
     bool admin;
 
@@ -559,8 +561,18 @@ private:
   StableHashSet<DungeonId> m_protectedDungeonIds;
   bool m_tileProtectionEnabled = true;
 
-  HashMap<Uuid, std::pair<ConnectionId, std::variant<std::monostate, ConnectionId, RpcPromiseKeeper<Json>>>> m_entityMessageResponses;
-  HashMap<Uuid, std::pair<ConnectionId, RpcPromise<Json>>> m_entityMessagePromises;
+  struct ClientEntityReply {
+    ConnectionId requester;
+    Uuid request_uuid;
+  };
+  struct PendingEntityReply {
+    ConnectionId expected_sender;
+    std::variant<ClientEntityReply, RpcPromiseKeeper<Json>> destination;
+  };
+
+  Uuid register_entity_reply(PendingEntityReply reply);
+  HashMap<Uuid, PendingEntityReply> m_entity_message_responses;
+  EntityMessagePromiseQueue<std::pair<ConnectionId, Uuid>> m_entity_message_promises;
 
   List<PhysicsForceRegion> m_force_regions;
 

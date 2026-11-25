@@ -562,7 +562,7 @@ std::expected<void, StarException> CraftingPane::upgrade_table() {
       return refresh_recipes();
   }
 
-  auto request_upgrade = m_world_client->sendEntityMessage(m_source_entity_id, "requestUpgrade");
+  auto request_upgrade = m_world_client->send_entity_message(m_source_entity_id, "requestUpgrade");
   if (!request_upgrade)
     return std::unexpected(std::move(request_upgrade.error()));
   if (auto result = unlock_configured_recipes("upgradeRecipeUnlocks"); !result)

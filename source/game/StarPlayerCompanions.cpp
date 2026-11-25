@@ -278,8 +278,8 @@ std::expected<void, StarException> PlayerCompanions::dismissCompanion(String con
   return {};
 }
 
-MessageResponseResult PlayerCompanions::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
-  return recover_lua_script_error(m_scriptComponent.handle_message(message, localMessage, args));
+MessageResponseResult PlayerCompanions::receive_message(String const& message, bool local_message, JsonArray const& args) {
+  return recover_lua_script_error(m_scriptComponent.handle_message(message, local_message, args));
 }
 
 std::expected<void, StarException> PlayerCompanions::update(float dt) {

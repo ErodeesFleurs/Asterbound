@@ -500,9 +500,9 @@ void Quest::detachPlayer() {
   m_world.reset();
   m_client.reset();
 }
-MessageResponseResult Quest::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
+MessageResponseResult Quest::receive_message(String const& message, bool local_message, JsonArray const& args) {
   if (!m_inited) return std::optional<ChainableJsonMessageResponse>();
-  return recover_lua_script_error(m_scriptComponent.handle_message(message, localMessage, args));
+  return recover_lua_script_error(m_scriptComponent.handle_message(message, local_message, args));
 }
 std::expected<std::optional<LuaValue>, StarException> Quest::callScript(String const& func, LuaVariadic<LuaValue> const& args) {
   if (!m_inited) return std::optional<LuaValue>();

@@ -250,7 +250,7 @@ public:
   
   [[nodiscard]] std::expected<RpcPromise<Json>, StarException> sendUniverseMessage(ConnectionId const& connectionId, String const& message, JsonArray const& args = {}) override;
   
-  [[nodiscard]] MessageResponseResult receiveMessage(String const& message, bool const& local, JsonArray const& args) override;
+  [[nodiscard]] MessageResponseResult receive_message(String const& message, bool const& local, JsonArray const& args) override;
 
 protected:
   [[nodiscard]] std::expected<void, StarException> run() override;

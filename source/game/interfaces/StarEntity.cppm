@@ -177,7 +177,7 @@ public:
   // to messages.  If the message is NOT handled, should return Nothing,
   // otherwise should return some Json value.
   // This will only ever be called on master entities.
-  [[nodiscard]] virtual MessageResponseResult receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args);
+  [[nodiscard]] virtual MessageResponseResult receive_message(ConnectionId sending_connection, String const& message, JsonArray const& args);
 
   [[nodiscard]] virtual std::expected<void, StarException> update(float dt, std::uint64_t currentStep);
 

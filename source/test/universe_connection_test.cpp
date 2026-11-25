@@ -112,6 +112,9 @@ import star.root;
 import star.file;
 import star.server_rcon;
 import star.universe_server;
+import star.player;
+import star.player_factory;
+import star.world_server;
 
 #include "gtest/gtest.h"
 
@@ -1922,3 +1925,155 @@ const GameTestRegistration
 const GameTestRegistration
   universeMessageResponseDecodeFailures("MessageResponsePackets", "UniverseDecodeFailures",
                                         [](GameTest&) { messageResponseDecodeFailures<UniverseMessageResponse>(); });
+
+namespace {
+
+template <typename T>
+bool check_route_result(std::expected<T, StarException> const& result,
+    std::source_location at = std::source_location::current()) {
+  return GameTest::check(bool(result), result ? "" : result.error().what(), at);
+}
+
+std::expected<EntityId, StarException> add_route_replica(Root& root, WorldServer& world, ConnectionId owner) {
+  auto factory = root.playerFactory();
+  if (!factory)
+    return std::unexpected(std::move(factory.error()));
+  auto player = (*factory)->create();
+  if (!player)
+    return std::unexpected(std::move(player.error()));
+  if (auto ready = (*player)->finalizeCreation(); !ready)
+    return std::unexpected(std::move(ready.error()));
+
+  NetCompatibilityRules rules;
+  auto store = (*player)->net_store(rules);
+  if (!store)
+    return std::unexpected(std::move(store.error()));
+  auto state = (*player)->write_net_state(0, rules);
+  if (!state)
+    return std::unexpected(std::move(state.error()));
+  auto space = connection_entity_space(owner);
+  if (!space)
+    return std::unexpected(std::move(space.error()));
+  auto entity = space->first;
+  auto accepted = world.handleIncomingPackets(owner, {
+      std::make_shared<EntityCreatePacket>(EntityType::Player, std::move(*store), std::move(state->first), entity)});
+  if (!accepted)
+    return std::unexpected(std::move(accepted.error()));
+  if (auto replica = world.entity(entity); !replica || !replica->isSlave())
+    return std::unexpected(StarException("EntityCreate did not publish the reply owner's replica"));
+  return entity;
+}
+
+template <typename PacketType>
+std::shared_ptr<PacketType> drain_route_packet(WorldServer& world, ConnectionId client, bool expected = true,
+    std::source_location at = std::source_location::current()) {
+  auto outgoing = world.getOutgoingPackets(client);
+  if (!check_route_result(outgoing, at))
+    return {};
+  std::shared_ptr<PacketType> found;
+  for (auto const& packet : *outgoing) {
+    if (auto candidate = as<PacketType>(packet)) {
+      GameTest::check(!found, "The client queued more than one packet of the tested type", at);
+      found = std::move(candidate);
+    }
+  }
+  GameTest::check(bool(found) == expected, expected ? "Missing entity route packet" : "Unexpected entity route packet", at);
+  return found;
+}
+
+const GameTestRegistration entity_reply_routes(
+    "EntityReplyRoutes", "OwnerValidationUuidIsolationAndDisconnect", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  auto storage = File::ephemeral_file(root.random());
+  if (!check_route_result(storage))
+    return;
+  auto created = WorldServer::create(root, Vec2U(2048, 2048), *storage);
+  if (!check_route_result(created))
+    return;
+  auto& world = **created;
+  auto close = make_scope_exit([&] { check_route_result(world.close()); });
+
+  constexpr ConnectionId requester = min_client_connection_id;
+  constexpr ConnectionId second_requester = requester + 1;
+  constexpr ConnectionId responder = requester + 2;
+  auto attach = [&](ConnectionId client) {
+    auto added = world.addClient(client, SpawnTargetPosition(1024, 1024), true);
+    return check_route_result(added) && fixture.check(*added, "Client should join the test world")
+        && check_route_result(world.handleIncomingPackets(client, {std::make_shared<WorldStartAcknowledgePacket>()}));
+  };
+  if (!attach(requester) || !attach(second_requester) || !attach(responder))
+    return;
+  auto target = add_route_replica(root, world, responder);
+  auto other_target = add_route_replica(root, world, second_requester);
+  if (!check_route_result(target) || !check_route_result(other_target))
+    return;
+
+  auto request = [&](ConnectionId client, EntityId entity, Uuid uuid) {
+    return check_route_result(world.handleIncomingPackets(client, {
+        std::make_shared<EntityMessagePacket>(entity, "entityReplyLifecycle", JsonArray{}, uuid)}));
+  };
+  auto respond = [&](ConnectionId client, Uuid uuid, Json result) {
+    return check_route_result(world.handleIncomingPackets(client, {
+        std::make_shared<EntityMessageResponsePacket>(std::move(result), uuid)}));
+  };
+  auto expect_response = [&](ConnectionId client, Uuid uuid, std::expected<Json, String> const& result,
+                             std::source_location at = std::source_location::current()) {
+    if (auto reply = drain_route_packet<EntityMessageResponsePacket>(world, client, true, at)) {
+      fixture.check(reply->uuid == uuid, "Response should use the original requester's UUID", at);
+      fixture.check(reply->response == result, "Unexpected entity response outcome", at);
+    }
+  };
+
+  // The requester UUID is local to each client, even when both ask the same owner.
+  auto shared_uuid = Uuid::nil();
+  if (!request(requester, *target, shared_uuid))
+    return;
+  auto first_route = drain_route_packet<EntityMessagePacket>(world, responder);
+  if (!request(second_requester, *target, shared_uuid))
+    return;
+  auto second_route = drain_route_packet<EntityMessagePacket>(world, responder);
+  if (!first_route || !second_route
+      || !fixture.check(first_route->uuid != second_route->uuid, "Concurrent forwards must have distinct route UUIDs"))
+    return;
+  fixture.check(first_route->fromConnection == requester && second_route->fromConnection == second_requester,
+                "Forwarding must preserve each requester's connection");
+
+  // Exercise the transport's native ownership check without relying on wire timing.
+  if (!respond(second_requester, first_route->uuid, Json("wrong owner")))
+    return;
+  drain_route_packet<EntityMessageResponsePacket>(world, requester, false);
+  if (!respond(responder, second_route->uuid, Json("second response"))
+      || !respond(responder, first_route->uuid, Json()))
+    return;
+  expect_response(second_requester, shared_uuid, Json("second response"));
+  expect_response(requester, shared_uuid, Json());
+
+  // This client is the owner of one outstanding request and the requester of another.
+  auto surviving_uuid = Uuid(root.random());
+  if (!request(requester, *target, shared_uuid) || !request(responder, *other_target, shared_uuid))
+    return;
+  auto abandoned_route = drain_route_packet<EntityMessagePacket>(world, second_requester);
+  if (!request(requester, *other_target, surviving_uuid))
+    return;
+  auto surviving_route = drain_route_packet<EntityMessagePacket>(world, second_requester);
+  auto server_call = world.send_entity_message(*target, "entityReplyLifecycle", JsonArray{});
+  if (!abandoned_route || !surviving_route || !check_route_result(server_call)
+      || !fixture.check(server_call->finished() == false, "Server call should wait for the owning client"))
+    return;
+
+  if (!check_route_result(world.removeClient(responder)))
+    return;
+  expect_response(requester, shared_uuid, std::unexpected(String("Client disconnected")));
+  auto server_error = server_call->error();
+  if (check_route_result(server_error))
+    fixture.check(*server_error == String("Client disconnected"), "Server call should fail when its owner leaves");
+
+  // Reusing a connection ID must not resurrect a departed requester's route.
+  if (!attach(responder) || !respond(second_requester, abandoned_route->uuid, Json("departed"))
+      || !respond(second_requester, surviving_route->uuid, Json("still connected")))
+    return;
+  drain_route_packet<EntityMessageResponsePacket>(world, responder, false);
+  expect_response(requester, surviving_uuid, Json("still connected"));
+});
+
+} // namespace

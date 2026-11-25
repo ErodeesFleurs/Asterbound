@@ -730,22 +730,15 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
     auto delivered = [&]() -> std::expected<void, StarException> {
       if (!keeper)
         return std::unexpected(StarException("Universe client message requires a local response keeper"));
-      auto responseResult = receiveMessage(message.message, true, message.args);
+      auto responseResult = receive_message(message.message, true, message.args);
       if (!responseResult)
         return std::unexpected(std::move(responseResult.error()));
       auto response = std::move(*responseResult);
       if (!response)
         return keeper->get().fail("Message not handled by universe");
-      struct DeliverResponseToKeeper {
-        RpcPromiseKeeper<Json>& keeper;
-
-        std::expected<void, StarException> operator()(RpcPromise<Json>& promise) const {
-          return keeper.chain(std::move(promise));
-        }
-
-        std::expected<void, StarException> operator()(Json& result) const { return keeper.fulfill(result); }
-      };
-      return std::visit(DeliverResponseToKeeper{keeper->get()}, *response);
+      if (std::holds_alternative<Json>(*response))
+        return keeper->get().fulfill(std::get<Json>(std::move(*response)));
+      return keeper->get().chain(std::get<RpcPromise<Json>>(std::move(*response)));
     }();
     if (!delivered) {
       auto error = std::move(delivered.error());
@@ -1592,25 +1585,10 @@ std::expected<RpcPromise<Json>, StarException> UniverseClient::sendSubWorldOnWor
 }
 
 // though it resolves instantly, still use a promise for consistency
-std::expected<RpcPromise<Json>, StarException> UniverseClient::sendMainWorldMessage(String const& message, JsonArray const& args) {
+std::expected<RpcPromise<Json>, StarException> UniverseClient::send_main_world_message(String const& message, JsonArray const& args) {
   if (!isConnected())
     return RpcPromise<Json>::make_failed("Not connected");
-  auto responseResult = m_worldClient->receiveMessage(server_connection_id, message, args);
-  if (!responseResult)
-    return std::unexpected(std::move(responseResult.error()));
-  auto response = std::move(*responseResult);
-  if (!response)
-    return RpcPromise<Json>::make_failed("Message not handled by world");
-  struct ResponseToPromise {
-    std::expected<RpcPromise<Json>, StarException> operator()(RpcPromise<Json>& promise) const {
-      return std::move(promise);
-    }
-
-    std::expected<RpcPromise<Json>, StarException> operator()(Json& result) const {
-      return RpcPromise<Json>::make_fulfilled(result);
-    }
-  };
-  return std::visit(ResponseToPromise{}, *response);
+  return to_message_promise(m_worldClient->receive_message(server_connection_id, message, args), "Message not handled by world");
 }
 
 bool UniverseClient::paused() const {
@@ -1847,7 +1825,7 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
         for (auto& p : log->map)
           m_root.logMap().set_value(p.first, p.second);
       } else if (auto message = as<UniverseMessage>(packet)) {
-        auto responseResult = receiveMessage(message->message, false, message->args);
+        auto responseResult = receive_message(message->message, false, message->args);
         if (!responseResult)
           return std::unexpected(std::move(responseResult.error()));
         auto response = std::move(*responseResult);
@@ -1858,11 +1836,11 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
             return std::unexpected(std::move(operation95.error()));
         } else if (std::holds_alternative<Json>(*response)) {
           auto operation96 = m_connection->pushSingle(
-            std::make_shared<UniverseMessageResponse>(std::get<Json>(*response), message->uuid));
+            std::make_shared<UniverseMessageResponse>(std::get<Json>(std::move(*response)), message->uuid));
           if (!operation96)
             return std::unexpected(std::move(operation96.error()));
         } else {
-          m_universeMessagePromises[message->uuid] = std::get<RpcPromise<Json>>(*response);
+          m_universeMessagePromises[message->uuid] = std::get<RpcPromise<Json>>(std::move(*response));
         }
       } else if (auto message = as<UniverseMessageResponse>(packet)) {
         std::unique_lock locker(m_messageMutex, std::defer_lock);
@@ -2061,13 +2039,10 @@ std::expected<RpcPromise<Json>, StarException> UniverseClient::sendUniverseMessa
   return pair.first;
 }
 
-MessageResponseResult UniverseClient::receiveMessage(String const& message, bool const& local, JsonArray const& args) {
+MessageResponseResult UniverseClient::receive_message(String const& message, bool const& local, JsonArray const& args) {
   for (auto&& p : m_scriptContexts) {
-    auto responseResult = recover_lua_script_error(p.second->handle_message(message, local, args));
-    if (!responseResult)
-      return std::unexpected(std::move(responseResult.error()));
-    auto response = std::move(*responseResult);
-    if (response)
+    auto response = recover_lua_script_error(p.second->handle_message(message, local, args));
+    if (!response || *response)
       return response;
   }
   return {};

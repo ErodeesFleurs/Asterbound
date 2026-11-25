@@ -2339,21 +2339,18 @@ std::expected<List<LightSource>, StarException> Npc::presentation_light_sources(
   return lights;
 }
 
-MessageResponseResult Npc::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
-  auto result502 = world();
-if (!result502) return std::unexpected(std::move(result502.error()));
-auto result503 = recover_lua_script_error(m_scriptComponent.handle_message(message, result502->get().connection() == sendingConnection, args));
-if (!result503) return std::unexpected(std::move(result503.error()));
-std::optional<ChainableJsonMessageResponse> result = std::move(*result503);
-  if (!result)
-    {
-  auto result504 = world();
-  if (!result504) return std::unexpected(std::move(result504.error()));
-  auto result505 = m_statusController->receiveMessage(message, result504->get().connection() == sendingConnection, args);
-  if (!result505) return std::unexpected(std::move(result505.error()));
-  result = std::move(*result505);
-}
-  return result;
+MessageResponseResult Npc::receive_message(ConnectionId sending_connection, String const& message, JsonArray const& args) {
+  auto current_world = world();
+  if (!current_world)
+    return std::unexpected(std::move(current_world.error()));
+  auto response = recover_lua_script_error(m_scriptComponent.handle_message(message, current_world->get().connection() == sending_connection, args));
+  if (!response || *response)
+    return response;
+  // The script may have changed world membership before declining the message.
+  auto fallback_world = world();
+  if (!fallback_world)
+    return std::unexpected(std::move(fallback_world.error()));
+  return m_statusController->receive_message(message, fallback_world->get().connection() == sending_connection, args);
 }
 
 std::expected<Vec2F, StarException> Npc::arm_position(ToolHand hand, Direction facing_direction, float arm_angle, Vec2F offset) const {

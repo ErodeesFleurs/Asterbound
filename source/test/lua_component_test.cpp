@@ -33,14 +33,18 @@ import star.lua_root;
 import star.npc;
 import star.net_packets;
 import star.npc_database;
+import star.object;
+import star.object_database;
 import star.root;
 import star.rpc_promise;
 import star.scriptable_thread;
 import star.string;
+import star.test_universe;
 import star.vector;
 import star.thread;
 import star.uuid;
 import star.warping;
+import star.world_client;
 import star.world_server;
 import star.world_lua_bindings;
 import star.logging;
@@ -663,6 +667,184 @@ const GameTestRegistration npcMessageRecovery(
     ASSERT_FALSE(reply->response);
     EXPECT_EQ(reply->response.error(), "Message not handled by entity");
   });
+
+constexpr ConnectionId origin_owner = min_client_connection_id;
+constexpr ConnectionId origin_remote = min_client_connection_id + 1;
+
+void close_origin_server(GameTest& fixture, WorldServer& server) {
+  // Client-owned replicas must be disconnected before the persistence path.
+  for (auto connection : {origin_remote, origin_owner}) {
+    if (server.hasClient(connection)) {
+      auto removed = server.removeClient(connection);
+      if (!removed)
+        fixture.check(false, removed.error().what());
+    }
+  }
+  auto closed = server.close();
+  if (!closed)
+    fixture.check(false, closed.error().what());
+}
+
+bool expect_forwarded_origin(GameTest& fixture, WorldServer& server, WorldClient& owner,
+    ConnectionId sender, List<std::shared_ptr<Packet>> const& outgoing,
+    std::optional<std::reference_wrapper<WorldClient>> requester) {
+  if (!fixture.check(outgoing.size() == 1u, "sender queued one entity request"))
+    return false;
+  auto request = as<EntityMessagePacket>(outgoing.front());
+  if (!fixture.check(bool(request), "sender queued an entity message"))
+    return false;
+  auto const original_uuid = request->uuid;
+  if (!fixture.check(bool(server.handleIncomingPackets(sender, outgoing)), "server accepts the relay request"))
+    return false;
+  auto forwarded = server.getOutgoingPackets(origin_owner);
+  if (!fixture.check(forwarded && forwarded->size() == 1u, "server forwarded one packet to the owner"))
+    return false;
+  auto stamped = as<EntityMessagePacket>(forwarded->front());
+  if (!fixture.check(bool(stamped), "owner received the forwarded entity message"))
+    return false;
+  fixture.check(stamped->fromConnection == sender, "forwarded origin is the authenticated sender");
+  if (!fixture.check(bool(owner.handleIncomingPackets(*forwarded)), "owner accepts the forwarded request"))
+    return false;
+  auto owner_replies = owner.getOutgoingPackets();
+  if (!fixture.check(owner_replies.size() == 1u, "owner queued one reply"))
+    return false;
+  auto owner_reply = as<EntityMessageResponsePacket>(owner_replies.front());
+  if (!fixture.check(bool(owner_reply), "owner replied with an entity response"))
+    return false;
+  fixture.check(owner_reply->uuid == stamped->uuid, "owner replies using the transport UUID");
+  if (!fixture.check(bool(server.handleIncomingPackets(origin_owner, owner_replies)), "server accepts the owner's reply"))
+    return false;
+  auto replies = server.getOutgoingPackets(sender);
+  if (!fixture.check(replies && replies->size() == 1u, "server routed one reply to the requester"))
+    return false;
+  auto reply = as<EntityMessageResponsePacket>(replies->front());
+  if (!fixture.check(reply && reply->response, "requester received a successful entity response"))
+    return false;
+  fixture.check(reply->uuid == original_uuid, "requester receives its original UUID");
+  fixture.check(*reply->response == Json(JsonArray{sender == origin_owner, "relay"}),
+    "Lua reports a forwarded message as local only when the sender owns the entity");
+  return !requester || fixture.check(bool(requester->get().handleIncomingPackets(*replies)),
+    "remote requester accepts its reply");
+}
+
+void expect_entity_message_origins(GameTest& fixture) {
+  auto& root = fixture.root();
+  auto universe = TestUniverse::create(root, {100, 100});
+  if (!fixture.check(bool(universe), "create test universe"))
+    return;
+  auto close_universe = make_scope_exit([&] { fixture.check(bool((*universe)->close()), "close test universe"); });
+
+  // Pump an isolated world manually so the server's stamped packet and each reply can be inspected.
+  auto storage = File::ephemeral_file(root.random());
+  if (!fixture.check(bool(storage), "create isolated world storage"))
+    return;
+  auto server = WorldServer::create(root, Vec2U(2048, 2048), *storage);
+  if (!fixture.check(bool(server), "create isolated world server"))
+    return;
+  auto close_server = make_scope_exit([&] { close_origin_server(fixture, **server); });
+  auto client = WorldClient::create(root, main_client_world_id, *(*universe)->client());
+  if (!fixture.check(bool(client), "create owner world client"))
+    return;
+  auto close_client = make_scope_exit([&] { fixture.check(bool((*client)->close()), "close owner world client"); });
+  auto remote = WorldClient::create(root, main_client_world_id, *(*universe)->client());
+  if (!fixture.check(bool(remote), "create remote world client"))
+    return;
+  auto close_remote = make_scope_exit([&] { fixture.check(bool((*remote)->close()), "close remote world client"); });
+
+  Vec2F const position(1024, 1024);
+  for (auto connection : {origin_owner, origin_remote}) {
+    auto accepted = (*server)->addClient(connection, SpawnTargetPosition(position), true);
+    if (!fixture.check(accepted && *accepted, "server accepts fixture client"))
+      return;
+    auto start = (*server)->getOutgoingPackets(connection);
+    if (!fixture.check(bool(start), "read world start packets"))
+      return;
+    auto& world = connection == origin_owner ? **client : **remote;
+    if (!fixture.check(bool(world.handleIncomingPackets(*start)), "client accepts world start packets"))
+      return;
+    if (!fixture.check(bool((*server)->handleIncomingPackets(connection, world.getOutgoingPackets())),
+        "server accepts world start acknowledgement"))
+      return;
+  }
+  if (!fixture.check((*client)->connection() == origin_owner, "world start sets the owner connection"))
+    return;
+
+  auto objects = root.objectDatabase();
+  if (!fixture.check(bool(objects), "load object database"))
+    return;
+  auto object = (*objects)->createObject("stoneteleporter",
+    JsonObject{{"clientEntityMode", "ClientMasterAllowed"}, {"scripts", JsonArray{}}, {"unbreakable", true}});
+  if (!fixture.check(bool(object), "create client-owned probe object"))
+    return;
+  if (!fixture.check(bool((*object)->setTilePosition(Vec2I::floor(position))), "position probe object"))
+    return;
+  if (!fixture.check(bool((*client)->addEntity(*object)), "publish probe object"))
+    return;
+  if (!fixture.check((*object)->isMaster(), "probe object is authoritative on the owner"))
+    return;
+  auto const id = (*object)->entityId();
+  if (!fixture.check(bool((*server)->handleIncomingPackets(origin_owner, (*client)->getOutgoingPackets())),
+      "server accepts probe replication"))
+    return;
+  auto replica = (*server)->entity(id);
+  if (!fixture.check(replica && replica->isSlave(), "server holds a replica of the probe object"))
+    return;
+
+  auto script = (*object)->eval_script(R"LUA(
+    message.setHandler("originProbe", function(_, localMessage, label)
+      return {localMessage, label}
+    end)
+    return true
+  )LUA");
+  if (!fixture.check(script && *script, "install Lua origin probe"))
+    return;
+
+  auto direct = (*client)->send_entity_message(id, "originProbe", {"direct"});
+  if (!fixture.check(bool(direct), "send direct message"))
+    return;
+  auto direct_result = direct->result();
+  if (!fixture.check(direct_result && *direct_result, "direct message resolves immediately"))
+    return;
+  fixture.check(**direct_result == Json(JsonArray{true, "direct"}), "Lua reports the direct message as local");
+  fixture.check((*client)->getOutgoingPackets().empty(), "direct message did not emit a packet");
+
+  auto from_server = (*server)->send_entity_message(id, "originProbe", {"server"});
+  if (!fixture.check(bool(from_server), "send server-originated message"))
+    return;
+  auto requests = (*server)->getOutgoingPackets(origin_owner);
+  if (!fixture.check(requests && requests->size() == 1u, "server queued one request to the owner"))
+    return;
+  auto request = as<EntityMessagePacket>(requests->front());
+  if (!fixture.check(bool(request), "server queued an entity message"))
+    return;
+  fixture.check(request->fromConnection == server_connection_id, "server-originated packet identifies the server");
+  if (!fixture.check(bool((*client)->handleIncomingPackets(*requests)), "owner accepts server request"))
+    return;
+  if (!fixture.check(bool((*server)->handleIncomingPackets(origin_owner, (*client)->getOutgoingPackets())),
+      "server accepts owner reply"))
+    return;
+  auto server_result = from_server->result();
+  if (!fixture.check(server_result && *server_result, "server-originated message completes its promise"))
+    return;
+  fixture.check(**server_result == Json(JsonArray{false, "server"}), "Lua does not report the server as local");
+
+  auto self_request = std::make_shared<EntityMessagePacket>(
+    id, "originProbe", JsonArray{"relay"}, Uuid(root.random()), server_connection_id);
+  if (!expect_forwarded_origin(fixture, **server, **client, origin_owner, {self_request}, std::nullopt))
+    return;
+  auto sent = (*remote)->send_entity_message(id, "originProbe", {"relay"});
+  if (!fixture.check(bool(sent), "remote requester sends a message to the owner"))
+    return;
+  auto outgoing = (*remote)->getOutgoingPackets();
+  if (!expect_forwarded_origin(fixture, **server, **client, origin_remote, outgoing, std::ref(**remote)))
+    return;
+  auto remote_result = sent->result();
+  if (fixture.check(remote_result && *remote_result, "forwarded remote reply completes its original promise"))
+    fixture.check(**remote_result == Json(JsonArray{false, "relay"}), "remote promise returns the non-local Lua reply");
+}
+
+const GameTestRegistration entity_message_origins(
+  "LuaComponentLifecycle", "ClientEntityMessagesPreserveOrigin", expect_entity_message_origins);
 
 const GameTestRegistration
   chainedMessageResult("LuaComponentLifecycle", "AsyncMessageResultsDistinguishPendingFailureAndSuccess",

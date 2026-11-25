@@ -343,7 +343,7 @@ namespace LuaBindings {
     [[nodiscard]] std::expected<Json, StarException> containerItemApply(World& world, EntityId entityId, Json const& items, std::size_t offset);
     [[nodiscard]] std::expected<std::optional<LuaValue>, StarException> callScriptedEntity(World& world, EntityId entityId, String const& function, LuaVariadic<LuaValue> const& args);
     [[nodiscard]] std::expected<RpcPromise<Vec2F>, StarException> findUniqueEntity(World& world, String const& uniqueId);
-    [[nodiscard]] std::expected<RpcPromise<Json>, StarException> sendEntityMessage(World& world, LuaEngine& engine, LuaValue entityId, String const& message, LuaVariadic<Json> args);
+    [[nodiscard]] std::expected<RpcPromise<Json>, StarException> send_entity_message(World& world, LuaEngine& engine, LuaValue target_id, String const& message, LuaVariadic<Json> args);
     [[nodiscard]] std::expected<std::optional<List<EntityId>>, StarException> loungingEntities(World& world, EntityId entityId, std::optional<std::size_t> anchorIndex);
     [[nodiscard]] std::expected<std::optional<bool>, StarException> loungeableOccupied(World& world, EntityId entityId, std::optional<std::size_t> anchorIndex);
     [[nodiscard]] std::expected<std::optional<std::size_t>, StarException> loungeableAnchorCount(World& world, EntityId entityId);
@@ -1810,7 +1810,7 @@ namespace LuaBindings {
           callbacks.register_callback_with_signature<RpcPromise<Json>, LuaEngine&, LuaValue, String, LuaVariadic<Json>>(
             "sendEntityMessage",
             [&world](LuaEngine& engine, LuaValue&& entity, String const& message, LuaVariadic<Json>&& args) {
-              return WorldEntityCallbacks::sendEntityMessage(world, engine, std::move(entity), message,
+              return WorldEntityCallbacks::send_entity_message(world, engine, std::move(entity), message,
                                                              std::move(args));
             });
         !result)
@@ -3852,20 +3852,20 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
     return world.findUniqueEntity(uniqueId);
   }
 
-  std::expected<RpcPromise<Json>, StarException> WorldEntityCallbacks::sendEntityMessage(World& world, LuaEngine& engine, LuaValue entityId, String const& message, LuaVariadic<Json> args) {
+  std::expected<RpcPromise<Json>, StarException> WorldEntityCallbacks::send_entity_message(World& world, LuaEngine& engine, LuaValue target_id, String const& message, LuaVariadic<Json> args) {
     auto arguments = JsonArray::from(std::move(args));
-    if (std::holds_alternative<LuaString>(entityId)) {
-      auto idResult = engine.lua_to<String>(entityId);
-      if (!idResult)
-        return std::unexpected(std::move(idResult.error()));
-      auto id = std::move(*idResult);
-      return world.sendEntityMessage(id, message, std::move(arguments));
+    if (std::holds_alternative<LuaString>(target_id)) {
+      auto id_result = engine.lua_to<String>(target_id);
+      if (!id_result)
+        return std::unexpected(std::move(id_result.error()));
+      auto id = std::move(*id_result);
+      return world.send_entity_message(id, message, std::move(arguments));
     }
-    auto idResult = engine.lua_to<EntityId>(entityId);
-    if (!idResult)
-      return std::unexpected(std::move(idResult.error()));
-    auto id = std::move(*idResult);
-    return world.sendEntityMessage(id, message, std::move(arguments));
+    auto id_result = engine.lua_to<EntityId>(target_id);
+    if (!id_result)
+      return std::unexpected(std::move(id_result.error()));
+    auto id = std::move(*id_result);
+    return world.send_entity_message(id, message, std::move(arguments));
   }
 
   std::expected<std::optional<List<EntityId>>, StarException> WorldEntityCallbacks::loungingEntities(World& world, EntityId entityId, std::optional<std::size_t> anchorIndex) {

@@ -2740,7 +2740,7 @@ end
       EXPECT_EQ(gradient.gradient.min(), expected_point({2,3}));
       EXPECT_EQ(gradient.gradient.max(), expected_point({4,5}));
     }
-    auto cleared = (*item)->receiveMessage("clearLocal", true, {});
+    auto cleared = (*item)->receive_message("clearLocal", true, {});
     ASSERT_TRUE(cleared);
     ASSERT_TRUE(*cleared);
     ASSERT_TRUE((*item)->uninit());
@@ -2802,7 +2802,7 @@ function uninit() visit("uninit") end
           EXPECT_TRUE((*item)->uninit());
       });
       if (failure == "message") {
-        auto response = (*item)->receiveMessage("recoveryProbe", true, {});
+        auto response = (*item)->receive_message("recoveryProbe", true, {});
         ASSERT_TRUE(response);
         EXPECT_FALSE(*response);
       }
@@ -2829,7 +2829,7 @@ function uninit() visit("uninit") end
       ASSERT_TRUE((*configuration)->set("recoveryItemFailure", "none"));
       ASSERT_TRUE((*item)->init(player, ToolHand::Primary));
       ASSERT_TRUE((*item)->update(dt, FireMode::Primary, false, {}));
-      auto response = (*item)->receiveMessage("recoveryProbe", true, {});
+      auto response = (*item)->receive_message("recoveryProbe", true, {});
       ASSERT_TRUE(response);
       EXPECT_TRUE(*response);
       ASSERT_TRUE((*item)->uninit());

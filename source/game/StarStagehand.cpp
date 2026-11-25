@@ -336,11 +336,11 @@ std::expected<String, StarException> Stagehand::typeName() const {
   return m_config.get_string("type");
 }
 
-MessageResponseResult Stagehand::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
+MessageResponseResult Stagehand::receive_message(ConnectionId sending_connection, String const& message, JsonArray const& args) {
   auto currentWorld = world();
   if (!currentWorld)
     return std::unexpected(std::move(currentWorld.error()));
-  return recover_lua_script_error(m_scriptComponent.handle_message(message, sendingConnection == currentWorld->get().connection(), args));
+  return recover_lua_script_error(m_scriptComponent.handle_message(message, sending_connection == currentWorld->get().connection(), args));
 }
 
 }

@@ -1051,21 +1051,18 @@ void Monster::setPosition(Vec2F const& pos) {
   m_movement_controller->setPosition(pos);
 }
 
-MessageResponseResult Monster::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
-  auto result173 = world();
-if (!result173) return std::unexpected(std::move(result173.error()));
-auto result174 = recover_lua_script_error(m_scriptComponent.handle_message(message, result173->get().connection() == sendingConnection, args));
-if (!result174) return std::unexpected(std::move(result174.error()));
-std::optional<ChainableJsonMessageResponse> result = std::move(*result174);
-  if (!result)
-    {
-  auto result175 = world();
-  if (!result175) return std::unexpected(std::move(result175.error()));
-  auto result176 = m_statusController->receiveMessage(message, result175->get().connection() == sendingConnection, args);
-  if (!result176) return std::unexpected(std::move(result176.error()));
-  result = std::move(*result176);
-}
-  return result;
+MessageResponseResult Monster::receive_message(ConnectionId sending_connection, String const& message, JsonArray const& args) {
+  auto current_world = world();
+  if (!current_world)
+    return std::unexpected(std::move(current_world.error()));
+  auto response = recover_lua_script_error(m_scriptComponent.handle_message(message, current_world->get().connection() == sending_connection, args));
+  if (!response || *response)
+    return response;
+  // The script may have changed world membership before declining the message.
+  auto fallback_world = world();
+  if (!fallback_world)
+    return std::unexpected(std::move(fallback_world.error()));
+  return m_statusController->receive_message(message, fallback_world->get().connection() == sending_connection, args);
 }
 
 std::expected<float, StarException> Monster::maxHealth() const {

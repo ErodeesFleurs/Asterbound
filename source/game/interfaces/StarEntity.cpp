@@ -136,7 +136,7 @@ std::expected<bool, StarException> Entity::should_destroy() const {
 
 std::expected<void, StarException> Entity::destroy(std::optional<std::reference_wrapper<RenderCallback>>) { return {}; }
 
-MessageResponseResult Entity::receiveMessage(ConnectionId, String const&, JsonArray const&) {
+MessageResponseResult Entity::receive_message(ConnectionId, String const&, JsonArray const&) {
   return {};
 }
 

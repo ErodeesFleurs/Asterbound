@@ -1403,12 +1403,12 @@ std::expected<Vec2F, StarException> Object::questIndicatorPosition() const {
   return position();
 }
 
-MessageResponseResult Object::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
+MessageResponseResult Object::receive_message(ConnectionId sending_connection, String const& message, JsonArray const& args) {
   auto currentWorldResult = world();
   if (!currentWorldResult)
     return std::unexpected(std::move(currentWorldResult.error()));
   auto& currentWorld = currentWorldResult->get();
-  return recover_lua_script_error(m_scriptComponent.handle_message(message, sendingConnection == currentWorld.connection(), args));
+  return recover_lua_script_error(m_scriptComponent.handle_message(message, sending_connection == currentWorld.connection(), args));
 }
 
 std::expected<Json, StarException> Object::configValue(String const& name, Json const& def) const {

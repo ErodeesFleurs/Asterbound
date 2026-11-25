@@ -661,8 +661,8 @@ std::optional<String> ActiveItem::cursor() const {
   return m_cursor;
 }
 
-MessageResponseResult ActiveItem::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
-  return recover_lua_script_error(m_script.handle_message(message, localMessage, args));
+MessageResponseResult ActiveItem::receive_message(String const& message, bool local_message, JsonArray const& args) {
+  return recover_lua_script_error(m_script.handle_message(message, local_message, args));
 }
 
 std::expected<float, StarException> ActiveItem::durabilityStatus() {

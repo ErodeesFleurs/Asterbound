@@ -183,6 +183,64 @@ TEST(RpcPromiseTest, FailingWrapperRemainsQueryable) {
   EXPECT_EQ(calls, 3);
 }
 
+namespace {
+
+class PollResultTest : public testing::Test {
+  static bool check(bool passed, std::string_view message, std::source_location at = std::source_location::current()) {
+    if (!passed)
+      testing::internal::AssertHelper(testing::TestPartResult::kNonFatalFailure, at.file_name(), static_cast<int>(at.line()), "")
+          = testing::Message() << message;
+    return passed;
+  }
+
+  void TestBody() override {
+    struct Progress {
+      std::reference_wrapper<int> polls;
+      std::expected<void, StarException> poll() {
+        ++polls.get();
+        return {};
+      }
+      std::expected<void, StarException> cancel() { return {}; }
+    };
+
+    auto [source, keeper] = RpcPromise<Json>::make_pair();
+    int polls = 0;
+    auto promise = source.with_cancellation(std::stop_token{}, String("cancelled"), Progress{polls});
+    if (!check(promise.has_value(), "create observable promise"))
+      return;
+    auto pending = promise->poll_result();
+    check(pending && !*pending && polls == 1, "one poll reports pending without a reply");
+
+    if (!check(keeper.fulfill(Json()).has_value(), "fulfill with JSON null"))
+      return;
+    auto completed = promise->poll_result();
+    check(completed && *completed && **completed && ***completed == Json() && polls == 2,
+        "one more poll reports a successful JSON null");
+
+    auto failed = RpcPromise<Json>::make_failed("remote error").poll_result();
+    check(failed && *failed && !(**failed) && (**failed).error() == String("remote error"),
+        "remote error is a terminal reply, not a query diagnostic");
+
+    auto [aborted, abort_keeper] = RpcPromise<Json>::make_pair();
+    check(abort_keeper.cancel("local cancellation") == true, "cancel pending promise");
+    auto cancelled = aborted.poll_result();
+    check(cancelled && *cancelled && !(**cancelled) && (**cancelled).error() == String("local cancellation"),
+        "local cancellation is a terminal reply, not a query diagnostic");
+  }
+};
+
+auto const poll_result_registration = [] {
+  auto location = std::source_location::current();
+  return testing::RegisterTest("RpcPromiseTest", "PollResultPreservesNullAndTerminalFailures",
+      nullptr, nullptr, location.file_name(), static_cast<int>(location.line()),
+      [] {
+        std::unique_ptr<testing::Test> test = std::make_unique<PollResultTest>();
+        return test.release();
+      });
+}();
+
+}
+
 TEST(RpcPromiseTest, WrappedFailureAndWrappedDelegation) {
   int calls = 0;
   auto [source, keeper] = RpcPromise<int, int>::make_pair();

@@ -870,7 +870,7 @@ const GameTestRegistration alt_music_lifecycle("WorldClientTest", "AltMusicStopA
     }
     return {};
   };
-  ASSERT_TRUE(player->receiveMessage(server_connection_id, "playAltMusic", play_args));
+  ASSERT_TRUE(player->receive_message(server_connection_id, "playAltMusic", play_args));
   ASSERT_TRUE(world->update(1.0f / 60.0f));
   auto first = take_alt_voice();
   ASSERT_TRUE(first);
@@ -878,7 +878,7 @@ const GameTestRegistration alt_music_lifecycle("WorldClientTest", "AltMusicStopA
   Mixer mixer(root.logger(), 8000, 1);
   ASSERT_TRUE(mixer.play(first));
   first->set_volume(1.0f); // Start the measured fade at full gain.
-  ASSERT_TRUE(player->receiveMessage(server_connection_id, "stopAltMusic", {0.25}));
+  ASSERT_TRUE(player->receive_message(server_connection_id, "stopAltMusic", {0.25}));
   ASSERT_TRUE(world->update(1.0f / 60.0f));
   EXPECT_FALSE(take_alt_voice());
   std::array<std::int16_t, 1000> samples{};
@@ -889,7 +889,7 @@ const GameTestRegistration alt_music_lifecycle("WorldClientTest", "AltMusicStopA
   ASSERT_TRUE(world->update(1.0f / 60.0f));
   EXPECT_FALSE(take_alt_voice()) << "The finished alternate track must not restart";
 
-  ASSERT_TRUE(player->receiveMessage(server_connection_id, "playAltMusic", play_args));
+  ASSERT_TRUE(player->receive_message(server_connection_id, "playAltMusic", play_args));
   ASSERT_TRUE(world->update(1.0f / 60.0f));
   auto second = take_alt_voice();
   ASSERT_TRUE(second);
@@ -931,7 +931,7 @@ const GameTestRegistration presentation_message_failures("WorldClientTest", "Pre
   // cinematics), rather than forwarding or losing the request.
   std::vector<RpcPromise<Json>> from_client, from_server;
   for (auto const& [message, args] : invalid) {
-    auto sent = world->sendEntityMessage(String("missing-presentation-test-entity"), message, args);
+    auto sent = world->send_entity_message(String("missing-presentation-test-entity"), message, args);
     ASSERT_TRUE(sent);
     from_client.push_back(std::move(*sent));
   }
@@ -943,7 +943,7 @@ const GameTestRegistration presentation_message_failures("WorldClientTest", "Pre
     ASSERT_TRUE((*universe)->update());
     auto sent = (*universe)->server()->executeForClient(*owner, [&](WorldServer& server, std::shared_ptr<Player> remote) -> std::expected<void, StarException> {
       auto send = [&](String const& message, JsonArray const& args) -> std::expected<void, StarException> {
-        auto result = server.sendEntityMessage(remote->entityId(), message, args);
+        auto result = server.send_entity_message(remote->entityId(), message, args);
         if (!result)
           return std::unexpected(std::move(result.error()));
         from_server.push_back(std::move(*result));
@@ -994,8 +994,8 @@ const GameTestRegistration presentation_message_failures("WorldClientTest", "Pre
 
   // Rejection is transactional. A malformed replacement cannot discard a
   // previously queued request; a single string track is not an empty list.
-  ASSERT_TRUE(world->sendEntityMessage(player->entityId(), "playAltMusic", {path, 0.25, 2}));
-  auto bad = world->sendEntityMessage(player->entityId(), "playAltMusic", {Json(JsonArray{path, 7})});
+  ASSERT_TRUE(world->send_entity_message(player->entityId(), "playAltMusic", {path, 0.25, 2}));
+  auto bad = world->send_entity_message(player->entityId(), "playAltMusic", {Json(JsonArray{path, 7})});
   ASSERT_TRUE(bad);
   EXPECT_EQ(bad->failed(), true);
   auto pending = player->pull_pending_alt_music();
@@ -1004,7 +1004,7 @@ const GameTestRegistration presentation_message_failures("WorldClientTest", "Pre
   EXPECT_EQ(pending->loops, 2);
   EXPECT_EQ(pending->fade_time, 0.25f);
   // Unrelated native errors are not mistaken for a rejected cosmetic RPC.
-  EXPECT_FALSE(world->sendEntityMessage(player->entityId(), "recordEvent", {}));
+  EXPECT_FALSE(world->send_entity_message(player->entityId(), "recordEvent", {}));
 });
 
 const GameTestRegistration missing_death_burst("WorldClientTest", "MissingPlayerDeathBurstPreservesDropsAndRemoval", [](GameTest& fixture) {
@@ -1755,6 +1755,17 @@ const GameTestRegistration status_lifecycle("StatusControllerTest", "ReentrantLu
   ASSERT_TRUE(settings) << settings.error().what();
   auto overlay = File::relative_to(*directory, "assets");
   ASSERT_TRUE(writeIsolationModules(overlay, {
+    {"fallback.statuseffect", R"({"name":"reply-fallback","defaultDuration":5,"scripts":["fallback.lua"]})"},
+    {"fallback.lua", R"LUA(
+      function init()
+        local function fallback()
+          status.setStatusProperty("fallbackVisits", status.statusProperty("fallbackVisits", 0) + 1)
+          return "fallback"
+        end
+        message.setHandler("handledNil", fallback)
+        message.setHandler("onlyFallback", fallback)
+      end
+    )LUA"},
     {"probe-a.statuseffect", R"({"name":"probe-a","defaultDuration":5,"scripts":["probe.lua"],"animationConfig":"probe.animation"})"},
     {"probe-b.statuseffect", R"({"name":"probe-b","defaultDuration":5,"scripts":["probe.lua"],"animationConfig":"probe.animation"})"},
     {"probe.animation", R"({"lights":{"lamp":{}}})"},
@@ -1768,6 +1779,10 @@ const GameTestRegistration status_lifecycle("StatusControllerTest", "ReentrantLu
         self.serial = bump("inits")
         effect.addStatModifierGroup({{stat="probePower", amount=1}})
         effect.setToolUsageSuppressed(self.serial <= 2)
+        message.setHandler("broadcast", function()
+          if bump("broadcastVisits") == 1 then return nil end
+          return "second"
+        end)
         message.setHandler("observe", function()
           status.setStatusProperty("source", effect.sourceEntity())
           status.setStatusProperty("duration", effect.duration())
@@ -1826,6 +1841,19 @@ const GameTestRegistration status_lifecycle("StatusControllerTest", "ReentrantLu
   ASSERT_TRUE(npc) << npc.error().what();
   (*npc)->setPosition(Vec2F(100, 100));
   ASSERT_TRUE((*world)->addEntity(*npc));
+  auto installed = (*npc)->eval_script(R"(
+    status.addEphemeralEffect("reply-fallback")
+    message.setHandler("handledNil", function() return nil end)
+  )");
+  if (!fixture.check(bool(installed), "install NPC and status handlers")) return;
+  auto handled = (*world)->send_entity_message((*npc)->entityId(), "handledNil");
+  auto fallback = (*world)->send_entity_message((*npc)->entityId(), "onlyFallback");
+  if (!fixture.check(handled && fallback, "dispatch both local NPC messages")) return;
+  auto first = handled->result();
+  auto second = fallback->result();
+  if (!fixture.check(first && *first && (**first).is_null() && second && *second && **second == Json("fallback")
+          && (*npc)->statusController().statusProperty("fallbackVisits") == Json(1),
+      "handled nil stops dispatch; only an unhandled message visits the status script")) return;
   Json config = JsonObject{{"stats", JsonObject{{"probePower", JsonObject{}}}}, {"minimumLiquidStatusEffectPercentage", 1},
       {"appliesEnvironmentStatusEffects", false}, {"appliesWeatherStatusEffects", false}, {"environmentStatusEffectUpdateTimer", 100}};
   auto created = StatusController::create(**root, config);
@@ -1835,6 +1863,10 @@ const GameTestRegistration status_lifecycle("StatusControllerTest", "ReentrantLu
   auto stop = make_scope_exit([&] { EXPECT_TRUE(status.uninit()); });
   ASSERT_TRUE(status.addEphemeralEffects({{"probe-a", {}}, {"probe-b", {}}}, 11));
   ASSERT_TRUE(status.toolUsageSuppressed());
+  auto broadcast = status.receive_message("broadcast", true);
+  if (!fixture.check(broadcast && *broadcast && std::holds_alternative<Json>(**broadcast)
+          && std::get<Json>(**broadcast).is_null() && status.statusProperty("broadcastVisits") == Json(2),
+      "both effects run, but the first handled reply wins even when it is null")) return;
   ASSERT_TRUE(status.tickMaster(1.0f));
   EXPECT_EQ(status.statusProperty("updates"), Json(1));
   EXPECT_EQ(status.statusProperty("returned"), Json(true));
@@ -1850,16 +1882,16 @@ const GameTestRegistration status_lifecycle("StatusControllerTest", "ReentrantLu
   EXPECT_EQ(summary.front().first, *name);
   EXPECT_EQ(summary.front().second, 1.0f);
   ASSERT_TRUE(status.addEphemeralEffect({*name, 8}, 88)); // Equal duration must not steal the source.
-  ASSERT_TRUE(status.receiveMessage("observe", true));
+  ASSERT_TRUE(status.receive_message("observe", true));
   EXPECT_EQ(status.statusProperty("duration"), Json(8));
   EXPECT_EQ(status.statusProperty("source"), Json(77));
   ASSERT_TRUE(status.tickMaster(2.0f));
   ASSERT_TRUE(status.addEphemeralEffect({*name, {}}, 90)); // Default 5 < remaining 6.
-  ASSERT_TRUE(status.receiveMessage("observe", true));
+  ASSERT_TRUE(status.receive_message("observe", true));
   EXPECT_EQ(status.statusProperty("source"), Json(77));
   EXPECT_EQ(status.statusProperty("duration"), Json(6));
   ASSERT_TRUE(status.addEphemeralEffect({*name, 7}, 91)); // Extends duration but not the historical peak.
-  ASSERT_TRUE(status.receiveMessage("observe", true));
+  ASSERT_TRUE(status.receive_message("observe", true));
   EXPECT_EQ(status.statusProperty("source"), Json(91));
   DataStreamBuffer wire;
   ASSERT_TRUE(status.net_store(wire));
@@ -1876,14 +1908,14 @@ const GameTestRegistration status_lifecycle("StatusControllerTest", "ReentrantLu
   if (!fixture.check(bool((*receiver)->append_light_sources(light_sources)), "collect replicated effect lights")) return;
   fixture.check(light_sources.size() == 1, "replica emits only the surviving effect's light");
 
-  ASSERT_TRUE(status.receiveMessage("mark", true));
+  ASSERT_TRUE(status.receive_message("mark", true));
   EXPECT_TRUE(status.uniqueStatusEffectActive(*name)); // effect.expire schedules, it does not remove.
   ASSERT_TRUE(status.tickMaster(0.5f));
   EXPECT_FALSE(status.uniqueStatusEffectActive(*name));
   EXPECT_EQ(status.statusProperty("expirations"), Json(3));
   EXPECT_EQ(status.statusProperty("uninits"), Json(3));
   ASSERT_TRUE(status.addEphemeralEffect({*name, {}}, {}));
-  ASSERT_TRUE(status.receiveMessage("remove", true));
+  ASSERT_TRUE(status.receive_message("remove", true));
   EXPECT_EQ(status.statusProperty("removedInMessage"), Json(*name));
   EXPECT_EQ(status.statusProperty("expirations"), Json(4));
   EXPECT_EQ(status.statusProperty("uninits"), Json(4));

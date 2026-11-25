@@ -289,7 +289,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
             auto world = entity->world();
             if (!world)
               return std::unexpected(std::move(world.error()));
-            return world->get().sendEntityMessage(entity->entityId(), message, JsonArray::from(std::move(args)));
+            return world->get().send_entity_message(entity->entityId(), message, JsonArray::from(std::move(args)));
         }
         return RpcPromise<Json>::make_failed("Entity not in world");
   }); !registration)

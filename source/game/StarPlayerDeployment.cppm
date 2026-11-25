@@ -59,7 +59,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> uninit();
 
   [[nodiscard]] std::expected<void, StarException> teleportOut();
-  [[nodiscard]] MessageResponseResult receiveMessage(String const& message, bool localMessage, JsonArray const& args = {});
+  [[nodiscard]] MessageResponseResult receive_message(String const& message, bool local_message, JsonArray const& args = {});
   [[nodiscard]] std::expected<void, StarException> update(float dt);
 
   [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& render_callback, Vec2F const& position);

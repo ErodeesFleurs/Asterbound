@@ -1867,74 +1867,48 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         if (!result132)
           return std::unexpected(std::move(result132.error()));
       }
-    } else if (auto entityMessagePacket = as<EntityMessagePacket>(packet)) {
-      std::shared_ptr<Entity> entity;
-      if (std::holds_alternative<EntityId>(entityMessagePacket->entityId)) {
-        entity = m_entityMap->entity(std::get<EntityId>(entityMessagePacket->entityId));
-      } else {
-        entity = m_entityMap->unique_entity(std::get<String>(entityMessagePacket->entityId));
-      }
-      
+    } else if (auto incoming = packet ? as_ref<EntityMessagePacket>(std::as_const(*packet)) : std::nullopt) {
+      auto const& request = incoming->get();
+      auto entity = std::holds_alternative<EntityId>(request.entityId)
+          ? m_entityMap->entity(std::get<EntityId>(request.entityId))
+          : m_entityMap->unique_entity(std::get<String>(request.entityId));
+
       if (!entity) {
         m_outgoingPackets.push_back(std::make_shared<EntityMessageResponsePacket>(
-          std::unexpected(String("Unknown entity")), entityMessagePacket->uuid));
+          std::unexpected(String("Unknown entity")), request.uuid));
       } else if (!entity->isMaster()) {
-        auto result133 = this->root().logger().error("Server has sent a scripted entity response for a slave entity");
-        if (!result133)
-          return std::unexpected(std::move(result133.error()));
+        auto logged = root.logger().error("Server has sent a scripted entity response for a slave entity");
+        if (!logged)
+          return std::unexpected(std::move(logged.error()));
         m_outgoingPackets.push_back(std::make_shared<EntityMessageResponsePacket>(
-          std::unexpected(String("Entity delivery error")), entityMessagePacket->uuid));
+          std::unexpected(String("Entity delivery error")), request.uuid));
       } else {
-        ConnectionId fromConnection = entityMessagePacket->fromConnection;
-        if (fromConnection == *m_clientId) {
-          fromConnection = server_connection_id;
-        }
-        
-        {
-          auto responseResult = entity->receiveMessage(entityMessagePacket->fromConnection,
-                                                       entityMessagePacket->message, entityMessagePacket->args);
-          if (!responseResult)
-            return std::unexpected(std::move(responseResult.error()));
-          if (auto response = std::move(*responseResult)) {
-            struct QueueEntityResponse {
-              WorldClient& client;
-              Uuid const& uuid;
-
-              void operator()(Json& result) const {
-                client.m_outgoingPackets.push_back(std::make_shared<EntityMessageResponsePacket>(result, uuid));
-              }
-
-              void operator()(RpcPromise<Json>& promise) const {
-                // Delay the response until this promise is done.
-                client.m_entityMessagePromises[uuid] = promise;
-              }
-            };
-            std::visit(QueueEntityResponse{.client = *this, .uuid = entityMessagePacket->uuid}, *response);
-          } else {
-            m_outgoingPackets.push_back(std::make_shared<EntityMessageResponsePacket>(
-              std::unexpected(String("Message not handled by entity")), entityMessagePacket->uuid));
-          }
+        std::weak_ptr const request_world = m_entityMap;
+        auto received = entity->receive_message(request.fromConnection, request.message, request.args);
+        if (!received)
+          return std::unexpected(std::move(received.error()));
+        // A handler can reenter and change worlds. Never answer an old world's request in the new one.
+        if (request_world.owner_before(m_entityMap) || m_entityMap.owner_before(request_world))
+          continue;
+        if (!*received) {
+          m_outgoingPackets.push_back(std::make_shared<EntityMessageResponsePacket>(
+            std::unexpected(String("Message not handled by entity")), request.uuid));
+        } else if (auto result = std::get_if<Json>(&**received)) {
+          m_outgoingPackets.push_back(std::make_shared<EntityMessageResponsePacket>(std::move(*result), request.uuid));
+        } else {
+          m_entity_message_promises.insert_or_assign(request.uuid, std::get<RpcPromise<Json>>(std::move(**received)));
         }
       }
-    } else if (auto entityMessageResponsePacket = as<EntityMessageResponsePacket>(packet)) {
-      if (!m_entityMessageResponses.contains(entityMessageResponsePacket->uuid)) {
-        auto result135 = this->root().logger().warn("EntityMessageResponse received for unknown context [{}]!", entityMessageResponsePacket->uuid.hex());
-        if (!result135)
-          return std::unexpected(std::move(result135.error()));
+    } else if (auto incoming = packet ? as_ref<EntityMessageResponsePacket>(std::as_const(*packet)) : std::nullopt) {
+      auto const& reply = incoming->get();
+      if (auto response = m_entityMessageResponses.try_extract_value(reply.uuid)) {
+        auto delivered = reply.response ? response->fulfill(*reply.response) : response->fail(reply.response.error());
+        if (!delivered)
+          return std::unexpected(std::move(delivered.error()));
       } else {
-        auto result136 = m_entityMessageResponses.extract_value(entityMessageResponsePacket->uuid);
-        if (!result136)
-          return std::unexpected(std::move(result136.error()));
-        auto response = (std::move(*result136));
-        if (entityMessageResponsePacket->response.has_value()) {
-          auto result138 = response.fulfill(*entityMessageResponsePacket->response);
-          if (!result138)
-            return std::unexpected(std::move(result138.error()));
-        } else {
-          auto result140 = response.fail(entityMessageResponsePacket->response.error());
-          if (!result140)
-            return std::unexpected(std::move(result140.error()));
-        }
+        auto logged = root.logger().warn("EntityMessageResponse received for unknown context [{}]!", reply.uuid.hex());
+        if (!logged)
+          return std::unexpected(std::move(logged.error()));
       }
     } else if (auto updateWorldProperties = as<UpdateWorldPropertiesPacket>(packet)) {
       // Kae: Properties set to null (nil from Lua) should be erased instead of lingering around
@@ -2024,23 +1998,18 @@ List<std::shared_ptr<Packet>> WorldClient::getOutgoingPackets() {
   return std::move(m_outgoingPackets);
 }
 
-MessageResponseResult WorldClient::receiveMessage(ConnectionId fromConnection, String const& message, JsonArray const& args) {
+MessageResponseResult WorldClient::receive_message(ConnectionId from_connection, String const& message, JsonArray const& args) {
   m_expiry_timer.reset();
   if (!inWorld()) {
     // script contexts aren't active to handle this message
     return {};
   }
-  std::optional<ChainableJsonMessageResponse> result;
-  for (auto&& p : m_scriptContexts) {
-    auto result152 = recover_lua_script_error(p.second->handle_message(message, fromConnection == server_connection_id, args));
-    if (!result152)
-      return std::unexpected(std::move(result152.error()));
-    result = (std::move(*result152));
-    if (result) {
-      break;
-    }
+  for (auto const& entry : m_scriptContexts) {
+    auto response = recover_lua_script_error(entry.second->handle_message(message, from_connection == server_connection_id, args));
+    if (!response || *response)
+      return response;
   }
-  return result;
+  return std::nullopt;
 }
 
 std::shared_ptr<WorldClient::ScriptComponent> WorldClient::scriptContext(String const& contextName) {
@@ -2460,32 +2429,16 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     if (!result189)
       return std::unexpected(std::move(result189.error()));
   }
-  for (auto const& uuid : m_entityMessagePromises.keys()) {
-    {
-      auto result190 = m_entityMessagePromises[uuid].finished();
-      if (!result190)
-        return std::unexpected(std::move(result190.error()));
-      if ((std::move(*result190))) {
-        {
-          auto result191 = m_entityMessagePromises[uuid].succeeded();
-          if (!result191)
-            return std::unexpected(std::move(result191.error()));
-          if ((std::move(*result191))) {
-            auto result192 = m_entityMessagePromises[uuid].result();
-            if (!result192)
-              return std::unexpected(std::move(result192.error()));
-            m_outgoingPackets.push_back(std::make_shared<EntityMessageResponsePacket>(*(std::move(*result192)), uuid));
-          } else {
-            auto result193 = m_entityMessagePromises[uuid].error();
-            if (!result193)
-              return std::unexpected(std::move(result193.error()));
-            m_outgoingPackets.push_back(
-              std::make_shared<EntityMessageResponsePacket>(std::unexpected(*(std::move(*result193))), uuid));
-          }
-        }
-        m_entityMessagePromises.remove(uuid);
-      }
-    }
+  if (!m_entity_message_promises.empty()) {
+    auto world = m_entityMap;
+    auto drained = m_entity_message_promises.drain([&self = *this](Uuid const& uuid, std::expected<Json, String> reply) {
+      self.m_outgoingPackets.push_back(std::make_shared<EntityMessageResponsePacket>(std::move(reply), uuid));
+    });
+    if (!drained)
+      return std::unexpected(std::move(drained.error()));
+    // Progress may have stopped the world or replaced it before returning.
+    if (!m_inWorld || m_entityMap != world)
+      return {};
   }
   
   auto result194 = queueUpdatePackets(m_entity_update_timer.wrap_tick(dt));
@@ -3527,6 +3480,7 @@ std::expected<void, StarException> WorldClient::clearWorld() {
   m_current_time = 0;
   m_inWorld = false;
   m_clientId.reset();
+  m_entity_message_promises.clear();
 
   m_interpolation_tracker = InterpolationTracker();
 
@@ -3582,7 +3536,6 @@ std::expected<void, StarException> WorldClient::clearWorld() {
   }
   for (auto&& response : std::exchange(m_entity_interaction_responses, {}))
     remember(response.second.cancel("Client world closed"));
-  m_entityMessagePromises = {};
 
   m_force_regions.clear();
   
@@ -4114,14 +4067,14 @@ std::expected<RpcPromise<Vec2F>, StarException> WorldClient::findUniqueEntity(St
   return pair.first;
 }
 
-std::expected<RpcPromise<Json>, StarException> WorldClient::sendEntityMessage(std::variant<EntityId, String> const& entityId, String const& message, JsonArray const& args) {
+std::expected<RpcPromise<Json>, StarException> WorldClient::send_entity_message(std::variant<EntityId, String> const& target_id, String const& message, JsonArray const& args) {
   if (!inWorld()) {
     return RpcPromise<Json>::make_failed("Not currently in a world");
   }
   
   std::shared_ptr<Entity> entity;
-  if (std::holds_alternative<EntityId>(entityId)) {
-    auto id = std::get<EntityId>(entityId);
+  if (std::holds_alternative<EntityId>(target_id)) {
+    auto id = std::get<EntityId>(target_id);
     auto owner = connection_for_entity(id);
     if (!owner)
       return RpcPromise<Json>::make_failed("Entity has no owning connection");
@@ -4129,30 +4082,16 @@ std::expected<RpcPromise<Json>, StarException> WorldClient::sendEntityMessage(st
     if (!entity && *owner == m_clientId)
       return RpcPromise<Json>::make_failed("Unknown entity");
   } else {
-    entity = m_entityMap->unique_entity(std::get<String>(entityId));
+    entity = m_entityMap->unique_entity(std::get<String>(target_id));
   }
 
   if (entity && entity->isMaster()) {
-    auto responseResult = entity->receiveMessage(*m_clientId, message, args);
-    if (!responseResult)
-      return std::unexpected(std::move(responseResult.error()));
-    auto response = std::move(*responseResult);
-    if (!response)
-      return RpcPromise<Json>::make_failed("Message not handled by entity");
-
-    struct ResponseToPromise {
-      std::expected<RpcPromise<Json>, StarException> operator()(Json& result) const {
-        return RpcPromise<Json>::make_fulfilled(result);
-      }
-
-      std::expected<RpcPromise<Json>, StarException> operator()(RpcPromise<Json>& promise) const { return promise; }
-    };
-    return std::visit(ResponseToPromise{}, *response);
+    return to_message_promise(entity->receive_message(*m_clientId, message, args), "Message not handled by entity");
   } else {
     auto pair = RpcPromise<Json>::make_pair();
     Uuid uuid(this->root().random());
     m_entityMessageResponses[uuid] = pair.second;
-    m_outgoingPackets.push_back(std::make_shared<EntityMessagePacket>(entityId, message, args, uuid));
+    m_outgoingPackets.push_back(std::make_shared<EntityMessagePacket>(target_id, message, args, uuid));
     return pair.first;
   }
 }

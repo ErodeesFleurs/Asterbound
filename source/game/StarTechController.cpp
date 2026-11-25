@@ -477,15 +477,13 @@ List<Particle> TechController::pullNewParticles() {
   return newParticles;
 }
 
-MessageResponseResult TechController::receiveMessage(String const& message, bool localMessage, JsonArray const& args) {
+MessageResponseResult TechController::receive_message(String const& message, bool local_message, JsonArray const& args) {
   for (auto& module : m_techModules) {
-    auto response = recover_lua_script_error(module.scriptComponent.handle_message(message, localMessage, args));
-    if (!response)
-      return std::unexpected(std::move(response.error()));
-    if (*response)
-      return std::move(*response);
+    auto response = recover_lua_script_error(module.scriptComponent.handle_message(message, local_message, args));
+    if (!response || *response)
+      return response;
   }
-  return std::optional<ChainableJsonMessageResponse>();
+  return std::nullopt;
 }
 
 TechController::TechAnimator::TechAnimator(Root& root) : m_root(root) {}

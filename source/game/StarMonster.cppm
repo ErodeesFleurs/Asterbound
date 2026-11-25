@@ -182,7 +182,7 @@ public:
 
   void setPosition(Vec2F const& pos);
 
-  [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) override;
+  [[nodiscard]] MessageResponseResult receive_message(ConnectionId sending_connection, String const& message, JsonArray const& args) override;
 
   [[nodiscard]] std::expected<float, StarException> maxHealth() const override;
   float health() const override;

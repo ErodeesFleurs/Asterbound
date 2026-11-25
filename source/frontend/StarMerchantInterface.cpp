@@ -447,7 +447,7 @@ std::expected<void, StarException> MerchantPane::dismissed() {
 
   if (m_sourceEntityId != null_entity_id)
     {
-      auto sendEntityMessageResult614 = m_worldClient->sendEntityMessage(m_sourceEntityId, "onMerchantClosed");
+      auto sendEntityMessageResult614 = m_worldClient->send_entity_message(m_sourceEntityId, "onMerchantClosed");
       if (!sendEntityMessageResult614)
         return std::unexpected(std::move(sendEntityMessageResult614.error()));
       
@@ -873,7 +873,7 @@ std::expected<void, StarException> MerchantPane::buy() {
   if (m_sourceEntityId != null_entity_id) {
     auto descriptor = m_selectedItem->descriptor().with_count(total_items);
     auto summary = JsonObject{{"item", descriptor.to_json()}, {"total", m_buy_total}};
-    auto sent = m_worldClient->sendEntityMessage(m_sourceEntityId, "onBuy", {std::move(summary)});
+    auto sent = m_worldClient->send_entity_message(m_sourceEntityId, "onBuy", {std::move(summary)});
     if (!sent)
       return std::unexpected(std::move(sent.error()));
   }
@@ -915,7 +915,7 @@ std::expected<void, StarException> MerchantPane::sell() {
     if (!toJsonResult687)
       return std::unexpected(std::move(toJsonResult687.error()));
     auto sellSummary = JsonObject{{"items", std::move(*toJsonResult687)}, {"total", m_sellTotal}};
-    auto sendEntityMessageResult688 = m_worldClient->sendEntityMessage(m_sourceEntityId, "onSell", {sellSummary});
+    auto sendEntityMessageResult688 = m_worldClient->send_entity_message(m_sourceEntityId, "onSell", {sellSummary});
     if (!sendEntityMessageResult688)
       return std::unexpected(std::move(sendEntityMessageResult688.error()));
 

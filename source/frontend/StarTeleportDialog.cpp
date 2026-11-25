@@ -408,7 +408,7 @@ std::expected<void, StarException> TeleportDialog::teleport() {
     auto& selected = destination->get();
     auto text = Star::print_warp_action(selected.first);
     if (!text) return std::unexpected(std::move(text.error()));
-    auto message = m_client->worldClient()->sendEntityMessage(m_sourceEntityId, "onTeleport", {*text});
+    auto message = m_client->worldClient()->send_entity_message(m_sourceEntityId, "onTeleport", {*text});
     if (!message) return std::unexpected(std::move(message.error()));
     bool deploy = selected.second;
     bool beam = std::holds_alternative<WarpAlias>(selected.first) && std::get<WarpAlias>(selected.first) == WarpAlias::OrbitedWorld;

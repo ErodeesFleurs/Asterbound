@@ -1121,7 +1121,7 @@ void exercise_merchant_purchase(GameTest& fixture, Application const& applicatio
   auto before = inventory->currency("money");
   ASSERT_EQ(before, std::numeric_limits<std::uint64_t>::max());
   auto report = [&] {
-    return client->worldClient()->sendEntityMessage(player->entityId(), "merchantProbe")
+    return client->worldClient()->send_entity_message(player->entityId(), "merchantProbe")
         .and_then([](RpcPromise<Json> const& promise) { return promise.result(); });
   };
   auto initial = report();

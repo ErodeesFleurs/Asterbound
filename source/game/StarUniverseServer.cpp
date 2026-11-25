@@ -2295,7 +2295,7 @@ std::expected<void, StarException> UniverseServer::handleUniverseMessages() {
   for (auto& message : messages) {
     auto processed = [&]() -> std::expected<void, StarException> {
       bool remote = std::holds_alternative<std::pair<Uuid, ConnectionId>>(message.keeper);
-      auto response = receiveMessage(message.message, !remote, message.args);
+      auto response = receive_message(message.message, !remote, message.args);
       if (remote) {
         auto [uuid, clientId] = std::get<std::pair<Uuid, ConnectionId>>(message.keeper);
         if (!response)
@@ -2308,11 +2308,11 @@ std::expected<void, StarException> UniverseServer::handleUniverseMessages() {
                                                  {std::make_shared<UniverseMessageResponse>(
                                                    std::unexpected(String("Message not handled by universe")), uuid)});
         if (std::holds_alternative<RpcPromise<Json>>(**response)) {
-          m_universeMessagePromises[uuid] = {clientId, std::get<RpcPromise<Json>>(**response)};
+          m_universeMessagePromises[uuid] = {clientId, std::get<RpcPromise<Json>>(std::move(**response))};
           return {};
         }
         return m_connectionServer->sendPackets(
-          clientId, {std::make_shared<UniverseMessageResponse>(std::get<Json>(**response), uuid)});
+          clientId, {std::make_shared<UniverseMessageResponse>(std::get<Json>(std::move(**response)), uuid)});
       }
       auto& keeper = std::get<RpcPromiseKeeper<Json>>(message.keeper);
       if (!response)
@@ -2320,8 +2320,8 @@ std::expected<void, StarException> UniverseServer::handleUniverseMessages() {
       if (!*response)
         return keeper.fail("Message not handled by universe");
       if (std::holds_alternative<RpcPromise<Json>>(**response))
-        return keeper.chain(std::get<RpcPromise<Json>>(**response));
-      return keeper.fulfill(std::get<Json>(**response));
+        return keeper.chain(std::get<RpcPromise<Json>>(std::move(**response)));
+      return keeper.fulfill(std::get<Json>(std::move(**response)));
     }();
     if (!processed) {
       if (error)
@@ -5031,12 +5031,10 @@ std::expected<RpcPromise<Json>, StarException> UniverseServer::sendUniverseMessa
   }
 }
 
-MessageResponseResult UniverseServer::receiveMessage(String const& message, bool const& local, JsonArray const& args) {
+MessageResponseResult UniverseServer::receive_message(String const& message, bool const& local, JsonArray const& args) {
   for (auto&& context : m_scriptContexts) {
     auto response = recover_lua_script_error(context.second->handle_message(message, local, args));
-    if (!response)
-      return std::unexpected(std::move(response.error()));
-    if (*response)
+    if (!response || *response)
       return response;
   }
   return std::nullopt;

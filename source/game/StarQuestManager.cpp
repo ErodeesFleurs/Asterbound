@@ -458,7 +458,7 @@ std::expected<std::optional<QuestIndicator>, StarException> QuestManager::getQue
 std::expected<StringSet, StarException> QuestManager::interestingObjects() {
   StringSet result;
   for (auto const& quest : m_quests.values()) {
-    auto response = quest->receiveMessage("interestingObjects", true, JsonArray());
+    auto response = quest->receive_message("interestingObjects", true, JsonArray());
     if (!response) return std::unexpected(std::move(response.error()));
     if (*response) {
       if (std::holds_alternative<Json>(**response)) {
@@ -470,10 +470,10 @@ std::expected<StringSet, StarException> QuestManager::interestingObjects() {
   }
   return result;
 }
-MessageResponseResult QuestManager::receiveMessage(String const& message, bool local, JsonArray const& args) {
+MessageResponseResult QuestManager::receive_message(String const& message, bool local, JsonArray const& args) {
   std::optional<ChainableJsonMessageResponse> result;
   for (auto const& quest : m_quests.values()) {
-    auto response = quest->receiveMessage(message, local, args);
+    auto response = quest->receive_message(message, local, args);
     if (!response) return std::unexpected(std::move(response.error()));
     if (!result) result = std::move(*response);
   }

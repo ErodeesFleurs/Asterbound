@@ -713,7 +713,7 @@ if (!result1207) return std::unexpected(std::move(result1207.error()));
 if (!result1209) return std::unexpected(std::move(result1209.error()));
 auto result1210 = loungeIndex(p.first);
 if (!result1210) return std::unexpected(std::move(result1210.error()));
-auto result1211 = result1209->get().sendEntityMessage(entityId(), "control_all", {std::move(*result1210), std::move(allControlsHeld)});
+auto result1211 = result1209->get().send_entity_message(entityId(), "control_all", {std::move(*result1210), std::move(allControlsHeld)});
 if (!result1211) return std::unexpected(std::move(result1211.error()));
       } else {
         for (auto control : p.second.slaveNewControls.difference(p.second.slaveOldControls)) {
@@ -726,7 +726,7 @@ if (!result1213) return std::unexpected(std::move(result1213.error()));
 if (!LoungeControlNames) return std::unexpected(LoungeControlNames.error());
 auto result1214 = LoungeControlNames->get_right(control);
 if (!result1214) return std::unexpected(std::move(result1214.error()));
-auto result1215 = result1212->get().sendEntityMessage(entityId(), "control_on", {std::move(*result1213), result1214->get()});
+auto result1215 = result1212->get().send_entity_message(entityId(), "control_on", {std::move(*result1213), result1214->get()});
 if (!result1215) return std::unexpected(std::move(result1215.error()));
         }
         for (auto control : p.second.slaveOldControls.difference(p.second.slaveNewControls)) {
@@ -739,7 +739,7 @@ if (!result1217) return std::unexpected(std::move(result1217.error()));
 if (!LoungeControlNames) return std::unexpected(LoungeControlNames.error());
 auto result1218 = LoungeControlNames->get_right(control);
 if (!result1218) return std::unexpected(std::move(result1218.error()));
-auto result1219 = result1216->get().sendEntityMessage(entityId(), "control_off", {std::move(*result1217), result1218->get()});
+auto result1219 = result1216->get().send_entity_message(entityId(), "control_off", {std::move(*result1217), result1218->get()});
 if (!result1219) return std::unexpected(std::move(result1219.error()));
         }
       }
@@ -750,7 +750,7 @@ auto result1220 = world();
 if (!result1220) return std::unexpected(std::move(result1220.error()));
 auto result1221 = loungeIndex(p.first);
 if (!result1221) return std::unexpected(std::move(result1221.error()));
-auto result1222 = result1220->get().sendEntityMessage(entityId(), "aim", {std::move(*result1221), p.second.slaveNewAimPosition[0], p.second.slaveNewAimPosition[1]});
+auto result1222 = result1220->get().send_entity_message(entityId(), "aim", {std::move(*result1221), p.second.slaveNewAimPosition[0], p.second.slaveNewAimPosition[1]});
 if (!result1222) return std::unexpected(std::move(result1222.error()));
 }
 
@@ -855,8 +855,8 @@ if (!result1181) return std::unexpected(std::move(result1181.error()));
   return {};
 }
 
-MessageResponseResult Vehicle::receiveMessage(ConnectionId connectionId, String const& message, JsonArray const& args) {
-  m_alive_master_connections[connectionId] = GameTimer(m_slave_control_timeout);
+MessageResponseResult Vehicle::receive_message(ConnectionId connection_id, String const& message, JsonArray const& args) {
+  m_alive_master_connections[connection_id] = GameTimer(m_slave_control_timeout);
   auto result1145 = message.equals_ignore_case("control_on");
 if (!result1145) return std::unexpected(std::move(result1145.error()));
 if (std::move(*result1145)) {
@@ -874,7 +874,7 @@ if (!result1150) return std::unexpected(std::move(result1150.error()));
 if (!LoungeControlNames) return std::unexpected(LoungeControlNames.error());
 auto result1151 = LoungeControlNames->get_left(std::move(*result1150));
 if (!result1151) return std::unexpected(std::move(result1151.error()));
-loungePosition.masterControlState[result1151->get()].slavesHeld.add(connectionId);
+loungePosition.masterControlState[result1151->get()].slavesHeld.add(connection_id);
     return ChainableJsonMessageResponse(Json());
   } else {
 auto result1152 = message.equals_ignore_case("control_off");
@@ -894,7 +894,7 @@ if (!result1157) return std::unexpected(std::move(result1157.error()));
 if (!LoungeControlNames) return std::unexpected(LoungeControlNames.error());
 auto result1158 = LoungeControlNames->get_left(std::move(*result1157));
 if (!result1158) return std::unexpected(std::move(result1158.error()));
-loungePosition.masterControlState[result1158->get()].slavesHeld.remove(connectionId);
+loungePosition.masterControlState[result1158->get()].slavesHeld.remove(connection_id);
     return ChainableJsonMessageResponse(Json());
   } else {
 auto result1159 = message.equals_ignore_case("control_all");
@@ -923,9 +923,9 @@ allControlsHeld.add(result1166->get());
 }
     for (auto& p : loungePosition.masterControlState) {
       if (allControlsHeld.contains(p.first))
-        p.second.slavesHeld.add(connectionId);
+        p.second.slavesHeld.add(connection_id);
       else
-        p.second.slavesHeld.remove(connectionId);
+        p.second.slavesHeld.remove(connection_id);
     }
     return ChainableJsonMessageResponse(Json());
   } else {
@@ -952,7 +952,7 @@ loungePosition.masterAimPosition = {std::move(*result1172), std::move(*result117
   } else {
     auto result1175 = world();
 if (!result1175) return std::unexpected(std::move(result1175.error()));
-auto result1176 = recover_lua_script_error(m_scriptComponent.handle_message(message, connectionId == result1175->get().connection(), args));
+auto result1176 = recover_lua_script_error(m_scriptComponent.handle_message(message, connection_id == result1175->get().connection(), args));
 if (!result1176) return std::unexpected(std::move(result1176.error()));
 return std::move(*result1176);
   }

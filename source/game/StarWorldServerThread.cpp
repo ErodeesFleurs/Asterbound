@@ -612,7 +612,7 @@ std::expected<void, StarException> WorldServerThread::update(WorldServerFidelity
     messages = std::move(m_messages);
   }
   auto settled = settleWorldMessageBatch(messages, [&](String const& message, JsonArray const& args) {
-    return m_worldServer->receiveMessage(server_connection_id, message, args);
+    return m_worldServer->receive_message(server_connection_id, message, args);
   });
   if (!settled)
     return std::unexpected(std::move(settled.error()));

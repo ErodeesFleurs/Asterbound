@@ -1731,7 +1731,7 @@ std::expected<bool, StarException> PathController::validate_edge(ActorMovementCo
         if (!response)
           return std::unexpected(std::move(response.error()));
         if (*response && std::holds_alternative<LuaBoolean>(**response) && std::get<LuaBoolean>(**response)) {
-          auto sent = world.sendEntityMessage(entity->entityId(), "openDoor");
+          auto sent = world.send_entity_message(entity->entityId(), "openDoor");
           if (!sent)
             return std::unexpected(std::move(sent.error()));
           opened = true;

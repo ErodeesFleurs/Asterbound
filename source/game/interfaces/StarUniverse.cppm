@@ -35,7 +35,7 @@ public:
   // Sends a universe message to the target universe's main universe script context.
   [[nodiscard]] virtual std::expected<RpcPromise<Json>, StarException> sendUniverseMessage(ConnectionId const& connectionId, String const& message, JsonArray const& args = {}) = 0;
 
-  [[nodiscard]] virtual MessageResponseResult receiveMessage(String const& message, bool const& local, JsonArray const& args) = 0;
+  [[nodiscard]] virtual MessageResponseResult receive_message(String const& message, bool const& local, JsonArray const& args) = 0;
 };
 
 }

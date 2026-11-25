@@ -1824,19 +1824,19 @@ std::expected<std::optional<String>, StarException> Player::process_presentation
   return {};
 }
 
-MessageResponseResult Player::receiveMessage(ConnectionId fromConnection, String const& message, JsonArray const& args) {
-  auto currentWorldResult = world();
-  if (!currentWorldResult)
-    return std::unexpected(std::move(currentWorldResult.error()));
-  auto& currentWorld = currentWorldResult->get();
-  bool localMessage = fromConnection == currentWorld.connection();
+MessageResponseResult Player::receive_message(ConnectionId from_connection, String const& message, JsonArray const& args) {
+  auto current_world_result = world();
+  if (!current_world_result)
+    return std::unexpected(std::move(current_world_result.error()));
+  auto& current_world = current_world_result->get();
+  bool local_message = from_connection == current_world.connection();
   if (message == "queueRadioMessage" && !args.empty()) {
     float delay = 0;
     if (args.size() > 1 && args[1].can_convert(Json::Type::Float)) {
-      auto valueResult = args[1].to_float();
-      if (!valueResult)
-        return std::unexpected(std::move(valueResult.error()));
-      auto value = std::move(*valueResult);
+      auto value_result = args[1].to_float();
+      if (!value_result)
+        return std::unexpected(std::move(value_result.error()));
+      auto value = std::move(*value_result);
       delay = value;
     }
     auto checked = process_radio_message(args[0], delay);
@@ -1848,24 +1848,24 @@ MessageResponseResult Player::receiveMessage(ConnectionId fromConnection, String
   } else if (message == "warp") {
     std::optional<String> animation;
     if (args.size() > 1) {
-      auto valueResult = args[1].to_string();
-      if (!valueResult)
-        return std::unexpected(std::move(valueResult.error()));
-      auto value = std::move(*valueResult);
+      auto value_result = args[1].to_string();
+      if (!value_result)
+        return std::unexpected(std::move(value_result.error()));
+      auto value = std::move(*value_result);
       animation = std::move(value);
     }
     bool deploy = false;
     if (args.size() > 2) {
-      auto valueResult = args[2].to_bool();
-      if (!valueResult)
-        return std::unexpected(std::move(valueResult.error()));
-      auto value = std::move(*valueResult);
+      auto value_result = args[2].to_bool();
+      if (!value_result)
+        return std::unexpected(std::move(value_result.error()));
+      auto value = std::move(*value_result);
       deploy = value;
     }
-    auto actionResult = args.get(0).to_string();
-    if (!actionResult)
-      return std::unexpected(std::move(actionResult.error()));
-    auto action = std::move(*actionResult);
+    auto action_result = args.get(0).to_string();
+    if (!action_result)
+      return std::unexpected(std::move(action_result.error()));
+    auto action = std::move(*action_result);
     setPendingWarp(action, animation, deploy);
   } else if (message == "interruptRadioMessage") {
     m_interruptRadioMessage = true;
@@ -1877,18 +1877,18 @@ MessageResponseResult Player::receiveMessage(ConnectionId fromConnection, String
       return ChainableJsonMessageResponse(RpcPromise<Json>::make_failed(std::move(**checked)));
     return ChainableJsonMessageResponse(Json{});
   } else if (message == "recordEvent") {
-    auto eventJsonResult = args.at(0);
-    if (!eventJsonResult)
-      return std::unexpected(std::move(eventJsonResult.error()));
-    auto const& eventJson = eventJsonResult->get();
-    auto fieldsResult = args.at(1);
-    if (!fieldsResult)
-      return std::unexpected(std::move(fieldsResult.error()));
-    auto const& fields = fieldsResult->get();
-    auto eventResult = eventJson.to_string();
-    if (!eventResult)
-      return std::unexpected(std::move(eventResult.error()));
-    auto event = std::move(*eventResult);
+    auto event_json_result = args.at(0);
+    if (!event_json_result)
+      return std::unexpected(std::move(event_json_result.error()));
+    auto const& event_json = event_json_result->get();
+    auto fields_result = args.at(1);
+    if (!fields_result)
+      return std::unexpected(std::move(fields_result.error()));
+    auto const& fields = fields_result->get();
+    auto event_result = event_json.to_string();
+    if (!event_result)
+      return std::unexpected(std::move(event_result.error()));
+    auto event = std::move(*event_result);
     statistics()->recordEvent(event, fields);
   } else if (message == "addCollectable") {
     auto collection_result = args.get(0).to_string();
@@ -1908,64 +1908,25 @@ MessageResponseResult Player::receiveMessage(ConnectionId fromConnection, String
         return std::unexpected(std::move(result.error()));
     }
   } else {
-    {
-      auto responseResult = m_tools->receiveMessage(message, localMessage, args);
-      if (!responseResult)
-        return std::unexpected(std::move(responseResult.error()));
-      auto response = std::move(*responseResult);
-      if (response)
-        return response;
-    }
-    {
-      auto responseResult = m_statusController->receiveMessage(message, localMessage, args);
-      if (!responseResult)
-        return std::unexpected(std::move(responseResult.error()));
-      auto response = std::move(*responseResult);
-      if (response)
-        return response;
-    }
-    {
-      auto responseResult = m_companions->receiveMessage(message, localMessage, args);
-      if (!responseResult)
-        return std::unexpected(std::move(responseResult.error()));
-      auto response = std::move(*responseResult);
-      if (response)
-        return response;
-    }
-    {
-      auto responseResult = m_deployment->receiveMessage(message, localMessage, args);
-      if (!responseResult)
-        return std::unexpected(std::move(responseResult.error()));
-      auto response = std::move(*responseResult);
-      if (response)
-        return response;
-    }
-    {
-      auto responseResult = m_techController->receiveMessage(message, localMessage, args);
-      if (!responseResult)
-        return std::unexpected(std::move(responseResult.error()));
-      auto response = std::move(*responseResult);
-      if (response)
-        return response;
-    }
-    {
-      auto responseResult = m_questManager->receiveMessage(message, localMessage, args);
-      if (!responseResult)
-        return std::unexpected(std::move(responseResult.error()));
-      auto response = std::move(*responseResult);
-      if (response)
-        return response;
-    }
-    for (auto&& script : m_genericScriptContexts) {
-      auto responseResult = script.second->handle_message(message, localMessage, args);
-      if (!responseResult)
-        return std::unexpected(std::move(responseResult.error()));
-      auto response = std::move(*responseResult);
-      if (response)
+    if (auto response = m_tools->receive_message(message, local_message, args); !response || *response)
+      return response;
+    if (auto response = m_statusController->receive_message(message, local_message, args); !response || *response)
+      return response;
+    if (auto response = m_companions->receive_message(message, local_message, args); !response || *response)
+      return response;
+    if (auto response = m_deployment->receive_message(message, local_message, args); !response || *response)
+      return response;
+    if (auto response = m_techController->receive_message(message, local_message, args); !response || *response)
+      return response;
+    if (auto response = m_questManager->receive_message(message, local_message, args); !response || *response)
+      return response;
+    for (auto const& entry : m_genericScriptContexts) {
+      auto response = entry.second->handle_message(message, local_message, args);
+      if (!response || *response)
         return response;
     }
   }
-  return std::optional<ChainableJsonMessageResponse>{};
+  return std::nullopt;
 }
 
 std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
@@ -2240,7 +2201,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
           if (ir.objectName) {
             if (!ir.entityId)
               return std::unexpected(PlayerException("Scanned object has no entity id"));
-            if (auto result = m_questManager->receiveMessage("objectScanned", true, {*ir.objectName, *ir.entityId}); !result)
+            if (auto result = m_questManager->receive_message("objectScanned", true, {*ir.objectName, *ir.entityId}); !result)
               return std::unexpected(std::move(result.error()));
             m_log->addScannedObject(*ir.objectName);
           }

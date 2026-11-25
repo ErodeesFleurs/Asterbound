@@ -703,10 +703,10 @@ std::expected<void, StarException> Projectile::render_light_sources(RenderCallba
   return render_callback.add_light_source({position(), m_config->light_color.to_rgb_f(), m_config->light_type});
 }
 
-MessageResponseResult Projectile::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
+MessageResponseResult Projectile::receive_message(ConnectionId sending_connection, String const& message, JsonArray const& args) {
   auto result896 = world();
 if (!result896) return std::unexpected(std::move(result896.error()));
-auto result897 = recover_lua_script_error(m_scriptComponent.handle_message(message, sendingConnection == result896->get().connection(), args));
+auto result897 = recover_lua_script_error(m_scriptComponent.handle_message(message, sending_connection == result896->get().connection(), args));
 if (!result897) return std::unexpected(std::move(result897.error()));
 return std::move(*result897);
 }
