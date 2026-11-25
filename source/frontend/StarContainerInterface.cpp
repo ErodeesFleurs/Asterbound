@@ -787,7 +787,7 @@ std::expected<void, StarException> ContainerPane::update(float dt) {
       
     }
 
-  m_itemBag->clearItems();
+  m_itemBag->clear_items();
   auto inputResult316 = context().input();
   if (!inputResult316)
     return std::unexpected(std::move(inputResult316.error()));
@@ -802,7 +802,7 @@ std::expected<void, StarException> ContainerPane::update(float dt) {
 
   for (std::size_t i = 0; i < m_itemBag->size(); ++i)
     {
-      auto putItemsResult317 = m_itemBag->putItems(i, container->containerItems()[i]);
+      auto putItemsResult317 = m_itemBag->put_items(i, container->containerItems()[i]);
       if (!putItemsResult317)
         return std::unexpected(std::move(putItemsResult317.error()));
       

@@ -212,7 +212,7 @@ std::expected<void, StarException> ContainerObject::init(World& world, EntityId 
           if (!itemResult)
             return std::unexpected(std::move(itemResult.error()));
           auto item = std::move(*itemResult);
-          auto operation2 = m_items->addItems(std::move(item));
+          auto operation2 = m_items->add_items(std::move(item));
           if (!operation2)
             return std::unexpected(std::move(operation2.error()));
         }
@@ -1199,7 +1199,7 @@ std::expected<void, StarException> ContainerObject::readStoredData(Json const& d
   if (!itemsConfigResult)
     return std::unexpected(std::move(itemsConfigResult.error()));
   auto itemsConfig = std::move(*itemsConfigResult);
-  auto itemsResult = ItemBag::loadStore(root(), itemsConfig);
+  auto itemsResult = ItemBag::load_store(root(), itemsConfig);
   if (!itemsResult)
     return std::unexpected(std::move(itemsResult.error()));
   auto items = std::move(*itemsResult);
@@ -1229,7 +1229,7 @@ std::expected<Json, StarException> ContainerObject::writeStoredData() const {
   if (!storedResult)
     return std::unexpected(std::move(storedResult.error()));
   auto stored = std::move(*storedResult);
-  auto itemsResult = m_items->diskStore();
+  auto itemsResult = m_items->disk_store();
   if (!itemsResult)
     return std::unexpected(std::move(itemsResult.error()));
   auto items = std::move(*itemsResult);
@@ -1308,7 +1308,7 @@ std::expected<void, StarException> ContainerObject::tickCrafting(float dt) {
   if (m_craftingProgress.get() >= 1.0f) {
     m_craftingProgress.set(0);
     for (auto const& input : m_goalRecipe.inputs) {
-      bool consumed = m_items->consumeItems(input);
+      bool consumed = m_items->consume_items(input);
       ((void)(consumed));
       if constexpr (Star::debug_enabled) {
         Star::star_assert_failed((consumed));
@@ -1322,7 +1322,7 @@ std::expected<void, StarException> ContainerObject::tickCrafting(float dt) {
     if (!outputResult)
       return std::unexpected(std::move(outputResult.error()));
     auto output = std::move(*outputResult);
-    auto overflowResult = m_items->putItems(m_items->size() - 1, std::move(output));
+    auto overflowResult = m_items->put_items(m_items->size() - 1, std::move(output));
     if (!overflowResult)
       return std::unexpected(std::move(overflowResult.error()));
     auto overflow = std::move(*overflowResult);
@@ -1346,22 +1346,22 @@ std::expected<void, StarException> ContainerObject::tickCrafting(float dt) {
 
 std::expected<std::shared_ptr<Item>, StarException> ContainerObject::doAddItems(std::shared_ptr<Item> const& items) {
   itemsUpdated();
-  return m_items->addItems(items);
+  return m_items->add_items(items);
 }
 
 std::expected<std::shared_ptr<Item>, StarException> ContainerObject::doPutItems(std::size_t slot, std::shared_ptr<Item> const& items) {
   itemsUpdated();
-  return m_items->putItems(slot, items);
+  return m_items->put_items(slot, items);
 }
 
 std::expected<std::shared_ptr<Item>, StarException> ContainerObject::doTakeItems(std::size_t slot, std::size_t count) {
   itemsUpdated();
-  return m_items->takeItems(slot, count);
+  return m_items->take_items(slot, count);
 }
 
 std::expected<std::shared_ptr<Item>, StarException> ContainerObject::doSwapItems(std::size_t slot, std::shared_ptr<Item> const& items, bool tryCombine) {
   itemsUpdated();
-  return m_items->swapItems(slot, items, tryCombine);
+  return m_items->swap_items(slot, items, tryCombine);
 }
 
 std::expected<std::shared_ptr<Item>, StarException> ContainerObject::doApplyAugment(std::size_t slot, std::shared_ptr<Item> const& item) {
@@ -1376,7 +1376,7 @@ std::expected<std::shared_ptr<Item>, StarException> ContainerObject::doApplyAugm
       if (!resultResult)
         return std::unexpected(std::move(resultResult.error()));
       auto result = std::move(*resultResult);
-      auto operation1 = m_items->setItem(slot, std::move(result));
+      auto operation1 = m_items->set_item(slot, std::move(result));
       if (!operation1)
         return std::unexpected(std::move(operation1.error()));
     }
@@ -1385,7 +1385,7 @@ std::expected<std::shared_ptr<Item>, StarException> ContainerObject::doApplyAugm
 }
 
 std::expected<bool, StarException> ContainerObject::doConsumeItems(ItemDescriptor const& descriptor) {
-  if (m_items->consumeItems(descriptor)) {
+  if (m_items->consume_items(descriptor)) {
     itemsUpdated();
     return true;
   }
@@ -1393,7 +1393,7 @@ std::expected<bool, StarException> ContainerObject::doConsumeItems(ItemDescripto
 }
 
 std::expected<bool, StarException> ContainerObject::doConsumeItems(std::size_t slot, std::size_t count) {
-  auto consumedResult = m_items->consumeItems(slot, count);
+  auto consumedResult = m_items->consume_items(slot, count);
   if (!consumedResult)
     return std::unexpected(std::move(consumedResult.error()));
   auto consumed = std::move(*consumedResult);
@@ -1408,8 +1408,8 @@ std::expected<List<std::shared_ptr<Item>>, StarException> ContainerObject::doCle
   auto operation1 = stopCrafting();
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
-  auto result = m_items->takeAll();
-  m_items->clearItems();
+  auto result = m_items->take_all();
+  m_items->clear_items();
   itemsUpdated();
   return result;
 }

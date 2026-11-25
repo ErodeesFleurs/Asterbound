@@ -374,7 +374,7 @@ PlayerInventory::PlayerInventory(Root& root, Json inventoryConfig, Json currenci
     if (*allowed) {
       auto bag = m_bags.find_ref(bs.bag_name);
       if (!bag) return std::unexpected(ItemException("Invalid inventory bag"));
-      auto assigned = bag->get()->setItem(bs.index, item);
+      auto assigned = bag->get()->set_item(bs.index, item);
       if (!assigned) return std::unexpected(std::move(assigned.error()));
       return true;
     }
@@ -451,7 +451,7 @@ bool PlayerInventory::slot_valid(InventorySlot const& slot) const {
     auto allowed = itemAllowedInBag(items, pair.first);
     if (!allowed) return std::unexpected(std::move(allowed.error()));
     if (!*allowed) continue;
-    auto stacked = pair.second->stackItems(items);
+    auto stacked = pair.second->stack_items(items);
     if (!stacked) return std::unexpected(std::move(stacked.error()));
     items = std::move(*stacked);
     if (!items) break;
@@ -460,7 +460,7 @@ bool PlayerInventory::slot_valid(InventorySlot const& slot) const {
       auto slot = std::as_const(*pair.second).at(i);
       if (!slot) return std::unexpected(std::move(slot.error()));
       if (!*slot) {
-        auto assigned = pair.second->setItem(i, std::exchange(items, {}));
+        auto assigned = pair.second->set_item(i, std::exchange(items, {}));
         if (!assigned) return std::unexpected(std::move(assigned.error()));
         auto added = auto_add_to_custom_bar(BagSlot{pair.first, static_cast<std::uint8_t>(i)});
         if (!added) return std::unexpected(std::move(added.error()));
@@ -479,26 +479,27 @@ bool PlayerInventory::slot_valid(InventorySlot const& slot) const {
   if (is<CurrencyItem>(items))
     return items->count();
 
-  std::uint64_t canFit = 0;
+  std::uint64_t can_fit = 0;
 
   // First, check the equipment slots
   if (is<HeadArmor>(items) && !headArmor())
-    ++canFit;
+    ++can_fit;
   if (is<ChestArmor>(items) && !chestArmor())
-    ++canFit;
+    ++can_fit;
   if (is<LegsArmor>(items) && !legsArmor())
-    ++canFit;
+    ++can_fit;
   if (is<BackArmor>(items) && !backArmor())
-    ++canFit;
+    ++can_fit;
 
   // Then add into bags
   for (auto const& pair : m_bags) {
     auto allowed = itemAllowedInBag(items, pair.first);
     if (!allowed) return std::unexpected(std::move(allowed.error()));
-    if (*allowed) canFit += pair.second->itemsCanFit(optional_ref(items));
+    if (*allowed && can_fit < items->count())
+      can_fit += std::min(items->count() - can_fit, pair.second->items_can_fit(optional_ref(items)));
   }
 
-  return std::min(canFit, items->count());
+  return std::min(can_fit, items->count());
 }
 
 bool PlayerInventory::hasItem(ItemDescriptor const& descriptor, bool exactMatch) const {
@@ -531,7 +532,7 @@ bool PlayerInventory::consumeItems(ItemDescriptor const& descriptor, bool exactM
     return false;
   for (auto const& bag : m_bags) {
     auto take = std::min(remaining, bag.second->matching_count(descriptor, exactMatch));
-    if (take && !bag.second->consumeItems(descriptor.withCount(take), exactMatch))
+    if (take && !bag.second->consume_items(descriptor.withCount(take), exactMatch))
       return false;
     remaining -= take;
     if (!remaining)
@@ -643,7 +644,7 @@ std::shared_ptr<ItemBag const> PlayerInventory::bagContents(String const& type) 
 [[nodiscard]] std::expected<void, StarException> PlayerInventory::condenseBagStacks(String const& bagType) {
   auto entry = m_bags.find_ref(bagType);
   if (!entry) return std::unexpected(ItemException("Invalid inventory bag"));
-  auto condensed = entry->get()->condenseStacks();
+  auto condensed = entry->get()->condense_stacks();
   if (!condensed) return std::unexpected(std::move(condensed.error()));
   for (std::size_t i = 0; i < m_custom_bar.extent(0); ++i) {
     for (std::size_t j = 0; j < m_custom_bar.extent(1); ++j) {
@@ -663,8 +664,8 @@ std::shared_ptr<ItemBag const> PlayerInventory::bagContents(String const& type) 
   return {};
 }
 
-[[nodiscard]] std::expected<void, StarException> PlayerInventory::sortBag(String const& bagType) {
-  auto entry = m_bags.find_ref(bagType);
+[[nodiscard]] std::expected<void, StarException> PlayerInventory::sortBag(String const& bag_type) {
+  auto entry = m_bags.find_ref(bag_type);
   if (!entry) return std::unexpected(ItemException("Invalid inventory bag"));
   auto& bag = *entry->get();
   MultiArray<std::pair<std::shared_ptr<Item>, std::shared_ptr<Item>>, 2> saved(m_custom_bar.extents());
@@ -674,10 +675,10 @@ std::shared_ptr<ItemBag const> PlayerInventory::bagContents(String const& type) 
       for (bool primary : {true, false}) {
         auto const& slot = primary ? link.primary : link.secondary;
         if (slot) {
-          if (std::holds_alternative<BagSlot>(*slot) && std::get<BagSlot>(*slot).bag_name == bagType) {
+          if (std::holds_alternative<BagSlot>(*slot) && std::get<BagSlot>(*slot).bag_name == bag_type) {
             auto item = std::as_const(bag).at(std::get<BagSlot>(*slot).index);
             if (!item) return std::unexpected(std::move(item.error()));
-            (primary ? saved(i, j).first : saved(i, j).second) = *item;
+            (primary ? saved(i, j).first : saved(i, j).second) = std::move(*item);
           }
         }
       }
@@ -686,7 +687,8 @@ std::shared_ptr<ItemBag const> PlayerInventory::bagContents(String const& type) 
   auto database = m_root.itemDatabase();
   if (!database) return std::unexpected(std::move(database.error()));
   Map<String, ItemType> types;
-  for (auto const& item : bag.items()) {
+  auto& items = bag.items();
+  for (auto const& item : items) {
     if (item && !types.contains(item->name())) {
       auto length = item->name().size();
       if (!length) return std::unexpected(std::move(length.error()));
@@ -695,24 +697,24 @@ std::shared_ptr<ItemBag const> PlayerInventory::bagContents(String const& type) 
       types[item->name()] = *type;
     }
   }
-  bag.items().sort([&types](auto const& a, auto const& b) {
+  items.sort([&types](std::shared_ptr<Item> const& a, std::shared_ptr<Item> const& b) {
     if (a && !b) return true;
     if (!a) return false;
-    auto aType = types.value(a->name());
-    auto bType = types.value(b->name());
-    if (aType != bType) return aType < bType;
+    auto a_type = types.value(a->name());
+    auto b_type = types.value(b->name());
+    if (a_type != b_type) return a_type < b_type;
     if (a->rarity() != b->rarity()) return a->rarity() > b->rarity();
     if (a->name().utf8() != b->name().utf8()) return a->name().utf8() < b->name().utf8();
     return a->count() > b->count();
   });
   Map<std::shared_ptr<Item>, std::size_t> indexes;
-  for (std::size_t i = 0; i < bag.size(); ++i)
-    if (bag.items()[i]) indexes[bag.items()[i]] = i;
+  for (std::size_t i = 0; i < items.size(); ++i)
+    if (items[i]) indexes[items[i]] = i;
   for (std::size_t i = 0; i < m_custom_bar.extent(0); ++i) {
     for (std::size_t j = 0; j < m_custom_bar.extent(1); ++j) {
       auto const& old = saved(i, j);
-      if (old.first) m_custom_bar(i, j).primary.emplace(BagSlot{bagType, static_cast<std::uint8_t>(indexes.value(old.first))});
-      if (old.second) m_custom_bar(i, j).secondary.emplace(BagSlot{bagType, static_cast<std::uint8_t>(indexes.value(old.second))});
+      if (old.first) m_custom_bar(i, j).primary.emplace(BagSlot{bag_type, static_cast<std::uint8_t>(indexes.value(old.first))});
+      if (old.second) m_custom_bar(i, j).secondary.emplace(BagSlot{bag_type, static_cast<std::uint8_t>(indexes.value(old.second))});
     }
   }
   return {};
@@ -745,7 +747,7 @@ std::shared_ptr<ItemBag const> PlayerInventory::bagContents(String const& type) 
     if (*allowed) {
       auto bag = m_bags.find_ref(bs.bag_name);
       if (!bag) return std::unexpected(ItemException("Invalid inventory bag"));
-      auto swapped = bag->get()->swapItems(bs.index, m_swapSlot);
+      auto swapped = bag->get()->swap_items(bs.index, m_swapSlot);
       if (!swapped) return std::unexpected(std::move(swapped.error()));
       m_swapSlot = std::move(*swapped);
       swap_custom_bar_links(SwapSlot(), slot);
@@ -1062,7 +1064,7 @@ void PlayerInventory::setEquipmentVisibility(EquipmentSlot slot, bool visible) {
   if (!bags) return std::unexpected(std::move(bags.error()));
   m_inventoryLoadOverflow.clear();
   for (auto const& entry : *bags) {
-    auto loaded = ItemBag::loadStore(m_root, entry.second);
+    auto loaded = ItemBag::load_store(m_root, entry.second);
     if (!loaded) return std::unexpected(std::move(loaded.error()));
     loaded->cleanup();
     if (auto bag = m_bags.find_ref(entry.first)) {
@@ -1151,7 +1153,7 @@ void PlayerInventory::setEquipmentVisibility(EquipmentSlot slot, bool visible) {
   }
   JsonObject bags;
   for (auto const& bag : m_bags) {
-    auto encoded = bag.second->diskStore();
+    auto encoded = bag.second->disk_store();
     if (!encoded) return std::unexpected(std::move(encoded.error()));
     bags[bag.first] = std::move(*encoded);
   }

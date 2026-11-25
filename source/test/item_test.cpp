@@ -654,48 +654,48 @@ const GameTestRegistration bagStackQueriesAndTransfersPreserveBehavior("ItemTest
   ASSERT_TRUE(blocker);
   ASSERT_TRUE(source);
   ItemBag bag(fixture.root(), 2);
-  ASSERT_TRUE(bag.setItem(0, target));
-  ASSERT_TRUE(bag.setItem(1, blocker));
+  ASSERT_TRUE(bag.set_item(0, target));
+  ASSERT_TRUE(bag.set_item(1, blocker));
 
-  EXPECT_EQ(bag.itemsCanFit(std::nullopt), 0u);
-  EXPECT_EQ(bag.itemsCanStack(std::nullopt), 0u);
-  auto nullFit = bag.itemsFitWhere(std::nullopt);
+  EXPECT_EQ(bag.items_can_fit(std::nullopt), 0u);
+  EXPECT_EQ(bag.items_can_stack(std::nullopt), 0u);
+  auto nullFit = bag.items_fit_where(std::nullopt);
   EXPECT_EQ(nullFit.leftover, 0u);
   EXPECT_TRUE(nullFit.slots.empty());
-  auto fit = bag.itemsFitWhere(std::cref(*source));
+  auto fit = bag.items_fit_where(std::cref(*source));
   EXPECT_EQ(fit.leftover, 2u);
   EXPECT_EQ(fit.slots, List<std::size_t>({0}));
-  EXPECT_EQ(bag.itemsCanFit(std::cref(*source)), 1u);
-  EXPECT_EQ(bag.itemsCanStack(std::cref(*source)), 1u);
-  auto limitedFit = bag.itemsFitWhere(std::cref(*source), 2);
+  EXPECT_EQ(bag.items_can_fit(std::cref(*source)), 1u);
+  EXPECT_EQ(bag.items_can_stack(std::cref(*source)), 1u);
+  auto limitedFit = bag.items_fit_where(std::cref(*source), 2);
   EXPECT_EQ(limitedFit.leftover, 1u);
   EXPECT_EQ(limitedFit.slots, List<std::size_t>({0}));
-  auto zeroFit = bag.itemsFitWhere(std::cref(*source), 0);
+  auto zeroFit = bag.items_fit_where(std::cref(*source), 0);
   EXPECT_EQ(zeroFit.leftover, 0u);
   EXPECT_TRUE(zeroFit.slots.empty());
   EXPECT_EQ(target->count(), 4u);
   EXPECT_EQ(source->count(), 3u);
   EXPECT_EQ(blocker->count(), 5u);
 
-  auto stacked = bag.stackItems(source);
+  auto stacked = bag.stack_items(source);
   ASSERT_TRUE(stacked);
   EXPECT_EQ(*stacked, source);
   EXPECT_EQ(source->count(), 2u);
   EXPECT_EQ(target->count(), 5u);
-  auto put = bag.putItems(0, source);
+  auto put = bag.put_items(0, source);
   ASSERT_TRUE(put);
   EXPECT_EQ(*put, source);
   EXPECT_EQ(source->count(), 2u);
-  auto swapped = bag.swapItems(0, source);
+  auto swapped = bag.swap_items(0, source);
   ASSERT_TRUE(swapped);
   EXPECT_EQ(*swapped, target);
   auto current = std::as_const(bag).at(0);
   ASSERT_TRUE(current);
   EXPECT_EQ(*current, source);
-  auto removed = bag.swapItems(0, {});
+  auto removed = bag.swap_items(0, {});
   ASSERT_TRUE(removed);
   EXPECT_EQ(*removed, source);
-  auto added = bag.addItems(target);
+  auto added = bag.add_items(target);
   ASSERT_TRUE(added);
   EXPECT_FALSE(*added);
   current = std::as_const(bag).at(0);
@@ -704,27 +704,27 @@ const GameTestRegistration bagStackQueriesAndTransfersPreserveBehavior("ItemTest
 
   // An externally exhausted stack is an empty slot, without query-time release.
   ASSERT_TRUE(blocker->consume(5));
-  fit = bag.itemsFitWhere(std::cref(*source));
+  fit = bag.items_fit_where(std::cref(*source));
   EXPECT_EQ(fit.leftover, 0u);
   EXPECT_EQ(fit.slots, List<std::size_t>({1}));
-  EXPECT_EQ(bag.itemsCanFit(std::cref(*source)), 2u);
+  EXPECT_EQ(bag.items_can_fit(std::cref(*source)), 2u);
   // A retained empty stack contributes capacity to the existing stacking query.
-  EXPECT_EQ(bag.itemsCanStack(std::cref(*source)), 2u);
+  EXPECT_EQ(bag.items_can_stack(std::cref(*source)), 2u);
   blocker->set_count(1);
   current = std::as_const(bag).at(1);
   ASSERT_TRUE(current);
   EXPECT_EQ(*current, blocker);
   blocker->set_count(0);
-  added = bag.addItems(source);
+  added = bag.add_items(source);
   ASSERT_TRUE(added);
   EXPECT_FALSE(*added);
   current = std::as_const(bag).at(1);
   ASSERT_TRUE(current);
   EXPECT_EQ(*current, source);
   source->set_count(0);
-  EXPECT_EQ(bag.itemsCanFit(std::cref(*source)), 0u);
-  EXPECT_EQ(bag.itemsCanStack(std::cref(*source)), 0u);
-  auto emptyFit = bag.itemsFitWhere(std::cref(*source));
+  EXPECT_EQ(bag.items_can_fit(std::cref(*source)), 0u);
+  EXPECT_EQ(bag.items_can_stack(std::cref(*source)), 0u);
+  auto emptyFit = bag.items_fit_where(std::cref(*source));
   EXPECT_EQ(emptyFit.leftover, 0u);
   EXPECT_TRUE(emptyFit.slots.empty());
 });
@@ -738,6 +738,37 @@ const GameTestRegistration constructItems("ItemTest", "ConstructItems", [](GameT
   }
 });
 
+const GameTestRegistration bag_wire_snapshot("ItemTest", "BagWireSnapshotCommitsOnlyCompletePrefix", [](GameTest& fixture) {
+  auto database = fixture.root().itemDatabase();
+  ASSERT_TRUE(database);
+  auto item = inventoryTestItem(**database, "perfectlygenericitem", 3);
+  ASSERT_TRUE(item && *item);
+  ItemBag source(fixture.root(), 512);
+  ASSERT_TRUE(source.set_item(1, *item));
+  DataStreamBuffer wire;
+  ASSERT_TRUE(source.write(wire));
+  ItemBag destination(fixture.root(), 1);
+  ASSERT_TRUE(destination.set_item(0, *item));
+  for (std::size_t n = 0; n < wire.span().size(); ++n) {
+    DataStreamReader reader(wire.span().first(n));
+    EXPECT_FALSE(destination.read(reader));
+    ASSERT_EQ(destination.size(), 1u);
+    EXPECT_EQ(std::as_const(destination).at(0), *item);
+  }
+  DataStreamBuffer invalid;
+  ASSERT_TRUE(invalid.write_vlq_u(1));
+  ASSERT_TRUE(invalid.write_vlq_u(2));
+  DataStreamReader bad(invalid.span());
+  EXPECT_FALSE(destination.read(bad));
+  EXPECT_EQ(std::as_const(destination).at(0), *item);
+  DataStreamReader complete(wire.span());
+  ASSERT_TRUE(destination.read(complete));
+  EXPECT_EQ(destination.size(), 512u);
+  auto original = source.to_json();
+  ASSERT_TRUE(original);
+  EXPECT_EQ(destination.to_json(), *original);
+});
+
 const GameTestRegistration constBagObservesEmptyStacksWithoutReleasingThem("ItemTest", "ConstBagObservesEmptyStacksWithoutReleasingThem", [](GameTest& fixture) {
   auto itemDatabase = fixture.root().itemDatabase();
   ASSERT_TRUE(itemDatabase);
@@ -747,7 +778,7 @@ const GameTestRegistration constBagObservesEmptyStacksWithoutReleasingThem("Item
       auto item = inventoryTestItem(**itemDatabase, "perfectlygenericitem");
       if (!item)
         return std::unexpected(std::move(item.error()));
-      auto set = bag.setItem(slot, std::move(*item));
+      auto set = bag.set_item(slot, std::move(*item));
       if (!set)
         return std::unexpected(std::move(set.error()));
     }
@@ -795,6 +826,123 @@ const GameTestRegistration constBagObservesEmptyStacksWithoutReleasingThem("Item
   EXPECT_FALSE(slots[0]);
   EXPECT_EQ(slots[1], liveItem);
   EXPECT_FALSE(listedBag.cleanup());
+});
+
+const GameTestRegistration bag_placement_skips_overfilled_targets(
+    "ItemTest", "BagPlacementSkipsOverfilledTargets", [](GameTest& fixture) {
+  auto database = fixture.root().itemDatabase();
+  ASSERT_TRUE(database);
+  auto make_stack = [&](std::uint64_t count) {
+    return inventoryTestItem(**database, "perfectlygenericitem", count, JsonObject{{"maxStack", 5}});
+  };
+  auto overfilled = make_stack(1);
+  auto first_target = make_stack(3);
+  auto second_target = make_stack(3);
+  auto source = make_stack(3);
+  auto remainder = make_stack(1);
+  ASSERT_TRUE(overfilled && *overfilled);
+  ASSERT_TRUE(first_target && *first_target);
+  ASSERT_TRUE(second_target && *second_target);
+  ASSERT_TRUE(source && *source);
+  ASSERT_TRUE(remainder && *remainder);
+  ASSERT_EQ((*overfilled)->set_count(12, true), 0u);
+
+  ItemBag bag(fixture.root(), 5);
+  ASSERT_TRUE(bag.set_item(0, *overfilled));
+  ASSERT_TRUE(bag.set_item(2, *first_target));
+  ASSERT_TRUE(bag.set_item(4, *second_target));
+  auto fit = bag.items_fit_where(std::cref(**source));
+  EXPECT_EQ(fit.leftover, 0u);
+  EXPECT_EQ(fit.slots, List<std::size_t>({2, 4}));
+  fit = bag.items_fit_where(std::cref(**source), 1);
+  EXPECT_EQ(fit.leftover, 0u);
+  EXPECT_EQ(fit.slots, List<std::size_t>({2}));
+  EXPECT_EQ(bag.items_can_fit(std::cref(**source)), 3u);
+  EXPECT_EQ(bag.items_can_stack(std::cref(**source)), 3u); // room is 2 + 2, but only 3 can transfer
+  ASSERT_EQ(bag.stack_items(*source), nullptr);
+  EXPECT_TRUE((*source)->empty());
+  EXPECT_EQ((*first_target)->count(), 5u);
+  EXPECT_EQ((*second_target)->count(), 4u);
+  EXPECT_EQ(std::as_const(bag).at(1), nullptr);
+
+  ASSERT_EQ((*second_target)->set_count(5), 0u);
+  fit = bag.items_fit_where(std::cref(**remainder));
+  EXPECT_EQ(fit.leftover, 0u);
+  EXPECT_EQ(fit.slots, List<std::size_t>({1}));
+  EXPECT_EQ(bag.items_can_stack(std::cref(**remainder)), 0u);
+  ASSERT_EQ(bag.add_items(*remainder), nullptr);
+  EXPECT_EQ(std::as_const(bag).at(1), *remainder);
+  EXPECT_EQ((*overfilled)->count(), 12u);
+});
+
+const GameTestRegistration bag_placement_distinguishes_retained_zero(
+    "ItemTest", "BagPlacementDistinguishesRetainedZero", [](GameTest& fixture) {
+  auto database = fixture.root().itemDatabase();
+  ASSERT_TRUE(database);
+  Json const parameters = JsonObject{{"maxStack", 5}};
+  auto target = inventoryTestItem(**database, "perfectlygenericitem", 4, parameters);
+  auto retained = inventoryTestItem(**database, "perfectlygenericitem", 1);
+  auto source = inventoryTestItem(**database, "perfectlygenericitem", 3, parameters);
+  auto blocker = inventoryTestItem(**database, "perfectlygenericitem", 1);
+  ASSERT_TRUE(target && *target);
+  ASSERT_TRUE(retained && *retained);
+  ASSERT_TRUE(source && *source);
+  ASSERT_TRUE(blocker && *blocker);
+
+  ItemBag bag(fixture.root(), 3);
+  ASSERT_TRUE(bag.set_item(1, *retained));
+  ASSERT_TRUE(bag.set_item(2, *target));
+  (*retained)->set_count(0);
+  EXPECT_EQ(bag.items_can_stack(std::cref(**source)), 1u);
+  EXPECT_EQ(bag.items_fit_where(std::cref(**source)).slots, List<std::size_t>({2, 0}));
+  ASSERT_TRUE(bag.set_item(0, *blocker));
+  auto fit = bag.items_fit_where(std::cref(**source));
+  EXPECT_EQ(fit.leftover, 0u);
+  EXPECT_EQ(fit.slots, List<std::size_t>({2, 1}));
+  EXPECT_EQ(bag.items_can_stack(std::cref(**source)), 3u);
+  EXPECT_EQ(bag.stack_items(*source), *source);
+  EXPECT_EQ((*source)->count(), 2u);
+  EXPECT_EQ((*target)->count(), 5u);
+  EXPECT_EQ(std::as_const(bag).at(1), nullptr);
+  ASSERT_EQ((*retained)->set_count(1), 0u);
+  EXPECT_EQ(std::as_const(bag).at(1), *retained);
+  (*retained)->set_count(0);
+  ASSERT_EQ((*target)->set_count(4), 0u);
+  ASSERT_EQ(bag.add_items(*source), nullptr);
+  EXPECT_EQ(std::as_const(bag).at(1), *source);
+  EXPECT_EQ((*source)->count(), 1u);
+  EXPECT_EQ((*target)->count(), 5u);
+});
+
+const GameTestRegistration bag_condense_prefers_high_targets_and_low_donors(
+    "ItemTest", "BagCondensePrefersHighTargetsAndLowDonors", [](GameTest& fixture) {
+  auto database = fixture.root().itemDatabase();
+  ASSERT_TRUE(database);
+  ItemBag bag(fixture.root(), 8);
+  std::array<std::shared_ptr<Item>, 8> slots;
+  constexpr std::array counts{1u, 2u, 4u, 0u, 4u, 4u, 1u, 1u};
+  for (std::size_t i = 0; i < counts.size(); ++i) {
+    if (counts[i] == 0)
+      continue;
+    auto parameters = i == 1 ? JsonObject{{"maxStack", 5}, {"testParameter", "different"}}
+                             : JsonObject{{"maxStack", 5}};
+    auto item = inventoryTestItem(**database, "perfectlygenericitem", counts[i], std::move(parameters));
+    ASSERT_TRUE(item && *item);
+    slots[i] = std::move(*item);
+    ASSERT_TRUE(bag.set_item(i, slots[i]));
+  }
+  slots[6]->set_count(0);
+  ASSERT_EQ(slots[7]->set_count(12, true), 0u);
+
+  ASSERT_TRUE(bag.condense_stacks());
+  EXPECT_FALSE(bag.cleanup()); // both previously empty and newly depleted stacks were released
+  constexpr std::array condensed{0u, 2u, 3u, 0u, 5u, 5u, 0u, 12u};
+  for (std::size_t i = 0; i < condensed.size(); ++i) {
+    SCOPED_TRACE(i);
+    EXPECT_EQ(std::as_const(bag).at(i), condensed[i] ? slots[i] : nullptr);
+    if (slots[i])
+      EXPECT_EQ(slots[i]->count(), condensed[i]);
+  }
 });
 
 namespace {

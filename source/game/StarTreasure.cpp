@@ -383,7 +383,7 @@ std::expected<List<std::shared_ptr<Item>>, StarException> TreasureDatabase::fill
     return std::unexpected(std::move(treasure.error()));
   List<std::shared_ptr<Item>> overflowItems;
   for (auto const& item : *treasure) {
-    auto overflow = itemBag->addItems(item);
+    auto overflow = itemBag->add_items(item);
     if (!overflow)
       return std::unexpected(std::move(overflow.error()));
     if (*overflow)

@@ -3667,7 +3667,7 @@ namespace LuaBindings {
       if (!toSearchResult)
         return std::unexpected(std::move(toSearchResult.error()));
       auto toSearch = std::move(*toSearchResult);
-      return itemBag->itemsCanFit(optional_ref(toSearch));
+      return itemBag->items_can_fit(optional_ref(toSearch));
     }
 
     return {};
@@ -3684,7 +3684,7 @@ namespace LuaBindings {
       if (!toSearchResult)
         return std::unexpected(std::move(toSearchResult.error()));
       auto toSearch = std::move(*toSearchResult);
-      auto res = itemBag->itemsFitWhere(optional_ref(toSearch));
+      auto res = itemBag->items_fit_where(optional_ref(toSearch));
 auto slotsResult = json_from_list<std::size_t>(res.slots);
       if (!slotsResult)
         return std::unexpected(std::move(slotsResult.error()));

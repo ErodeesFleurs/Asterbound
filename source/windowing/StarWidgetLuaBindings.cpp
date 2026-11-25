@@ -931,7 +931,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
       for (auto const& descriptor : items) {
         auto item = (*database)->fromJson(descriptor);
         if (!item) return std::unexpected(std::move(item.error()));
-        auto added = bag->addItems(std::move(*item));
+        auto added = bag->add_items(std::move(*item));
         if (!added) return std::unexpected(std::move(added.error()));
       }
       return widget->setItemBag(std::move(bag));
@@ -940,7 +940,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("itemGridItems", [parentWidget](String const& widgetName) -> std::expected<Json, StarException> {
     return withWidget<ItemGridWidget>(parentWidget, widgetName, [&](std::shared_ptr<ItemGridWidget> widget) -> std::expected<Json, StarException> {
-      return widget->bag()->toJson();
+      return widget->bag()->to_json();
     });
   }); !registered)
     return std::unexpected(std::move(registered.error()));

@@ -47,58 +47,57 @@ ItemBag::ItemBag(Root& root, std::size_t size) : m_root(root) {
   m_items.resize(size);
 }
 
-std::expected<ItemBag, StarException> ItemBag::fromJson(Root& root, Json const& store) {
-  auto itemDatabase = root.itemDatabase();
-  if (!itemDatabase)
-    return std::unexpected(std::move(itemDatabase.error()));
-  auto entries = store.iterate_array();
+namespace {
+enum class BagFormat { Descriptor, Disk };
+
+std::expected<ItemBag, StarException> decode_bag(Root& root, Json const& store, BagFormat format) {
+  auto database = root.itemDatabase();
+  if (!database)
+    return std::unexpected(std::move(database.error()));
+  auto entries = store.array_ptr();
   if (!entries)
     return std::unexpected(std::move(entries.error()));
-  ItemBag res(root, 0);
-  for (auto const& entry : *entries) {
-    auto item = (*itemDatabase)->fromJson(entry);
+  ItemBag bag(root, (*entries)->size());
+  auto& slots = bag.items();
+  std::size_t index = 0;
+  for (auto const& entry : **entries) {
+    auto item = format == BagFormat::Disk ? (*database)->diskLoad(entry) : (*database)->fromJson(entry);
     if (!item)
       return std::unexpected(std::move(item.error()));
-    res.m_items.push_back(std::move(*item));
+    slots[index++] = std::move(*item);
   }
-  return res;
+  return bag;
+}
 }
 
-std::expected<ItemBag, StarException> ItemBag::loadStore(Root& root, Json const& store) {
-  auto itemDatabase = root.itemDatabase();
-  if (!itemDatabase)
-    return std::unexpected(std::move(itemDatabase.error()));
-  auto entries = store.iterate_array();
-  if (!entries)
-    return std::unexpected(std::move(entries.error()));
-  ItemBag res(root, 0);
-  for (auto const& entry : *entries) {
-    auto item = (*itemDatabase)->diskLoad(entry);
-    if (!item)
-      return std::unexpected(std::move(item.error()));
-    res.m_items.push_back(std::move(*item));
-  }
-  return res;
+std::expected<ItemBag, StarException> ItemBag::from_json(Root& root, Json const& store) {
+  return decode_bag(root, store, BagFormat::Descriptor);
 }
 
-std::expected<Json, StarException> ItemBag::toJson() const {
+std::expected<ItemBag, StarException> ItemBag::load_store(Root& root, Json const& store) {
+  return decode_bag(root, store, BagFormat::Disk);
+}
+
+std::expected<Json, StarException> ItemBag::to_json() const {
   JsonArray entries;
+  entries.reserve(m_items.size());
   for (auto const& item : m_items)
     entries.push_back(item ? item->descriptor().toJson() : Json());
   return Json(std::move(entries));
 }
 
-std::expected<Json, StarException> ItemBag::diskStore() const {
-  auto versioningDatabase = m_root.get().versioningDatabase();
-  if (!versioningDatabase)
-    return std::unexpected(std::move(versioningDatabase.error()));
+std::expected<Json, StarException> ItemBag::disk_store() const {
+  auto database = m_root.get().versioningDatabase();
+  if (!database)
+    return std::unexpected(std::move(database.error()));
   JsonArray entries;
+  entries.reserve(m_items.size());
   for (auto const& item : m_items) {
     if (!item) {
       entries.push_back(Json());
       continue;
     }
-    auto stored = item->descriptor().diskStore(**versioningDatabase);
+    auto stored = item->descriptor().diskStore(**database);
     if (!stored)
       return std::unexpected(std::move(stored.error()));
     entries.push_back(std::move(*stored));
@@ -113,9 +112,9 @@ std::size_t ItemBag::size() const {
 std::expected<List<std::shared_ptr<Item>>, StarException> ItemBag::resize(std::size_t size) {
   List<std::shared_ptr<Item>> lost;
   while (m_items.size() > size) {
-    auto lastItem = std::move(m_items[m_items.size() - 1]);
+    auto last_item = std::move(m_items[m_items.size() - 1]);
     m_items.resize(m_items.size() - 1);
-    auto remaining = addItems(std::move(lastItem));
+    auto remaining = add_items(std::move(last_item));
     if (!remaining)
       return std::unexpected(std::move(remaining.error()));
     if (*remaining && !(*remaining)->empty())
@@ -125,22 +124,22 @@ std::expected<List<std::shared_ptr<Item>>, StarException> ItemBag::resize(std::s
   return lost;
 }
 
-void ItemBag::clearItems() {
-  std::size_t oldSize = m_items.size();
+void ItemBag::clear_items() {
+  std::size_t old_size = m_items.size();
   m_items.clear();
-  m_items.resize(oldSize);
+  m_items.resize(old_size);
 }
 
 bool ItemBag::cleanup() const {
-  bool cleanupDone = false;
-  for (auto& items : m_items) {
-    if (items && items->empty()) {
-      cleanupDone = true;
-      items = {};
+  bool cleanup_done = false;
+  for (auto& item : m_items) {
+    if (item && item->empty()) {
+      cleanup_done = true;
+      item.reset();
     }
   }
 
-  return cleanupDone;
+  return cleanup_done;
 }
 
 List<std::shared_ptr<Item>>& ItemBag::items() {
@@ -172,7 +171,7 @@ std::expected<std::reference_wrapper<std::shared_ptr<Item>>, StarException> Item
   return *item;
 }
 
-List<std::shared_ptr<Item>> ItemBag::takeAll() {
+List<std::shared_ptr<Item>> ItemBag::take_all() {
   cleanup();
   List<std::shared_ptr<Item>> taken;
   for (auto& item : m_items) {
@@ -182,262 +181,260 @@ List<std::shared_ptr<Item>> ItemBag::takeAll() {
   return taken;
 }
 
-std::expected<void, StarException> ItemBag::setItem(std::size_t pos, std::shared_ptr<Item> item) {
-  auto storedItem = at(pos);
-  if (!storedItem)
-    return std::unexpected(std::move(storedItem.error()));
-  storedItem->get() = std::move(item);
+std::expected<void, StarException> ItemBag::set_item(std::size_t pos, std::shared_ptr<Item> item) {
+  auto stored_item = at(pos);
+  if (!stored_item)
+    return std::unexpected(std::move(stored_item.error()));
+  stored_item->get() = std::move(item);
   return {};
 }
 
-std::expected<std::shared_ptr<Item>, StarException> ItemBag::putItems(std::size_t pos, std::shared_ptr<Item> items) {
+std::expected<std::shared_ptr<Item>, StarException> ItemBag::put_items(std::size_t pos, std::shared_ptr<Item> items) {
   if (!items || items->empty())
     return std::shared_ptr<Item>();
   auto slot = at(pos);
   if (!slot)
     return std::unexpected(std::move(slot.error()));
-  auto& storedItem = slot->get();
-  if (storedItem) {
-    storedItem->stack_with(optional_ref(items));
+  auto& stored_item = slot->get();
+  if (stored_item) {
+    stored_item->stack_with(optional_ref(items));
     if (!items->empty())
       return items;
   } else {
-    storedItem = std::move(items);
+    stored_item = std::move(items);
   }
   return std::shared_ptr<Item>();
 }
 
-std::expected<std::shared_ptr<Item>, StarException> ItemBag::takeItems(std::size_t pos, std::uint64_t count) {
+std::expected<std::shared_ptr<Item>, StarException> ItemBag::take_items(std::size_t pos, std::uint64_t count) {
   auto slot = at(pos);
   if (!slot)
     return std::unexpected(std::move(slot.error()));
-  auto& storedItem = slot->get();
-  if (!storedItem)
+  auto& stored_item = slot->get();
+  if (!stored_item)
     return std::shared_ptr<Item>();
-  auto taken = storedItem->take(count);
+  auto taken = stored_item->take(count);
   if (!taken)
     return std::unexpected(std::move(taken.error()));
-  if (storedItem->empty())
-    storedItem.reset();
+  if (stored_item->empty())
+    stored_item.reset();
   return taken;
 }
 
-std::expected<std::shared_ptr<Item>, StarException> ItemBag::swapItems(std::size_t pos, std::shared_ptr<Item> items, bool tryCombine) {
+std::expected<std::shared_ptr<Item>, StarException> ItemBag::swap_items(std::size_t pos, std::shared_ptr<Item> items, bool try_combine) {
   auto slot = at(pos);
   if (!slot)
     return std::unexpected(std::move(slot.error()));
-  auto& storedItem = slot->get();
+  auto& stored_item = slot->get();
 
-  auto swapItems = std::move(items);
-  if (!swapItems || swapItems->empty()) {
-    // If we are passed in nothing, simply return what's there, if anything.
-    swapItems = storedItem;
-    storedItem = {};
-  } else if (storedItem) {
-    // If something is there, try to stack with it first.  If we can't stack,
-    // then swap.
-    if (!tryCombine || !storedItem->stack_with(optional_ref(swapItems)))
-      std::swap(storedItem, swapItems);
-  } else {
-    // Otherwise just place the given items in the slot.
-    storedItem = swapItems;
-    swapItems = {};
+  // Empty input removes the stored stack; an empty slot adopts the input.
+  if (!items || items->empty())
+    return std::move(stored_item);
+  if (!stored_item) {
+    stored_item = std::move(items);
+    return std::shared_ptr<Item>();
   }
 
-  return swapItems;
+  // Preserve the unmerged input (even when the merge exhausts it).
+  if (!try_combine || !stored_item->stack_with(optional_ref(items)))
+    std::swap(stored_item, items);
+  return items;
 }
 
-std::expected<bool, StarException> ItemBag::consumeItems(std::size_t pos, std::uint64_t count) {
+std::expected<bool, StarException> ItemBag::consume_items(std::size_t pos, std::uint64_t count) {
   auto slot = at(pos);
   if (!slot)
     return std::unexpected(std::move(slot.error()));
-  auto& storedItem = slot->get();
+  auto& stored_item = slot->get();
   bool consumed = false;
-  if (storedItem) {
-    consumed = storedItem->consume(count);
-    if (storedItem->empty())
-      storedItem.reset();
+  if (stored_item) {
+    consumed = stored_item->consume(count);
+    if (stored_item->empty())
+      stored_item.reset();
   }
   return consumed;
 }
 
-bool ItemBag::consumeItems(ItemDescriptor const& descriptor, bool exactMatch) {
-  std::uint64_t countLeft = descriptor.count();
-  List<std::pair<std::size_t, std::uint64_t>> consumeLocations;
+bool ItemBag::consume_items(ItemDescriptor const& descriptor, bool exact_match) {
+  std::uint64_t count_left = descriptor.count();
+  List<std::pair<std::size_t, std::uint64_t>> consume_locations;
   for (std::size_t i = 0; i < m_items.size(); ++i) {
-    auto& storedItem = m_items[i];
-    if (storedItem && storedItem->empty())
-      storedItem.reset();
-    if (storedItem && storedItem->matches(descriptor, exactMatch)) {
-      std::uint64_t count = storedItem->count();
-      std::uint64_t take = std::min(count, countLeft);
-      consumeLocations.push_back({i, take});
-      countLeft -= take;
-      if (countLeft == 0)
+    auto& stored_item = m_items[i];
+    if (stored_item && stored_item->empty())
+      stored_item.reset();
+    if (stored_item && stored_item->matches(descriptor, exact_match)) {
+      std::uint64_t count = stored_item->count();
+      std::uint64_t take = std::min(count, count_left);
+      consume_locations.push_back({i, take});
+      count_left -= take;
+      if (count_left == 0)
         break;
     }
   }
 
   // Only consume any if we can consume them all
-  if (countLeft > 0)
+  if (count_left > 0)
     return false;
 
-  for (auto const& loc : consumeLocations) {
-    auto& storedItem = m_items[loc.first];
-    storedItem->consume(loc.second);
-    if (storedItem->empty())
-      storedItem.reset();
+  for (auto const& [index, count] : consume_locations) {
+    auto& stored_item = m_items[index];
+    stored_item->consume(count);
+    if (stored_item->empty())
+      stored_item.reset();
   }
 
   return true;
 }
 
-std::uint64_t ItemBag::matching_count(ItemDescriptor const& descriptor, bool exactMatch) const {
+std::uint64_t ItemBag::matching_count(ItemDescriptor const& descriptor, bool exact_match) const {
   std::uint64_t count = 0;
   for (auto const& items : m_items) {
-    if (items && items->matches(descriptor, exactMatch))
+    if (items && items->matches(descriptor, exact_match))
       count += std::min(items->count(), std::numeric_limits<std::uint64_t>::max() - count);
   }
 
   return count;
 }
 
-std::uint64_t ItemBag::available(ItemDescriptor const& descriptor, bool exactMatch) const {
+std::uint64_t ItemBag::available(ItemDescriptor const& descriptor, bool exact_match) const {
   auto batch = descriptor.count();
-  return batch ? matching_count(descriptor, exactMatch) / batch : 0;
+  return batch ? matching_count(descriptor, exact_match) / batch : 0;
 }
 
-std::uint64_t ItemBag::itemsCanFit(std::optional<std::reference_wrapper<Item const>> items) const {
-  auto itemsFit = itemsFitWhere(items);
-  return items ? items->get().count() - itemsFit.leftover : 0;
-}
+namespace {
 
-std::uint64_t ItemBag::itemsCanStack(std::optional<std::reference_wrapper<Item const>> items) const {
-  auto itemsFit = itemsFitWhere(items);
-  std::uint64_t stackable = 0;
-  for (auto slot : itemsFit.slots)
-    if (m_items[slot])
-      stackable += stackTransfer(!m_items[slot]->empty() ? optional_ref(m_items[slot]) : std::nullopt, items);
-  return stackable;
-}
+constexpr auto ignore_slot = [](std::size_t) {};
 
-auto ItemBag::itemsFitWhere(std::optional<std::reference_wrapper<Item const>> items, std::uint64_t max) const -> ItemsFitWhereResult {
-  if (!items || items->get().empty())
-    return ItemsFitWhereResult();
-
-  List<std::size_t> slots;
-  StableHashSet<std::size_t> taken;
-  std::uint64_t count = std::min(items->get().count(), max);
-
-  while (true) {
-    if (count == 0)
-      break;
-
-    std::size_t slot = bestSlotAvailable(items->get(), false, [&](std::size_t i) {
-      return !taken.contains(i);
-    });
-    if (slot == npos)
-      break;
-    else {
-      slots.push_back(slot);
-      taken.insert(slot);
-    }
-
-    std::uint64_t available = stackTransfer(m_items[slot] && !m_items[slot]->empty() ? optional_ref(m_items[slot]) : std::nullopt, items);
-    if (available != 0)
-      count -= std::min(available, count);
-    else
-      break;
-  }
-
-  return ItemsFitWhereResult{count, slots};
-}
-
-std::expected<std::shared_ptr<Item>, StarException> ItemBag::addItems(std::shared_ptr<Item> items) {
-  if (!items || items->empty())
-    return std::shared_ptr<Item>();
-
-  while (true) {
-    std::size_t slot = bestSlotAvailable(*items, false);
-    if (slot == npos)
-      return items;
-
-    auto& storedItem = m_items[slot];
-    if (storedItem && storedItem->empty())
-      storedItem.reset();
-    if (storedItem) {
-      storedItem->stack_with(optional_ref(items));
-      if (items->empty())
-        return std::shared_ptr<Item>();
-    } else {
-      storedItem = std::move(items);
-      return std::shared_ptr<Item>();
+template <typename RecordSlot>
+  requires std::invocable<RecordSlot&, std::size_t&>
+std::uint64_t unplaced_items(List<std::shared_ptr<Item>> const& slots,
+    std::optional<std::reference_wrapper<Item const>> source, std::uint64_t remaining,
+    bool include_vacant, RecordSlot record_slot) {
+  std::size_t first_vacant = npos;
+  for (std::size_t i = 0; remaining && i < slots.size(); ++i) {
+    auto const& target = slots[i];
+    if (!target || target->empty()) {
+      if (first_vacant == npos)
+        first_vacant = i;
+    } else if (auto capacity = target->could_stack(source)) {
+      record_slot(i);
+      remaining -= std::min(remaining, capacity);
     }
   }
+
+  // Existing stacks take precedence. The legacy stack-only query counts a
+  // retained zero stack if it was the first vacant slot, but not a null slot.
+  if (remaining && first_vacant != npos && (include_vacant || slots[first_vacant])) {
+    record_slot(first_vacant);
+    return 0;
+  }
+  return remaining;
 }
 
-std::expected<std::shared_ptr<Item>, StarException> ItemBag::stackItems(std::shared_ptr<Item> items) {
-  if (!items || items->empty())
-    return std::shared_ptr<Item>();
+std::shared_ptr<Item> transfer_items(List<std::shared_ptr<Item>>& slots,
+    std::shared_ptr<Item> source, bool include_vacant) {
+  if (!source || source->empty())
+    return {};
 
-  while (true) {
-    std::size_t slot = bestSlotAvailable(*items, true);
-    if (slot == npos)
-      return items;
-
-    auto& storedItem = m_items[slot];
-    if (storedItem && storedItem->empty())
-      storedItem.reset();
-    if (storedItem) {
-      storedItem->stack_with(optional_ref(items));
-      if (items->empty())
-        return std::shared_ptr<Item>();
-    } else {
-      storedItem = std::move(items);
-      return std::shared_ptr<Item>();
+  std::size_t first_vacant = npos;
+  for (std::size_t i = 0; i < slots.size(); ++i) {
+    auto& target = slots[i];
+    if (!target || target->empty()) {
+      if (include_vacant && first_vacant == npos)
+        first_vacant = i;
+    } else if (target != source && target->stack_with(optional_ref(source)) && source->empty()) {
+      return {};
     }
   }
+  if (first_vacant != npos) {
+    slots[first_vacant] = std::move(source);
+    return {};
+  }
+  return source;
 }
 
-std::expected<void, StarException> ItemBag::condenseStacks() {
-  cleanup();
-  for (std::size_t i = size(); i > 1;) {
-    --i;
-    if (auto& item = m_items[i]) {
-      for (std::size_t j = 0; j < i; ++j) {
-        if (auto& stackWithItem = m_items[j])
-          item->stack_with(optional_ref(stackWithItem));
-        if (item->empty())
-          break;
+}
+
+std::uint64_t ItemBag::items_can_fit(std::optional<std::reference_wrapper<Item const>> items) const {
+  auto count = items ? items->get().count() : 0;
+  return count - unplaced_items(m_items, items, count, true, ignore_slot);
+}
+
+std::uint64_t ItemBag::items_can_stack(std::optional<std::reference_wrapper<Item const>> items) const {
+  auto count = items ? items->get().count() : 0;
+  return count - unplaced_items(m_items, items, count, false, ignore_slot);
+}
+
+auto ItemBag::items_fit_where(std::optional<std::reference_wrapper<Item const>> items, std::uint64_t max) const
+    -> ItemsFitWhereResult {
+  auto count = items ? std::min(items->get().count(), max) : 0;
+  ItemsFitWhereResult fit{};
+  fit.leftover = unplaced_items(m_items, items, count, true, [&](std::size_t slot) { fit.slots.push_back(slot); });
+  return fit;
+}
+
+std::expected<std::shared_ptr<Item>, StarException> ItemBag::add_items(std::shared_ptr<Item> items) {
+  return transfer_items(m_items, std::move(items), true);
+}
+
+std::expected<std::shared_ptr<Item>, StarException> ItemBag::stack_items(std::shared_ptr<Item> items) {
+  return transfer_items(m_items, std::move(items), false);
+}
+
+std::expected<void, StarException> ItemBag::condense_stacks() {
+  std::size_t first_donor = 0;
+  for (std::size_t i = m_items.size(); i > 0;) {
+    auto& target = m_items[--i];
+    if (!target)
+      continue;
+    if (target->empty()) {
+      target.reset();
+      continue;
+    }
+    if (target->count() >= target->max_stack())
+      continue;
+
+    // Higher slots receive first; each receives from lower slots in ascending order.
+    for (std::size_t j = first_donor; j < i; ++j) {
+      auto& donor = m_items[j];
+      if (donor) {
+        if (donor != target)
+          target->stack_with(optional_ref(donor));
+        if (donor->empty())
+          donor.reset();
       }
+      if (j == first_donor && !donor)
+        ++first_donor;
+      if (target->count() >= target->max_stack())
+        break;
     }
   }
   return {};
 }
 
 std::expected<void, StarException> ItemBag::read(DataStream& ds) {
-  auto itemDatabase = m_root.get().itemDatabase();
-  if (!itemDatabase)
-    return std::unexpected(std::move(itemDatabase.error()));
+  auto database = m_root.get().itemDatabase();
+  if (!database)
+    return std::unexpected(std::move(database.error()));
   auto size = ds.read_vlq_u();
   if (!size)
     return std::unexpected(std::move(size.error()));
-  m_items.clear();
-  m_items.resize(*size);
-  auto setItemsSize = ds.read_vlq_u();
-  if (!setItemsSize)
-    return std::unexpected(std::move(setItemsSize.error()));
-  for (std::size_t i = 0; i < *setItemsSize; ++i) {
+  auto prefix = ds.read_vlq_u();
+  if (!prefix)
+    return std::unexpected(std::move(prefix.error()));
+  List<std::shared_ptr<Item>> slots;
+  if (*prefix > *size || *size > slots.max_size())
+    return std::unexpected(ItemException("Invalid item bag dimensions"));
+  slots.resize(*size);
+  for (std::size_t i = 0; i < *prefix; ++i) {
     auto descriptor = ds.read<ItemDescriptor>();
     if (!descriptor)
       return std::unexpected(std::move(descriptor.error()));
-    auto slot = at(i);
-    if (!slot)
-      return std::unexpected(std::move(slot.error()));
-    auto loaded = (*itemDatabase)->loadItem(*descriptor, slot->get());
+    auto loaded = (*database)->loadItem(*descriptor, slots[i]);
     if (!loaded)
       return std::unexpected(std::move(loaded.error()));
   }
+  m_items = std::move(slots);
   return {};
 }
 
@@ -445,57 +442,19 @@ std::expected<void, StarException> ItemBag::write(DataStream& ds) const {
   auto size = ds.write_vlq_u(m_items.size());
   if (!size)
     return std::unexpected(std::move(size.error()));
-  std::size_t setItemsSize = 0;
-  for (std::size_t i = 0; i < m_items.size(); ++i) {
-    if (m_items[i] && !m_items[i]->empty())
-      setItemsSize = i + 1;
-  }
-  auto writtenSize = ds.write_vlq_u(setItemsSize);
-  if (!writtenSize)
-    return std::unexpected(std::move(writtenSize.error()));
-  for (std::size_t i = 0; i < setItemsSize; ++i) {
+  auto prefix = m_items.size();
+  while (prefix && (!m_items[prefix - 1] || m_items[prefix - 1]->empty()))
+    --prefix;
+  auto written_size = ds.write_vlq_u(prefix);
+  if (!written_size)
+    return std::unexpected(std::move(written_size.error()));
+  for (std::size_t i = 0; i < prefix; ++i) {
     auto const& item = m_items[i];
-    auto written = ds.write(item_safe_descriptor(item && !item->empty() ? item : std::shared_ptr<Item>()));
+    auto written = ds.write(item && !item->empty() ? item->descriptor() : ItemDescriptor());
     if (!written)
       return std::unexpected(std::move(written.error()));
   }
   return {};
-}
-
-std::uint64_t ItemBag::stackTransfer(std::optional<std::reference_wrapper<Item const>> to, std::optional<std::reference_wrapper<Item const>> from) {
-  if (!from)
-    return 0;
-  else if (!to)
-    return from->get().count();
-  else if (!to->get().stackable_with(from))
-    return 0;
-  else
-    return std::min(to->get().max_stack() - to->get().count(), from->get().count());
-}
-
-std::size_t ItemBag::bestSlotAvailable(Item const& item, bool stacksOnly, std::function<bool(std::size_t)> test) const {
-  // First look for any slots that can stack, before empty slots.
-  for (std::size_t i = 0; i < m_items.size(); ++i) {
-    if (!test(i))
-      continue;
-    auto const& storedItem = m_items[i];
-    if (storedItem && !storedItem->empty() && stackTransfer(optional_ref(storedItem), std::cref(item)) != 0)
-      return i;
-  }
-
-  if (!stacksOnly) {
-    // Then, look for any empty slots.
-    for (std::size_t i = 0; i < m_items.size(); ++i) {
-      if (!m_items[i] || m_items[i]->empty())
-        return i;
-    }
-  }
-
-  return npos;
-}
-
-std::size_t ItemBag::bestSlotAvailable(Item const& item, bool stacksOnly) const {
-  return bestSlotAvailable(item, stacksOnly, [](std::size_t) { return true; });
 }
 
 }

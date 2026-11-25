@@ -174,7 +174,7 @@ std::expected<BagBatch, StarException> prepareBag(Root& root, ItemFixture const&
     auto item = fixture.prototypes[i % 4]->clone();
     if (!item)
       return std::unexpected(std::move(item.error()));
-    auto set = bag.setItem(i, std::move(*item));
+    auto set = bag.set_item(i, std::move(*item));
     if (!set)
       return std::unexpected(std::move(set.error()));
   }
@@ -189,7 +189,7 @@ std::expected<BagBatch, StarException> prepareBag(Root& root, ItemFixture const&
 std::expected<std::array<std::uint64_t, 5>, StarException> bagBatch(BagBatch& batch, ItemFixture const& fixture) {
   // These are ownership-transfer APIs in both revisions. The benchmark never
   // calls Item comparison or the query-only ItemBag pointer APIs directly.
-  auto leftover = batch.bag.stackItems(std::move(batch.incoming));
+  auto leftover = batch.bag.stack_items(std::move(batch.incoming));
   if (!leftover)
     return std::unexpected(std::move(leftover.error()));
   batch.incoming = std::move(*leftover);
@@ -239,7 +239,7 @@ void itemStackAndMatch(benchmark::State& state, BenchmarkSession& session) {
   auto checksum = HashSeed;
   for (auto count : *expected)
     checksum = mix(checksum, count);
-  label(state, "perfectlygenericitem, four parameter variants; stackItems + five exact available scans", checksum);
+  label(state, "perfectlygenericitem, four parameter variants; stack_items + five exact available scans", checksum);
   for (auto _ : state) {
     (void)_;
     state.PauseTiming();

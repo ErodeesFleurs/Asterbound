@@ -437,7 +437,7 @@ std::expected<void, StarException> MerchantPane::dismissed() {
   if (!dismissedResult612)
     return std::unexpected(std::move(dismissedResult612.error()));
 
-  for (auto unsold : m_itemBag->takeAll())
+  for (auto unsold : m_itemBag->take_all())
     {
       auto giveItemResult613 = m_player->giveItem(unsold);
       if (!giveItemResult613)
@@ -544,7 +544,7 @@ EntityId MerchantPane::sourceEntityId() const {
 
 std::expected<std::shared_ptr<Item>, StarException> MerchantPane::addItems(std::shared_ptr<Item> const& items) {
   if (m_tabSet->selectedTab() == 1) {
-    auto addItemsResult629 = m_itemBag->addItems(items);
+    auto addItemsResult629 = m_itemBag->add_items(items);
     if (!addItemsResult629)
       return std::unexpected(std::move(addItemsResult629.error()));
     auto remainder = std::move(*addItemsResult629);
@@ -566,7 +566,7 @@ std::expected<void, StarException> MerchantPane::swapSlot() {
       if (!selectedItemResult631)
         return std::unexpected(std::move(selectedItemResult631.error()));
       if (std::move(*selectedItemResult631)) {
-        auto takeItemsResult632 = m_itemBag->takeItems(m_itemGrid->selectedIndex());
+        auto takeItemsResult632 = m_itemBag->take_items(m_itemGrid->selectedIndex());
         if (!takeItemsResult632)
           return std::unexpected(std::move(takeItemsResult632.error()));
         auto addItemsResult633 = inv->addItems(std::move(*takeItemsResult632));
@@ -575,7 +575,7 @@ std::expected<void, StarException> MerchantPane::swapSlot() {
         auto remainder = std::move(*addItemsResult633);
         if (remainder && !remainder->empty())
           {
-            auto setItemResult634 = m_itemBag->setItem(m_itemGrid->selectedIndex(), remainder);
+            auto setItemResult634 = m_itemBag->set_item(m_itemGrid->selectedIndex(), remainder);
             if (!setItemResult634)
               return std::unexpected(std::move(setItemResult634.error()));
             
@@ -585,7 +585,7 @@ std::expected<void, StarException> MerchantPane::swapSlot() {
   } else {
     if (auto heldItem = m_player->inventory()->swapSlotItem())
       {
-        auto swapItemsResult635 = m_itemBag->swapItems(m_itemGrid->selectedIndex(), heldItem);
+        auto swapItemsResult635 = m_itemBag->swap_items(m_itemGrid->selectedIndex(), heldItem);
         if (!swapItemsResult635)
           return std::unexpected(std::move(swapItemsResult635.error()));
         auto setSwapSlotItemResult636 = inv->setSwapSlotItem(std::move(*swapItemsResult635));
@@ -595,7 +595,7 @@ std::expected<void, StarException> MerchantPane::swapSlot() {
       }
     else
       {
-        auto takeItemsResult637 = m_itemBag->takeItems(m_itemGrid->selectedIndex());
+        auto takeItemsResult637 = m_itemBag->take_items(m_itemGrid->selectedIndex());
         if (!takeItemsResult637)
           return std::unexpected(std::move(takeItemsResult637.error()));
         auto setSwapSlotItemResult638 = inv->setSwapSlotItem(std::move(*takeItemsResult637));
@@ -911,7 +911,7 @@ std::expected<void, StarException> MerchantPane::updateSellTotal() {
 
 std::expected<void, StarException> MerchantPane::sell() {
   if (m_sellTotal > 0) {
-    auto toJsonResult687 = m_itemBag->toJson();
+    auto toJsonResult687 = m_itemBag->to_json();
     if (!toJsonResult687)
       return std::unexpected(std::move(toJsonResult687.error()));
     auto sellSummary = JsonObject{{"items", std::move(*toJsonResult687)}, {"total", m_sellTotal}};
@@ -922,7 +922,7 @@ std::expected<void, StarException> MerchantPane::sell() {
     auto addCurrencyResult689 = m_player->inventory()->addCurrency("money", m_sellTotal);
     if (!addCurrencyResult689)
       return std::unexpected(std::move(addCurrencyResult689.error()));
-    m_itemBag->clearItems();
+    m_itemBag->clear_items();
     auto updateSellTotalResult690 = updateSellTotal();
     if (!updateSellTotalResult690)
       return std::unexpected(std::move(updateSellTotalResult690.error()));
