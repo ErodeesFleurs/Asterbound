@@ -248,7 +248,7 @@ std::expected<std::shared_ptr<ItemDrop>, StarException> ItemDrop::create(Root& r
   auto itemStore = store.get("item");
   if (!itemStore)
     return std::unexpected(std::move(itemStore.error()));
-  auto item = (*database)->diskLoad(*itemStore);
+  auto item = (*database)->disk_load(*itemStore);
   if (!item)
     return std::unexpected(std::move(item.error()));
   if (auto initialized = drop->initializeItem(std::move(*item)); !initialized)
@@ -312,7 +312,7 @@ std::expected<Json, StarException> ItemDrop::diskStore() const {
   auto database = root().itemDatabase();
   if (!database)
     return std::unexpected(std::move(database.error()));
-  auto stored = (*database)->diskStore(m_item);
+  auto stored = (*database)->disk_store(m_item);
   if (!stored)
     return std::unexpected(std::move(stored.error()));
   if (!ModeNames)
@@ -547,7 +547,7 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
       auto database = root().itemDatabase();
       if (!database)
         return std::unexpected(std::move(database.error()));
-      auto aged = (*database)->ageItem(m_item, m_age_items_timer.elapsed_time());
+      auto aged = (*database)->age_item(m_item, m_age_items_timer.elapsed_time());
       if (!aged)
         return std::unexpected(std::move(aged.error()));
       if (*aged)
@@ -559,7 +559,7 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
       auto database = root().itemDatabase();
       if (!database)
         return std::unexpected(std::move(database.error()));
-      auto loaded = (*database)->loadItem(m_itemDescriptor.get(), m_item);
+      auto loaded = (*database)->load_item(m_itemDescriptor.get(), m_item);
       if (!loaded)
         return std::unexpected(std::move(loaded.error()));
       if (!m_item)

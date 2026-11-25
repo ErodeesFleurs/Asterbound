@@ -529,10 +529,10 @@ std::expected<void, StarException> ContainerPane::initialize(std::shared_ptr<Wor
       auto iconItemResult276 = container->iconItem();
       if (!iconItemResult276)
         return std::unexpected(std::move(iconItemResult276.error()));
-      auto itemSharedResult277 = itemDatabase->itemShared(std::move(*iconItemResult276));
-      if (!itemSharedResult277)
-        return std::unexpected(std::move(itemSharedResult277.error()));
-      auto iconItem = std::move(*itemSharedResult277);
+      auto item_shared_result277 = itemDatabase->item_shared(std::move(*iconItemResult276));
+      if (!item_shared_result277)
+        return std::unexpected(std::move(item_shared_result277.error()));
+      auto iconItem = std::move(*item_shared_result277);
       auto createResult278 = ItemSlotWidget::create(context(), iconItem, "/interface/inventory/portrait.png");
       if (!createResult278)
         return std::unexpected(std::move(createResult278.error()));

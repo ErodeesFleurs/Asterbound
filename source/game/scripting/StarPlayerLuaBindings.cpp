@@ -907,7 +907,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     auto inventory = player.inventory();
     auto items = inventory->availableItems();
     if (!items) return std::unexpected(std::move(items.error()));
-    auto recipes = (*database)->recipesFromBagContents(*items, inventory->availableCurrencies(), filter.value_or(StringSet{}));
+    auto recipes = (*database)->recipes_from_bag_contents(*items, inventory->availableCurrencies(), filter.value_or(StringSet{}));
     JsonArray result;
     result.reserve(recipes.size());
     for (auto const& recipe : recipes) {

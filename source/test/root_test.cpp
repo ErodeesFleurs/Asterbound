@@ -2711,6 +2711,103 @@ const GameTestRegistration simultaneousWorldMaterials("RootTest", "SimultaneousW
   ASSERT_TRUE(placeIsolationMaterial(*worldB, Vec2I(1048, 1024), material, true));
 });
 
+const GameTestRegistration item_shared_builder_seeds("ItemDatabaseTest", "SharedBuilderSeedsUseRequestIdentity", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  if (!GameTest::check(directory.has_value(), "creating the builder fixture directory"))
+    return;
+  auto cleanup = make_scope_exit([&] {
+    GameTest::check(bool(File::remove_all(*directory)), "removing the builder fixture directory");
+  });
+  auto settings = isolationSettings(fixture.rootSettings(), *directory, "item-seed-probe");
+  if (!GameTest::check(settings.has_value(), "configuring the builder fixture"))
+    return;
+  auto written = writeIsolationModules(File::relative_to(*directory, "assets"), {
+    {"item-seed-probe.item", R"({
+      "itemName":"item-seed-probe","rarity":"common","maxStack":10,"builder":"/item-seed-probe.lua"
+    })"},
+    {"item-seed-probe.lua", R"LUA(
+      function build(_, config, parameters, level, seed)
+        local builds = root.getConfiguration("itemSeedProbeBuilds") + 1
+        root.setConfiguration("itemSeedProbeBuilds", builds)
+        parameters.buildLevel = level
+        if parameters.seedMode == "retain" then
+          parameters.seed = seed
+        elseif parameters.seedMode == "generate" then
+          parameters.wasSeeded = seed ~= nil
+          -- Disjoint ranges let the test observe fresh random draws without collision risk.
+          parameters.seed = seed or builds * 1000 + sb.makeRandomSource():randInt(0, 999)
+        end
+        return config, parameters
+      end
+    )LUA"}
+  });
+  if (!GameTest::check(written.has_value(), "writing the builder fixture assets"))
+    return;
+  auto root = Root::create(std::move(*settings));
+  if (!GameTest::check(root.has_value(), "creating the builder fixture root"))
+    return;
+  auto configuration = (*root)->configuration();
+  if (!GameTest::check(configuration && (*configuration)->set("itemSeedProbeBuilds", 0), "initializing the Lua build counter"))
+    return;
+  auto database = (*root)->itemDatabase();
+  if (!GameTest::check(database.has_value(), "loading the builder fixture item database"))
+    return;
+  auto valid_item = [](std::expected<std::shared_ptr<Item>, StarException> const& result) {
+    return result && *result && (*result)->name() == "item-seed-probe";
+  };
+
+  auto ignore = ItemDescriptor::create("item-seed-probe", 1);
+  auto retain = ItemDescriptor::create("item-seed-probe", 1, JsonObject{{"seedMode", "retain"}});
+  auto generate = ItemDescriptor::create("item-seed-probe", 1, JsonObject{{"seedMode", "generate"}});
+  if (!GameTest::check(ignore && retain && generate, "creating the seed probe descriptors"))
+    return;
+  auto& db = **database;
+  auto ignored = db.item_shared(*ignore, {}, 0);
+  if (!GameTest::check(valid_item(ignored), "running the builder that discards the explicit seed"))
+    return;
+  GameTest::check(db.item_shared(*ignore, {}, 0) == *ignored && (*configuration)->get("itemSeedProbeBuilds") == Json(1),
+      "the same explicit seed hits before invoking a builder that discards it");
+  auto unseeded = db.item_shared(*ignore);
+  GameTest::check(valid_item(unseeded) && *unseeded != *ignored && db.item_shared(*ignore) == *unseeded,
+      "a seedless result remains cacheable but cannot alias explicit seed zero");
+  auto other_seed = db.item_shared(*ignore, {}, 1);
+  GameTest::check(valid_item(other_seed) && *other_seed != *ignored && db.item_shared(*ignore, {}, 1) == *other_seed,
+      "distinct explicit seeds do not alias even when the builder ignores them");
+  auto other_count = db.item_shared(ignore->withCount(2), {}, 0);
+  GameTest::check(valid_item(other_count) && *other_count != *ignored && (*other_count)->count() == 2 && (*ignored)->count() == 1,
+      "shared requests with different counts do not alias");
+  auto other_level = db.item_shared(*ignore, 2.0f, 0);
+  GameTest::check(valid_item(other_level) && *other_level != *ignored && (*other_level)->parameters().get_double("buildLevel") == 2.0,
+      "shared requests with different levels do not alias");
+
+  auto retained = db.item_shared(*retain, {}, 17);
+  GameTest::check(valid_item(retained) && (*retained)->parameters().get_uint("seed") == 17u && db.item_shared(*retain, {}, 17) == *retained,
+      "an explicit seed still hits when the builder retains it");
+  auto first = db.item_shared(*generate);
+  auto second = db.item_shared(*generate);
+  if (!GameTest::check(valid_item(first) && valid_item(second), "running the unseeded random builder twice"))
+    return;
+  auto first_seed = (*first)->parameters().get_uint("seed");
+  auto second_seed = (*second)->parameters().get_uint("seed");
+  if (!GameTest::check(first_seed && second_seed && *first_seed != *second_seed && *first != *second,
+      "unseeded generation runs again and preserves its fresh seed"))
+    return;
+  auto explicit_generated_seed = db.item_shared(*generate, {}, *first_seed);
+  if (!GameTest::check(valid_item(explicit_generated_seed) && *explicit_generated_seed != *first
+      && (*explicit_generated_seed)->parameters().get_bool("wasSeeded") == true
+      && (*explicit_generated_seed)->parameters().get_uint("seed") == *first_seed
+      && db.item_shared(*generate, {}, *first_seed) == *explicit_generated_seed,
+      "an unseeded result cannot populate the cache entry for the seed it generated"))
+    return;
+  auto third = db.item_shared(*generate);
+  if (!GameTest::check(valid_item(third), "running the unseeded random builder after an explicit cache hit"))
+    return;
+  auto third_seed = (*third)->parameters().get_uint("seed");
+  GameTest::check(third_seed && *third_seed != *first_seed && *third_seed != *second_seed
+      && *third != *explicit_generated_seed && (*third)->parameters().get_bool("wasSeeded") == false,
+      "caching an explicit result does not stop later unseeded generation");
+});
+
 const GameTestRegistration animatorPartDrawableFirstAdd("AnimatorTest", "PartDrawableFirstAdd", [](GameTest& fixture) {
   auto config = Json::parse_json(R"JSON({"animatedParts":{"parts":{"body":{"properties":{}}}}})JSON");
   ASSERT_TRUE(config) << config.error().what();
@@ -2779,14 +2876,14 @@ const GameTestRegistration animatorPartDrawableFirstAdd("AnimatorTest", "PartDra
 // Use authored items with actual handedness instead of test-only overrides.
 std::expected<std::shared_ptr<Item>, StarException> hudAuthoredItem(
     ItemDatabase const& database, ItemType requiredType, bool twoHanded) {
-  auto names = database.allItems();
+  auto names = database.all_items();
   names.sort();
   for (auto const& name : names) {
-    auto type = database.itemType(name);
+    auto type = database.item_type(name);
     if (!type) return std::unexpected(std::move(type.error()));
     if (*type != requiredType)
       continue;
-    auto item = database.fromJson(name);
+    auto item = database.from_json(name);
     if (!item) return std::unexpected(std::move(item.error()));
     if (*item && (*item)->two_handed() == twoHanded)
       return *item;

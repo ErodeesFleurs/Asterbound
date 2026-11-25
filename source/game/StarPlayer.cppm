@@ -643,7 +643,7 @@ private:
 
   [[nodiscard]] std::expected<void, StarException> getNetStates(bool initial);
   [[nodiscard]] std::expected<void, StarException> setNetStates();
-  [[nodiscard]] std::expected<void, StarException> getNetArmorSecrets();
+  [[nodiscard]] std::expected<void, StarException> apply_net_armor_secrets();
   [[nodiscard]] std::expected<void, StarException> setNetArmorSecret(EquipmentSlot slot, std::shared_ptr<ArmorItem> const& armor, bool visible = true);
   [[nodiscard]] std::expected<void, StarException> setNetArmorSecrets(bool includeEmpty = false);
 
@@ -726,7 +726,7 @@ private:
 
   std::shared_ptr<ToolUser> m_tools;
   std::shared_ptr<ArmorWearer> m_armor;
-  HashMap<EquipmentSlot, std::uint64_t> m_armorSecretNetVersions;
+  HashMap<EquipmentSlot, std::uint64_t> m_armor_secret_net_versions;
 
   bool m_useDown;
   bool m_edgeTriggeredUse;

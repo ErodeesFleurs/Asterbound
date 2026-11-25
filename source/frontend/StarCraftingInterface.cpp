@@ -469,10 +469,10 @@ std::expected<void, StarException> CraftingPane::initialize(std::shared_ptr<Worl
             auto iconItemResult377 = container->iconItem();
             if (!iconItemResult377)
               return std::unexpected(std::move(iconItemResult377.error()));
-            auto itemSharedResult378 = itemDatabase->itemShared(std::move(*iconItemResult377));
-            if (!itemSharedResult378)
-              return std::unexpected(std::move(itemSharedResult378.error()));
-            auto iconItem = std::move(*itemSharedResult378);
+            auto item_shared_result378 = itemDatabase->item_shared(std::move(*iconItemResult377));
+            if (!item_shared_result378)
+              return std::unexpected(std::move(item_shared_result378.error()));
+            auto iconItem = std::move(*item_shared_result378);
             auto createResult379 = ItemSlotWidget::create(context(), iconItem, "/interface/inventory/portrait.png");
             if (!createResult379)
               return std::unexpected(std::move(createResult379.error()));
@@ -632,14 +632,6 @@ std::expected<void, StarException> CraftingPane::upgradeTable() {
   return {};
 }
 
-std::expected<std::size_t, StarException> CraftingPane::itemCount(List<std::shared_ptr<Item>> const& store, ItemDescriptor const& item) {
-  auto itemDatabaseResult408 = context().root().itemDatabase();
-  if (!itemDatabaseResult408)
-    return std::unexpected(std::move(itemDatabaseResult408.error()));
-  auto itemDb = std::move(*itemDatabaseResult408);
-  return itemDb->get_count_of_item(store, item);
-}
-
 std::expected<void, StarException> CraftingPane::update(float dt) {
   // shut down if we can't reach the table anymore.
   if (m_sourceEntityId != null_entity_id) {
@@ -696,10 +688,10 @@ std::expected<void, StarException> CraftingPane::update(float dt) {
       auto itemDatabaseResult415 = context().root().itemDatabase();
       if (!itemDatabaseResult415)
         return std::unexpected(std::move(itemDatabaseResult415.error()));
-      auto itemSharedResult416 = std::move(*itemDatabaseResult415)->itemShared(recipe.output);
-      if (!itemSharedResult416)
-        return std::unexpected(std::move(itemSharedResult416.error()));
-      auto item = std::move(*itemSharedResult416);
+      auto item_shared_result416 = std::move(*itemDatabaseResult415)->item_shared(recipe.output);
+      if (!item_shared_result416)
+        return std::unexpected(std::move(item_shared_result416.error()));
+      auto item = std::move(*item_shared_result416);
       auto buildItemDescriptionResult417 = ItemTooltipBuilder::buildItemDescription(context(), description, item);
       if (!buildItemDescriptionResult417)
         return std::unexpected(std::move(buildItemDescriptionResult417.error()));
@@ -947,10 +939,10 @@ std::expected<void, StarException> CraftingPane::setupWidget(std::shared_ptr<Wid
     auto itemDatabaseResult454 = root.itemDatabase();
     if (!itemDatabaseResult454)
       return std::unexpected(std::move(itemDatabaseResult454.error()));
-    auto itemSharedResult455 = std::move(*itemDatabaseResult454)->itemShared(single);
-    if (!itemSharedResult455)
-      return std::unexpected(std::move(itemSharedResult455.error()));
-    item = std::move(*itemSharedResult455);
+    auto item_shared_result455 = std::move(*itemDatabaseResult454)->item_shared(single);
+    if (!item_shared_result455)
+      return std::unexpected(std::move(item_shared_result455.error()));
+    item = std::move(*item_shared_result455);
     m_itemCache[single] = item;
   }
 
@@ -1153,10 +1145,10 @@ std::expected<std::shared_ptr<Pane>, StarException> CraftingPane::setupTooltip(I
       auto createResult496 = ItemDescriptor::create(std::move(*getStringResult495));
       if (!createResult496)
         return std::unexpected(std::move(createResult496.error()));
-      auto itemSharedResult497 = std::move(*itemDatabaseResult493)->itemShared(std::move(*createResult496));
-      if (!itemSharedResult497)
-        return std::unexpected(std::move(itemSharedResult497.error()));
-      auto currencyItem = std::move(*itemSharedResult497);
+      auto item_shared_result497 = std::move(*itemDatabaseResult493)->item_shared(std::move(*createResult496));
+      if (!item_shared_result497)
+        return std::unexpected(std::move(item_shared_result497.error()));
+      auto currencyItem = std::move(*item_shared_result497);
       addIngredient(currencyItem, m_player->currency(p.first), p.second);
     }
   }
@@ -1165,10 +1157,10 @@ std::expected<std::shared_ptr<Pane>, StarException> CraftingPane::setupTooltip(I
     auto itemDatabaseResult498 = root.itemDatabase();
     if (!itemDatabaseResult498)
       return std::unexpected(std::move(itemDatabaseResult498.error()));
-    auto itemSharedResult499 = std::move(*itemDatabaseResult498)->itemShared(input.singular());
-    if (!itemSharedResult499)
-      return std::unexpected(std::move(itemSharedResult499.error()));
-    auto item = std::move(*itemSharedResult499);
+    auto item_shared_result499 = std::move(*itemDatabaseResult498)->item_shared(input.singular());
+    if (!item_shared_result499)
+      return std::unexpected(std::move(item_shared_result499.error()));
+    auto item = std::move(*item_shared_result499);
     std::size_t itemCount = itemDb->get_count_of_item(normalizedBag, input, recipe.matchInputParameters);
     addIngredient(item, itemCount, input.count());
   }
@@ -1422,7 +1414,7 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
             if (!getConfigResult541)
               return std::unexpected(std::move(getConfigResult541.error()));
             if (auto objectConfig = std::move(*getConfigResult541)) {
-              if (objectConfig->printable && itemDb->hasItem(itemName))
+              if (objectConfig->printable && itemDb->has_item(itemName))
                 printableItems.push_back(itemName);
             }
           }
@@ -1444,20 +1436,20 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
         if (!createResult544)
           return std::unexpected(std::move(createResult544.error()));
         recipe.output = std::move(*createResult544);
-        auto itemSharedResult545 = itemDb->itemShared(recipe.output);
-        if (!itemSharedResult545)
-          return std::unexpected(std::move(itemSharedResult545.error()));
-        auto recipeItem = std::move(*itemSharedResult545);
+        auto item_shared_result545 = itemDb->item_shared(recipe.output);
+        if (!item_shared_result545)
+          return std::unexpected(std::move(item_shared_result545.error()));
+        auto recipeItem = std::move(*item_shared_result545);
         auto price = static_cast<double>(recipeItem->price()) * printFactor;
         if (!(price >= 0 && price < 0x1p64))
           return std::unexpected(RecipeException("Printer currency requirement exceeds supported range"));
         recipe.currencyInputs["money"] = static_cast<std::uint64_t>(price);
         recipe.outputRarity = recipeItem->rarity();
         recipe.duration = printTime;
-        auto guiFilterStringResult546 = ItemDatabase::guiFilterString(recipeItem);
-        if (!guiFilterStringResult546)
-          return std::unexpected(std::move(guiFilterStringResult546.error()));
-        recipe.guiFilterString = std::move(*guiFilterStringResult546);
+        auto gui_filter_string_result546 = ItemDatabase::gui_filter_string(recipeItem);
+        if (!gui_filter_string_result546)
+          return std::unexpected(std::move(gui_filter_string_result546.error()));
+        recipe.guiFilterString = std::move(*gui_filter_string_result546);
         auto getConfigResult547 = objectDatabase->getConfig(itemName);
         if (!getConfigResult547)
           return std::unexpected(std::move(getConfigResult547.error()));
@@ -1479,14 +1471,14 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
                 auto toStringResult550 = entry.to_string();
                 if (!toStringResult550)
                   return std::unexpected(std::move(toStringResult550.error()));
-                recipes.insert_range(itemDb->recipesForOutputItem(std::move(*toStringResult550)));
+                recipes.insert_range(itemDb->recipes_for_output_item(*toStringResult550));
               }
             else
               {
-                auto parseRecipeResult551 = itemDb->parseRecipe(entry);
-                if (!parseRecipeResult551)
-                  return std::unexpected(std::move(parseRecipeResult551.error()));
-                recipes.add(std::move(*parseRecipeResult551));
+                auto parse_recipe_result551 = itemDb->parse_recipe(entry);
+                if (!parse_recipe_result551)
+                  return std::unexpected(std::move(parse_recipe_result551.error()));
+                recipes.add(std::move(*parse_recipe_result551));
               }
           }
         }
@@ -1496,7 +1488,7 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
           auto availableItems = m_player->inventory()->availableItems();
           if (!availableItems)
             return std::unexpected(std::move(availableItems.error()));
-          recipes.insert_range(itemDb->recipesFromSubset(std::move(*availableItems),
+          recipes.insert_range(itemDb->recipes_from_subset(std::move(*availableItems),
                                                    m_player->inventory()->availableCurrencies(),
                                                    std::exchange(recipes, {}), m_filter));
           }
@@ -1506,10 +1498,10 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
             auto availableItemsResult553 = m_player->inventory()->availableItems();
             if (!availableItemsResult553)
               return std::unexpected(std::move(availableItemsResult553.error()));
-            recipes.insert_range(itemDb->recipesFromBagContents(std::move(*availableItemsResult553), m_player->inventory()->availableCurrencies(), m_filter));
+            recipes.insert_range(itemDb->recipes_from_bag_contents(std::move(*availableItemsResult553), m_player->inventory()->availableCurrencies(), m_filter));
           }
         else
-          recipes.insert_range(itemDb->allRecipes(m_filter));
+          recipes.insert_range(itemDb->all_recipes(m_filter));
       }
            }
   }
@@ -1582,10 +1574,10 @@ std::expected<List<ItemRecipe>, StarException> CraftingPane::determineRecipes() 
     return std::unexpected(std::move(itemDatabaseResult559.error()));
   auto itemDatabase = std::move(*itemDatabaseResult559);
   auto sortByComputedValueResult563 = sort_by_key(sortedRecipes, [itemDatabase](ItemRecipe const& recipe) -> std::expected<std::tuple<String, String>, StarException> {
-      auto itemFriendlyNameResult560 = itemDatabase->itemFriendlyName(recipe.output.name());
-      if (!itemFriendlyNameResult560)
-        return std::unexpected(std::move(itemFriendlyNameResult560.error()));
-      auto trimResult561 = std::move(*itemFriendlyNameResult560).trim();
+      auto item_friendly_name_result560 = itemDatabase->item_friendly_name(recipe.output.name());
+      if (!item_friendly_name_result560)
+        return std::unexpected(std::move(item_friendly_name_result560.error()));
+      auto trimResult561 = std::move(*item_friendly_name_result560).trim();
       if (!trimResult561)
         return std::unexpected(std::move(trimResult561.error()));
       auto toLowerResult562 = std::move(*trimResult561).to_lower();

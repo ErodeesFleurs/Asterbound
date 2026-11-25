@@ -1043,7 +1043,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
                                        return std::unexpected(std::move(itemDb.error()));
                                      JsonArray result;
                                      for (auto const& item : container->get().itemBag()->items())
-                                       result.push_back((*itemDb)->toJson(item));
+                                       result.push_back((*itemDb)->to_json(item));
                                      return result;
                                    }
                                    return Json();
@@ -1060,7 +1060,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
                 return std::unexpected(std::move(itemDb.error()));
               auto const& items = container->get().itemBag()->items();
               if (offset < items.size())
-                return (*itemDb)->toJson(items[offset]);
+                return (*itemDb)->to_json(items[offset]);
             }
             return Json();
           });
@@ -1131,7 +1131,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           if (*items) {
             JsonArray result;
             for (auto const& item : **items)
-              result.push_back((*itemDb)->toJson(item));
+              result.push_back((*itemDb)->to_json(item));
             return result;
           }
         }
@@ -1154,7 +1154,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
                 if (!item)
                   return std::unexpected(std::move(item.error()));
                 if (*item)
-                  return (*itemDb)->toJson(**item);
+                  return (*itemDb)->to_json(**item);
               }
             }
             return Json();
@@ -1177,7 +1177,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
                                                          if (!item)
                                                            return std::unexpected(std::move(item.error()));
                                                          if (*item)
-                                                           return (*itemDb)->toJson(**item);
+                                                           return (*itemDb)->to_json(**item);
                                                        }
                                                      }
                                                      return Json();
@@ -1193,7 +1193,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
                                      auto itemDb = entity->root().itemDatabase();
                                      if (!itemDb)
                                        return std::unexpected(std::move(itemDb.error()));
-                                     auto item = (*itemDb)->fromJson(items);
+                                     auto item = (*itemDb)->from_json(items);
                                      if (!item)
                                        return std::unexpected(std::move(item.error()));
                                      return container->get().itemBag()->items_can_fit(optional_ref(*item));
@@ -1210,7 +1210,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
               auto itemDb = entity->root().itemDatabase();
               if (!itemDb)
                 return std::unexpected(std::move(itemDb.error()));
-              auto item = (*itemDb)->fromJson(items);
+              auto item = (*itemDb)->from_json(items);
               if (!item)
                 return std::unexpected(std::move(item.error()));
               auto result = container->get().itemBag()->items_fit_where(optional_ref(*item));
@@ -1231,7 +1231,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
               auto itemDb = entity->root().itemDatabase();
               if (!itemDb)
                 return std::unexpected(std::move(itemDb.error()));
-              auto item = (*itemDb)->fromJson(items);
+              auto item = (*itemDb)->from_json(items);
               if (!item)
                 return std::unexpected(std::move(item.error()));
               auto promise = container->get().addItems(*item);
@@ -1241,7 +1241,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
               if (!result)
                 return std::unexpected(std::move(result.error()));
               if (*result)
-                return (*itemDb)->toJson(**result);
+                return (*itemDb)->to_json(**result);
             }
             return items;
           });
@@ -1255,7 +1255,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
               auto itemDb = entity->root().itemDatabase();
               if (!itemDb)
                 return std::unexpected(std::move(itemDb.error()));
-              auto item = (*itemDb)->fromJson(items);
+              auto item = (*itemDb)->from_json(items);
               if (!item)
                 return std::unexpected(std::move(item.error()));
               auto promise = container->get().addItems(*item);
@@ -1265,7 +1265,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
               if (!result)
                 return std::unexpected(std::move(result.error()));
               if (*result)
-                return (*itemDb)->toJson(**result);
+                return (*itemDb)->to_json(**result);
             }
             return items;
           });
@@ -1279,7 +1279,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
                                                        auto itemDb = entity->root().itemDatabase();
                                                        if (!itemDb)
                                                          return std::unexpected(std::move(itemDb.error()));
-                                                       auto item = (*itemDb)->fromJson(items);
+                                                       auto item = (*itemDb)->from_json(items);
                                                        if (!item)
                                                          return std::unexpected(std::move(item.error()));
                                                        if (offset < container->get().containerSize()) {
@@ -1290,7 +1290,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
                                                          if (!result)
                                                            return std::unexpected(std::move(result.error()));
                                                          if (*result)
-                                                           return (*itemDb)->toJson(**result);
+                                                           return (*itemDb)->to_json(**result);
                                                        }
                                                      }
                                                      return items;
@@ -1306,7 +1306,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
                                      auto itemDb = entity->root().itemDatabase();
                                      if (!itemDb)
                                        return std::unexpected(std::move(itemDb.error()));
-                                     auto item = (*itemDb)->fromJson(items);
+                                     auto item = (*itemDb)->from_json(items);
                                      if (!item)
                                        return std::unexpected(std::move(item.error()));
                                      if (offset < container->get().containerSize()) {
@@ -1317,7 +1317,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
                                        if (!result)
                                          return std::unexpected(std::move(result.error()));
                                        if (*result)
-                                         return (*itemDb)->toJson(**result);
+                                         return (*itemDb)->to_json(**result);
                                      }
                                    }
                                    return items;
@@ -1332,7 +1332,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
                                                        auto itemDb = entity->root().itemDatabase();
                                                        if (!itemDb)
                                                          return std::unexpected(std::move(itemDb.error()));
-                                                       auto item = (*itemDb)->fromJson(items);
+                                                       auto item = (*itemDb)->from_json(items);
                                                        if (!item)
                                                          return std::unexpected(std::move(item.error()));
                                                        if (offset < container->get().containerSize()) {
@@ -1343,7 +1343,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
                                                          if (!result)
                                                            return std::unexpected(std::move(result.error()));
                                                          if (*result)
-                                                           return (*itemDb)->toJson(**result);
+                                                           return (*itemDb)->to_json(**result);
                                                        }
                                                      }
                                                      return items;

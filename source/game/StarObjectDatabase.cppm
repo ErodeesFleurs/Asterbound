@@ -56,7 +56,6 @@ class Root;
 class World;
 class Image;
 class ItemDatabase;
-class RecipeDatabase;
 class Object;
 class LuaRoot;
 class Rebuilder;
@@ -274,7 +273,6 @@ export namespace Star {
   using ::Star::World;
   using ::Star::Image;
   using ::Star::ItemDatabase;
-  using ::Star::RecipeDatabase;
   using ::Star::Object;
   using ::Star::ObjectOrientation;
   using ::Star::ObjectConfig;

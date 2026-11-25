@@ -72,7 +72,7 @@ std::expected<std::shared_ptr<Item>, StarException> AugmentItem::applyTo(std::sh
   auto database = root().itemDatabase();
   if (!database)
     return std::unexpected(std::move(database.error()));
-  return (*database)->applyAugment(item, *this);
+  return (*database)->apply_augment(item, *this);
 }
 
 }

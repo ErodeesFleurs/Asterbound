@@ -208,11 +208,11 @@ ToolUser::ToolUser(Root& root)
   if (!database) return std::unexpected(std::move(database.error()));
   auto primaryJson = store.get("primaryHandItem", {});
   if (!primaryJson) return std::unexpected(std::move(primaryJson.error()));
-  auto primary = (*database)->diskLoad(*primaryJson);
+  auto primary = (*database)->disk_load(*primaryJson);
   if (!primary) return std::unexpected(std::move(primary.error()));
   auto altJson = store.get("altHandItem", {});
   if (!altJson) return std::unexpected(std::move(altJson.error()));
-  auto alt = (*database)->diskLoad(*altJson);
+  auto alt = (*database)->disk_load(*altJson);
   if (!alt) return std::unexpected(std::move(alt.error()));
   auto primarySet = m_primaryHandItem.set(std::move(*primary));
   if (!primarySet) return std::unexpected(std::move(primarySet.error()));
@@ -902,7 +902,7 @@ void ToolUser::NetItem::init_net_version(std::optional<std::reference_wrapper<Ne
   if (!descriptor) return std::unexpected(std::move(descriptor.error()));
   auto database = m_root.get().itemDatabase();
   if (!database) return std::unexpected(std::move(database.error()));
-  auto loaded = (*database)->loadItem(m_itemDescriptor.get(), m_item);
+  auto loaded = (*database)->load_item(m_itemDescriptor.get(), m_item);
   if (!loaded) return std::unexpected(std::move(loaded.error()));
   if (*loaded) {
     m_newItem = true;
@@ -995,7 +995,7 @@ void ToolUser::NetItem::init_net_version(std::optional<std::reference_wrapper<Ne
       if (!m_item || !m_item->matches(m_itemDescriptor.get(), true)) {
         auto database = m_root.get().itemDatabase();
         if (!database) return std::unexpected(std::move(database.error()));
-        auto loaded = (*database)->loadItem(m_itemDescriptor.get(), m_item);
+        auto loaded = (*database)->load_item(m_itemDescriptor.get(), m_item);
         if (!loaded) return std::unexpected(std::move(loaded.error()));
         if (*loaded) {
           m_newItem = true;

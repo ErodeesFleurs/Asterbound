@@ -210,7 +210,7 @@ std::expected<Collectable, StarException> CollectionDatabase::parse_item(String 
   auto descriptor = ItemDescriptor::create(*item_name, 1);
   if (!descriptor)
     return std::unexpected(std::move(descriptor.error()));
-  auto item = catalog->get().itemShared(std::move(*descriptor));
+  auto item = catalog->get().item_shared(std::move(*descriptor));
   if (!item)
     return std::unexpected(std::move(item.error()));
   if (!*item)

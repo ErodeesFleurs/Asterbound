@@ -215,7 +215,7 @@ std::expected<void, StarException> ArmorWearer::disk_load(Json const& store) {
       return std::unexpected(std::move(entry.error()));
     if (!*entry)
       continue;
-    auto loaded = (*database)->diskLoad((*entry)->get());
+    auto loaded = (*database)->disk_load((*entry)->get());
     if (!loaded)
       return std::unexpected(std::move(loaded.error()));
     if (auto item = as<ArmorItem>(std::move(*loaded)))
@@ -296,7 +296,7 @@ std::expected<void, StarException> ArmorWearer::net_elements_need_load(bool) {
   for (auto& armor : m_armors) {
     if (!armor.net_state.pull_updated())
       continue;
-    auto loaded = (*database)->loadItem(armor.net_state.get(), armor.item);
+    auto loaded = (*database)->load_item(armor.net_state.get(), armor.item);
     if (!loaded)
       return std::unexpected(std::move(loaded.error()));
     if (*loaded) {

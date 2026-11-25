@@ -567,10 +567,10 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.register_callback("itemFile", [&root, itemCatalog](String const& itemName) -> std::expected<std::optional<String>, StarException> {
-    if (itemCatalog) return itemCatalog->get().itemFile(itemName);
+    if (itemCatalog) return itemCatalog->get().item_file(itemName);
     auto database = root.itemDatabase();
     if (!database) return std::unexpected(std::move(database.error()));
-    return (*database)->itemFile(itemName);
+    return (*database)->item_file(itemName);
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.register_callback("materialConfig", [&root](std::variant<MaterialId, String> const& materialNameOrId) -> std::expected<Json, StarException> {
@@ -1006,7 +1006,7 @@ std::expected<Json, StarException> LuaBindings::RootCallbacks::projectileConfig(
 }
 
 std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::recipesForItem(ItemDatabase const& database, String const& arg1) {
-  auto recipes = database.recipesForOutputItem(arg1);
+  auto recipes = database.recipes_for_output_item(arg1);
   JsonArray result;
   result.reserve(recipes.size());
   for (auto& recipe : recipes) {
@@ -1019,9 +1019,9 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::recipesForIt
 
 std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::allRecipes(ItemDatabase const& database, std::optional<StringSet> filter) {
   HashSet<ItemRecipe> filtered;
-  auto recipes = std::cref(database.allRecipes());
+  auto recipes = std::cref(database.all_recipes());
   if (filter) {
-    filtered = database.allRecipes(*filter);
+    filtered = database.all_recipes(*filter);
     recipes = std::cref(filtered);
   }
   JsonArray result;
@@ -1035,21 +1035,21 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::allRecipes(I
 }
 
 std::expected<String, StarException> LuaBindings::RootCallbacks::itemType(ItemDatabase const& database, String const& itemName) {
-  auto type = database.itemType(itemName);
+  auto type = database.item_type(itemName);
   if (!type) return std::unexpected(std::move(type.error()));
-  auto name = enum_name<ItemTypeNames>(*type);
+  auto name = enum_name<item_type_names>(*type);
   if (!name) return std::unexpected(std::move(name.error()));
   return String(*name);
 }
 
 std::expected<Json, StarException> LuaBindings::RootCallbacks::itemTags(ItemDatabase const& database, String const& itemName) {
-  auto tags = database.itemTags(itemName);
+  auto tags = database.item_tags(itemName);
   if (!tags) return std::unexpected(std::move(tags.error()));
   return json_from_string_set(*tags);
 }
 
 std::expected<bool, StarException> LuaBindings::RootCallbacks::itemHasTag(ItemDatabase const& database, String const& itemName, String const& itemTag) {
-  auto tags = database.itemTags(itemName);
+  auto tags = database.item_tags(itemName);
   if (!tags) return std::unexpected(std::move(tags.error()));
   return tags->contains(itemTag);
 }
@@ -1057,8 +1057,8 @@ std::expected<bool, StarException> LuaBindings::RootCallbacks::itemHasTag(ItemDa
 std::expected<Json, StarException> LuaBindings::RootCallbacks::itemConfig(ItemDatabase const& database, Json const& descJson, std::optional<float> const& level, std::optional<std::uint64_t> const& seed) {
   auto descriptor = ItemDescriptor::create(descJson);
   if (!descriptor) return std::unexpected(std::move(descriptor.error()));
-  if (!database.hasItem(descriptor->name())) return Json();
-  auto config = database.itemConfig(descriptor->name(), descriptor->parameters(), level, seed);
+  if (!database.has_item(descriptor->name())) return Json();
+  auto config = database.item_config(descriptor->name(), descriptor->parameters(), level, seed);
   if (!config) return std::unexpected(std::move(config.error()));
   return JsonObject{{"directory", config->directory}, {"config", config->config}, {"parameters", config->parameters}};
 }

@@ -929,7 +929,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
       if (!database) return std::unexpected(std::move(database.error()));
       auto bag = std::make_shared<ItemBag>(widget->context().root(), size.value_or(widget->itemSlots()));
       for (auto const& descriptor : items) {
-        auto item = (*database)->fromJson(descriptor);
+        auto item = (*database)->from_json(descriptor);
         if (!item) return std::unexpected(std::move(item.error()));
         auto added = bag->add_items(std::move(*item));
         if (!added) return std::unexpected(std::move(added.error()));
@@ -996,7 +996,7 @@ std::expected<LuaCallbacks, StarException> makeWidgetCallbacks(GuiContext& conte
       auto database = widget->context().root().itemDatabase();
       if (!database)
         return std::unexpected(std::move(database.error()));
-      auto item = (*database)->fromJson(config);
+      auto item = (*database)->from_json(config);
       if (!item)
         return std::unexpected(std::move(item.error()));
       widget->setItem(*item);

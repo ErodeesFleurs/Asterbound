@@ -720,7 +720,7 @@ void exercise_optional_ui_content(GameTest& fixture, Application const& applicat
   ASSERT_TRUE(application.renderer()->setScissorRect({}));
   auto database = root.itemDatabase();
   ASSERT_TRUE(database);
-  auto item = (*database)->fromJson(JsonObject{{"name", "perfectlygenericitem"}, {"count", 2},
+  auto item = (*database)->from_json(JsonObject{{"name", "perfectlygenericitem"}, {"count", 2},
       {"parameters", JsonObject{{"rarityBorder", 17}}}});
   ASSERT_TRUE(item && *item);
   auto slot = ItemSlotWidget::create(**context, *item, {});
@@ -1234,7 +1234,7 @@ const GameTestRegistration item_slot_indicator("ItemSlotWidget", "NewIndicatorRe
   ASSERT_TRUE(context) << context.error().what();
   auto items = (*root)->itemDatabase();
   ASSERT_TRUE(items) << items.error().what();
-  auto item = (*items)->fromJson(JsonObject{{"name", "dirtmaterial"}, {"count", 1}, {"parameters", JsonObject{}}});
+  auto item = (*items)->from_json(JsonObject{{"name", "dirtmaterial"}, {"count", 1}, {"parameters", JsonObject{}}});
   ASSERT_TRUE(item && *item);
   auto slot = ItemSlotWidget::create(**context, *item, {});
   ASSERT_TRUE(slot) << slot.error().what();
@@ -5145,9 +5145,9 @@ const GameTestRegistration questLogPresentation(
     auto items = root.itemDatabase();
     ASSERT_TRUE(items) << items.error().what();
     auto reward =
-      (*items)->fromJson(JsonObject{{"name", "dirtmaterial"}, {"count", 2003}, {"parameters", JsonObject{}}});
+      (*items)->from_json(JsonObject{{"name", "dirtmaterial"}, {"count", 2003}, {"parameters", JsonObject{}}});
     ASSERT_TRUE(reward && *reward);
-    auto rewardStore = (*items)->diskStore(*reward);
+    auto rewardStore = (*items)->disk_store(*reward);
     ASSERT_TRUE(rewardStore) << rewardStore.error().what();
     Json portrait = JsonObject{{"line", JsonArray{JsonArray{2, 3}, JsonArray{7, 11}}}, {"width", 1}};
     JsonObject storedQuests;

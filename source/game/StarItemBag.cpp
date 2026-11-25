@@ -61,7 +61,7 @@ std::expected<ItemBag, StarException> decode_bag(Root& root, Json const& store, 
   auto& slots = bag.items();
   std::size_t index = 0;
   for (auto const& entry : **entries) {
-    auto item = format == BagFormat::Disk ? (*database)->diskLoad(entry) : (*database)->fromJson(entry);
+    auto item = format == BagFormat::Disk ? (*database)->disk_load(entry) : (*database)->from_json(entry);
     if (!item)
       return std::unexpected(std::move(item.error()));
     slots[index++] = std::move(*item);
@@ -430,7 +430,7 @@ std::expected<void, StarException> ItemBag::read(DataStream& ds) {
     auto descriptor = ds.read<ItemDescriptor>();
     if (!descriptor)
       return std::unexpected(std::move(descriptor.error()));
-    auto loaded = (*database)->loadItem(*descriptor, slots[i]);
+    auto loaded = (*database)->load_item(*descriptor, slots[i]);
     if (!loaded)
       return std::unexpected(std::move(loaded.error()));
   }

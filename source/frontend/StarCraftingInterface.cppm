@@ -92,7 +92,6 @@ private:
 
   [[nodiscard]] std::expected<std::shared_ptr<Pane>, StarException> setupTooltip(ItemRecipe const& recipe);
 
-  [[nodiscard]] std::expected<std::size_t, StarException> itemCount(List<std::shared_ptr<Item>> const& store, ItemDescriptor const& item);
 
   std::shared_ptr<WorldClient> m_worldClient;
   std::shared_ptr<Player> m_player;

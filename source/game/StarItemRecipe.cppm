@@ -45,6 +45,8 @@ struct ItemRecipe {
   String guiFilterString;
   StringMap<String> collectables;
   bool matchInputParameters = false;
+  // Catalog tie-break only; not part of recipe identity or serialization.
+  String source_path;
 };
 
 template <>

@@ -26,6 +26,12 @@ public:
   GameTest(GameTestEnvironment& environment, Body body);
   Root& root() const;
   Root::Settings const& rootSettings() const;
+  static bool check(bool passed, std::string_view message, std::source_location at = std::source_location::current()) {
+    if (!passed)
+      testing::internal::AssertHelper(testing::TestPartResult::kNonFatalFailure, at.file_name(), static_cast<int>(at.line()), "")
+          = testing::Message() << message;
+    return passed;
+  }
 
 private:
   void TestBody() override;

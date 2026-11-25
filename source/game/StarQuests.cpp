@@ -352,7 +352,7 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, J
   auto rewards = store->get_array("rewards");
   if (!rewards) return std::unexpected(std::move(rewards.error()));
   for (auto const& entry : *rewards) {
-    auto item = (*items)->diskLoad(entry);
+    auto item = (*items)->disk_load(entry);
     if (!item) return std::unexpected(std::move(item.error()));
     quest->m_rewards.push_back(*item);
   }
@@ -442,7 +442,7 @@ std::expected<Json, StarException> Quest::diskStore() const {
   result["serverUuid"] = json_from_optional(m_serverUuid.transform(std::mem_fn(&Uuid::hex)));
   auto items = m_root.itemDatabase();
   if (!items) return std::unexpected(std::move(items.error()));
-  auto rewards = json_from_list(m_rewards, [&items](auto const& item) { return (*items)->diskStore(item); });
+  auto rewards = json_from_list(m_rewards, [&items](auto const& item) { return (*items)->disk_store(item); });
   if (!rewards) return std::unexpected(std::move(rewards.error()));
   result["rewards"] = std::move(*rewards);
   result["lastUpdatedOn"] = m_lastUpdatedOn.time_since_epoch().count();

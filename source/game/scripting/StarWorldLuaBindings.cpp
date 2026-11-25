@@ -3523,7 +3523,7 @@ namespace LuaBindings {
         return std::unexpected(std::move(itemDbResult.error()));
       auto itemDb = std::move(*itemDbResult);
       for (auto const& item : container->itemBag()->items())
-        res.push_back(itemDb->toJson(item));
+        res.push_back(itemDb->to_json(item));
       return res;
     }
 
@@ -3538,7 +3538,7 @@ namespace LuaBindings {
       auto itemDb = std::move(*itemDbResult);
       auto items = container->itemBag()->items();
       if (offset < items.size()) {
-        return itemDb->toJson(items[offset]);
+        return itemDb->to_json(items[offset]);
       }
     }
 
@@ -3605,7 +3605,7 @@ namespace LuaBindings {
       if (itemList) {
         JsonArray res;
         for (auto const& item : *itemList)
-          res.push_back(itemDb->toJson(item));
+          res.push_back(itemDb->to_json(item));
         return res;
       }
     }
@@ -3628,7 +3628,7 @@ namespace LuaBindings {
           return std::unexpected(std::move(resResult.error()));
         auto res = std::move(*resResult);
         if (res)
-          return itemDb->toJson(*res);
+          return itemDb->to_json(*res);
       }
     }
     return Json();
@@ -3650,7 +3650,7 @@ namespace LuaBindings {
           return std::unexpected(std::move(resResult.error()));
         auto res = std::move(*resResult);
         if (res)
-          return itemDb->toJson(*res);
+          return itemDb->to_json(*res);
       }
     }
     return Json();
@@ -3663,7 +3663,7 @@ namespace LuaBindings {
         return std::unexpected(std::move(itemDbResult.error()));
       auto itemDb = std::move(*itemDbResult);
       auto itemBag = container->itemBag();
-      auto toSearchResult = itemDb->fromJson(items);
+      auto toSearchResult = itemDb->from_json(items);
       if (!toSearchResult)
         return std::unexpected(std::move(toSearchResult.error()));
       auto toSearch = std::move(*toSearchResult);
@@ -3680,7 +3680,7 @@ namespace LuaBindings {
         return std::unexpected(std::move(itemDbResult.error()));
       auto itemDb = std::move(*itemDbResult);
       auto itemBag = container->itemBag();
-      auto toSearchResult = itemDb->fromJson(items);
+      auto toSearchResult = itemDb->from_json(items);
       if (!toSearchResult)
         return std::unexpected(std::move(toSearchResult.error()));
       auto toSearch = std::move(*toSearchResult);
@@ -3701,7 +3701,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
       if (!itemDbResult)
         return std::unexpected(std::move(itemDbResult.error()));
       auto itemDb = std::move(*itemDbResult);
-      auto toInsertResult = itemDb->fromJson(items);
+      auto toInsertResult = itemDb->from_json(items);
       if (!toInsertResult)
         return std::unexpected(std::move(toInsertResult.error()));
       auto toInsert = std::move(*toInsertResult);
@@ -3714,7 +3714,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
         return std::unexpected(std::move(resResult.error()));
       auto res = std::move(*resResult);
       if (res)
-        return itemDb->toJson(*res);
+        return itemDb->to_json(*res);
     }
     return items;
   }
@@ -3725,7 +3725,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
       if (!itemDbResult)
         return std::unexpected(std::move(itemDbResult.error()));
       auto itemDb = std::move(*itemDbResult);
-      auto toInsertResult = itemDb->fromJson(items);
+      auto toInsertResult = itemDb->from_json(items);
       if (!toInsertResult)
         return std::unexpected(std::move(toInsertResult.error()));
       auto toInsert = std::move(*toInsertResult);
@@ -3738,7 +3738,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
         return std::unexpected(std::move(resResult.error()));
       auto res = std::move(*resResult);
       if (res)
-        return itemDb->toJson(*res);
+        return itemDb->to_json(*res);
     }
     return items;
   }
@@ -3749,7 +3749,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
       if (!itemDbResult)
         return std::unexpected(std::move(itemDbResult.error()));
       auto itemDb = std::move(*itemDbResult);
-      auto toInsertResult = itemDb->fromJson(items);
+      auto toInsertResult = itemDb->from_json(items);
       if (!toInsertResult)
         return std::unexpected(std::move(toInsertResult.error()));
       auto toInsert = std::move(*toInsertResult);
@@ -3763,7 +3763,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
           return std::unexpected(std::move(resResult.error()));
         auto res = std::move(*resResult);
         if (res)
-          return itemDb->toJson(*res);
+          return itemDb->to_json(*res);
       }
     }
     return items;
@@ -3775,7 +3775,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
       if (!itemDbResult)
         return std::unexpected(std::move(itemDbResult.error()));
       auto itemDb = std::move(*itemDbResult);
-      auto toInsertResult = itemDb->fromJson(items);
+      auto toInsertResult = itemDb->from_json(items);
       if (!toInsertResult)
         return std::unexpected(std::move(toInsertResult.error()));
       auto toInsert = std::move(*toInsertResult);
@@ -3789,7 +3789,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
           return std::unexpected(std::move(resResult.error()));
         auto res = std::move(*resResult);
         if (res)
-          return itemDb->toJson(*res);
+          return itemDb->to_json(*res);
       }
     }
     return items;
@@ -3801,7 +3801,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
       if (!itemDbResult)
         return std::unexpected(std::move(itemDbResult.error()));
       auto itemDb = std::move(*itemDbResult);
-      auto toInsertResult = itemDb->fromJson(items);
+      auto toInsertResult = itemDb->from_json(items);
       if (!toInsertResult)
         return std::unexpected(std::move(toInsertResult.error()));
       auto toInsert = std::move(*toInsertResult);
@@ -3815,7 +3815,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
           return std::unexpected(std::move(resResult.error()));
         auto res = std::move(*resResult);
         if (res)
-          return itemDb->toJson(*res);
+          return itemDb->to_json(*res);
       }
     }
     return items;
@@ -3827,7 +3827,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
       if (!itemDbResult)
         return std::unexpected(std::move(itemDbResult.error()));
       auto itemDb = std::move(*itemDbResult);
-      auto toInsertResult = itemDb->fromJson(items);
+      auto toInsertResult = itemDb->from_json(items);
       if (!toInsertResult)
         return std::unexpected(std::move(toInsertResult.error()));
       auto toInsert = std::move(*toInsertResult);
@@ -3841,7 +3841,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
           return std::unexpected(std::move(resResult.error()));
         auto res = std::move(*resResult);
         if (res)
-          return itemDb->toJson(*res);
+          return itemDb->to_json(*res);
       }
     }
     return items;

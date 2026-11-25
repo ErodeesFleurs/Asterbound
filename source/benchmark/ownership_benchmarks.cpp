@@ -145,7 +145,7 @@ std::expected<ItemFixture, StarException> prepareItems(Root& root) {
   auto database = root.itemDatabase();
   if (!database)
     return std::unexpected(std::move(database.error()));
-  if (!(*database)->hasItem("perfectlygenericitem"))
+  if (!(*database)->has_item("perfectlygenericitem"))
     return std::unexpected(StarException("Real perfectlygenericitem fixture is absent"));
   ItemFixture fixture;
   for (unsigned variant = 0; variant != 5; ++variant) {

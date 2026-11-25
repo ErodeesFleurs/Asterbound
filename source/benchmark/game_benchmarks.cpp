@@ -945,7 +945,7 @@ void benchmark_cold_codex_items(benchmark::State& state, BenchmarkSession& sessi
   auto const& entries = (*catalog)->entries();
   std::size_t generated = 0;
   for (auto const& [id, book] : entries) {
-    auto type = (*items)->itemType(Star::format("{}-codex", id));
+    auto type = (*items)->item_type(Star::format("{}-codex", id));
     if (!type) return session.fail(state, type.error());
     generated += *type == ItemType::Codex;
   }

@@ -316,7 +316,7 @@ std::expected<void, StarException> ContainerObject::update(float dt, std::uint64
         if (!databaseResult)
           return std::unexpected(std::move(databaseResult.error()));
         auto database = std::move(*databaseResult);
-        auto agedResult = database->ageItem(item, elapsed);
+        auto agedResult = database->age_item(item, elapsed);
         if (!agedResult)
           return std::unexpected(std::move(agedResult.error()));
         auto aged = std::move(*agedResult);
@@ -513,7 +513,7 @@ MessageResponseResult ContainerObject::receiveMessage(ConnectionId sendingConnec
     if (!itemArgResult)
       return std::unexpected(std::move(itemArgResult.error()));
     auto itemArg = std::move(*itemArgResult);
-    auto itemResult = database->fromJson(itemArg.get());
+    auto itemResult = database->from_json(itemArg.get());
     if (!itemResult)
       return std::unexpected(std::move(itemResult.error()));
     auto item = std::move(*itemResult);
@@ -540,7 +540,7 @@ MessageResponseResult ContainerObject::receiveMessage(ConnectionId sendingConnec
     if (!itemArgResult)
       return std::unexpected(std::move(itemArgResult.error()));
     auto itemArg = std::move(*itemArgResult);
-    auto itemResult = database->fromJson(itemArg.get());
+    auto itemResult = database->from_json(itemArg.get());
     if (!itemResult)
       return std::unexpected(std::move(itemResult.error()));
     auto item = std::move(*itemResult);
@@ -594,7 +594,7 @@ MessageResponseResult ContainerObject::receiveMessage(ConnectionId sendingConnec
     if (!itemArgResult)
       return std::unexpected(std::move(itemArgResult.error()));
     auto itemArg = std::move(*itemArgResult);
-    auto itemResult = database->fromJson(itemArg.get());
+    auto itemResult = database->from_json(itemArg.get());
     if (!itemResult)
       return std::unexpected(std::move(itemResult.error()));
     auto item = std::move(*itemResult);
@@ -626,7 +626,7 @@ MessageResponseResult ContainerObject::receiveMessage(ConnectionId sendingConnec
     if (!itemArgResult)
       return std::unexpected(std::move(itemArgResult.error()));
     auto itemArg = std::move(*itemArgResult);
-    auto itemResult = database->fromJson(itemArg.get());
+    auto itemResult = database->from_json(itemArg.get());
     if (!itemResult)
       return std::unexpected(std::move(itemResult.error()));
     auto item = std::move(*itemResult);
@@ -1256,7 +1256,7 @@ std::expected<ItemRecipe, StarException> ContainerObject::recipeForMaterials(Lis
     if (!groupResult)
       return std::unexpected(std::move(groupResult.error()));
     auto group = std::move(*groupResult);
-    return database->getPreciseRecipeForMaterials(group, inputItems, {});
+    return database->get_precise_recipe_for_materials(group, inputItems, {});
   }
   auto descriptors = inputItems
       | std::views::filter([](std::shared_ptr<Item> const& item) { return bool(item); })
@@ -1270,7 +1270,7 @@ std::expected<ItemRecipe, StarException> ContainerObject::recipeForMaterials(Lis
   auto result = std::move(*resultResult);
   if (!result || result->is_null())
     return ItemRecipe();
-  return database->parseRecipe(*result);
+  return database->parse_recipe(*result);
 }
 
 std::expected<void, StarException> ContainerObject::tickCrafting(float dt) {

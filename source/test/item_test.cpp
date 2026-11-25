@@ -222,6 +222,66 @@ public:
 
 }
 
+const GameTestRegistration ranked_recipes("ItemTest", "SparseContainerChoosesHighestScoringRecipe", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  if (!fixture.check(bool(directory), "create private recipe directory")) return;
+  auto cleanup = make_scope_exit([&] { fixture.check(bool(File::remove_all(*directory)), "clean recipe directory"); });
+  auto overlay = File::relative_to(*directory, "assets");
+  if (!fixture.check(bool(File::create_directory(overlay)), "create recipe overlay")) return;
+  auto put = [&](String const& name, String const& contents) {
+    return File::write_file(contents, File::relative_to(overlay, name));
+  };
+  if (!fixture.check(bool(put("bad.currency", R"({"itemName":"invalidrecipecurrency","rarity":"common","currency":"money","value":"invalid"})")),
+        "write currency fixture")) return;
+  auto recipe_file = [&](String const& path, String const& group, int count, String const& output) {
+    Json recipe = JsonObject{{"input", JsonArray{JsonArray{"perfectlygenericitem", count}}},
+        {"groups", JsonArray{group}}, {"output", JsonArray{output, 1, JsonObject{{"probe", group}}}}};
+    return recipe.repr().and_then([&](String const& contents) { return put(path, contents); });
+  };
+  if (!fixture.check(recipe_file("a.recipe", "forwardprobe", 2, "dirtmaterial")
+      && recipe_file("b.recipe", "forwardprobe", 5, "perfectlygenericitem")
+      && recipe_file("c.recipe", "reverseprobe", 5, "perfectlygenericitem")
+      && recipe_file("d.recipe", "reverseprobe", 2, "dirtmaterial")
+      && recipe_file("e.recipe", "tieprobe", 5, "dirtmaterial")
+      && recipe_file("f.recipe", "tieprobe", 5, "perfectlygenericitem")
+      && put("null.recipe", R"({"input":[],"output":null})"), "write ranking fixtures")) return;
+  auto settings = fixture.rootSettings();
+  settings.assetSources.push_back(overlay);
+  settings.storageDirectory = File::relative_to(*directory, "storage");
+  settings.runtimeConfigFile.reset();
+  settings.logDirectory.reset();
+  settings.logFile.reset();
+  settings.includeUGC = false;
+  auto root = Root::create(std::move(settings));
+  if (!fixture.check(bool(root), "create private root")) return;
+  auto database = (*root)->itemDatabase();
+  if (!fixture.check(bool(database), "bad recipe does not prevent catalog construction")) return;
+  auto material = inventoryTestItem(**database, "perfectlygenericitem", 5);
+  if (!fixture.check(material && *material, "instantiate material")) return;
+  List<std::shared_ptr<Item>> bag{{}, *material, {}};
+  for (String const& group : {String("forwardprobe"), String("reverseprobe"), String("tieprobe")}) {
+    auto chosen = (*database)->get_precise_recipe_for_materials(group, bag, {});
+    fixture.check(chosen.output.name().utf8() == (group == "tieprobe" ? "dirtmaterial" : "perfectlygenericitem"), group.utf8());
+  }
+  auto invalid = (*database)->parse_recipe(JsonObject{{"input", JsonArray{"invalidrecipecurrency"}}, {"output", "dirtmaterial"}});
+  fixture.check(!invalid && invalid.error().is<RecipeException>(), "fallback is not a currency");
+});
+
+const GameTestRegistration item_disk_load("ItemTest", "TypedDiskLoadDistinguishesFailureUnchangedAndClear", [](GameTest& fixture) {
+  auto database = fixture.root().itemDatabase();
+  if (!fixture.check(bool(database), "load catalog")) return;
+  auto original = inventoryTestItem(**database, "perfectlygenericitem", 3);
+  if (!fixture.check(original && *original, "load original stack")) return;
+  auto slot = *original;
+  fixture.check(!(*database)->disk_load(JsonObject{{"invalid", true}}, slot), "malformed save returns an error");
+  if (!fixture.check(slot == *original && slot->count() == 3, "failed load preserves item and count")) return;
+  auto stored = (*database)->disk_store(slot);
+  if (!fixture.check(bool(stored), "serialize stack")) return;
+  fixture.check((*database)->disk_load(*stored, slot) == false && slot == *original, "unchanged save retains identity");
+  fixture.check((*database)->disk_load(Json(), slot) == true && !slot, "null save clears occupied slot");
+  fixture.check((*database)->disk_load(Json(), slot) == false, "null save leaves empty slot unchanged");
+});
+
 const GameTestRegistration itemDescriptorConstruction("ItemTest", "ItemDescriptorConstruction", [](GameTest&) {
   struct ConstructionCase {
     char const* label;
@@ -732,7 +792,7 @@ const GameTestRegistration bagStackQueriesAndTransfersPreserveBehavior("ItemTest
 const GameTestRegistration constructItems("ItemTest", "ConstructItems", [](GameTest& fixture) {
   auto itemDatabase = fixture.root().itemDatabase();
   ASSERT_TRUE(itemDatabase);
-  for (auto const& itemName : (*itemDatabase)->allItems()) {
+  for (auto const& itemName : (*itemDatabase)->all_items()) {
     auto item = inventoryTestItem(**itemDatabase, itemName);
     ASSERT_TRUE(item);
   }
@@ -951,8 +1011,8 @@ namespace {
   auto itemDatabase = root.itemDatabase();
   if (!itemDatabase)
     return std::unexpected(std::move(itemDatabase.error()));
-  for (auto const& name : (*itemDatabase)->allItems()) {
-    auto type = (*itemDatabase)->itemType(name);
+  for (auto const& name : (*itemDatabase)->all_items()) {
+    auto type = (*itemDatabase)->item_type(name);
     if (!type)
       return std::unexpected(std::move(type.error()));
     if (*type == ItemType::HeadArmor)
@@ -1063,6 +1123,11 @@ const GameTestRegistration crafting_batch_accounting("ItemTest", "CraftingBatchA
   EXPECT_EQ(limit(), 3u);
   recipe.matchInputParameters = true;
   recipe.inputs[1] = plain_id;
+  auto invalid_output = recipe;
+  invalid_output.output = recipe.output.withCount(0);
+  fixture.check((*db)->craft_recipe(player, invalid_output, 1) == false, "zero output rejected");
+  fixture.check(inventory.currency("money") == 6 && inventory.hasCountOfItem(plain_id, true) == 4,
+      "zero output leaves money and ingredients untouched");
   EXPECT_EQ((*db)->craft_recipe(player, recipe, 3), false);
   EXPECT_EQ(inventory.currency("money"), 6u);
   EXPECT_EQ(inventory.hasCountOfItem(plain_id, true), 4u);
@@ -1875,10 +1940,10 @@ end
     auto databaseResult = root.itemDatabase();
     ASSERT_TRUE(databaseResult);
     auto const& database = *databaseResult;
-    auto builtRecipes = database->recipesForOutputItem("readycatalogbuilt");
+    auto builtRecipes = database->recipes_for_output_item("readycatalogbuilt");
     ASSERT_EQ(builtRecipes.size(), 1u);
     EXPECT_EQ(builtRecipes.begin()->guiFilterString.contains("nestedready_leafowner"), true);
-    auto rebuiltRecipes = database->recipesForOutputItem("readycatalogbroken");
+    auto rebuiltRecipes = database->recipes_for_output_item("readycatalogbroken");
     ASSERT_EQ(rebuiltRecipes.size(), 1u);
     EXPECT_EQ(rebuiltRecipes.begin()->guiFilterString.contains("rebuiltready_leafowner"), true);
     auto builtResult = inventoryTestItem(*database, "readycatalogbuilt");
@@ -1951,7 +2016,7 @@ const GameTestRegistration
     auto uninitTools = make_scope_exit([&] { EXPECT_TRUE((*tools)->uninit()); });
     auto database = root.itemDatabase();
     ASSERT_TRUE(database);
-    auto paint = (*database)->itemConfig("painttool", JsonObject{});
+    auto paint = (*database)->item_config("painttool", JsonObject{});
     ASSERT_TRUE(paint);
     // Keep the genuine asset and item implementation; make the cubic overshoot
     // its endpoint, and remove display noise so its geometry is observable.
@@ -2557,7 +2622,7 @@ const GameTestRegistration blueprintLearning(
     // publish either known or unread blueprint state.
     auto database = (*root)->itemDatabase();
     ASSERT_TRUE(database);
-    ASSERT_TRUE((*database)->hasItem("perfectlygenericitem"));
+    ASSERT_TRUE((*database)->has_item("perfectlygenericitem"));
     auto broken = ItemDescriptor::create("perfectlygenericitem", 1,
                                          JsonObject{{"maxStack", "not an integer"}, {"blueprintFixture", "broken"}});
     ASSERT_TRUE(broken);
@@ -2704,7 +2769,7 @@ end
         auto originalDescriptor = original->descriptor();
         bool scriptFailed = !test.stage.empty() || test.cleanup;
         if (aging) {
-          auto result = (*database)->ageItem(*target, 7.25);
+          auto result = (*database)->age_item(*target, 7.25);
           EXPECT_EQ(result.has_value(), !scriptFailed && !test.malformed);
           if (result)
             EXPECT_EQ(*result, !test.unchanged);
@@ -2725,7 +2790,7 @@ end
                                              "/", JsonObject());
           ASSERT_TRUE(augment) << augment.error().what();
           ASSERT_EQ((*augment)->set_count(3), 0u);
-          auto result = (*database)->applyAugment(*target, **augment);
+          auto result = (*database)->apply_augment(*target, **augment);
           EXPECT_EQ(result.has_value(), !scriptFailed && !test.malformed);
           if (result)
             *target = *result;

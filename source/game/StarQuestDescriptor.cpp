@@ -338,13 +338,13 @@ std::expected<String, StarException> questParamText(Root& root, QuestParam const
   if (std::holds_alternative<QuestItem>(parameter.detail)) {
     auto descriptor = std::get<QuestItem>(parameter.detail).descriptor();
     if (!descriptor) return std::unexpected(std::move(descriptor.error()));
-    auto value = (*database)->itemShared(*descriptor);
+    auto value = (*database)->item_shared(*descriptor);
     if (!value) return std::unexpected(std::move(value.error()));
     return (*value)->friendly_name();
   } else if (std::holds_alternative<QuestItemList>(parameter.detail)) {
     StringList strings;
     for (auto const& descriptor : std::get<QuestItemList>(parameter.detail)) {
-      auto item = (*database)->itemShared(descriptor);
+      auto item = (*database)->item_shared(descriptor);
       if (!item) return std::unexpected(std::move(item.error()));
       strings.push_back(Star::format("{} {}", descriptor.count(), (*item)->friendly_name()));
     }

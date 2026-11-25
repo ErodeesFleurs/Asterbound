@@ -40,6 +40,8 @@ import star.lua;
 import star.lua_root;
 import star.net_compatibility;
 import star.player;
+import star.player_inventory;
+import star.inventory_types;
 import star.poly;
 import star.player_factory;
 import star.player_lua_bindings;
@@ -235,6 +237,54 @@ const GameTestRegistration self_damage_history(
     EXPECT_EQ(*inflicted, *observed);
   });
 
+const GameTestRegistration armor_retry("ArmorWearerTest", "BadLegacyCosmeticCanRetrySameRevision", [](GameTest& fixture) {
+  PlayerWorldContext setup;
+  if (!fixture.check(bool(setup.init(fixture.root())), "create player world")) return;
+  auto& sender = *setup.player;
+  NetCompatibilityRules rules(legacy_version);
+  auto initial = sender.net_store(rules);
+  if (!fixture.check(bool(initial), "serialize master")) return;
+  auto replica = setup.factory->net_load_player(*initial, rules);
+  if (!fixture.check(replica && (*replica)->init(*setup.world, 101, EntityMode::Slave), "initialize legacy replica")) return;
+  auto cleanup = make_scope_exit([&] { fixture.check(bool((*replica)->uninit()), "release replica"); });
+  std::uint64_t cursor = 0;
+  auto sync = [&]() -> std::expected<void, StarException> {
+    auto packet = sender.write_net_state(cursor, rules);
+    if (!packet)
+      return std::unexpected(std::move(packet.error()));
+    cursor = packet->second;
+    return (*replica)->read_net_state(std::move(packet->first), 0, rules);
+  };
+  auto database = fixture.root().itemDatabase();
+  if (!fixture.check(bool(database), "load catalog")) return;
+  String armor;
+  for (auto const& name : (*database)->all_items()) {
+    if ((*database)->item_type(name) == ItemType::HeadArmor) {
+      armor = name;
+      break;
+    }
+  }
+  if (!fixture.check(!armor.empty(), "find real head armor")) return;
+  auto descriptor = ItemDescriptor::create(armor);
+  if (!fixture.check(bool(descriptor), "create armor descriptor")) return;
+  auto item = (*database)->item(*descriptor);
+  if (!fixture.check(item && *item, "instantiate head armor")) return;
+  auto stored = (*database)->disk_store(*item);
+  if (!fixture.check(stored && sender.setSecretProperty("armorWearer.replicating", true)
+      && sender.setSecretProperty("armorWearer.cosmetic1.version", 1)
+      && sender.setSecretProperty("armorWearer.cosmetic1.data", *stored)
+      && sync(), "apply first cosmetic packet")) return;
+  auto read_slot = [&] { return (*replica)->inventory()->itemsAt(EquipmentSlot::Cosmetic1); };
+  auto previous = read_slot();
+  if (!fixture.check(previous && *previous, "replica received armor")) return;
+  if (!fixture.check(sender.setSecretProperty("armorWearer.cosmetic1.version", 2)
+      && sender.setSecretProperty("armorWearer.cosmetic1.data", JsonObject{{"bad", true}}), "set bad save")) return;
+  fixture.check(!sync(), "bad cosmetic save rejected");
+  fixture.check(read_slot() == *previous, "bad save preserves previous cosmetic");
+  if (!fixture.check(sender.setSecretProperty("armorWearer.cosmetic1.data", Json()) && sync(), "retry same revision")) return;
+  fixture.check(read_slot() == nullptr, "corrected revision clears cosmetic");
+});
+
 const GameTestRegistration armor_visibility_transitions(
   "ArmorWearerTest", "CosmeticBoundsMaskingNudityAndConfigRetry", [](GameTest& fixture) {
     auto& root = fixture.root();
@@ -251,8 +301,8 @@ const GameTestRegistration armor_visibility_transitions(
     auto database = root.itemDatabase();
     ASSERT_TRUE(database);
     String name;
-    for (auto const& candidate : (*database)->allItems()) {
-      auto type = (*database)->itemType(candidate);
+    for (auto const& candidate : (*database)->all_items()) {
+      auto type = (*database)->item_type(candidate);
       ASSERT_TRUE(type);
       if (*type == ItemType::HeadArmor) {
         name = candidate;
@@ -365,11 +415,11 @@ const GameTestRegistration
     ASSERT_TRUE((*humanoid)->set_identity(identity));
     auto database = fixture.root().itemDatabase();
     ASSERT_TRUE(database) << database.error().what();
-    auto names = (*database)->allItems();
+    auto names = (*database)->all_items();
     std::sort(names.begin(), names.end());
     String chestName;
     for (auto const& name : names) {
-      auto type = (*database)->itemType(name);
+      auto type = (*database)->item_type(name);
       ASSERT_TRUE(type);
       if (*type != ItemType::ChestArmor)
         continue;
@@ -1384,8 +1434,8 @@ static void exercise_dummy_preview(Root& root, Json const& config) {
   auto database = root.itemDatabase();
   ASSERT_TRUE(database);
   String head_name, back_name;
-  for (auto const& name : (*database)->allItems()) {
-    auto type = (*database)->itemType(name);
+  for (auto const& name : (*database)->all_items()) {
+    auto type = (*database)->item_type(name);
     ASSERT_TRUE(type);
     if (*type == ItemType::HeadArmor && head_name.empty())
       head_name = name;

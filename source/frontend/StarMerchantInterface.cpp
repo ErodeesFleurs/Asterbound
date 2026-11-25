@@ -471,10 +471,10 @@ std::expected<std::shared_ptr<Pane>, StarException> MerchantPane::createTooltip(
         auto createResult617 = ItemDescriptor::create(std::move(*getResult616));
         if (!createResult617)
           return std::unexpected(std::move(createResult617.error()));
-        auto itemSharedResult618 = std::move(*itemDatabaseResult615)->itemShared(std::move(*createResult617));
-        if (!itemSharedResult618)
-          return std::unexpected(std::move(itemSharedResult618.error()));
-        std::shared_ptr<Item> item = std::move(*itemSharedResult618);
+        auto item_shared_result618 = std::move(*itemDatabaseResult615)->item_shared(std::move(*createResult617));
+        if (!item_shared_result618)
+          return std::unexpected(std::move(item_shared_result618.error()));
+        std::shared_ptr<Item> item = std::move(*item_shared_result618);
         auto buildItemTooltipResult619 = ItemTooltipBuilder::buildItemTooltip(context(), item, m_player);
         if (!buildItemTooltipResult619)
           return std::unexpected(std::move(buildItemTooltipResult619.error()));
@@ -630,7 +630,7 @@ std::expected<void, StarException> MerchantPane::buildItemList() {
         auto createResult643 = ItemDescriptor::create(std::move(*getResult642));
         if (!createResult643)
           return std::unexpected(std::move(createResult643.error()));
-        if (!itemDatabase->hasItem(std::move(*createResult643).name()))
+        if (!itemDatabase->has_item(std::move(*createResult643).name()))
           return false;
       }
 
@@ -717,10 +717,10 @@ std::expected<void, StarException> MerchantPane::setupWidget(std::shared_ptr<Wid
   auto createResult654 = ItemDescriptor::create(std::move(*getResult653));
   if (!createResult654)
     return std::unexpected(std::move(createResult654.error()));
-  auto itemSharedResult655 = std::move(*itemDatabaseResult652)->itemShared(std::move(*createResult654));
-  if (!itemSharedResult655)
-    return std::unexpected(std::move(itemSharedResult655.error()));
-  std::shared_ptr<Item> item = std::move(*itemSharedResult655);
+  auto item_shared_result655 = std::move(*itemDatabaseResult652)->item_shared(std::move(*createResult654));
+  if (!item_shared_result655)
+    return std::unexpected(std::move(item_shared_result655.error()));
+  std::shared_ptr<Item> item = std::move(*item_shared_result655);
 
   String name = item->friendly_name();
   if (item->count() > 1)
@@ -795,10 +795,10 @@ std::expected<void, StarException> MerchantPane::updateSelection() {
       auto createResult667 = ItemDescriptor::create(std::move(*getResult666));
       if (!createResult667)
         return std::unexpected(std::move(createResult667.error()));
-      auto itemSharedResult668 = std::move(*itemDatabaseResult665)->itemShared(std::move(*createResult667));
-      if (!itemSharedResult668)
-        return std::unexpected(std::move(itemSharedResult668.error()));
-      m_selectedItem = std::move(*itemSharedResult668);
+      auto item_shared_result668 = std::move(*itemDatabaseResult665)->item_shared(std::move(*createResult667));
+      if (!item_shared_result668)
+        return std::unexpected(std::move(item_shared_result668.error()));
+      m_selectedItem = std::move(*item_shared_result668);
       auto findChildResult669 = findChild<ButtonWidget>("spinCount.up");
       if (!findChildResult669)
         return std::unexpected(std::move(findChildResult669.error()));

@@ -1460,7 +1460,7 @@ std::expected<void, StarException> Player::destroy(std::optional<std::reference_
       } else {
         Set<ItemType> types;
         for (auto const& name : drop_types.right_ref()) {
-          auto typeResult = enum_value<ItemTypeNames>(name);
+          auto typeResult = enum_value<item_type_names>(name);
           if (!typeResult)
             return std::unexpected(std::move(typeResult.error()));
           auto const& type = *typeResult;
@@ -1471,7 +1471,7 @@ std::expected<void, StarException> Player::destroy(std::optional<std::reference_
           return std::unexpected(std::move(databaseResult.error()));
         auto database = std::move(*databaseResult);
         if (auto result = dropSelectedItems([types = std::move(types), database](std::shared_ptr<Item> item) -> std::expected<bool, StarException> {
-          auto typeResult = database->itemType(item->name());
+          auto typeResult = database->item_type(item->name());
           if (!typeResult)
             return std::unexpected(std::move(typeResult.error()));
           auto type = std::move(*typeResult);
@@ -2237,7 +2237,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
     return std::unexpected(std::move(itemDatabaseResult.error()));
   auto itemDatabase = std::move(*itemDatabaseResult);
       if (auto result = m_inventory->for_each_item([&](InventorySlot const&, std::shared_ptr<Item>& item) -> std::expected<void, StarException> {
-        if (auto result = itemDatabase->ageItem(item, m_age_items_timer.duration); !result)
+        if (auto result = itemDatabase->age_item(item, m_age_items_timer.duration); !result)
           return std::unexpected(std::move(result.error()));
         return {};
       }); !result)
@@ -2766,7 +2766,7 @@ std::expected<std::shared_ptr<Item>, StarException> Player::pickupItems(std::sha
     if (!databaseResult)
       return std::unexpected(std::move(databaseResult.error()));
     auto database = std::move(*databaseResult);
-    auto sharedResult = database->itemShared(items->descriptor());
+    auto sharedResult = database->item_shared(items->descriptor());
     if (!sharedResult)
       return std::unexpected(std::move(sharedResult.error()));
     auto shared = std::move(*sharedResult);
@@ -3971,7 +3971,7 @@ std::expected<void, StarException> Player::getNetStates(bool initial) {
   auto const& emote = emoteResult->get();
   m_emoteState = emote;
   m_dance.name = m_humanoid_dance_net_state.get();
-  return getNetArmorSecrets();
+  return apply_net_armor_secrets();
 }
 
 std::expected<void, StarException> Player::setNetStates() {
@@ -4037,11 +4037,11 @@ std::expected<void, StarException> Player::setNetArmorSecret(EquipmentSlot slot,
   auto store = std::move(*storeResult);
   if (auto result = setSecretProperty(Star::format("armorWearer.{}.data", slotName), store); !result)
     return std::unexpected(std::move(result.error()));
-  if (m_armorSecretNetVersions.empty()) {
+  if (m_armor_secret_net_versions.empty()) {
     if (auto result = setSecretProperty("armorWearer.replicating", true); !result)
       return std::unexpected(std::move(result.error()));
   }
-  return setSecretProperty(Star::format("armorWearer.{}.version", slotName), ++m_armorSecretNetVersions[slot]);
+  return setSecretProperty(Star::format("armorWearer.{}.version", slotName), ++m_armor_secret_net_versions[slot]);
 }
 
 std::expected<void, StarException> Player::setNetArmorSecrets(bool includeEmpty) {
@@ -4063,45 +4063,43 @@ std::expected<void, StarException> Player::setNetArmorSecrets(bool includeEmpty)
   return {};
 }
 
-std::expected<void, StarException> Player::getNetArmorSecrets() {
-  if (isSlave() && getSecretPropertyRef("armorWearer.replicating")) {
-    auto databaseResult = root().itemDatabase();
-    if (!databaseResult)
-      return std::unexpected(std::move(databaseResult.error()));
-    auto database = std::move(*databaseResult);
-    for (std::uint8_t i = 0; i != 12; ++i) {
-      auto slot = EquipmentSlot(static_cast<std::uint8_t>(EquipmentSlot::Cosmetic1) + i);
-      auto slotNameResult = enum_name<equipment_slot_names>(slot);
-      if (!slotNameResult)
-        return std::unexpected(std::move(slotNameResult.error()));
-      auto const& slotName = *slotNameResult;
-      auto& currentVersion = m_armorSecretNetVersions[slot];
-      std::uint64_t newVersion = 0;
-      auto versionResult = getSecretProperty(Star::format("armorWearer.{}.version", slotName), 0);
-      if (!versionResult)
-        return std::unexpected(std::move(versionResult.error()));
-      auto version = std::move(*versionResult);
-      if (version.is_type(Json::Type::Int)) {
-        auto valueResult = version.to_uint();
-        if (!valueResult)
-          return std::unexpected(std::move(valueResult.error()));
-        auto value = std::move(*valueResult);
-        newVersion = value;
-      }
-      if (newVersion > currentVersion) {
-        currentVersion = newVersion;
-        std::shared_ptr<ArmorItem> item;
-        auto storeResult = getSecretProperty(Star::format("armorWearer.{}.data", slotName));
-        if (!storeResult)
-          return std::unexpected(std::move(storeResult.error()));
-        auto store = std::move(*storeResult);
-        if (auto result = database->diskLoad(store, item); !result)
-          return std::unexpected(std::move(result.error()));
-        if (auto result = m_inventory->setItem(slot, item); !result)
-          return std::unexpected(std::move(result.error()));
-        m_armor->set_cosmetic_item(i, item);
-      }
+std::expected<void, StarException> Player::apply_net_armor_secrets() {
+  if (!isSlave() || !getSecretPropertyRef("armorWearer.replicating"))
+    return {};
+  auto database = root().itemDatabase();
+  if (!database)
+    return std::unexpected(std::move(database.error()));
+  for (std::uint8_t i = 0; i != 12; ++i) {
+    auto slot = EquipmentSlot(static_cast<std::uint8_t>(EquipmentSlot::Cosmetic1) + i);
+    auto name = enum_name<equipment_slot_names>(slot);
+    if (!name)
+      return std::unexpected(std::move(name.error()));
+    auto version = getSecretProperty(Star::format("armorWearer.{}.version", *name), 0);
+    if (!version)
+      return std::unexpected(std::move(version.error()));
+    if (!version->is_type(Json::Type::Int))
+      continue;
+    auto revision = version->to_uint();
+    if (!revision)
+      return std::unexpected(std::move(revision.error()));
+    if (*revision <= m_armor_secret_net_versions.value(slot, 0))
+      continue;
+    std::shared_ptr<ArmorItem> item;
+    if (auto data = getSecretPropertyRef(Star::format("armorWearer.{}.data", *name))) {
+      DataStreamReader reader{std::span<char const>(data->get().utf8())};
+      auto store = reader.read<Json>();
+      if (!store)
+        return std::unexpected(std::move(store.error()));
+      if (auto loaded = (*database)->disk_load(*store, item); !loaded)
+        return std::unexpected(std::move(loaded.error()));
     }
+    auto applied = m_inventory->setItem(slot, item);
+    if (!applied)
+      return std::unexpected(std::move(applied.error()));
+    if (!*applied)
+      return std::unexpected(ItemException("Could not apply replicated cosmetic armor"));
+    m_armor->set_cosmetic_item(i, item);
+    m_armor_secret_net_versions[slot] = *revision;
   }
   return {};
 }

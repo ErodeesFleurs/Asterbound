@@ -692,7 +692,7 @@ std::shared_ptr<ItemBag const> PlayerInventory::bagContents(String const& type) 
     if (item && !types.contains(item->name())) {
       auto length = item->name().size();
       if (!length) return std::unexpected(std::move(length.error()));
-      auto type = (*database)->itemType(item->name());
+      auto type = (*database)->item_type(item->name());
       if (!type) return std::unexpected(std::move(type.error()));
       types[item->name()] = *type;
     }
@@ -1050,7 +1050,7 @@ void PlayerInventory::setEquipmentVisibility(EquipmentSlot slot, bool visible) {
   auto loadItem = [&](String const& key, std::shared_ptr<Item>& item, bool optional = false) -> std::expected<void, StarException> {
     auto json = optional ? store.get(key, Json()) : store.get(key);
     if (!json) return std::unexpected(std::move(json.error()));
-    auto loaded = (*database)->diskLoad(*json);
+    auto loaded = (*database)->disk_load(*json);
     if (!loaded) return std::unexpected(std::move(loaded.error()));
     item = std::move(*loaded);
     normalizeItem(item);
@@ -1165,7 +1165,7 @@ void PlayerInventory::setEquipmentVisibility(EquipmentSlot slot, bool visible) {
     {"customBarGroup", m_custom_bar_group}, {"customBar", std::move(bar)},
     {"selectedActionBar", std::move(*selected)}, {"equipmentVisibilityMask", m_equipmentVisibilityMask}};
   auto saveItem = [&](String const& key, std::shared_ptr<Item> const& item) -> std::expected<void, StarException> {
-    auto encoded = (*database)->diskStore(item);
+    auto encoded = (*database)->disk_store(item);
     if (!encoded) return std::unexpected(std::move(encoded.error()));
     data[key] = std::move(*encoded);
     return {};
@@ -1357,9 +1357,9 @@ void PlayerInventory::setPlayer(std::optional<std::reference_wrapper<Player>> pl
   }
   auto database = m_root.itemDatabase();
   if (!database) return std::unexpected(std::move(database.error()));
-  auto type = (*database)->itemType(items->name());
+  auto type = (*database)->item_type(items->name());
   if (!type) return std::unexpected(std::move(type.error()));
-  auto typeName = enum_name<ItemTypeNames>(*type);
+  auto typeName = enum_name<item_type_names>(*type);
   if (!typeName) return std::unexpected(std::move(typeName.error()));
   for (auto const& entry : {std::pair<String, bool>{"typeWhitelist", false}, {"typeBlacklist", true}}) {
     auto present = filterConfig.contains(entry.first);
@@ -1371,7 +1371,7 @@ void PlayerInventory::setPlayer(std::optional<std::reference_wrapper<Player>> pl
         return false;
     }
   }
-  auto tags = (*database)->itemTags(items->name());
+  auto tags = (*database)->item_tags(items->name());
   if (!tags) return std::unexpected(std::move(tags.error()));
   for (auto const& entry : {std::pair<String, bool>{"tagWhitelist", false}, {"tagBlacklist", true}}) {
     auto present = filterConfig.contains(entry.first);
@@ -1496,7 +1496,7 @@ void PlayerInventory::swap_custom_bar_links(InventorySlot const& a, InventorySlo
   if (!database) return std::unexpected(std::move(database.error()));
   auto load = [&](NetElementData<ItemDescriptor>& state, std::shared_ptr<Item>& item) -> std::expected<void, StarException> {
     if (state.pull_updated()) {
-      auto result = (*database)->loadItem(state.get(), item);
+      auto result = (*database)->load_item(state.get(), item);
       if (!result) return std::unexpected(std::move(result.error()));
     }
     return {};
