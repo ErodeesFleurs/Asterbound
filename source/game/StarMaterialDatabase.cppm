@@ -279,7 +279,7 @@ inline std::expected<bool, StarException> MaterialDatabase::foreground_light_tra
     auto info = get_material_info(id);
     if (!info) return std::unexpected(std::move(info.error()));
     if (auto const& profile = info->get().render_profile)
-      return profile->foregroundLightTransparent;
+      return profile->foreground_light_transparent;
   }
   return id != StructureMaterialId;
 }
@@ -290,7 +290,7 @@ inline std::expected<bool, StarException> MaterialDatabase::background_light_tra
     auto info = get_material_info(id);
     if (!info) return std::unexpected(std::move(info.error()));
     if (auto const& profile = info->get().render_profile)
-      return profile->backgroundLightTransparent;
+      return profile->background_light_transparent;
   }
   return id != StructureMaterialId;
 }
@@ -301,7 +301,7 @@ inline std::expected<bool, StarException> MaterialDatabase::occludes_behind(Mate
     auto info = get_material_info(id);
     if (!info) return std::unexpected(std::move(info.error()));
     if (auto const& profile = info->get().render_profile)
-      return profile->occludesBehind;
+      return profile->occludes_behind;
   }
   return false;
 }
@@ -309,9 +309,9 @@ inline std::expected<bool, StarException> MaterialDatabase::occludes_behind(Mate
 inline Vec3F MaterialDatabase::radiant_light(MaterialId material_id, ModId mod_id) const {
   Vec3F light;
   if (auto profile = material_render_profile(material_id))
-    light += profile->get().radiantLight;
+    light += profile->get().radiant_light;
   if (auto profile = mod_render_profile(mod_id))
-    light += profile->get().radiantLight;
+    light += profile->get().radiant_light;
   return light;
 }
 

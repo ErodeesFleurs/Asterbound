@@ -1,5 +1,6 @@
 import std;
 import star.algorithm;
+import star.asset_path;
 import star.assets;
 import star.collision_block;
 import star.file;
@@ -15,10 +16,12 @@ import star.material_database;
 import star.material_render_profile;
 import star.material_types;
 import star.particle_database;
+import star.rect;
 import star.root;
 import star.string;
 import star.tile_damage;
 import star.unicode;
+import star.vector;
 
 #include "gtest/gtest.h"
 
@@ -67,32 +70,121 @@ const GameTestRegistration material_falling_behavior("MaterialDatabaseTest", "Fa
 const GameTestRegistration
   material_rule_join_names("MaterialRenderProfile", "RuleJoinNamesPreserveDefaultsCaseAndErrors", [](GameTest& fixture) {
     auto metadata = fixture.root().image_metadata_database();
-    ASSERT_TRUE(metadata) << metadata.error().what();
+    if (!fixture.check(bool(metadata), "load image metadata for material rules")) return;
     auto make_spec = [](Json rule) -> Json {
       return JsonObject{{"representativePiece", ""},
                         {"rules", JsonObject{{"test", std::move(rule)}}},
                         {"pieces", JsonObject{}},
-                        {"matches", JsonArray{JsonArray{"main", JsonArray{}}}}};
+                        {"matches", JsonArray{JsonArray{"main", JsonArray{JsonObject{
+                          {"matchAllPoints", JsonArray{JsonArray{JsonArray{0, 0}, "test"}}}
+                        }}}}}};
     };
     for (auto const& [rule, expected] : {std::pair{Json(JsonObject{}), MaterialJoinType::All},
                                          std::pair{Json(JsonObject{{"join", "aLl"}}), MaterialJoinType::All},
                                          std::pair{Json(JsonObject{{"join", "aNy"}}), MaterialJoinType::Any}}) {
-      auto profile = parseMaterialRenderProfile(**metadata, make_spec(rule));
-      ASSERT_TRUE(profile) << profile.error().what();
-      auto parsed = profile->rules.get("test");
-      ASSERT_TRUE(parsed) << parsed.error().what();
-      EXPECT_EQ(parsed->get()->join, expected);
+      auto profile = parse_material_render_profile(**metadata, make_spec(rule));
+      if (!fixture.check(bool(profile), "compile material join")) return;
+      if (!fixture.check(!profile->main_matches().empty(), "compile the root match")) return;
+      auto points = profile->match_points(profile->main_matches().front());
+      if (!fixture.check(points.size() == 1, "keep authored point")) return;
+      fixture.check(profile->rule(points.front().rule_index).join == expected, "preserve join default and spelling");
     }
     for (String const& name : {String("unknown"), String("日本語"), String(std::string_view("All\0", 4))}) {
-      auto profile = parseMaterialRenderProfile(**metadata, make_spec(JsonObject{{"join", name}}));
-      ASSERT_FALSE(profile);
-      EXPECT_TRUE(profile.error().is<MapException>());
+      auto profile = parse_material_render_profile(**metadata, make_spec(JsonObject{{"join", name}}));
+      fixture.check(!profile && profile.error().is<MapException>(), "reject unknown material join");
     }
     auto invalid =
-      parseMaterialRenderProfile(**metadata, make_spec(JsonObject{{"join", String(std::string_view("All\xff", 4))}}));
-    ASSERT_FALSE(invalid);
-    EXPECT_TRUE(invalid.error().is<UnicodeException>());
+      parse_material_render_profile(**metadata, make_spec(JsonObject{{"join", String(std::string_view("All\xff", 4))}}));
+    fixture.check(!invalid && invalid.error().is<UnicodeException>(), "report malformed UTF-8 in material join");
   });
+
+const GameTestRegistration profile_geometry("MaterialRenderProfile", "AtlasRowsPreserveExplicitSelectionAndWrap", [](GameTest& fixture) {
+  auto metadata = fixture.root().image_metadata_database();
+  if (!fixture.check(bool(metadata), "load image metadata")) return;
+  String const texture = "/asterbound/modicon.png";
+  auto dimensions = (*metadata)->image_size(texture);
+  if (!fixture.check(bool(dimensions), "measure the actual atlas image")) return;
+  JsonObject tile{{"texturePosition", JsonArray{1, 2}}, {"textureSize", JsonArray{3, 4}},
+                  {"variantStride", JsonArray{5, 0}}, {"colorStride", JsonArray{0, 3}}};
+  JsonObject spec{{"representativePiece", "tile"}, {"texture", texture}, {"variants", 2},
+                  {"multiColored", true}, {"colorVariants", 2}, {"rules", JsonObject{}},
+                  {"pieces", JsonObject{{"tile", tile}}}, {"matches", JsonArray{JsonArray{"main", JsonArray{}}}}};
+  auto profile = parse_material_render_profile(**metadata, spec);
+  if (!fixture.check(bool(profile), profile ? "compile atlas" : profile.error().what())) return;
+  auto expected = Star::format("{}?crop=6;{};9;{}", texture, (*dimensions)[1] - 12, (*dimensions)[1] - 8);
+  fixture.check(profile->piece_image("tile", 3, 2) == String(expected),
+      "explicit lookup keeps the final authored color row, wraps the random variant and flips atlas Y");
+  fixture.check(!profile->piece_image("tile", 0, 3), "explicit lookup rejects an absent color");
+  auto piece = profile->find_piece("tile");
+  if (!fixture.check(bool(piece), "resolve tile piece")) return;
+  auto fallback = piece->get().world_rectangle(3, 3);
+  auto base = piece->get().world_rectangle(1, 0);
+  fixture.check(fallback && base && fallback->get() == base->get(), "world lookup falls back to color zero");
+  auto crack = profile->damage_image(1.f, TileDamageType::Blockish);
+  auto protection = profile->damage_image(0.f, TileDamageType::Protected);
+  fixture.check(crack && crack->get().first == "/tiles/blockdamage.png:5" &&
+      protection && protection->get().first == "/tiles/blockprotection.png:1", "select distinct overlay endpoints");
+
+  spec["variants"] = 0;
+  auto no_variants = parse_material_render_profile(**metadata, spec);
+  if (!fixture.check(bool(no_variants), "zero variants remain loadable")) return;
+  auto empty_piece = no_variants->find_piece("tile");
+  fixture.check(empty_piece && !empty_piece->get().world_rectangle(0, 0) &&
+      !no_variants->piece_image("tile", 0), "an empty piece does not silently draw a rectangle");
+  tile["colorStride"] = JsonArray{0, 0};
+  spec["pieces"] = JsonObject{{"tile", tile}};
+  spec["colorVariants"] = 255;
+  spec["variants"] = 1;
+  auto full = parse_material_render_profile(**metadata, spec);
+  if (!fixture.check(bool(full), "compile all 256 authored rows")) return;
+  auto last_row = full->piece_image("tile", 0, 255);
+  fixture.check(last_row && full->piece_image("tile", 0, 0) == *last_row, "select row 255 without wrapping the row count");
+  spec["variants"] = std::int64_t{1} << 32;
+  fixture.check(!parse_material_render_profile(**metadata, spec), "reject unrepresentable atlas size before allocation");
+});
+
+const GameTestRegistration profile_rebinding("MaterialRenderProfile", "EarlierListsKeepOriginalChildren", [](GameTest& fixture) {
+  auto metadata = fixture.root().image_metadata_database();
+  if (!fixture.check(bool(metadata), "load image metadata")) return;
+  JsonObject spec{{"representativePiece", ""}, {"pieces", JsonObject{}}, {"rules", JsonObject{}},
+      {"matches", JsonArray{
+          JsonArray{"leaf", JsonArray{JsonObject{{"occlude", true}}}},
+          JsonArray{"first", JsonArray{JsonObject{{"subMatches", "leaf"}}}},
+          JsonArray{"leaf", JsonArray{JsonObject{{"occlude", false}}}},
+          JsonArray{"main", JsonArray{JsonObject{{"subMatches", "first"}}, JsonObject{{"subMatches", "leaf"}}}}}}};
+  auto profile = parse_material_render_profile(**metadata, spec);
+  if (!fixture.check(bool(profile), profile ? "compile named lists" : profile.error().what())) return;
+  auto main = profile->main_matches();
+  if (!fixture.check(main.size() == 2, "keep both root branches")) return;
+  auto first = profile->sub_matches(main[0]);
+  auto newest = profile->sub_matches(main[1]);
+  if (!fixture.check(first.size() == 1 && newest.size() == 1, "resolve both child lists")) return;
+  auto original = profile->sub_matches(first.front());
+  fixture.check(original.size() == 1 && original.front().occlude == true && newest.front().occlude == false,
+      "earlier references keep their binding after a name is reused");
+});
+
+const GameTestRegistration profile_bounds("MaterialRenderProfile", "RejectsWrappedIdsCountsAndNeighborOffsets", [](GameTest& fixture) {
+  auto metadata = fixture.root().image_metadata_database();
+  if (!fixture.check(bool(metadata), "load image metadata")) return;
+  auto parse = [&](std::int64_t colors, std::int64_t z, std::int64_t id, std::int64_t x) {
+    Json rule = JsonObject{{"entries", JsonArray{JsonObject{{"type", "EqualsId"}, {"id", id}}}}};
+    Json match = JsonObject{{"matchAllPoints", JsonArray{JsonArray{JsonArray{x, 0}, "id"}}}};
+    Json spec = JsonObject{{"representativePiece", ""}, {"pieces", JsonObject{}},
+        {"multiColored", true}, {"colorVariants", colors}, {"zLevel", z},
+        {"rules", JsonObject{{"id", rule}}}, {"matches", JsonArray{JsonArray{"main", JsonArray{match}}}}};
+    return parse_material_render_profile(**metadata, spec);
+  };
+  constexpr std::int64_t high_bit = std::int64_t{1} << 32;
+  auto valid = parse(255, high_bit - 1, 65535, -2);
+  fixture.check(valid && valid->color_variants == 255 && valid->z_level == high_bit - 1,
+      "accept representable counts and sort keys without requiring a texture for an empty piece table");
+  fixture.check(!parse(256, 0, 1, 0), "color count cannot alias zero");
+  fixture.check(!parse(0, high_bit, 1, 0), "sort key cannot alias the lowest layer");
+  fixture.check(!parse(0, 0, 65536, 0), "EqualsId cannot alias material zero");
+  fixture.check(!parse(0, 0, 1, std::numeric_limits<int>::min()) && !parse(0, 0, 1, high_bit),
+      "reject distant neighbors before absolute value or narrowing");
+});
 
 JsonObject material_fixture(std::int64_t id, String name = "fixture") {
   return {{"materialId", id}, {"materialName", std::move(name)}, {"category", "fixture"}};
@@ -421,7 +513,7 @@ const GameTestRegistration material_catalog_lookup("MaterialDatabaseTest", "Pres
   auto mod_render = catalog.mod_render_profile(mod_id);
   static_assert(std::same_as<decltype(material_render), std::optional<std::reference_wrapper<MaterialRenderProfile const>>>);
   static_assert(std::same_as<decltype(mod_render), decltype(material_render)>);
-  fixture.check(material_render && material_render->get().zLevel == 5 && mod_render && mod_render->get().zLevel == 3 &&
+  fixture.check(material_render && material_render->get().z_level == 5 && mod_render && mod_render->get().z_level == 3 &&
                   catalog.foreground_light_transparent(material_id) == true &&
                   catalog.background_light_transparent(material_id) == false,
                 "material resolves its template relative to the asset, while mod resolves from the asset root");

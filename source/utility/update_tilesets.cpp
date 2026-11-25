@@ -121,7 +121,7 @@ std::expected<void, StarException> scanMaterials(Root& root, TilesetUpdater& upd
     if (!tileset)
       return std::unexpected(std::move(tileset.error()));
     auto const& profile = render_profile->get();
-    auto image_path = profile.pieceImage(profile.representativePiece, 0);
+    auto image_path = profile.piece_image(profile.representative_piece, 0);
     if (!image_path)
       return std::unexpected(std::move(image_path.error()));
     auto image = assets.image(*image_path);

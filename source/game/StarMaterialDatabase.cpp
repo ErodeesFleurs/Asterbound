@@ -171,7 +171,7 @@ std::expected<void, StarException> MaterialDatabase::AssetInfo::load_render_and_
     if (!render_template) return std::unexpected(std::move(render_template.error()));
     auto parameters = asset.config.get("renderParameters");
     if (!parameters) return std::unexpected(std::move(parameters.error()));
-    auto profile = parseMaterialRenderProfile(image_metadata, json_merge(*render_template, *parameters), asset.path);
+    auto profile = parse_material_render_profile(image_metadata, json_merge(*render_template, *parameters), asset.path);
     if (!profile) return std::unexpected(std::move(profile.error()));
     render_profile.emplace(std::move(*profile));
   }
@@ -596,7 +596,7 @@ std::expected<MaterialColorVariant, StarException> MaterialDatabase::material_co
   if (isRealMaterial(id)) {
     auto info = get_material_info(id);
     if (!info) return std::unexpected(std::move(info.error()));
-    if (auto const& profile = info->get().render_profile) return profile->colorVariants;
+    if (auto const& profile = info->get().render_profile) return profile->color_variants;
   }
   return 0;
 }
@@ -605,7 +605,7 @@ std::expected<MaterialColorVariant, StarException> MaterialDatabase::mod_color_v
   if (isRealMod(id)) {
     auto info = get_mod_info(id);
     if (!info) return std::unexpected(std::move(info.error()));
-    if (auto const& profile = info->get().render_profile) return profile->colorVariants;
+    if (auto const& profile = info->get().render_profile) return profile->color_variants;
   }
   return 0;
 }

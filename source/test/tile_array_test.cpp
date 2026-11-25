@@ -33,9 +33,195 @@ import star.world_tiles;
 import star.array;
 import star.game_test;
 import star.root;
+import star.game_types;
+import star.image_metadata_database;
+import star.material_database;
+import star.material_render_profile;
+import star.tile_drawer;
+import star.world_render_data;
 using namespace Star;
 
 namespace {
+
+const GameTestRegistration tile_match_rules("TileDrawerTest", "RuleJoinsPreserveFailuresAndLayerSemantics", [](GameTest& fixture) {
+  auto materials = fixture.root().material_database();
+  auto metadata = fixture.root().image_metadata_database();
+  if (!fixture.check(bool(materials), materials ? "load material catalog" : materials.error().what()) ||
+      !fixture.check(bool(metadata), metadata ? "load image metadata" : metadata.error().what()))
+    return;
+  auto dirt = (*materials)->material_id("dirt");
+  auto grass = (*materials)->mod_id("grass");
+  if (!fixture.check(bool(dirt), dirt ? "resolve dirt" : dirt.error().what()) ||
+      !fixture.check(bool(grass), grass ? "resolve grass" : grass.error().what()))
+    return;
+
+  WorldRenderData render_data;
+  render_data.geometry = WorldGeometry(Vec2U{8, 8});
+  render_data.tile_min_position = {6, 3};
+  auto sized = render_data.tiles.set_size({4, 1});
+  if (!fixture.check(bool(sized), sized ? "allocate match tiles" : sized.error().what()))
+    return;
+  render_data.tiles.fill(TileDrawer::default_render_tile);
+  auto& base = render_data.tiles(1, 0);
+  base.foreground = base.background = *dirt;
+  base.foregroundMod = *grass;
+  base.foregroundHueShift = 11;
+  base.foregroundModHueShift = 37;
+  render_data.tiles(0, 0) = base;
+  render_data.tiles(0, 0).foregroundMod = NoModId;
+  render_data.tiles(2, 0) = base; // world X = 0, one step across the seam
+  render_data.tiles(2, 0).foregroundHueShift = 12;
+  render_data.tiles(2, 0).foregroundModHueShift = 38;
+  render_data.tiles(3, 0) = base;
+  render_data.tiles(3, 0).foreground = EmptyMaterialId;
+
+  auto spec = Json::parse_json(R"json({
+    "representativePiece": "",
+    "pieces": {},
+    "rules": {
+      "connects": { "entries": [{"type":"Connects"}] },
+      "disconnected": { "entries": [{"type":"Connects", "inverse":true}] },
+      "shadows": { "entries": [{"type":"Shadows"}, {"type":"Shadows"}] },
+      "self": { "entries": [{"type":"EqualsSelf"}] },
+      "selfHue": { "entries": [{"type":"EqualsSelf", "matchHue":true}] },
+      "missing": { "entries": [
+        {"type":"PropertyEquals", "propertyName":"asterboundRuntimeMatchMissing", "propertyValue":null}
+      ] },
+      "anySuccessBeforeError": { "join":"Any", "entries": [
+        {"type":"Connects"},
+        {"type":"PropertyEquals", "propertyName":"asterboundRuntimeMatchMissing", "propertyValue":null}
+      ] },
+      "allFailureBeforeError": { "join":"All", "entries": [
+        {"type":"Connects", "inverse":true},
+        {"type":"PropertyEquals", "propertyName":"asterboundRuntimeMatchMissing", "propertyValue":null}
+      ] },
+      "emptyAll": {},
+      "emptyAny": { "join":"Any" }
+    }
+  })json");
+  if (!fixture.check(bool(spec), spec ? "read matching profile spec" : spec.error().what()))
+    return;
+  auto id_rule = [](std::uint16_t id) -> Json {
+    return JsonObject{{"entries", JsonArray{JsonObject{{"type", "EqualsId"}, {"id", id}}}}};
+  };
+  spec = spec->set_path("rules.dirtId", id_rule(*dirt));
+  if (!fixture.check(bool(spec), spec ? "configure material ID rule" : spec.error().what()))
+    return;
+  spec = spec->set_path("rules.grassId", id_rule(*grass));
+  if (!fixture.check(bool(spec), spec ? "configure mod ID rule" : spec.error().what()))
+    return;
+  auto point = [](String name, int x = 1) -> Json { return JsonArray{JsonArray{x, 0}, std::move(name)}; };
+  auto all = [&](String name, int x = 1) -> JsonObject {
+    return {{"matchAllPoints", JsonArray{point(std::move(name), x)}}};
+  };
+  using enum TileLayer;
+  struct RuleCase {
+    std::string_view description;
+    JsonObject match;
+    std::optional<bool> expected; // Absent means strict material property lookup must fail.
+    TileLayer layer = Foreground;
+    bool is_mod = false;
+  };
+  RuleCase const cases[] = {
+    {"mod connects to supporting material without a mod", all("connects", -1), true, Foreground, true},
+    {"mod does not connect to an empty supporting tile with a mod", all("connects", 2), false, Foreground, true},
+    {"inversion applies to the result of Connects", all("disconnected", 2), true},
+    {"foreground material does not shadow itself", all("shadows"), false},
+    {"foreground material shadows background", all("shadows"), true, Background},
+    {"background without a foreground profile is not shadowed", all("shadows", 2), false, Background},
+    {"a material matches itself across the seam without a hue constraint", all("self"), true},
+    {"a material does not match its different hue across the seam", all("selfHue"), false},
+    {"a material with the same hue matches itself", all("selfHue", -1), true},
+    {"a mod with a different hue matches itself without a hue constraint", all("self"), true, Foreground, true},
+    {"a mod does not match its different hue with a hue constraint", all("selfHue"), false, Foreground, true},
+    {"a mod with the same hue matches itself", all("selfHue", 0), true, Foreground, true},
+    {"a material matches the configured material ID", all("dirtId"), true},
+    {"a different material fails the configured material ID rule", all("dirtId", 2), false},
+    {"a mod matches the configured mod ID", all("grassId", 2), true, Foreground, true},
+    {"an absent mod fails the configured mod ID rule", all("grassId", -1), false, Foreground, true},
+    {"absent property on a real material is an error", all("missing"), std::nullopt},
+    {"absent property on a real mod defaults to null", all("missing"), true, Foreground, true},
+    {"missing mod profile does not match null", all("missing", -1), false, Foreground, true},
+    {"missing material profile does not match null", all("missing", 2), false},
+    {"Any rules still evaluate later fallible entries", all("anySuccessBeforeError"), std::nullopt},
+    {"All rules skip later entries after failure", all("allFailureBeforeError"), false},
+    {"Any points still evaluate later fallible points",
+        {{"matchAnyPoints", JsonArray{point("connects"), point("missing")}}}, std::nullopt},
+    {"All points skip later points after failure",
+        {{"matchAllPoints", JsonArray{point("disconnected"), point("missing")}}}, false},
+    {"empty point sets match even in Any", {{"matchAnyPoints", JsonArray{}}}, true},
+    {"empty All rules match", all("emptyAll"), true},
+    {"empty Any rules do not match", all("emptyAny"), false},
+  };
+  for (auto const& test : cases) {
+    auto configured = spec->set("matches", JsonArray{JsonArray{"main", JsonArray{test.match}}});
+    if (!fixture.check(bool(configured), configured ? "configure matching profile" : configured.error().what()))
+      return;
+    auto profile = parse_material_render_profile(**metadata, *configured);
+    if (!fixture.check(bool(profile), profile ? "parse matching profile" : profile.error().what()))
+      return;
+    TileDrawer::MaterialPieceResultList pieces;
+    auto result = TileDrawer::determine_matching_pieces(pieces, {}, **materials, *profile, render_data, {7, 3}, test.layer, test.is_mod);
+    if (test.expected)
+      fixture.check(result == *test.expected && pieces.empty(), result ? test.description : result.error().what());
+    else
+      fixture.check(!result && result.error().is<JsonException>() && result.error().what().contains("asterboundRuntimeMatchMissing") &&
+              pieces.empty(), test.description);
+  }
+});
+
+const GameTestRegistration tile_match_order("TileDrawerTest", "EmitsParentBeforeChildrenAndHaltsTheCorrectSiblingList", [](GameTest& fixture) {
+  auto materials = fixture.root().material_database();
+  auto metadata = fixture.root().image_metadata_database();
+  if (!fixture.check(bool(materials), materials ? "load material catalog" : materials.error().what()) ||
+      !fixture.check(bool(metadata), metadata ? "load image metadata" : metadata.error().what()))
+    return;
+  auto spec = Json::parse_json(R"json({
+    "representativePiece":"sample", "texture":"/tiles/blockdamage.png",
+    "pieces":{"sample":{"textureSize":[1,1], "texturePosition":[0,0]}},
+    "rules":{},
+    "matches":[
+      ["children",[
+        {"requiredLayer":"foreground", "pieces":[["sample",[2,0]]], "occlude":false,
+          "subMatches":[{"pieces":[["sample",[3,0]]]}]}
+      ]],
+      ["main",[
+        {"requiredLayer":"background", "pieces":[["sample",[-1,0]]], "occlude":true},
+        {"pieces":[["sample",[1,0]]], "occlude":true, "subMatches":"children", "haltOnSubMatch":true},
+        {"pieces":[["sample",[4,0]]], "occlude":false, "haltOnMatch":true,
+          "subMatches":[{"pieces":[["sample",[5,0]]], "occlude":true}]},
+        {"pieces":[["sample",[6,0]]], "occlude":false}
+      ]]
+    ]
+  })json");
+  if (!fixture.check(bool(spec), spec ? "read ordered matching spec" : spec.error().what()))
+    return;
+  auto profile = parse_material_render_profile(**metadata, *spec);
+  if (!fixture.check(bool(profile), profile ? "parse ordered matching profile" : profile.error().what()))
+    return;
+
+  WorldRenderData render_data;
+  render_data.geometry = WorldGeometry(Vec2U{8, 8});
+  auto positions_equal = [](TileDrawer::MaterialPieceResultList const& pieces, std::initializer_list<Vec2F> expected) {
+    return std::ranges::equal(pieces, expected, {}, [](TileDrawer::MaterialPieceResultList::value_type const& placement) {
+      return placement.second;
+    });
+  };
+  for (auto layer : {TileLayer::Foreground, TileLayer::Background}) {
+    TileDrawer::MaterialPieceResultList pieces;
+    bool occlude = false;
+    auto result = TileDrawer::determine_matching_pieces(pieces, std::ref(occlude), **materials, *profile, render_data, {0, 0}, layer, false);
+    if (!fixture.check(result == true, result ? "match ordered profile" : result.error().what()))
+      continue;
+    if (layer == TileLayer::Foreground) {
+      fixture.check(positions_equal(pieces, {{1, 0}, {2, 0}, {3, 0}}) && !occlude,
+          "emit children after parent, apply child occlusion and halt on a successful submatch");
+    } else {
+      fixture.check(positions_equal(pieces, {{-1, 0}, {1, 0}, {4, 0}, {5, 0}}) && occlude,
+          "ignore mismatched layers, continue after a failed submatch, and enter children before the parent halt");
+    }
+  }
+});
 
 const GameTestRegistration tile_damage_union("TileDamageTest", "WeightedUnionDistinguishesMissingAndZero", [](GameTest& fixture) {
   auto assets = fixture.root().assets();

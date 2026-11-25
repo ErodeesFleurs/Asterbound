@@ -90,12 +90,12 @@ public:
   // as RenderChunkSize - 1 tiles rendered outside of the viewing area from
   // chunk alignment.  In addition to this, there is also a region around each
   // tile that is used for neighbor based rendering rules which has a max of
-  // MaterialRenderProfileMaxNeighborDistance.  If the given tile data does not
-  // extend RenderChunkSize + MaterialRenderProfileMaxNeighborDistance - 1
+  // material_render_profile_max_neighbor_distance. If the given tile data does not
+  // extend RenderChunkSize + material_render_profile_max_neighbor_distance - 1
   // around the viewing area, then border chunks can continuously change hash,
   // and will be recomputed too often.
   static unsigned const RenderChunkSize = 16;
-  static unsigned const BorderTileSize = RenderChunkSize + MaterialRenderProfileMaxNeighborDistance - 1;
+  static unsigned const BorderTileSize = RenderChunkSize + material_render_profile_max_neighbor_distance - 1;
 
   [[nodiscard]] static std::expected<std::shared_ptr<TilePainter>, StarException> create(Root& root, std::shared_ptr<Renderer> renderer);
 
@@ -136,7 +136,9 @@ private:
   using TerrainChunk = HashMap<TerrainLayer, HashMap<QuadZLevel, std::shared_ptr<RenderBuffer>>>;
   using LiquidChunk = HashMap<LiquidId, std::shared_ptr<RenderBuffer>>;
 
-  using MaterialPieceTextureKey = std::tuple<MaterialId, MaterialRenderPieceIndex, MaterialHue, bool>;
+  // The cache owns whole textures: a directive slot changes pixels, while an
+  // atlas rectangle only changes where the quad samples that texture.
+  using MaterialPieceTextureKey = std::tuple<MaterialRenderPieceIndex, MaterialId, MaterialHue, MaterialColorVariant, bool>;
   using AssetTextureKey = String;
   using TextureKey = std::variant<MaterialPieceTextureKey, AssetTextureKey>;
 
@@ -159,7 +161,7 @@ private:
   getLiquidChunk(WorldRenderData& renderData, Vec2I chunkIndex, ChunkHash hash);
 
   [[nodiscard]] std::expected<bool, StarException> produceTerrainPrimitives(HashMap<QuadZLevel, List<RenderPrimitive>>& primitives,
-      MaterialPieceResultList& pieces, TerrainLayer terrainLayer, Vec2I const& pos, WorldRenderData const& renderData,
+      MaterialPieceResultList& pieces, TerrainLayer terrain_layer, Vec2I const& pos, WorldRenderData const& render_data,
       std::shared_ptr<Assets const> const& assets, MaterialDatabase const& material_database);
   [[nodiscard]] std::expected<void, StarException> produceLiquidPrimitives(HashMap<LiquidId, List<RenderPrimitive>>& primitives, Vec2I const& pos, WorldRenderData const& renderData);
   [[nodiscard]] std::expected<TexturePtr, StarException> setupTexture(std::shared_ptr<Image const> const& image);

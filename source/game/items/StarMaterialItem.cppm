@@ -192,9 +192,9 @@ public:
   std::expected<void, StarException> render(RenderCallback& render_callback, EntityRenderLayer renderLayer) override;
 
   [[nodiscard]]
-  std::expected<List<Drawable>, StarException> preview(std::optional<std::reference_wrapper<TileDrawer>> tileDrawer, std::shared_ptr<Player> const& viewer = {}) const override;
+  std::expected<List<Drawable>, StarException> preview(std::optional<std::reference_wrapper<TileDrawer>> tile_drawer, std::shared_ptr<Player> const& viewer = {}) const override;
   [[nodiscard]]
-  std::expected<List<Drawable>, StarException> drop_drawables(std::optional<std::reference_wrapper<TileDrawer>> tileDrawer) const override;
+  std::expected<List<Drawable>, StarException> drop_drawables(std::optional<std::reference_wrapper<TileDrawer>> tile_drawer) const override;
   [[nodiscard]]
   std::expected<bool, StarException> beamCanPlace() const override;
 
@@ -217,7 +217,7 @@ public:
   [[nodiscard]]
   std::expected<List<PreviewTile>, StarException> preview_tiles(bool shifting) const override;
   [[nodiscard]]
-  std::expected<std::reference_wrapper<List<Drawable> const>, StarException> generatedPreview(std::optional<std::reference_wrapper<TileDrawer>> tileDrawer, Vec2I position = {}) const;
+  std::expected<std::reference_wrapper<List<Drawable> const>, StarException> generated_preview(std::optional<std::reference_wrapper<TileDrawer>> tile_drawer, Vec2I position = {}) const;
 private:
   explicit MaterialItem(Root& root) : Item(root), BeamItem(root) {}
   [[nodiscard]]
@@ -245,8 +245,8 @@ private:
   mutable float m_lastTileAreaRadiusCache;
   mutable List<Vec2I> m_tileAreasCache;
 
-  mutable std::optional<List<Drawable>> m_generatedPreviewCache;
-  mutable bool m_generatedPreviewUsesTileDrawer = false;
+  mutable std::optional<List<Drawable>> m_generated_preview_cache;
+  mutable bool m_generated_preview_uses_tile_drawer = false;
 };
 
 }
@@ -544,12 +544,12 @@ std::expected<void, StarException> MaterialItem::render(RenderCallback& render_c
   return {};
 }
 
-std::expected<List<Drawable>, StarException> MaterialItem::preview(std::optional<std::reference_wrapper<TileDrawer>> tileDrawer, std::shared_ptr<Player> const&) const {
-  return generatedPreview(tileDrawer).transform([](std::reference_wrapper<List<Drawable> const> drawables) { return drawables.get(); });
+std::expected<List<Drawable>, StarException> MaterialItem::preview(std::optional<std::reference_wrapper<TileDrawer>> tile_drawer, std::shared_ptr<Player> const&) const {
+  return generated_preview(tile_drawer).transform([](std::reference_wrapper<List<Drawable> const> drawables) { return drawables.get(); });
 }
 
-std::expected<List<Drawable>, StarException> MaterialItem::drop_drawables(std::optional<std::reference_wrapper<TileDrawer>> tileDrawer) const {
-  return generatedPreview(tileDrawer).transform([](std::reference_wrapper<List<Drawable> const> drawables) { return drawables.get(); });
+std::expected<List<Drawable>, StarException> MaterialItem::drop_drawables(std::optional<std::reference_wrapper<TileDrawer>> tile_drawer) const {
+  return generated_preview(tile_drawer).transform([](std::reference_wrapper<List<Drawable> const> drawables) { return drawables.get(); });
 }
 
 std::expected<bool, StarException> MaterialItem::beamCanPlace() const {
@@ -843,17 +843,17 @@ MaterialId MaterialItem::materialId() const {
   return m_material;
 }
 
-std::expected<std::reference_wrapper<List<Drawable> const>, StarException> MaterialItem::generatedPreview(std::optional<std::reference_wrapper<TileDrawer>> tileDrawer, Vec2I position) const {
-  if (!m_generatedPreviewCache || m_generatedPreviewUsesTileDrawer != tileDrawer.has_value()) {
-    if (tileDrawer) {
-      auto locker = tileDrawer->get().lockRenderData();
-      WorldRenderData& renderData = tileDrawer->get().renderData();
-      renderData.geometry = WorldGeometry(3, 3);
-      auto resized = renderData.tiles.set_size({3, 3});
+std::expected<std::reference_wrapper<List<Drawable> const>, StarException> MaterialItem::generated_preview(std::optional<std::reference_wrapper<TileDrawer>> tile_drawer, Vec2I position) const {
+  if (!m_generated_preview_cache || m_generated_preview_uses_tile_drawer != tile_drawer.has_value()) {
+    if (tile_drawer) {
+      auto locker = tile_drawer->get().lock_render_data();
+      WorldRenderData& render_data = tile_drawer->get().render_data();
+      render_data.geometry = WorldGeometry(3, 3);
+      auto resized = render_data.tiles.set_size({3, 3});
       if (!resized) return std::unexpected(std::move(resized.error()));
-      renderData.tiles.fill(TileDrawer::DefaultRenderTile);
-      renderData.tile_min_position = { 0, 0 };
-      auto tile = renderData.tiles.at({1, 1});
+      render_data.tiles.fill(TileDrawer::default_render_tile);
+      render_data.tile_min_position = { 0, 0 };
+      auto tile = render_data.tiles.at({1, 1});
       if (!tile)
         return std::unexpected(std::move(tile.error()));
       tile->get().foreground = m_material;
@@ -861,26 +861,26 @@ std::expected<std::reference_wrapper<List<Drawable> const>, StarException> Mater
       tile->get().foregroundColorVariant = 0;
 
       List<Drawable> drawables;
-      TileDrawer::Drawables tileDrawables;
+      TileDrawer::Drawables tile_drawables;
       auto database = root().material_database();
       if (!database)
         return std::unexpected(std::move(database.error()));
       auto collision = (*database)->material_collision_kind(m_material);
       if (!collision)
         return std::unexpected(std::move(collision.error()));
-      bool isBlock = BlockCollisionSet.contains(*collision);
-      TileDrawer::TerrainLayer layer = isBlock ? TileDrawer::TerrainLayer::Foreground : TileDrawer::TerrainLayer::Midground;
+      bool is_block = BlockCollisionSet.contains(*collision);
+      TileDrawer::TerrainLayer layer = is_block ? TileDrawer::TerrainLayer::Foreground : TileDrawer::TerrainLayer::Midground;
       for (int x = 0; x != 3; ++x) {
         for (int y = 0; y != 3; ++y) {
-          auto produced = tileDrawer->get().produceTerrainDrawables(tileDrawables, layer, {x, y}, renderData, 1.0f / tile_pixels, position - Vec2I(1, 1));
+          auto produced = tile_drawer->get().produce_terrain_drawables(tile_drawables, layer, {x, y}, render_data, 1.0f / tile_pixels, position - Vec2I(1, 1));
           if (!produced)
             return std::unexpected(std::move(produced.error()));
         }
       }
 
       locker.unlock();
-      for (auto& index : tileDrawables.keys()) {
-        auto taken = tileDrawables.extract_value(index);
+      for (auto& index : tile_drawables.keys()) {
+        auto taken = tile_drawables.extract_value(index);
         if (!taken)
           return std::unexpected(std::move(taken.error()));
         drawables.append_range(std::move(*taken));
@@ -888,25 +888,25 @@ std::expected<std::reference_wrapper<List<Drawable> const>, StarException> Mater
       auto metadata = root().image_metadata_database();
       if (!metadata)
         return std::unexpected(std::move(metadata.error()));
-      auto boundBox = Drawable::bound_box_all(**metadata, drawables, true);
-      if (!boundBox)
-        return std::unexpected(std::move(boundBox.error()));
-      if (!boundBox->is_empty()) {
+      auto bound_box = Drawable::bound_box_all(**metadata, drawables, true);
+      if (!bound_box)
+        return std::unexpected(std::move(bound_box.error()));
+      if (!bound_box->is_empty()) {
         for (auto& drawable : drawables)
-          drawable.translate(-boundBox->center());
+          drawable.translate(-bound_box->center());
       }
 
-      m_generatedPreviewCache.emplace(std::move(drawables));
+      m_generated_preview_cache.emplace(std::move(drawables));
     }
     else {
       auto icons = icon_drawables();
       if (!icons)
         return std::unexpected(std::move(icons.error()));
-      m_generatedPreviewCache.emplace(std::move(*icons));
+      m_generated_preview_cache.emplace(std::move(*icons));
     }
-    m_generatedPreviewUsesTileDrawer = tileDrawer.has_value();
+    m_generated_preview_uses_tile_drawer = tile_drawer.has_value();
   }
-  return std::cref(*m_generatedPreviewCache);
+  return std::cref(*m_generated_preview_cache);
 }
 
 std::expected<void, StarException> MaterialItem::updatePropertiesFromPlayer(Player& player) {

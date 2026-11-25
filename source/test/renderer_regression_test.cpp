@@ -6,6 +6,11 @@
 #include "StarTestDisplay.hpp"
 
 import std;
+import star.algorithm;
+import star.assets;
+import star.buffer;
+import star.byte_array;
+import star.file;
 import star.format;
 import star.renderer;
 import star.renderer_opengl;
@@ -23,9 +28,16 @@ import star.drawable_painter;
 import star.game_types;
 import star.line;
 import star.list;
+import star.material_types;
 import star.poly;
+import star.random;
 import star.ref_ptr;
+import star.root;
+import star.tile_painter;
+import star.world_camera;
+import star.world_geometry;
 import star.world_render_data;
+import star.world_tiles;
 
 using namespace Star;
 
@@ -417,6 +429,128 @@ class OpenGlRendererRegression : public RendererRegression {};
 class VulkanRendererRegression : public RendererRegression {
   bool vulkan() const override { return true; }
 };
+
+class OpenGlTileDirectiveRegression : public RendererRegression {
+  void TestBody() override {
+    RandomService random(0);
+    auto directory = checked(File::temporary_directory(random));
+    auto cleanup = make_scope_exit([&] { checked(File::remove_all(directory)); });
+    auto overlay = File::relative_to(directory, "assets");
+    checked(File::create_directory(overlay));
+    auto write_asset = [&](std::string_view name, std::string_view text) {
+      checked(File::write_file(String(text), File::relative_to(overlay, name)));
+    };
+    write_asset("preload.config", "[]");
+    write_asset("metamaterials.config", "[]");
+    write_asset("client.config", R"({"defaultFootstepSound":""})");
+    write_asset("rendering.config", R"({
+      "backgroundLayerColor":[255,255,255,255], "foregroundLayerColor":[255,255,255,255],
+      "liquidDrawLevels":[0,1], "chunkCacheTimeout":600000, "textureTimeout":600000
+    })");
+    write_asset("liquids.config", R"({
+      "liquidEngineParameters":{
+        "lateralMoveFactor":0, "spreadOverfillUpFactor":0, "spreadOverfillLateralFactor":0,
+        "spreadOverfillDownFactor":0, "pressureEqualizeFactor":0, "pressureMoveFactor":0,
+        "maximumPressureLevelImbalance":0, "minimumLivenPressureChange":0,
+        "minimumLivenLevelChange":0, "minimumLiquidLevel":0, "interactTransformationLevel":0
+      }, "backgroundDrain":0
+    })");
+    write_asset("directive.material", R"({
+      "materialId":1, "materialName":"directive", "category":"test",
+      "damageTable":{"damageFactors":{},"damageRecovery":0},
+      "renderTemplate":"/directive.config",
+      "renderParameters":{"colorDirectives":["?setcolor=ff0000","?setcolor=00ff00"]}
+    })");
+    write_asset("directive.matmod", R"({
+      "modId":1, "modName":"directive",
+      "damageTable":{"damageFactors":{},"damageRecovery":0},
+      "renderTemplate":"/directive.config",
+      "renderParameters":{"colorDirectives":["?setcolor=0000ff","?setcolor=ffff00"],
+                          "matches":[["main",[{"matchAllPoints":[],"pieces":[["half",[4,0]]]}]]]}
+    })");
+    // Both slots sample exactly the same atlas rectangle. The material and
+    // mod occupy opposite halves so that neither can hide the other's pixels.
+    write_asset("directive.config", R"({
+      "texture":"/directive.png", "multiColored":true, "colorVariants":2,
+      "representativePiece":"half", "rules":{},
+      "pieces":{"half":{"textureSize":[4,8],"texturePosition":[0,0],"colorStride":[0,0]}},
+      "matches":[["main",[{"matchAllPoints":[],"pieces":[["half",[0,0]]]}]]]
+    })");
+    auto png = std::make_shared<Buffer>();
+    checked(Image::filled({4, 8}, {255, 255, 255, 255}).write_png(logger, png));
+    checked(File::write_file(png->take_data(), File::relative_to(overlay, "directive.png")));
+
+    Root::Settings settings{};
+    settings.assetSources = {overlay};
+    settings.assetsSettings.asset_time_to_live = 600;
+    settings.assetsSettings.allow_remote_assets = false;
+    settings.defaultConfiguration = JsonObject{};
+    settings.storageDirectory = File::relative_to(directory, "storage");
+    settings.logLevel = LogLevel::Error;
+    auto root = checked(Root::create(std::move(settings)));
+
+    WorldRenderData data;
+    data.geometry = WorldGeometry(128, 128);
+    data.tile_min_position = {0, 0};
+    checked(data.tiles.set_size({48, 48}));
+    for (unsigned x = 0; x != 48; ++x)
+      for (unsigned y = 0; y != 48; ++y)
+        data.tiles(x, y) = RenderTile{.foreground = EmptyMaterialId, .foregroundMod = NoModId,
+                                    .background = EmptyMaterialId, .backgroundMod = NoModId};
+    auto& tile = data.tiles(24, 24);
+    tile.foreground = 1;
+    tile.foregroundMod = 1;
+
+    WorldCamera camera;
+    camera.setWorldGeometry(data.geometry);
+    camera.setScreenSize({Width, Height});
+    camera.setCenterWorldPosition({24, 24}, true);
+    auto material_pixel = camera.worldToScreen({24.25f, 24.5f});
+    auto mod_pixel = camera.worldToScreen({24.75f, 24.5f});
+    std::array const expected_material{Pixel{255, 0, 0, 255}, Pixel{0, 255, 0, 255}};
+    std::array const expected_mod{Pixel{0, 0, 255, 255}, Pixel{255, 255, 0, 255}};
+    auto draw = [&](TilePainter& painter, unsigned slot, std::string const& phase) {
+      auto location = std::source_location::current();
+      testing::ScopedTrace trace(location.file_name(), location.line(), phase);
+      tile.foregroundColorVariant = static_cast<MaterialColorVariant>(slot);
+      checked(renderer->startFrame());
+      select("internal");
+      checked(painter.setup(camera, data));
+      checked(painter.renderForeground(camera));
+      auto frame = pixels();
+      auto material_x = static_cast<unsigned>(material_pixel.x());
+      auto mod_x = static_cast<unsigned>(mod_pixel.x());
+      auto y = static_cast<unsigned>(material_pixel.y());
+      auto const& material = frame[y * Width + material_x];
+      auto const& mod = frame[y * Width + mod_x];
+      RecordProperty(phase, std::format("{:02x}{:02x}{:02x}/{:02x}{:02x}{:02x}",
+          material[0], material[1], material[2], mod[0], mod[1], mod[2]));
+      expectPixel(frame, Width, material_x, y, expected_material[slot], 0);
+      expectPixel(frame, Width, mod_x, y, expected_mod[slot], 0);
+      checked(renderer->finishFrame());
+      painter.cleanup();
+    };
+
+    for (unsigned first : {0u, 1u}) {
+      auto order = first == 0 ? std::string("ab_") : std::string("ba_");
+      auto second = 1 - first;
+      auto painter = checked(TilePainter::create(*root, renderer));
+      draw(*painter, first, order + "cold");
+      draw(*painter, second, order + "switched");
+      draw(*painter, second, order + "warm");
+      draw(*painter, first, order + "returned");
+      auto fresh = checked(TilePainter::create(*root, renderer));
+      draw(*fresh, second, order + "fresh");
+    }
+  }
+};
+
+auto const tile_directive_registration = [] {
+  auto location = std::source_location::current();
+  return testing::RegisterTest("OpenGlTileDirectiveRegression", "TileDirectiveSlotsAreIndependent",
+      nullptr, nullptr, location.file_name(), static_cast<int>(location.line()),
+      [] { return std::make_unique<OpenGlTileDirectiveRegression>().release(); });
+}();
 
 TEST_F(OpenGlRendererRegression, RekeyedLayersPreserveOverlappingPixelsAndEntityOrder) {
   DrawablePainter painter(renderer, {});

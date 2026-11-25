@@ -147,7 +147,7 @@ add_test(NAME fixed_scheduler_tests
   COMMAND fixed_scheduler_tests)
 set_tests_properties(fixed_scheduler_tests PROPERTIES LABELS "NoAssets")
 
-# Native pixels and Vulkan synchronization validation, without Root or assets.
+# Native pixels and Vulkan synchronization validation, without installed assets.
 # Windows are forbidden unless DISPLAY is explicitly opted in by the runner.
 if(STAR_BUILD_GUI AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
   add_executable(renderer_regression_tests

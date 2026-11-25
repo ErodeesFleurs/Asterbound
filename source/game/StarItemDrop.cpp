@@ -587,7 +587,7 @@ std::expected<void, StarException> ItemDrop::render(RenderCallback& render_callb
     auto mat = as_ref<MaterialItem>(*m_item);
     List<Drawable> generated;
     if (mat) {
-      auto preview = mat->get().generatedPreview(render_callback.tile_drawer(), Vec2I(position().floor()));
+      auto preview = mat->get().generated_preview(render_callback.tile_drawer(), Vec2I(position().floor()));
       if (!preview)
         return std::unexpected(std::move(preview.error()));
       generated = preview->get();

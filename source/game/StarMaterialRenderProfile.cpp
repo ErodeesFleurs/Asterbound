@@ -1,356 +1,592 @@
+import std;
+import star.asset_path;
+import star.bi_map;
+import star.color;
+import star.directives;
+import star.format;
+import star.game_types;
+import star.image_metadata_database;
 import star.json;
 import star.json_extra;
 import star.list;
-import star.rect;
-import star.color;
-import star.image_processing;
-import star.hash;
-import star.data_stream;
-import star.string_view;
-import star.thread;
-import star.directives;
-import star.asset_path;
-import star.bi_map;
-import star.game_types;
-import star.material_types;
-import star.vector;
-import star.lexical_cast;
-import star.ordered_map;
-import star.io_device;
-import star.ref_ptr;
-import star.logging;
-import star.listener;
-import std;
-import star.string;
-import star.format;
-
-import star.tile_damage;
+import star.map;
 import star.material_render_profile;
-import star.asset_source;
-import star.assets;
-
-
-import star.image_metadata_database;
-
+import star.material_types;
 import star.math_common;
+import star.rect;
+import star.string;
+import star.string_view;
+import star.tile_damage;
+import star.vector;
+
 namespace Star {
+namespace {
 
-[[nodiscard]]
-std::expected<MaterialRenderMatchList, StarException> parseMaterialRenderMatchList(Json const& matchSpec, RuleMap const& ruleMap, PieceMap const& pieceMap, MatchMap const& matchMap) {
-  MaterialRenderMatchList result;
-  auto configs = matchSpec.iterate_array();
-  if (!configs) return std::unexpected(std::move(configs.error()));
-  for (auto const& config : *configs) {
-    auto match = std::make_shared<MaterialRenderMatch>();
-    Json points = JsonArray();
-    auto all = config.opt("matchAllPoints");
-    if (!all) return std::unexpected(std::move(all.error()));
-    if (*all) {
-      points = **all;
-      match->matchJoin = MaterialJoinType::All;
-    } else {
-      auto any = config.opt("matchAnyPoints");
-      if (!any) return std::unexpected(std::move(any.error()));
-      if (*any) {
-        points = **any;
-        match->matchJoin = MaterialJoinType::Any;
-      }
-    }
-    auto point_configs = points.iterate_array();
-    if (!point_configs)
-      return std::unexpected(std::move(point_configs.error()));
-    for (auto const& point_config : *point_configs) {
-      MaterialMatchPoint point;
-      auto position = point_config.get(0);
-      if (!position) return std::unexpected(std::move(position.error()));
-      {
-        auto value = json_to_vec2i(*position);
-        if (!value) return std::unexpected(std::move(value.error()));
-        point.position = std::move(*value);
-      }
-      if (std::abs(point.position[0]) > MaterialRenderProfileMaxNeighborDistance || std::abs(point.position[1]) > MaterialRenderProfileMaxNeighborDistance)
-        return std::unexpected(MaterialRenderProfileException(Star::format("Match position {} outside of maximum rule distance {}", point.position, MaterialRenderProfileMaxNeighborDistance)));
-      auto name = point_config.get_string(1);
-      if (!name) return std::unexpected(std::move(name.error()));
-      auto rule = ruleMap.get(*name);
-      if (!rule) return std::unexpected(std::move(rule.error()));
-      point.rule = rule->get();
-      match->matchPoints.push_back(std::move(point));
-    }
-    auto pieces = config.find("pieces");
-    if (!pieces) return std::unexpected(std::move(pieces.error()));
-    if (*pieces && !(*pieces)->get().is_null()) {
-      auto piece_configs = (*pieces)->get().iterate_array();
-      if (!piece_configs)
-        return std::unexpected(std::move(piece_configs.error()));
-      for (auto const& piece : *piece_configs) {
-        auto name = piece.get_string(0);
-        if (!name)
-          return std::unexpected(std::move(name.error()));
-        auto render_piece = pieceMap.get(*name);
-        if (!render_piece)
-          return std::unexpected(std::move(render_piece.error()));
-        auto position_config = piece.get(1);
-        if (!position_config)
-          return std::unexpected(std::move(position_config.error()));
-        auto position = json_to_vec2f(*position_config);
-        if (!position)
-          return std::unexpected(std::move(position.error()));
-        match->resultingPieces.push_back({render_piece->get(), *position});
-      }
-    }
-    auto subMatches = config.get("subMatches", {});
-    if (!subMatches) return std::unexpected(std::move(subMatches.error()));
-    if (subMatches->is_type(Json::Type::String)) {
-      auto name = subMatches->to_string();
-      if (!name) return std::unexpected(std::move(name.error()));
-      auto list = matchMap.get(*name);
-      if (!list) return std::unexpected(std::move(list.error()));
-      match->subMatches = list->get();
-    } else if (!subMatches->is_null()) {
-      {
-        auto value = parseMaterialRenderMatchList(*subMatches, ruleMap, pieceMap, matchMap);
-        if (!value) return std::unexpected(std::move(value.error()));
-        match->subMatches = std::move(*value);
-      }
-    }
-    auto layer = config.opt_string("requiredLayer");
-    if (!layer) return std::unexpected(std::move(layer.error()));
-    if (*layer) {
-      auto value = enum_value<tile_layer_names>(**layer);
-      if (!value) return std::unexpected(std::move(value.error()));
-      match->requiredLayer = *value;
-    }
-    {
-      auto value = config.get_bool("haltOnMatch", false);
-      if (!value) return std::unexpected(std::move(value.error()));
-      match->haltOnMatch = std::move(*value);
-    }
-    {
-      auto value = config.get_bool("haltOnSubMatch", false);
-      if (!value) return std::unexpected(std::move(value.error()));
-      match->haltOnSubMatch = std::move(*value);
-    }
-    {
-      auto value = config.opt_bool("occlude");
-      if (!value) return std::unexpected(std::move(value.error()));
-      match->occlude = std::move(*value);
-    }
-    result.push_back(std::move(match));
+// Limit generated rectangles per profile to 16 MiB of RectF storage.
+constexpr std::size_t max_profile_rectangles = 1'048'576;
+
+constexpr auto material_join_type_names =
+    sorted_enum_names(std::to_array<std::pair<MaterialJoinType, std::string_view>>(
+        {{MaterialJoinType::All, "All"}, {MaterialJoinType::Any, "Any"}}));
+
+enum class RuleKind : std::uint8_t { Connects, Shadows, EqualsSelf, EqualsId, PropertyEquals };
+constexpr auto rule_kind_names = std::to_array<std::pair<RuleKind, std::string_view>>({
+    {RuleKind::Connects, "Connects"},
+    {RuleKind::Shadows, "Shadows"},
+    {RuleKind::EqualsSelf, "EqualsSelf"},
+    {RuleKind::EqualsId, "EqualsId"},
+    {RuleKind::PropertyEquals, "PropertyEquals"},
+});
+
+std::expected<std::optional<RuleKind>, StarException> find_rule_kind(StringView name) {
+  for (auto const& [kind, spelling] : rule_kind_names) {
+    auto matches = name.equals_ignore_case(spelling);
+    if (!matches)
+      return std::unexpected(std::move(matches.error()));
+    if (*matches)
+      return kind;
   }
-  return result;
+  return std::nullopt;
 }
 
-std::expected<String, StarException> MaterialRenderProfile::pieceImage(String const& pieceName, unsigned variant, MaterialColorVariant colorVariant, MaterialHue hueShift) const {
-  auto piece = pieces.get(pieceName);
-  if (!piece) return std::unexpected(std::move(piece.error()));
-  String texture = piece->get()->texture;
-  if (hueShift != MaterialHue()) texture = Star::format("{}?hueshift={}", texture, materialHueToDegrees(hueShift));
-  auto variants = piece->get()->variants.get(colorVariant);
-  if (!variants) return std::unexpected(std::move(variants.error()));
-  auto rect = variants->get().wrap(variant);
-  if (!rect) return std::unexpected(std::move(rect.error()));
-  return Star::format("{}?crop={};{};{};{}", texture, rect->get().x_min(), rect->get().y_min(), rect->get().x_max(), rect->get().y_max());
+std::expected<Vec2F, StarException> parse_stride(Json const& config, String const& field) {
+  auto value = config.find(field);
+  if (!value)
+    return std::unexpected(std::move(value.error()));
+  if (*value)
+    return json_to_vec2f((*value)->get());
+  return Vec2F(0, 0);
 }
 
-std::expected<std::reference_wrapper<std::pair<String, Vec2F> const>, StarException> MaterialRenderProfile::damageImage(float damageLevel, TileDamageType damageType) const {
-  if (damageType == TileDamageType::Protected)
-    return protectedFrames.at(std::clamp<unsigned>(damageLevel * crackingFrames.size(), 0, crackingFrames.size() - 1));
-  return crackingFrames.at(std::clamp<unsigned>(damageLevel * crackingFrames.size(), 0, crackingFrames.size() - 1));
-}
-
-std::expected<MaterialRenderProfile, StarException> parseMaterialRenderProfile(ImageMetadataDatabase const& image_metadata, Json const& spec, String const& relativePath) {
-  MaterialRenderProfile profile;
-  auto transparent = spec.get_bool("lightTransparent", false);
-  if (!transparent) return std::unexpected(std::move(transparent.error()));
-  {
-    auto value = spec.get_bool("foregroundLightTransparent", *transparent);
-    if (!value) return std::unexpected(std::move(value.error()));
-    profile.foregroundLightTransparent = std::move(*value);
-  }
-  {
-    auto value = spec.get_bool("backgroundLightTransparent", *transparent);
-    if (!value) return std::unexpected(std::move(value.error()));
-    profile.backgroundLightTransparent = std::move(*value);
-  }
-  auto multiColored = spec.get_bool("multiColored", false);
-  if (!multiColored) return std::unexpected(std::move(multiColored.error()));
-  profile.colorVariants = 0;
-  if (*multiColored) {
-    {
-      auto value = spec.get_uint("colorVariants", static_cast<std::uint64_t>(MaxMaterialColorVariant) + 1);
-      if (!value) return std::unexpected(std::move(value.error()));
-      profile.colorVariants = std::move(*value);
-    }
-  }
-  auto directives = spec.get_array("colorDirectives", JsonArray());
-  if (!directives) return std::unexpected(std::move(directives.error()));
-  for (auto const& entry : *directives) {
-    auto text = entry.to_string();
-    if (!text) return std::unexpected(std::move(text.error()));
-    profile.colorDirectives.push_back(Directives(*text));
-  }
-  {
-    auto value = spec.get_bool("occludesBelow", true);
-    if (!value) return std::unexpected(std::move(value.error()));
-    profile.occludesBehind = std::move(*value);
-  }
-  {
-    auto value = spec.get_uint("zLevel", 0);
-    if (!value) return std::unexpected(std::move(value.error()));
-    profile.zLevel = std::move(*value);
-  }
-  auto lightConfig = spec.get("radiantLight", JsonArray{0, 0, 0});
-  if (!lightConfig) return std::unexpected(std::move(lightConfig.error()));
-  auto light = json_to_vec3b(*lightConfig);
-  if (!light) return std::unexpected(std::move(light.error()));
-  profile.radiantLight = Color::rgb(*light).to_rgb_f();
-  {
-    auto value = spec.get_string("representativePiece");
-    if (!value) return std::unexpected(std::move(value.error()));
-    profile.representativePiece = std::move(*value);
-  }
-  auto rulesConfig = spec.get("rules");
-  if (!rulesConfig) return std::unexpected(std::move(rulesConfig.error()));
-  auto rules = rulesConfig->iterate_object();
-  if (!rules) return std::unexpected(std::move(rules.error()));
-  for (auto const& pair : *rules) {
-    auto rule = std::make_shared<MaterialRule>();
-    auto joinName = pair.second.get_string("join", "all");
-    if (!joinName) return std::unexpected(std::move(joinName.error()));
-    auto join = enum_value<MaterialJoinTypeNames>(*joinName);
-    if (!join) return std::unexpected(std::move(join.error()));
-    rule->join = *join;
-    auto entries = pair.second.get_array("entries", {});
-    if (!entries) return std::unexpected(std::move(entries.error()));
-    for (auto const& entryConfig : *entries) {
-      auto inverse = entryConfig.get_bool("inverse", false);
-      if (!inverse) return std::unexpected(std::move(inverse.error()));
-      auto type = entryConfig.get_string("type");
-      if (!type) return std::unexpected(std::move(type.error()));
-      if (auto match0 = type->equals_ignore_case("Connects"); !match0) return std::unexpected(std::move(match0.error()));
-      else if (*match0) {
-        rule->entries.push_back({MaterialRule::RuleConnects(), *inverse});
-      }
-      else if (auto match1 = type->equals_ignore_case("Shadows"); !match1) return std::unexpected(std::move(match1.error()));
-      else if (*match1) {
-        rule->entries.push_back({MaterialRule::RuleShadows(), *inverse});
-      }
-      else if (auto match2 = type->equals_ignore_case("EqualsSelf"); !match2) return std::unexpected(std::move(match2.error()));
-      else if (*match2) {
-        auto matchHue = entryConfig.get_bool("matchHue", false);
-        if (!matchHue) return std::unexpected(std::move(matchHue.error()));
-        MaterialRule::RuleEntry entry{{}, *inverse};
-        entry.rule.emplace<4>(MaterialRule::RuleEqualsSelf{*matchHue});
-        rule->entries.push_back(std::move(entry));
-      }
-      else if (auto match3 = type->equals_ignore_case("EqualsId"); !match3) return std::unexpected(std::move(match3.error()));
-      else if (*match3) {
-        auto id = entryConfig.get_uint("id");
-        if (!id) return std::unexpected(std::move(id.error()));
-        rule->entries.push_back({MaterialRule::RuleEqualsId{static_cast<std::uint16_t>(*id)}, *inverse});
-      }
-      else if (auto match4 = type->equals_ignore_case("PropertyEquals"); !match4) return std::unexpected(std::move(match4.error()));
-      else if (*match4) {
-        auto name = entryConfig.get_string("propertyName");
-        if (!name) return std::unexpected(std::move(name.error()));
-        auto value = entryConfig.get("propertyValue");
-        if (!value) return std::unexpected(std::move(value.error()));
-        rule->entries.push_back({MaterialRule::RulePropertyEquals{std::move(*name), std::move(*value)}, *inverse});
-      }
-    }
-    profile.rules[pair.first] = std::move(rule);
-  }
-  auto piecesConfig = spec.get("pieces");
-  if (!piecesConfig) return std::unexpected(std::move(piecesConfig.error()));
-  auto pieces = piecesConfig->iterate_object();
-  if (!pieces) return std::unexpected(std::move(pieces.error()));
-  for (auto const& pair : *pieces) {
-    auto piece = std::make_shared<MaterialRenderPiece>();
-    piece->pieceId = profile.pieces.size();
-    auto defaultTexture = spec.get_string("texture");
-    if (!defaultTexture) return std::unexpected(std::move(defaultTexture.error()));
-    auto texture = pair.second.get_string("texture", *defaultTexture);
-    if (!texture) return std::unexpected(std::move(texture.error()));
-    piece->texture = AssetPath::relative_to(relativePath, *texture);
-    auto defaultVariants = spec.get_uint("variants", 1);
-    if (!defaultVariants) return std::unexpected(std::move(defaultVariants.error()));
-    auto variants = pair.second.get_uint("variants", *defaultVariants);
-    if (!variants) return std::unexpected(std::move(variants.error()));
-    auto sizeConfig = pair.second.get("textureSize");
-    if (!sizeConfig) return std::unexpected(std::move(sizeConfig.error()));
-    auto size = json_to_vec2f(*sizeConfig);
-    if (!size) return std::unexpected(std::move(size.error()));
-    auto positionConfig = pair.second.get("texturePosition");
-    if (!positionConfig) return std::unexpected(std::move(positionConfig.error()));
-    auto position = json_to_vec2f(*positionConfig);
-    if (!position) return std::unexpected(std::move(position.error()));
-    auto variantStrideConfig = pair.second.get("variantStride", JsonArray{0, 0});
-    if (!variantStrideConfig) return std::unexpected(std::move(variantStrideConfig.error()));
-    auto variantStride = json_to_vec2f(*variantStrideConfig);
-    if (!variantStride) return std::unexpected(std::move(variantStride.error()));
-    auto colorStrideConfig = pair.second.get("colorStride", JsonArray{0, 0});
-    if (!colorStrideConfig) return std::unexpected(std::move(colorStrideConfig.error()));
-    auto colorStride = json_to_vec2f(*colorStrideConfig);
-    if (!colorStride) return std::unexpected(std::move(colorStride.error()));
-    auto image_size = image_metadata.image_size(piece->texture);
-    if (!image_size) return std::unexpected(std::move(image_size.error()));
-    auto image_height = (*image_size)[1];
-    auto flip = [image_height](RectF const& rect) { return RectF::with_size(Vec2F(rect.x_min(), image_height - rect.y_max()), rect.size()); };
-    for (unsigned v = 0; v < *variants; ++v) {
-      auto i = DefaultMaterialColorVariant;
-      auto rect = RectF::with_size(*position + *variantStride * v, *size);
-      piece->variants[i].push_back(flip(rect));
-      for (MaterialColorVariant c = 0; c != profile.colorVariants; ++c) {
-        auto rect = RectF::with_size(*position + *variantStride * v + *colorStride * ++i, *size);
-        piece->variants[i].push_back(flip(rect));
-      }
-    }
-    profile.pieces[pair.first] = std::move(piece);
-  }
-  auto matchesConfig = spec.get("matches");
-  if (!matchesConfig) return std::unexpected(std::move(matchesConfig.error()));
-  auto matches = matchesConfig->iterate_array();
-  if (!matches) return std::unexpected(std::move(matches.error()));
-  for (auto const& entry : *matches) {
-    auto name = entry.get_string(0);
-    if (!name) return std::unexpected(std::move(name.error()));
-    auto config = entry.get(1);
-    if (!config) return std::unexpected(std::move(config.error()));
-    {
-      auto value = parseMaterialRenderMatchList(*config, profile.rules, profile.pieces, profile.matches);
-      if (!value) return std::unexpected(std::move(value.error()));
-      profile.matches[*name] = std::move(*value);
-    }
-  }
-  auto main = profile.matches.get("main");
-  if (!main) return std::unexpected(std::move(main.error()));
-  profile.mainMatchList = main->get();
-
-  // TODO: Completely hard-coded for now
-  profile.crackingFrames = {
+using DamageFrame = std::pair<String, Vec2F>;
+constexpr std::size_t damage_frame_count = 5;
+std::array<DamageFrame, damage_frame_count> const cracking_frames{{
     {"/tiles/blockdamage.png:1", Vec2F(0, 0)},
     {"/tiles/blockdamage.png:2", Vec2F(0, 0)},
     {"/tiles/blockdamage.png:3", Vec2F(0, 0)},
     {"/tiles/blockdamage.png:4", Vec2F(0, 0)},
-    {"/tiles/blockdamage.png:5", Vec2F(0, 0)}
-  };
-
-  profile.protectedFrames = {
+    {"/tiles/blockdamage.png:5", Vec2F(0, 0)},
+}};
+std::array<DamageFrame, damage_frame_count> const protected_frames{{
     {"/tiles/blockprotection.png:1", Vec2F(0, 0)},
     {"/tiles/blockprotection.png:2", Vec2F(0, 0)},
     {"/tiles/blockprotection.png:3", Vec2F(0, 0)},
     {"/tiles/blockprotection.png:4", Vec2F(0, 0)},
-    {"/tiles/blockprotection.png:5", Vec2F(0, 0)}
-  };
+    {"/tiles/blockprotection.png:5", Vec2F(0, 0)},
+}};
 
-  {
-    auto value = spec.get("ruleProperties", JsonObject());
-    if (!value) return std::unexpected(std::move(value.error()));
-    profile.ruleProperties = std::move(*value);
+template <std::unsigned_integral Value>
+std::expected<Value, StarException> checked_unsigned(
+    std::expected<std::uint64_t, StarException> value, std::string_view field) {
+  if (!value)
+    return std::unexpected(std::move(value.error()));
+  if (!std::in_range<Value>(*value))
+    return std::unexpected(MaterialRenderProfileException::format(
+        "{} value {} is out of range [0, {}]", field, *value, std::numeric_limits<Value>::max()));
+  return static_cast<Value>(*value);
+}
+
+std::expected<Vec2I, StarException> parse_match_position(Json const& config) {
+  auto components = config.iterate_array();
+  if (!components || components->container->size() != 2)
+    return std::unexpected(JsonException("Json not an array of size 2 in jsonToVec2I"));
+
+  Vec2I position;
+  for (std::size_t axis = 0; axis != 2; ++axis) {
+    auto coordinate = (*components->container)[axis].to_int();
+    if (!coordinate)
+      return std::unexpected(std::move(coordinate.error()));
+    constexpr auto limit = material_render_profile_max_neighbor_distance;
+    if (*coordinate < -limit || *coordinate > limit)
+      return std::unexpected(MaterialRenderProfileException::format(
+          "Match position component {} outside of maximum rule distance {}", *coordinate, limit));
+    position[axis] = static_cast<int>(*coordinate);
+  }
+  return position;
+}
+
+std::expected<MaterialRule, StarException> parse_rule(Json const& config) {
+  auto join_name = config.get_string("join", "all");
+  if (!join_name)
+    return std::unexpected(std::move(join_name.error()));
+  auto join = enum_value<material_join_type_names>(*join_name);
+  if (!join)
+    return std::unexpected(std::move(join.error()));
+  MaterialRule result{*join, {}};
+
+  auto entries = config.find("entries");
+  if (!entries)
+    return std::unexpected(std::move(entries.error()));
+  if (!*entries || (*entries)->get().is_null())
+    return result;
+  auto entries_array = (*entries)->get().iterate_array();
+  if (!entries_array)
+    return std::unexpected(std::move(entries_array.error()));
+  result.entries.reserve(entries_array->container->size());
+  for (auto const& entry_config : *entries_array) {
+    auto inverse = entry_config.get_bool("inverse", false);
+    if (!inverse)
+      return std::unexpected(std::move(inverse.error()));
+    auto name = entry_config.get_string("type");
+    if (!name)
+      return std::unexpected(std::move(name.error()));
+    auto kind = find_rule_kind(*name);
+    if (!kind)
+      return std::unexpected(std::move(kind.error()));
+    // Empty and other unrecognized rule spellings have never emitted an entry.
+    if (!*kind)
+      continue;
+
+    switch (**kind) {
+      case RuleKind::Connects:
+        result.entries.push_back({MaterialRule::RuleConnects{}, *inverse});
+        break;
+      case RuleKind::Shadows:
+        result.entries.push_back({MaterialRule::RuleShadows{}, *inverse});
+        break;
+      case RuleKind::EqualsSelf: {
+        auto match_hue = entry_config.get_bool("matchHue", false);
+        if (!match_hue)
+          return std::unexpected(std::move(match_hue.error()));
+        result.entries.push_back({MaterialRule::RuleEqualsSelf{*match_hue}, *inverse});
+        break;
+      }
+      case RuleKind::EqualsId: {
+        auto id = checked_unsigned<std::uint16_t>(entry_config.get_uint("id"), "EqualsId.id");
+        if (!id)
+          return std::unexpected(std::move(id.error()));
+        result.entries.push_back({MaterialRule::RuleEqualsId{*id}, *inverse});
+        break;
+      }
+      case RuleKind::PropertyEquals: {
+        auto property_name = entry_config.get_string("propertyName");
+        if (!property_name)
+          return std::unexpected(std::move(property_name.error()));
+        auto value = entry_config.get("propertyValue");
+        if (!value)
+          return std::unexpected(std::move(value.error()));
+        result.entries.push_back({MaterialRule::RulePropertyEquals{std::move(*property_name), std::move(*value)}, *inverse});
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+}
+
+class MaterialProfileCompiler {
+public:
+  std::expected<MaterialRenderProfile, StarException> compile(
+      ImageMetadataDatabase const& image_metadata, Json const& spec, String const& relative_path);
+
+private:
+  using Range = MaterialRenderMatch::Range;
+
+  std::expected<void, StarException> compile_settings(Json const& spec);
+  std::expected<void, StarException> compile_rules(Json const& spec);
+  std::expected<void, StarException> compile_pieces(
+      ImageMetadataDatabase const& image_metadata, Json const& spec, String const& relative_path);
+  std::expected<void, StarException> compile_named_matches(Json const& spec);
+  std::expected<Range, StarException> compile_match_list(Json const& spec);
+  std::expected<MaterialRenderMatch, StarException> compile_match(Json const& config);
+  std::expected<Range, StarException> compile_points(Json const& spec);
+  std::expected<Range, StarException> compile_placements(Json const& spec);
+
+  MaterialRenderProfile m_profile;
+  StringMap<std::size_t> m_rule_indices;
+  StringMap<Range> m_named_matches;
+  std::size_t m_rectangle_count = 0;
+};
+
+std::expected<void, StarException> MaterialProfileCompiler::compile_settings(Json const& spec) {
+  auto transparent = spec.get_bool("lightTransparent", false);
+  if (!transparent)
+    return std::unexpected(std::move(transparent.error()));
+  auto foreground = spec.get_bool("foregroundLightTransparent", *transparent);
+  if (!foreground)
+    return std::unexpected(std::move(foreground.error()));
+  m_profile.foreground_light_transparent = *foreground;
+  auto background = spec.get_bool("backgroundLightTransparent", *transparent);
+  if (!background)
+    return std::unexpected(std::move(background.error()));
+  m_profile.background_light_transparent = *background;
+
+  auto multi_colored = spec.get_bool("multiColored", false);
+  if (!multi_colored)
+    return std::unexpected(std::move(multi_colored.error()));
+  if (*multi_colored) {
+    auto count = checked_unsigned<std::uint8_t>(
+        spec.get_uint("colorVariants", MaxMaterialColorVariant + 1), "colorVariants");
+    if (!count)
+      return std::unexpected(std::move(count.error()));
+    m_profile.color_variants = *count;
   }
 
-  return profile;
+  auto directives = spec.find("colorDirectives");
+  if (!directives)
+    return std::unexpected(std::move(directives.error()));
+  if (*directives && !(*directives)->get().is_null()) {
+    auto entries = (*directives)->get().iterate_array();
+    if (!entries)
+      return std::unexpected(std::move(entries.error()));
+    m_profile.color_directives.reserve(entries->container->size());
+    for (auto const& entry : *entries) {
+      auto text = entry.to_string();
+      if (!text)
+        return std::unexpected(std::move(text.error()));
+      m_profile.color_directives.emplace_back(*text);
+    }
+  }
+
+  auto occludes_behind = spec.get_bool("occludesBelow", true);
+  if (!occludes_behind)
+    return std::unexpected(std::move(occludes_behind.error()));
+  m_profile.occludes_behind = *occludes_behind;
+
+  // The storage width is independent of the renderer's mod-layer sort bit.
+  auto z_level = checked_unsigned<std::uint32_t>(spec.get_uint("zLevel", 0), "zLevel");
+  if (!z_level)
+    return std::unexpected(std::move(z_level.error()));
+  m_profile.z_level = *z_level;
+
+  auto light_config = spec.get("radiantLight", JsonArray{0, 0, 0});
+  if (!light_config)
+    return std::unexpected(std::move(light_config.error()));
+  auto light = json_to_vec3b(*light_config);
+  if (!light)
+    return std::unexpected(std::move(light.error()));
+  m_profile.radiant_light = Color::rgb(*light).to_rgb_f();
+
+  auto representative = spec.get_string("representativePiece");
+  if (!representative)
+    return std::unexpected(std::move(representative.error()));
+  m_profile.representative_piece = std::move(*representative);
+  return {};
+}
+
+std::expected<void, StarException> MaterialProfileCompiler::compile_rules(Json const& spec) {
+  auto config = spec.get("rules");
+  if (!config)
+    return std::unexpected(std::move(config.error()));
+  auto rules = config->iterate_object();
+  if (!rules)
+    return std::unexpected(std::move(rules.error()));
+  m_rule_indices.reserve(rules->container->size());
+  m_profile.compiled_rules.reserve(rules->container->size());
+  for (auto const& [name, rule_config] : *rules) {
+    auto rule = parse_rule(rule_config);
+    if (!rule)
+      return std::unexpected(std::move(rule.error()));
+    m_rule_indices[name] = m_profile.compiled_rules.size();
+    m_profile.compiled_rules.push_back(std::move(*rule));
+  }
+  return {};
+}
+
+std::expected<void, StarException> MaterialProfileCompiler::compile_pieces(
+    ImageMetadataDatabase const& image_metadata, Json const& spec, String const& relative_path) {
+  auto config = spec.get("pieces");
+  if (!config)
+    return std::unexpected(std::move(config.error()));
+  auto pieces = config->iterate_object();
+  if (!pieces)
+    return std::unexpected(std::move(pieces.error()));
+  if (pieces->container->empty())
+    return {};
+
+  auto default_texture = spec.get_string("texture");
+  if (!default_texture)
+    return std::unexpected(std::move(default_texture.error()));
+  auto default_variants = spec.get_uint("variants", 1);
+  if (!default_variants)
+    return std::unexpected(std::move(default_variants.error()));
+  auto color_rows = std::size_t(m_profile.color_variants) + 1;
+  m_profile.compiled_pieces.reserve(pieces->container->size());
+  m_profile.piece_indices.reserve(pieces->container->size());
+
+  for (auto const& [name, piece_config] : *pieces) {
+    MaterialRenderPiece piece;
+    piece.piece_id = m_profile.compiled_pieces.size();
+    piece.last_color = m_profile.color_variants;
+    auto texture = piece_config.opt_string("texture");
+    if (!texture)
+      return std::unexpected(std::move(texture.error()));
+    piece.texture = AssetPath::relative_to(relative_path, texture->has_value() ? **texture : *default_texture);
+
+    auto count = piece_config.opt_uint("variants");
+    if (!count)
+      return std::unexpected(std::move(count.error()));
+    auto variants = count->value_or(*default_variants);
+    if (variants > (max_profile_rectangles - m_rectangle_count) / color_rows)
+      return std::unexpected(MaterialRenderProfileException::format(
+          "Piece '{}' has {} variants across {} color rows; material profile exceeds the {} rectangle limit",
+          name, variants, color_rows, max_profile_rectangles));
+    piece.variant_count = static_cast<unsigned>(variants);
+    auto rectangle_count = static_cast<std::size_t>(variants) * color_rows;
+
+    auto size = piece_config.get("textureSize").and_then(json_to_vec2f);
+    if (!size)
+      return std::unexpected(std::move(size.error()));
+    auto position = piece_config.get("texturePosition").and_then(json_to_vec2f);
+    if (!position)
+      return std::unexpected(std::move(position.error()));
+    auto variant_stride = parse_stride(piece_config, "variantStride");
+    if (!variant_stride)
+      return std::unexpected(std::move(variant_stride.error()));
+    auto color_stride = parse_stride(piece_config, "colorStride");
+    if (!color_stride)
+      return std::unexpected(std::move(color_stride.error()));
+    auto image_size = image_metadata.image_size(piece.texture);
+    if (!image_size)
+      return std::unexpected(std::move(image_size.error()));
+    auto image_height = (*image_size)[1];
+
+    piece.rectangles.reserve(rectangle_count);
+    if (rectangle_count != 0) {
+      for (std::size_t color = 0; color < color_rows; ++color) {
+        auto color_offset = color != 0 ? *color_stride * color : Vec2F(0, 0);
+        for (unsigned variant = 0; variant < piece.variant_count; ++variant) {
+          auto origin = *position + *variant_stride * variant;
+          if (color != 0)
+            origin += color_offset;
+          auto rect = RectF::with_size(origin, *size);
+          piece.rectangles.push_back(
+              RectF::with_size(Vec2F(rect.x_min(), image_height - rect.y_max()), rect.size()));
+        }
+      }
+    }
+    m_rectangle_count += rectangle_count;
+    m_profile.piece_indices[name] = piece.piece_id;
+    m_profile.compiled_pieces.push_back(std::move(piece));
+  }
+  return {};
+}
+
+std::expected<MaterialProfileCompiler::Range, StarException>
+MaterialProfileCompiler::compile_points(Json const& spec) {
+  auto points = spec.iterate_array();
+  if (!points)
+    return std::unexpected(std::move(points.error()));
+  Range range{m_profile.compiled_points.size(), points->container->size()};
+  for (auto const& point : *points) {
+    auto position_config = point.get(0);
+    if (!position_config)
+      return std::unexpected(std::move(position_config.error()));
+    auto position = parse_match_position(*position_config);
+    if (!position)
+      return std::unexpected(std::move(position.error()));
+    auto name = point.get_string(1);
+    if (!name)
+      return std::unexpected(std::move(name.error()));
+    auto rule = m_rule_indices.get(*name);
+    if (!rule)
+      return std::unexpected(std::move(rule.error()));
+    m_profile.compiled_points.push_back({*position, rule->get()});
+  }
+  return range;
+}
+
+std::expected<MaterialProfileCompiler::Range, StarException>
+MaterialProfileCompiler::compile_placements(Json const& spec) {
+  auto placements = spec.iterate_array();
+  if (!placements)
+    return std::unexpected(std::move(placements.error()));
+  Range range{m_profile.compiled_placements.size(), placements->container->size()};
+  for (auto const& placement : *placements) {
+    auto name = placement.get_string(0);
+    if (!name)
+      return std::unexpected(std::move(name.error()));
+    auto piece_index = m_profile.piece_indices.get(*name);
+    if (!piece_index)
+      return std::unexpected(std::move(piece_index.error()));
+    auto position_config = placement.get(1);
+    if (!position_config)
+      return std::unexpected(std::move(position_config.error()));
+    auto position = json_to_vec2f(*position_config);
+    if (!position)
+      return std::unexpected(std::move(position.error()));
+    m_profile.compiled_placements.push_back({piece_index->get(), *position});
+  }
+  return range;
+}
+
+std::expected<MaterialRenderMatch, StarException> MaterialProfileCompiler::compile_match(Json const& config) {
+  MaterialRenderMatch match;
+  auto points = config.find("matchAllPoints");
+  if (!points)
+    return std::unexpected(std::move(points.error()));
+  if (!*points || (*points)->get().is_null()) {
+    points = config.find("matchAnyPoints");
+    if (!points)
+      return std::unexpected(std::move(points.error()));
+    if (*points && !(*points)->get().is_null())
+      match.match_join = MaterialJoinType::Any;
+  }
+  if (*points && !(*points)->get().is_null()) {
+    auto range = compile_points((*points)->get());
+    if (!range)
+      return std::unexpected(std::move(range.error()));
+    match.point_range = *range;
+  }
+
+  auto pieces = config.find("pieces");
+  if (!pieces)
+    return std::unexpected(std::move(pieces.error()));
+  if (*pieces && !(*pieces)->get().is_null()) {
+    auto range = compile_placements((*pieces)->get());
+    if (!range)
+      return std::unexpected(std::move(range.error()));
+    match.placement_range = *range;
+  }
+
+  auto sub_matches = config.find("subMatches");
+  if (!sub_matches)
+    return std::unexpected(std::move(sub_matches.error()));
+  if (*sub_matches && !(*sub_matches)->get().is_null()) {
+    auto const& list_config = (*sub_matches)->get();
+    if (list_config.is_type(Json::Type::String)) {
+      auto name = list_config.to_string();
+      if (!name)
+        return std::unexpected(std::move(name.error()));
+      auto range = m_named_matches.get(*name);
+      if (!range)
+        return std::unexpected(std::move(range.error()));
+      // Resolve to the current range, not to a name that can be rebound later.
+      match.sub_match_range = range->get();
+    } else {
+      auto range = compile_match_list(list_config);
+      if (!range)
+        return std::unexpected(std::move(range.error()));
+      match.sub_match_range = *range;
+    }
+  }
+
+  auto layer = config.opt_string("requiredLayer");
+  if (!layer)
+    return std::unexpected(std::move(layer.error()));
+  if (*layer) {
+    auto value = enum_value<tile_layer_names>(**layer);
+    if (!value)
+      return std::unexpected(std::move(value.error()));
+    match.required_layer = *value;
+  }
+  auto halt_on_match = config.get_bool("haltOnMatch", false);
+  if (!halt_on_match)
+    return std::unexpected(std::move(halt_on_match.error()));
+  match.halt_on_match = *halt_on_match;
+  auto halt_on_sub_match = config.get_bool("haltOnSubMatch", false);
+  if (!halt_on_sub_match)
+    return std::unexpected(std::move(halt_on_sub_match.error()));
+  match.halt_on_sub_match = *halt_on_sub_match;
+  auto occlude = config.opt_bool("occlude");
+  if (!occlude)
+    return std::unexpected(std::move(occlude.error()));
+  match.occlude = *occlude;
+  return match;
+}
+
+std::expected<MaterialProfileCompiler::Range, StarException>
+MaterialProfileCompiler::compile_match_list(Json const& spec) {
+  auto configs = spec.iterate_array();
+  if (!configs)
+    return std::unexpected(std::move(configs.error()));
+  // Reserve the entire sibling range before appending any inline children.
+  Range range{m_profile.compiled_matches.size(), configs->container->size()};
+  m_profile.compiled_matches.resize(range.begin + range.size);
+  auto index = range.begin;
+  for (auto const& config : *configs) {
+    auto match = compile_match(config);
+    if (!match)
+      return std::unexpected(std::move(match.error()));
+    m_profile.compiled_matches[index++] = std::move(*match);
+  }
+  return range;
+}
+
+std::expected<void, StarException> MaterialProfileCompiler::compile_named_matches(Json const& spec) {
+  auto config = spec.get("matches");
+  if (!config)
+    return std::unexpected(std::move(config.error()));
+  auto matches = config->iterate_array();
+  if (!matches)
+    return std::unexpected(std::move(matches.error()));
+  m_named_matches.reserve(matches->container->size());
+  for (auto const& entry : *matches) {
+    auto name = entry.get_string(0);
+    if (!name)
+      return std::unexpected(std::move(name.error()));
+    auto list_config = entry.get(1);
+    if (!list_config)
+      return std::unexpected(std::move(list_config.error()));
+    auto range = compile_match_list(*list_config);
+    if (!range)
+      return std::unexpected(std::move(range.error()));
+    m_named_matches[*name] = *range;
+  }
+  auto main = m_named_matches.get("main");
+  if (!main)
+    return std::unexpected(std::move(main.error()));
+  m_profile.main_match_range = main->get();
+  return {};
+}
+
+std::expected<MaterialRenderProfile, StarException> MaterialProfileCompiler::compile(
+    ImageMetadataDatabase const& image_metadata, Json const& spec, String const& relative_path) {
+  if (auto settings = compile_settings(spec); !settings)
+    return std::unexpected(std::move(settings.error()));
+  if (auto rules = compile_rules(spec); !rules)
+    return std::unexpected(std::move(rules.error()));
+  if (auto pieces = compile_pieces(image_metadata, spec, relative_path); !pieces)
+    return std::unexpected(std::move(pieces.error()));
+  if (auto matches = compile_named_matches(spec); !matches)
+    return std::unexpected(std::move(matches.error()));
+
+  auto properties = spec.get("ruleProperties", JsonObject());
+  if (!properties)
+    return std::unexpected(std::move(properties.error()));
+  m_profile.rule_properties = std::move(*properties);
+  return std::move(m_profile);
+}
+
+std::expected<std::reference_wrapper<MaterialRenderPiece const>, StarException>
+MaterialRenderProfile::find_piece(String const& name) const {
+  auto index = piece_indices.get(name);
+  if (!index)
+    return std::unexpected(std::move(index.error()));
+  return std::cref(piece(index->get()));
+}
+
+std::expected<String, StarException> MaterialRenderProfile::piece_image(
+    String const& piece_name, unsigned variant, MaterialColorVariant color_variant, MaterialHue hue_shift) const {
+  auto result = find_piece(piece_name);
+  if (!result)
+    return std::unexpected(std::move(result.error()));
+  auto const& piece = result->get();
+  auto selected = piece.rectangle(variant, color_variant, false);
+  if (!selected)
+    return std::unexpected(MaterialRenderProfileException::format(
+        "Piece '{}' has no texture variants for color {}", piece_name, color_variant));
+  auto const& rect = selected->get();
+  if (hue_shift != MaterialHue())
+    return Star::format("{}?hueshift={}?crop={};{};{};{}", piece.texture, materialHueToDegrees(hue_shift),
+        rect.x_min(), rect.y_min(), rect.x_max(), rect.y_max());
+  return Star::format("{}?crop={};{};{};{}", piece.texture, rect.x_min(), rect.y_min(), rect.x_max(), rect.y_max());
+}
+
+std::expected<std::reference_wrapper<DamageFrame const>, StarException>
+MaterialRenderProfile::damage_image(float damage_level, TileDamageType damage_type) const {
+  if (!is_finite(damage_level))
+    return std::unexpected(MaterialRenderProfileException("Damage level must be finite"));
+  auto const& frames = damage_type == TileDamageType::Protected ? protected_frames : cracking_frames;
+  auto scaled = std::clamp(damage_level, 0.0f, 1.0f) * frames.size();
+  auto index = std::min(static_cast<std::size_t>(scaled), frames.size() - 1);
+  return std::cref(frames[index]);
+}
+
+std::expected<MaterialRenderProfile, StarException> parse_material_render_profile(
+    ImageMetadataDatabase const& image_metadata, Json const& spec, String const& relative_path) {
+  return MaterialProfileCompiler().compile(image_metadata, spec, relative_path);
 }
 
 }
