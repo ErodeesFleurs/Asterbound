@@ -151,12 +151,12 @@ std::expected<void, StarException> FireableItem::init(ToolUserEntity& owner, Too
     auto addedFireable = m_scriptComponent->add_callbacks("fireableItem", std::move(*fireableCallbacks));
     if (!addedFireable)
       return std::unexpected(std::move(addedFireable.error()));
-    auto itemCallbacks = LuaBindings::makeItemCallbacks(item->get());
-    if (!itemCallbacks)
-      return std::unexpected(std::move(itemCallbacks.error()));
-    auto addedItem = m_scriptComponent->add_callbacks("item", std::move(*itemCallbacks));
-    if (!addedItem)
-      return std::unexpected(std::move(addedItem.error()));
+    auto item_callbacks = LuaBindings::make_item_callbacks(item->get());
+    if (!item_callbacks)
+      return std::unexpected(std::move(item_callbacks.error()));
+    auto added_item = m_scriptComponent->add_callbacks("item", std::move(*item_callbacks));
+    if (!added_item)
+      return std::unexpected(std::move(added_item.error()));
     auto itemWorld = world();
     if (!itemWorld)
       return std::unexpected(std::move(itemWorld.error()));

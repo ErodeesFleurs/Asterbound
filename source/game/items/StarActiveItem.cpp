@@ -215,9 +215,9 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
     auto activeCallbacks = makeActiveItemCallbacks().and_then([&](LuaCallbacks callbacks) { return m_script.add_callbacks("activeItem", std::move(callbacks)); });
     if (!activeCallbacks)
       return std::unexpected(std::move(activeCallbacks.error()));
-    auto itemCallbacks = LuaBindings::makeItemCallbacks(*this).and_then([&](LuaCallbacks callbacks) { return m_script.add_callbacks("item", std::move(callbacks)); });
-    if (!itemCallbacks)
-      return std::unexpected(std::move(itemCallbacks.error()));
+    auto item_callbacks = LuaBindings::make_item_callbacks(*this).and_then([&](LuaCallbacks callbacks) { return m_script.add_callbacks("item", std::move(callbacks)); });
+    if (!item_callbacks)
+      return std::unexpected(std::move(item_callbacks.error()));
     auto configCallbacks =
       LuaBindings::makeConfigCallbacks([this](String const& name,
                                               Json const& defaultValue) -> std::expected<Json, StarException> {

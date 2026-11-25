@@ -820,7 +820,7 @@ treasurePool = std::move(*result121);
           {
     auto result127 = world();
     if (!result127) return std::unexpected(std::move(result127.error()));
-    auto result128 = ItemDrop::createRandomizedDrop(this->root(), treasureItem, position());
+    auto result128 = ItemDrop::create_randomized_drop(this->root(), treasureItem, position());
     if (!result128) return std::unexpected(std::move(result128.error()));
     auto result129 = result127->get().addEntity(std::move(*result128));
     if (!result129) return std::unexpected(std::move(result129.error()));

@@ -269,7 +269,7 @@ std::expected<void, StarException> ContainerObject::update(float dt, std::uint64
       return std::unexpected(std::move(currentWorldResult.error()));
     auto currentWorld = std::move(*currentWorldResult);
     for (auto const& item : std::exchange(m_lostItems, {})) {
-      auto dropResult = ItemDrop::createRandomizedDrop(root(), item, position());
+      auto dropResult = ItemDrop::create_randomized_drop(root(), item, position());
       if (!dropResult)
         return std::unexpected(std::move(dropResult.error()));
       auto drop = std::move(*dropResult);
@@ -457,7 +457,7 @@ std::expected<void, StarException> ContainerObject::destroy(std::optional<std::r
       return std::unexpected(std::move(currentWorldResult.error()));
     auto currentWorld = std::move(*currentWorldResult);
     for (auto const& item : m_items->items()) {
-      auto dropResult = ItemDrop::createRandomizedDrop(root(), item, position());
+      auto dropResult = ItemDrop::create_randomized_drop(root(), item, position());
       if (!dropResult)
         return std::unexpected(std::move(dropResult.error()));
       auto drop = std::move(*dropResult);
@@ -1331,7 +1331,7 @@ std::expected<void, StarException> ContainerObject::tickCrafting(float dt) {
       if (!currentWorldResult)
         return std::unexpected(std::move(currentWorldResult.error()));
       auto currentWorld = std::move(*currentWorldResult);
-      auto dropResult = ItemDrop::createRandomizedDrop(root(), overflow, position());
+      auto dropResult = ItemDrop::create_randomized_drop(root(), overflow, position());
       if (!dropResult)
         return std::unexpected(std::move(dropResult.error()));
       auto drop = std::move(*dropResult);

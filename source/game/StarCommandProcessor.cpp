@@ -715,7 +715,7 @@ std::expected<String, StarException> CommandProcessor::spawn_item(ConnectionId c
         if (!item) return std::unexpected(std::move(item.error()));
         auto aim_position = player->aimPosition();
         if (!aim_position) return std::unexpected(std::move(aim_position.error()));
-        auto drop = ItemDrop::createRandomizedDrop(m_root, *item, (*aim_position));
+        auto drop = ItemDrop::create_randomized_drop(m_root, *item, (*aim_position));
         if (!drop) return std::unexpected(std::move(drop.error()));
         return world.addEntity(*drop);
       });
@@ -748,7 +748,7 @@ std::expected<String, StarException> CommandProcessor::spawn_treasure(Connection
         for (auto const& treasure_item : *treasure) {
           auto aim_position = player->aimPosition();
           if (!aim_position) return std::unexpected(std::move(aim_position.error()));
-          auto drop = ItemDrop::createRandomizedDrop(m_root, treasure_item, (*aim_position));
+          auto drop = ItemDrop::create_randomized_drop(m_root, treasure_item, (*aim_position));
           if (!drop) return std::unexpected(std::move(drop.error()));
           auto added = world.addEntity(*drop);
           if (!added) return std::unexpected(std::move(added.error()));

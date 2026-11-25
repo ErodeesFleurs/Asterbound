@@ -997,7 +997,7 @@ if (!result746) return std::unexpected(std::move(result746.error()));
 if (!std::move(*result746)) {
 auto result748 = materialDatabase->materialItemDrop(std::get<1>(tile));
 if (!result748) return std::unexpected(std::move(result748.error()));
-auto result750 = ItemDrop::createRandomizedDrop(this->root(), std::move(*result748), Vec2F(std::get<0>(tile)));
+auto result750 = ItemDrop::create_randomized_drop(this->root(), std::move(*result748), Vec2F(std::get<0>(tile)));
 if (!result750) return std::unexpected(std::move(result750.error()));
 auto itemDrop = std::move(*result750);
         auto result751 = world();
@@ -1471,7 +1471,7 @@ JsonObject data = std::move(*result857);
 
     auto result858 = ItemDescriptor::create(name, count, data);
 if (!result858) return std::unexpected(std::move(result858.error()));
-auto result859 = ItemDrop::createRandomizedDrop(this->root(), std::move(*result858), position());
+auto result859 = ItemDrop::create_randomized_drop(this->root(), std::move(*result858), position());
 if (!result859) return std::unexpected(std::move(result859.error()));
 auto itemDrop = std::move(*result859);
     auto result860 = world();

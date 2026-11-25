@@ -877,7 +877,7 @@ auto treasureDatabase = std::move(*result175);
           auto result178 = world();
           if (!result178)
             return std::unexpected(std::move(result178.error()));
-          auto result179 = ItemDrop::createRandomizedDrop(this->root(), treasureItem, position());
+          auto result179 = ItemDrop::create_randomized_drop(this->root(), treasureItem, position());
           if (!result179)
             return std::unexpected(std::move(result179.error()));
           auto result180 = result178->get().addEntity(std::move(*result179));

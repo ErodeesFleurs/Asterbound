@@ -606,7 +606,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDatabase::apply_augment(
       return std::unexpected(std::move(scripts.error()));
     if (auto set = script.set_scripts(std::move(*scripts)); !set)
       return std::unexpected(std::move(set.error()));
-    auto item_callbacks = LuaBindings::makeItemCallbacks(augment);
+    auto item_callbacks = LuaBindings::make_item_callbacks(augment);
     if (!item_callbacks)
       return std::unexpected(std::move(item_callbacks.error()));
     if (auto added = script.add_callbacks("item", std::move(*item_callbacks)); !added)

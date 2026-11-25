@@ -2282,36 +2282,32 @@ std::expected<void, StarException> WorldClient::update(float dt) {
         }
       }
       
-      Vec2F playerPos = m_mainPlayer->position();
-      auto result169 = m_entityMap->query<ItemDrop>(RectF(playerPos - Vec2F::filled(DropDist / 2), playerPos + Vec2F::filled(DropDist / 2)));
-      if (!result169)
-        return std::unexpected(std::move(result169.error()));
-      auto dropList = (std::move(*result169));
-      for (auto const& itemDrop : dropList) {
-        auto distSquared = m_geometry.diff(itemDrop->position(), playerPos).magnitude_squared();
+      auto const player_position = m_mainPlayer->position();
+      auto drops = m_entityMap->query<ItemDrop>(RectF::with_center(player_position, Vec2F::filled(2.0f * DropDist)));
+      if (!drops)
+        return std::unexpected(std::move(drops.error()));
+      for (auto const& drop : *drops) {
+        auto const id = drop->entityId();
+        if (m_requestedDrops.contains(id) || !drop->pickup_available()
+            || !(m_geometry.diff(drop->position(), player_position).magnitude_squared() < square(DropDist)))
+          continue;
 
-        // If the drop is within DropDist and not owned, request it.
-        {
-          auto result173 = itemDrop->canTake();
-          if (!result173)
-            return std::unexpected(std::move(result173.error()));
-          if ((std::move(*result173)) && !m_requestedDrops.contains(itemDrop->entityId()) && distSquared < square(DropDist)) {
-            m_requestedDrops.add(itemDrop->entityId());
-            {
-              auto result174 = m_mainPlayer->itemsCanHold(itemDrop->item());
-              if (!result174)
-                return std::unexpected(std::move(result174.error()));
-              if ((std::move(*result174)) != 0) {
-                m_startupHiddenEntities.erase(itemDrop->entityId());
-                auto result175 =
-                  itemDrop->takeBy(m_mainPlayer->entityId(), static_cast<float>(m_latency.count()) / 1000);
-                if (!result175)
-                  return std::unexpected(std::move(result175.error()));
-                m_outgoingPackets.push_back(std::make_shared<RequestDropPacket>(itemDrop->entityId()));
-              }
-            }
-          }
+        auto capacity = m_mainPlayer->itemsCanHold(drop->item());
+        if (!capacity)
+          return std::unexpected(std::move(capacity.error()));
+        if (*capacity == 0) {
+          m_requestedDrops.add(id);
+          continue;
         }
+
+        auto taken = drop->take_by(m_mainPlayer->entityId(), static_cast<float>(m_latency.count()) / 1000);
+        if (!taken)
+          return std::unexpected(std::move(taken.error()));
+        if (!*taken)
+          continue;
+        m_requestedDrops.add(id);
+        m_startupHiddenEntities.erase(id);
+        m_outgoingPackets.push_back(std::make_shared<RequestDropPacket>(id));
       }
     } else {
       m_requestedDrops.clear();
@@ -3624,7 +3620,7 @@ std::expected<void, StarException> WorldClient::tryGiveMainPlayerItem(std::share
     if (!result290)
       return std::unexpected(std::move(result290.error()));
     if (auto spill = (std::move(*result290))) {
-      auto result291 = ItemDrop::createRandomizedDrop(this->root(), spill->descriptor(), m_mainPlayer->position());
+      auto result291 = ItemDrop::create_randomized_drop(this->root(), spill->descriptor(), m_mainPlayer->position());
       if (!result291)
         return std::unexpected(std::move(result291.error()));
       auto result292 = addEntity((std::move(*result291)), null_entity_id);

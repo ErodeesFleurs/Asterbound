@@ -250,7 +250,7 @@ namespace LuaBindings {
     [[nodiscard]] std::expected<std::optional<LiquidLevel>, StarException> forceDestroyLiquid(WorldServer& world, Vec2F const& position);
     [[nodiscard]] std::expected<EntityId, StarException> loadUniqueEntity(WorldServer& world, String const& uniqueId);
     [[nodiscard]] std::expected<void, StarException> setUniqueId(WorldServer& world, EntityId entityId, std::optional<String> const& uniqueId);
-    [[nodiscard]] std::expected<Json, StarException> takeItemDrop(World& world, EntityId entityId, std::optional<EntityId> const& takenBy);
+    [[nodiscard]] std::expected<Json, StarException> take_item_drop(World& world, EntityId entity_id, std::optional<EntityId> const& taken_by);
     [[nodiscard]] std::expected<void, StarException> setPlayerStart(WorldServer& world, Vec2F const& playerStart, std::optional<bool> respawnInWorld);
     [[nodiscard]] std::expected<List<EntityId>, StarException> players(WorldServer& world);
     [[nodiscard]] std::expected<LuaString, StarException> fidelity(WorldServer& world, LuaEngine& engine);
@@ -1121,8 +1121,8 @@ namespace LuaBindings {
         return std::unexpected(std::move(result.error()));
       if (auto result = callbacks.register_callback_with_signature<Json, EntityId, std::optional<EntityId>>(
             "takeItemDrop",
-            [&world](EntityId entity, std::optional<EntityId> const& takenBy) {
-              return ServerWorldCallbacks::takeItemDrop(world, entity, takenBy);
+            [&world](EntityId entity, std::optional<EntityId> const& taken_by) {
+              return ServerWorldCallbacks::take_item_drop(world, entity, taken_by);
             });
           !result)
         return std::unexpected(std::move(result.error()));
@@ -2539,7 +2539,7 @@ namespace LuaBindings {
           : ItemDescriptor::create(itemType);
       if (!descriptorResult)
         return std::unexpected(std::move(descriptorResult.error()));
-      auto itemDropResult = ItemDrop::createRandomizedDrop(world.root(), *descriptorResult, worldPosition);
+      auto itemDropResult = ItemDrop::create_randomized_drop(world.root(), *descriptorResult, worldPosition);
       if (!itemDropResult)
         return std::unexpected(std::move(itemDropResult.error()));
       auto itemDrop = std::move(*itemDropResult);
@@ -2548,7 +2548,7 @@ namespace LuaBindings {
         return {};
       }
       if (initialVelocity)
-        itemDrop->setVelocity(*initialVelocity);
+        itemDrop->set_velocity(*initialVelocity);
       if (intangibleTime)
         itemDrop->set_intangible_time(*intangibleTime);
       if (auto operation = world.addEntity(itemDrop); !operation)
@@ -2588,7 +2588,7 @@ namespace LuaBindings {
         return std::unexpected(std::move(treasureResult.error()));
       auto treasure = std::move(*treasureResult);
       for (auto const& treasureItem : treasure) {
-        auto entityResult = ItemDrop::createRandomizedDrop(world.root(), treasureItem, position);
+        auto entityResult = ItemDrop::create_randomized_drop(world.root(), treasureItem, position);
         if (!entityResult)
           return std::unexpected(std::move(entityResult.error()));
         auto entity = std::move(*entityResult);
@@ -2938,19 +2938,13 @@ namespace LuaBindings {
     return {};
   }
 
-  std::expected<Json, StarException> ServerWorldCallbacks::takeItemDrop(World& world, EntityId entityId, std::optional<EntityId> const& takenBy) {
-    auto itemDrop = world.get<ItemDrop>(entityId);
-    if (itemDrop) {
-      auto canTake = itemDrop->canTake();
-      if (!canTake)
-        return std::unexpected(std::move(canTake.error()));
-      if (!*canTake || !itemDrop->isMaster())
-        return Json();
-      auto itemResult = takenBy ? itemDrop->takeBy(*takenBy) : itemDrop->take();
-      if (!itemResult)
-        return std::unexpected(std::move(itemResult.error()));
-      if (*itemResult)
-        return (*itemResult)->descriptor().to_json();
+  std::expected<Json, StarException> ServerWorldCallbacks::take_item_drop(World& world, EntityId entity_id, std::optional<EntityId> const& taken_by) {
+    if (auto item_drop = world.get<ItemDrop>(entity_id); item_drop && item_drop->isMaster()) {
+      auto taken = taken_by ? item_drop->take_by(*taken_by) : item_drop->take();
+      if (!taken)
+        return std::unexpected(std::move(taken.error()));
+      if (*taken)
+        return (*taken)->descriptor().to_json();
     }
     return Json();
   }

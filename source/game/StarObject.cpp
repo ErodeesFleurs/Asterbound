@@ -1020,7 +1020,7 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
         return std::unexpected(std::move(currentWorldResult.error()));
       auto& currentWorld = currentWorldResult->get();
       auto dropItem = [&](auto const& item) -> std::expected<void, StarException> {
-        auto dropResult = ItemDrop::createRandomizedDrop(root(), item, position());
+        auto dropResult = ItemDrop::create_randomized_drop(root(), item, position());
         if (!dropResult)
           return std::unexpected(std::move(dropResult.error()));
         auto drop = std::move(*dropResult);

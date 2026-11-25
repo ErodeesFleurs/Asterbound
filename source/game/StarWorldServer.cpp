@@ -1000,18 +1000,12 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           return std::unexpected(std::move(logged.error()));
       }
     } else if (auto rdpacket = as<RequestDropPacket>(packet)) {
-      auto drop = m_entityMap->get<ItemDrop>(rdpacket->dropEntityId);
-      if (drop && drop->isMaster()) {
-        auto canTake = drop->canTake();
-        if (!canTake)
-          return std::unexpected(std::move(canTake.error()));
-        if (!*canTake)
-          continue;
-        auto result85 = drop->takeBy(clientInfo->clientState->playerId());
-        if (!result85)
-          return std::unexpected(std::move(result85.error()));
-        if (auto taken = std::move(*result85))
-          clientInfo->outgoingPackets.push_back(std::make_shared<GiveItemPacket>(taken->descriptor()));
+      if (auto drop = m_entityMap->get<ItemDrop>(rdpacket->dropEntityId); drop && drop->isMaster()) {
+        auto taken = drop->take_by(clientInfo->clientState->playerId());
+        if (!taken)
+          return std::unexpected(std::move(taken.error()));
+        if (*taken)
+          clientInfo->outgoingPackets.push_back(std::make_shared<GiveItemPacket>((*taken)->descriptor()));
       }
     } else if (auto hit = as<HitRequestPacket>(packet)) {
       auto owner = hit->remoteHitRequest.destination_connection();
@@ -2015,7 +2009,7 @@ std::expected<bool, StarException> WorldServer::replaceTile(Vec2I const& pos, Ti
       if (!result226)
         return std::unexpected(std::move(result226.error()));
       for (auto const& drop : std::move(*result226)) {
-        auto result227 = ItemDrop::createRandomizedDrop(this->root(), drop, dropPosition);
+        auto result227 = ItemDrop::create_randomized_drop(this->root(), drop, dropPosition);
         if (!result227)
           return std::unexpected(std::move(result227.error()));
         auto result228 = addEntity(std::move(*result227), null_entity_id);
@@ -3815,7 +3809,7 @@ std::expected<void, StarException> WorldServer::updateDamagedBlocks(float dt) {
       if (!result417)
         return std::unexpected(std::move(result417.error()));
       for (auto const& drop : std::move(*result417)) {
-        auto result418 = ItemDrop::createRandomizedDrop(this->root(), drop, dropPosition);
+        auto result418 = ItemDrop::create_randomized_drop(this->root(), drop, dropPosition);
         if (!result418)
           return std::unexpected(std::move(result418.error()));
         auto result419 = addEntity(std::move(*result418), null_entity_id);
@@ -3873,7 +3867,7 @@ std::expected<void, StarException> WorldServer::updateDamagedBlocks(float dt) {
       if (!result427)
         return std::unexpected(std::move(result427.error()));
       for (auto const& drop : std::move(*result427)) {
-        auto result428 = ItemDrop::createRandomizedDrop(this->root(), drop, dropPosition);
+        auto result428 = ItemDrop::create_randomized_drop(this->root(), drop, dropPosition);
         if (!result428)
           return std::unexpected(std::move(result428.error()));
         auto result429 = addEntity(std::move(*result428), null_entity_id);

@@ -3,45 +3,19 @@ import std;
 import star.format;
 import star.type_identity;
 import star.json;
-import star.id_map;
 import star.game_types;
 import star.casting;
 import star.vector;
-import star.strong_typedef;
+import star.rect;
 import star.list;
 import star.rpc_promise;
 import star.data_stream;
 import star.bi_map;
 import star.lua;
 import star.string;
-import star.color;
-import star.rect;
-import star.image_processing;
-import star.hash;
-import star.string_view;
-import star.thread;
-import star.directives;
-import star.asset_path;
-
-import star.lua_root;
 import star.lua_components;
-import star.damage_types;
-import star.world_geometry;
-import star.status_types;
-import star.damage;
-import star.light_source;
 import star.entity;
-import star.tile_damage;
-import star.interaction_types;
-import star.celestial_coordinate;
-import star.quest_descriptor;
-import star.interactive_entity;
-import star.collision_block;
-import star.tile_entity;
-import star.tile_modification;
-import star.force_regions;
 import star.world;
-import star.physics_entity;
 import star.movement_controller;
 import star.item_descriptor;
 import star.mobile_entity;
@@ -60,43 +34,44 @@ class Root;
 class Item;
 
 class ItemDrop : public virtual MobileEntity, public virtual ScriptedEntity {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
+
 public:
+  ItemDrop(ConstructionKey, Root& root_context);
+
   void query_type(TypeQuery& query) const noexcept override {
     query_type_of<ItemDrop, MobileEntity, ScriptedEntity>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ItemDrop>(); }
 
-  // Creates a drop at the given position and adds a hard-coded amount of
-  // randomness to the drop position / velocity.
+  // Randomizes the creation position and initial velocity using itemdrop.config.
   [[nodiscard]]
-  static std::expected<std::shared_ptr<ItemDrop>, StarException> createRandomizedDrop(Root& rootContext, std::shared_ptr<Item> const& item, Vec2F const& position, bool eternal = false);
+  static std::expected<std::shared_ptr<ItemDrop>, StarException> create_randomized_drop(Root& root_context, std::shared_ptr<Item> const& item, Vec2F const& position, bool eternal = false);
   [[nodiscard]]
-  static std::expected<std::shared_ptr<ItemDrop>, StarException> createRandomizedDrop(Root& rootContext, ItemDescriptor const& itemDescriptor, Vec2F const& position, bool eternal = false);
+  static std::expected<std::shared_ptr<ItemDrop>, StarException> create_randomized_drop(Root& root_context, ItemDescriptor const& item_descriptor, Vec2F const& position, bool eternal = false);
 
-  // Create a drop and throw in the given direction with a hard-coded initial
-  // throw velocity (unrelated to magnitude of direction, direction is
-  // normalized first).  Initially intangible for 1 second.
+  // Throw speed and the delay before pickup come from itemdrop.config.
   [[nodiscard]]
-  static std::expected<std::shared_ptr<ItemDrop>, StarException> throwDrop(Root& rootContext, std::shared_ptr<Item> const& item, Vec2F const& position, Vec2F const& velocity, Vec2F const& direction, bool eternal = false);
+  static std::expected<std::shared_ptr<ItemDrop>, StarException> throw_drop(Root& root_context, std::shared_ptr<Item> const& item, Vec2F const& position, Vec2F const& velocity, Vec2F const& direction, bool eternal = false);
   [[nodiscard]]
-  static std::expected<std::shared_ptr<ItemDrop>, StarException> throwDrop(Root& rootContext, ItemDescriptor const& itemDescriptor, Vec2F const& position, Vec2F const& velocity, Vec2F const& direction, bool eternal = false);
+  static std::expected<std::shared_ptr<ItemDrop>, StarException> throw_drop(Root& root_context, ItemDescriptor const& item_descriptor, Vec2F const& position, Vec2F const& velocity, Vec2F const& direction, bool eternal = false);
 
   [[nodiscard]]
-  static std::expected<std::shared_ptr<ItemDrop>, StarException> create(Root& rootContext, std::shared_ptr<Item> item);
+  static std::expected<std::shared_ptr<ItemDrop>, StarException> create(Root& root_context, std::shared_ptr<Item> item);
   [[nodiscard]]
-  static std::expected<std::shared_ptr<ItemDrop>, StarException> create(Root& rootContext, Json const& diskStore);
+  static std::expected<std::shared_ptr<ItemDrop>, StarException> create(Root& root_context, Json const& disk_store);
   [[nodiscard]]
-  static std::expected<std::shared_ptr<ItemDrop>, StarException> create(Root& rootContext, ByteArray net_store, NetCompatibilityRules rules = {});
+  static std::expected<std::shared_ptr<ItemDrop>, StarException> create(Root& root_context, ByteArray net_store, NetCompatibilityRules rules = {});
 
   [[nodiscard]]
-  std::expected<Json, StarException> diskStore() const;
+  std::expected<Json, StarException> disk_store() const;
   [[nodiscard]]
   std::expected<ByteArray, StarException> net_store(NetCompatibilityRules rules = {}) const;
 
   EntityType entityType() const override;
 
   [[nodiscard]]
-  std::expected<void, StarException> init(World& world, EntityId entityId, EntityMode mode) override;
+  std::expected<void, StarException> init(World& world, EntityId entity_id, EntityMode mode) override;
   [[nodiscard]]
   std::expected<void, StarException> uninit() override;
 
@@ -106,12 +81,12 @@ public:
   std::expected<String, StarException> description() const override;
 
   [[nodiscard]]
-  std::expected<std::pair<ByteArray, std::uint64_t>, StarException> write_net_state(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {}) override;
+  std::expected<std::pair<ByteArray, std::uint64_t>, StarException> write_net_state(std::uint64_t from_version = 0, NetCompatibilityRules rules = {}) override;
   [[nodiscard]]
-  std::expected<void, StarException> read_net_state(ByteArray data, float interpolationTime = 0.0f, NetCompatibilityRules rules = {}) override;
+  std::expected<void, StarException> read_net_state(ByteArray data, float interpolation_time = 0.0f, NetCompatibilityRules rules = {}) override;
 
   [[nodiscard]]
-  std::expected<void, StarException> enableInterpolation(float extrapolationHint = 0.0f) override;
+  std::expected<void, StarException> enableInterpolation(float extrapolation_hint = 0.0f) override;
   [[nodiscard]]
   std::expected<void, StarException> disableInterpolation() override;
 
@@ -123,7 +98,7 @@ public:
   RectF collisionArea() const override;
 
   [[nodiscard]]
-  std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
+  std::expected<void, StarException> update(float dt, std::uint64_t current_step) override;
 
   [[nodiscard]]
   std::expected<bool, StarException> shouldDestroy() const override;
@@ -140,7 +115,7 @@ public:
   // The item that this drop contains
   std::shared_ptr<Item> item() const;
 
-  void setEternal(bool eternal);
+  void set_eternal(bool eternal);
 
   // Delay pickup by the given amount of game time.
   void set_intangible_time(float intangible_time);
@@ -148,24 +123,25 @@ public:
   // Mark this drop as taken by the given entity.  The drop will animate
   // towards them for a while and then disappear.
   [[nodiscard]]
-  std::expected<std::shared_ptr<Item>, StarException> takeBy(EntityId entityId, float time_offset = 0.0f);
+  std::expected<std::shared_ptr<Item>, StarException> take_by(EntityId entity_id, float time_offset = 0.0f);
 
   // Mark this drop as taken, but do not animate it towards a player simply
   // disappear next step.
   [[nodiscard]]
   std::expected<std::shared_ptr<Item>, StarException> take();
 
-  // Item is not taken and is not intangible
+  // Native preflight does not run scripts; the final pickup checks Lua permission.
+  bool pickup_available() const;
   [[nodiscard]]
-  std::expected<bool, StarException> canTake() const;
+  std::expected<bool, StarException> can_take() const;
 
-  void setPosition(Vec2F const& position);
+  void set_position(Vec2F const& position);
 
   Vec2F velocity() const;
-  void setVelocity(Vec2F const& position);
+  void set_velocity(Vec2F const& velocity);
   
   [[nodiscard]]
-  std::expected<Json, StarException> configValue(String const& name, Json const& def = Json()) const;
+  std::expected<Json, StarException> config_value(String const& name, Json const& def = Json()) const;
 
   [[nodiscard]]
   std::expected<std::optional<LuaValue>, StarException> callScript(String const& func, LuaVariadic<LuaValue> const& args) override;
@@ -176,40 +152,41 @@ public:
 
 private:
   enum class Mode { Intangible, Available, Taken, Dead };
-  static std::expected<EnumMap<Mode>, StarException> const ModeNames;
+  static std::expected<EnumMap<Mode>, StarException> const mode_names;
 
-  explicit ItemDrop(Root& rootContext);
   [[nodiscard]]
   std::expected<void, StarException> initialize();
   [[nodiscard]]
-  std::expected<void, StarException> initializeItem(std::shared_ptr<Item> item);
+  std::expected<void, StarException> initialize_item(std::shared_ptr<Item> item);
+  void replace_item(std::shared_ptr<Item> replacement);
   [[nodiscard]]
-  std::expected<void, StarException> updateTaken(bool master);
+  std::expected<void, StarException> update_taken(bool master);
 
   [[nodiscard]]
-  std::expected<LuaCallbacks, StarException> makeItemDropCallbacks();
+  std::expected<LuaCallbacks, StarException> make_item_drop_callbacks();
 
   Json m_config;
   Json m_parameters;
   std::shared_ptr<Item> m_item;
-  RectF m_boundBox;
+  RectF m_bound_box;
   float m_after_taken_life;
   float m_overhead_time;
-  float m_pickupDistance;
+  float m_pickup_distance;
   float m_velocity;
-  float m_velocityApproach;
-  float m_overheadApproach;
-  Vec2F m_overheadOffset;
+  float m_velocity_approach;
+  float m_overhead_approach;
+  Vec2F m_overhead_offset;
 
-  float m_combineChance;
-  float m_combineRadius;
+  float m_combine_chance;
+  float m_combine_radius;
   double m_age_items_every;
 
-  NetElementTopGroup m_netGroup;
+  NetElementTopGroup m_net_group;
   NetElementEnum<Mode> m_mode;
-  NetElementIntegral<EntityId> m_owningEntity;
-  NetElementData<ItemDescriptor> m_itemDescriptor;
-  std::shared_ptr<MovementController> m_movementController;
+  NetElementIntegral<EntityId> m_owning_entity;
+  NetElementData<ItemDescriptor> m_item_descriptor;
+  bool m_item_descriptor_pending = false;
+  std::shared_ptr<MovementController> m_movement_controller;
 
   // Only updated on master
   bool m_eternal;
@@ -217,14 +194,15 @@ private:
   GameTimer m_intangible_timer;
   EpochTimer m_age_items_timer;
 
-  bool m_drawRarityBeam;
-  bool m_overForeground;
+  bool m_draw_rarity_beam;
+  bool m_over_foreground;
   std::optional<List<Drawable>> m_drawables;
   
-  ClientEntityMode m_clientEntityMode;
+  ClientEntityMode m_client_entity_mode;
   
-  mutable LuaEntityScript m_scriptComponent;
-  std::optional<Mode> m_overrideMode;
+  mutable LuaEntityScript m_script_component;
+  mutable bool m_checking_pickup = false;
+  std::optional<Mode> m_override_mode;
 };
 
 }

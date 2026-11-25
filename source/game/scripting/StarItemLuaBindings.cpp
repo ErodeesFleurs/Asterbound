@@ -89,114 +89,91 @@ namespace Star::LuaBindings::ItemCallbacks {
 }
 namespace Star {
 
-std::expected<LuaCallbacks, StarException> LuaBindings::makeItemCallbacks(Item& item) {
+namespace {
+
+template <typename Resolve>
+  requires std::invocable<Resolve const&>
+    && (std::same_as<std::invoke_result_t<Resolve const&>, Item&>
+      || std::same_as<std::invoke_result_t<Resolve const&>, std::shared_ptr<Item>>)
+std::expected<LuaCallbacks, StarException> bind_item_callbacks(Resolve resolve) {
+  using namespace LuaBindings::ItemCallbacks;
   LuaCallbacks callbacks;
+  auto bind = [&]<auto& callback, typename Return, typename... Args>(String name)
+    requires std::invocable<decltype(callback), Item&, Args...>
+  {
+    return callbacks.register_callback_with_signature<Return, Args...>(std::move(name), [resolve](Args&&... args) {
+      // The slot resolver takes ownership for the duration of this call, even
+      // if item code reenters Lua and replaces the slot before returning.
+      decltype(auto) item = resolve();
+      if constexpr (std::same_as<decltype(item), Item&>)
+        return callback(item, std::move(args)...);
+      else
+        return callback(*item, std::move(args)...);
+    });
+  };
 
-  if (auto registration =
-        callbacks.register_callback_with_signature<String>("name", [&item]() { return ItemCallbacks::name(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration =
-        callbacks.register_callback_with_signature<std::size_t>("count", [&item]() { return ItemCallbacks::count(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.register_callback_with_signature<std::size_t, std::size_t>(
-        "setCount", [&item](std::size_t count) { return ItemCallbacks::set_count(item, count); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.register_callback_with_signature<std::size_t>(
-        "maxStack", [&item]() { return ItemCallbacks::max_stack(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.register_callback_with_signature<bool, Json, std::optional<bool>>(
-        "matches",
-        [&item](Json const& descriptor, std::optional<bool> exactMatch) {
-          return ItemCallbacks::matches(item, descriptor, exactMatch);
-        });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.register_callback_with_signature<bool, std::size_t>(
-        "consume", [&item](std::size_t count) { return ItemCallbacks::consume(item, count); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration =
-        callbacks.register_callback_with_signature<bool>("empty", [&item]() { return ItemCallbacks::empty(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.register_callback_with_signature<Json>(
-        "descriptor", [&item]() { return ItemCallbacks::descriptor(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.register_callback_with_signature<String>(
-        "description", [&item]() { return ItemCallbacks::description(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.register_callback_with_signature<String>(
-        "friendlyName", [&item]() { return ItemCallbacks::friendly_name(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration =
-        callbacks.register_callback_with_signature<int>("rarity", [&item]() { return ItemCallbacks::rarity(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.register_callback_with_signature<String>(
-        "rarityString", [&item]() { return ItemCallbacks::rarityString(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration =
-        callbacks.register_callback_with_signature<std::size_t>("price", [&item]() { return ItemCallbacks::price(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.register_callback_with_signature<Json>(
-        "fuelAmount", [&item]() { return ItemCallbacks::fuelAmount(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.register_callback_with_signature<Json>(
-        "iconDrawables", [&item]() { return ItemCallbacks::icon_drawables(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.register_callback_with_signature<Json>(
-        "dropDrawables", [&item]() { return ItemCallbacks::drop_drawables(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.register_callback_with_signature<String>(
-        "largeImage", [&item]() { return ItemCallbacks::large_image(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.register_callback_with_signature<String>(
-        "tooltipKind", [&item]() { return ItemCallbacks::tooltip_kind(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.register_callback_with_signature<String>(
-        "category", [&item]() { return ItemCallbacks::category(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.register_callback_with_signature<String>(
-        "pickupSound", [&item]() { return ItemCallbacks::pickup_sound(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.register_callback_with_signature<bool>(
-        "twoHanded", [&item]() { return ItemCallbacks::two_handed(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.register_callback_with_signature<float>(
-        "timeToLive", [&item]() { return ItemCallbacks::time_to_live(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.register_callback_with_signature<Json>(
-        "learnBlueprintsOnPickup", [&item]() { return ItemCallbacks::learn_blueprints_on_pickup(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.register_callback_with_signature<bool, String>(
-        "hasItemTag", [&item](String const& tag) { return ItemCallbacks::has_item_tag(item, tag); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-  if (auto registration = callbacks.register_callback_with_signature<Json>(
-        "pickupQuestTemplates", [&item]() { return ItemCallbacks::pickup_quest_templates(item); });
-      !registration)
-    return std::unexpected(std::move(registration.error()));
-
+  if (auto result = bind.template operator()<name, String>("name"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<count, std::size_t>("count"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<set_count, std::size_t, std::size_t>("setCount"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<max_stack, std::size_t>("maxStack"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<matches, bool, Json, std::optional<bool>>("matches"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<consume, bool, std::size_t>("consume"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<empty, bool>("empty"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<descriptor, Json>("descriptor"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<description, String>("description"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<friendly_name, String>("friendlyName"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<rarity, int>("rarity"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<rarityString, String>("rarityString"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<price, std::size_t>("price"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<fuelAmount, Json>("fuelAmount"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<icon_drawables, Json>("iconDrawables"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<drop_drawables, Json>("dropDrawables"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<large_image, String>("largeImage"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<tooltip_kind, String>("tooltipKind"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<category, String>("category"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<pickup_sound, String>("pickupSound"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<two_handed, bool>("twoHanded"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<time_to_live, float>("timeToLive"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<learn_blueprints_on_pickup, Json>("learnBlueprintsOnPickup"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<has_item_tag, bool, String>("hasItemTag"); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = bind.template operator()<pickup_quest_templates, Json>("pickupQuestTemplates"); !result)
+    return std::unexpected(std::move(result.error()));
   return callbacks;
+}
+
+}
+
+std::expected<LuaCallbacks, StarException> LuaBindings::make_item_callbacks(Item& item) {
+  return bind_item_callbacks([&item]() -> Item& { return item; });
+}
+
+std::expected<LuaCallbacks, StarException> LuaBindings::make_item_slot_callbacks(
+    std::reference_wrapper<std::shared_ptr<Item> const> item_slot) {
+  return bind_item_callbacks([item_slot] { return item_slot.get(); });
 }
 
 // Returns the name of the item. (Unique identifier)

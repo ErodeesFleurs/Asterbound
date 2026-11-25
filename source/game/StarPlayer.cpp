@@ -1087,7 +1087,7 @@ std::expected<void, StarException> Player::init(World& world, EntityId entityId,
         return std::unexpected(std::move(result.error()));
     }
     for (auto& p : m_inventory->pullOverflow()) {
-      auto dropResult = ItemDrop::createRandomizedDrop(root(), p, m_movementController->position(), true);
+      auto dropResult = ItemDrop::create_randomized_drop(root(), p, m_movementController->position(), true);
       if (!dropResult)
         return std::unexpected(std::move(dropResult.error()));
       auto drop = std::move(*dropResult);
@@ -1714,7 +1714,7 @@ std::expected<void, StarException> Player::dropItem() {
         return std::unexpected(std::move(dropResult.error()));
       auto drop = std::move(*dropResult);
       if (drop) {
-        auto entityResult = ItemDrop::throwDrop(root(), drop, position(), velocity(), throwDirection);
+        auto entityResult = ItemDrop::throw_drop(root(), drop, position(), velocity(), throwDirection);
         if (!entityResult)
           return std::unexpected(std::move(entityResult.error()));
         auto entity = std::move(*entityResult);
@@ -2785,7 +2785,7 @@ std::expected<void, StarException> Player::giveItem(std::shared_ptr<Item> const&
     if (!currentWorldResult)
       return std::unexpected(std::move(currentWorldResult.error()));
     auto& currentWorld = currentWorldResult->get();
-    auto dropResult = ItemDrop::createRandomizedDrop(root(), spill->descriptor(), position());
+    auto dropResult = ItemDrop::create_randomized_drop(root(), spill->descriptor(), position());
     if (!dropResult)
       return std::unexpected(std::move(dropResult.error()));
     auto drop = std::move(*dropResult);
@@ -2919,7 +2919,7 @@ std::expected<void, StarException> Player::clearSwap() {
       if (!itemResult)
         return std::unexpected(std::move(itemResult.error()));
       auto item = std::move(*itemResult);
-      auto dropResult = ItemDrop::createRandomizedDrop(root(), item, position());
+      auto dropResult = ItemDrop::create_randomized_drop(root(), item, position());
       if (!dropResult)
         return std::unexpected(std::move(dropResult.error()));
       auto drop = std::move(*dropResult);
@@ -4842,7 +4842,7 @@ std::expected<void, StarException> Player::dropSelectedItems(std::function<std::
       return std::unexpected(std::move(angleResult.error()));
     auto angle = std::move(*angleResult);
     auto dropResult =
-      ItemDrop::throwDrop(root(), std::exchange(item, {}), position(), velocity(), Vec2F::with_angle(angle), true);
+      ItemDrop::throw_drop(root(), std::exchange(item, {}), position(), velocity(), Vec2F::with_angle(angle), true);
     if (!dropResult)
       return std::unexpected(std::move(dropResult.error()));
     auto drop = std::move(*dropResult);

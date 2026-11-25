@@ -452,7 +452,7 @@ std::expected<BlockMoveResult, BlockMoveError> FallingBlocksWorld::move_block(Ve
         ? BlockMoveResult::Changed : BlockMoveResult::Unchanged;
     if (!drops) return std::unexpected(BlockMoveError{std::move(drops.error()), result});
     for (auto const& drop : *drops) {
-      auto entity = ItemDrop::createRandomizedDrop(m_world_server.root(), drop, Vec2F(target_pos));
+      auto entity = ItemDrop::create_randomized_drop(m_world_server.root(), drop, Vec2F(target_pos));
       if (!entity) return std::unexpected(BlockMoveError{std::move(entity.error()), result});
       auto added = m_world_server.addEntity(*entity);
       if (!added) return std::unexpected(BlockMoveError{std::move(added.error()), result});
@@ -845,7 +845,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::place_biome_items(Vec2
 std::expected<void, StarException> DungeonGeneratorWorld::addDrop(Vec2F const& position, ItemDescriptor const& item) {
   auto& generationRoot = m_worldServer.root();
   {
-    auto operationResult1 = ItemDrop::createRandomizedDrop(generationRoot, item, position);
+    auto operationResult1 = ItemDrop::create_randomized_drop(generationRoot, item, position);
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
     auto operationResult2 = m_worldServer.addEntity((*operationResult1));
     if (!operationResult2) return std::unexpected(std::move(operationResult2.error()));

@@ -459,7 +459,7 @@ for (auto const& drop : option) {
       ItemDescriptor::create("sapling", static_cast<std::size_t>(std::move(*result324)), m_saplingConfig);
     if (!result325)
       return std::unexpected(std::move(result325.error()));
-    auto result326 = ItemDrop::createRandomizedDrop(this->root(), std::move(*result325), position() + pos);
+    auto result326 = ItemDrop::create_randomized_drop(this->root(), std::move(*result325), position() + pos);
     if (!result326)
       return std::unexpected(std::move(result326.error()));
     auto result327 = result323->get().addEntity(std::move(*result326));
@@ -478,7 +478,7 @@ for (auto const& drop : option) {
     auto result331 = ItemDescriptor::create(std::move(*result329), static_cast<std::size_t>(std::move(*result330)));
     if (!result331)
       return std::unexpected(std::move(result331.error()));
-    auto result332 = ItemDrop::createRandomizedDrop(this->root(), std::move(*result331), position() + pos);
+    auto result332 = ItemDrop::create_randomized_drop(this->root(), std::move(*result331), position() + pos);
     if (!result332)
       return std::unexpected(std::move(result332.error()));
     auto result333 = result328->get().addEntity(std::move(*result332));

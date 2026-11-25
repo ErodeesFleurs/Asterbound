@@ -91,16 +91,40 @@ const GameTestRegistration missingSnapshot("EntitySnapshot", "MissingEntityRetur
   EXPECT_TRUE(*result);
 });
 
+const GameTestRegistration drop_physics("ItemDrop", "TickRestoresDropPhysicsAfterControllerEdits", [](GameTest& fixture) {
+  SnapshotWorld setup;
+  if (!fixture.check(bool(setup.init(fixture.root())), "create server world")) return;
+  auto descriptor = ItemDescriptor::create("dirtmaterial", 7);
+  if (!fixture.check(bool(descriptor), "create material descriptor")) return;
+  auto thrown = ItemDrop::throw_drop(fixture.root(), *descriptor, Vec2F(1024, 1024), {}, {}, true);
+  if (!fixture.check(thrown && *thrown && bool(setup.world->addEntity(*thrown)), "throw material into world")) return;
+  auto& drop = **thrown;
+  auto stored = drop.disk_store();
+  if (!fixture.check(stored && stored->get_bool("eternal") == true && stored->get_string("mode") == "Intangible",
+      "thrown descriptor retains lifetime and pickup delay")) return;
+  if (!fixture.check(bool(drop.update(1.0f / 60, 1)), "advance drop before modifying controller")) return;
+  auto& controller = drop.movementController();
+  MovementParameters changed;
+  changed.gravityEnabled = false;
+  changed.collisionEnabled = false;
+  changed.maxMovementPerStep = 2.0f;
+  if (!fixture.check(bool(controller.applyParameters(changed)), "change live drop physics")) return;
+  if (!fixture.check(bool(drop.update(1.0f / 60, 2)), "advance drop after controller change")) return;
+  auto const& current = controller.parameters();
+  fixture.check(current.gravityEnabled == true && current.collisionEnabled == true && current.maxMovementPerStep == 2.0f,
+      "drop restores gravity and collision without resetting unrelated movement settings");
+});
+
 const GameTestRegistration persistentSnapshot("EntitySnapshot", "VersionedPersistentEntityRoundTrips", [](GameTest& fixture) {
   SnapshotWorld setup;
   auto initialized = setup.init(fixture.root());
   ASSERT_TRUE(initialized) << initialized.error().what();
   auto descriptor = ItemDescriptor::create("dirtmaterial", 7, JsonObject{{"snapshotMarker", "native disk payload"}});
   ASSERT_TRUE(descriptor) << descriptor.error().what();
-  auto drop = ItemDrop::createRandomizedDrop(fixture.root(), *descriptor, Vec2F(1024, 1024));
+  auto drop = ItemDrop::create_randomized_drop(fixture.root(), *descriptor, Vec2F(1024, 1024));
   ASSERT_TRUE(drop) << drop.error().what();
   ASSERT_TRUE(setup.world->addEntity(*drop));
-  auto original = (*drop)->diskStore();
+  auto original = (*drop)->disk_store();
   ASSERT_TRUE(original) << original.error().what();
   auto result = snapshot(setup, (*drop)->entityId());
   ASSERT_TRUE(result) << result.error().what();
@@ -126,7 +150,7 @@ const GameTestRegistration persistentSnapshot("EntitySnapshot", "VersionedPersis
   ASSERT_TRUE(restoredDrop);
   EXPECT_EQ(restoredDrop->item()->descriptor(), *descriptor);
   EXPECT_EQ(restoredDrop->position(), (*drop)->position());
-  EXPECT_EQ((*drop)->diskStore(), *original);
+  EXPECT_EQ((*drop)->disk_store(), *original);
   EXPECT_EQ(snapshot(setup, (*drop)->entityId()), *result);
 });
 
@@ -210,7 +234,7 @@ const GameTestRegistration transientSnapshots("EntitySnapshot", "TransientStateR
   // world. Keep a real source alive so the net_store assertion is meaningful.
   auto sourceDescriptor = ItemDescriptor::create("dirtmaterial", 1);
   ASSERT_TRUE(sourceDescriptor) << sourceDescriptor.error().what();
-  auto source = ItemDrop::createRandomizedDrop(fixture.root(), *sourceDescriptor, Vec2F(1024, 1024));
+  auto source = ItemDrop::create_randomized_drop(fixture.root(), *sourceDescriptor, Vec2F(1024, 1024));
   ASSERT_TRUE(source) << source.error().what();
   ASSERT_TRUE(setup.world->addEntity(*source, 4242));
   auto database = fixture.root().projectileDatabase();

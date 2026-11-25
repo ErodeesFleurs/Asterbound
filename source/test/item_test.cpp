@@ -95,6 +95,8 @@ import star.player_lua_bindings;
 import star.warping;
 import star.world_client_state;
 import star.world_tiles;
+import star.entity_rendering_types;
+import star.item_lua_bindings;
 namespace Star {
 
 void PrintTo(ItemDescriptor const& descriptor, std::ostream* stream) {
@@ -572,32 +574,167 @@ const GameTestRegistration item_take_overfill("ItemTest", "TakingOverfilledItemC
 
 const GameTestRegistration item_drop_take_overfill("ItemTest", "OverfilledDropStaysTakeableUntilDrained", [](GameTest& fixture) {
   for (bool take_by : {false, true}) {
-    SCOPED_TRACE(take_by);
     auto item = GenericItem::create(fixture.root(),
         JsonObject{{"itemName", "dropprobe"}, {"rarity", "common"}, {"maxStack", 5}}, "/", JsonObject{});
-    ASSERT_TRUE(item) << item.error().what();
+    if (!fixture.check(item && *item, "create pickup item")) return;
     auto drop = ItemDrop::create(fixture.root(), std::move(*item));
-    ASSERT_TRUE(drop) << drop.error().what();
+    if (!fixture.check(drop && *drop, "create overfilled drop")) return;
     auto source = (*drop)->item();
-    ASSERT_EQ(source->set_count(12, true), 0u);
+    if (!fixture.check(source->set_count(12, true) == 0, "seed overfilled drop")) return;
 
-    auto take = [&] { return take_by ? (*drop)->takeBy(101) : (*drop)->take(); };
+    auto take = [&] { return take_by ? (*drop)->take_by(101) : (*drop)->take(); };
     std::uint64_t remaining = source->count();
     for (std::uint64_t expected : {5u, 5u, 2u}) {
-      EXPECT_EQ((*drop)->canTake(), true);
+      fixture.check((*drop)->can_take() == true, "partially drained drop remains available");
       auto picked_up = take();
-      ASSERT_TRUE(picked_up) << picked_up.error().what();
-      ASSERT_TRUE(*picked_up);
-      EXPECT_EQ((*picked_up)->count(), expected);
+      if (!fixture.check(picked_up && *picked_up && (*picked_up)->count() == expected, "take one legal stack")) return;
       remaining -= expected;
-      EXPECT_EQ(source->count(), remaining);
-      EXPECT_EQ((*drop)->persistent(), !take_by || remaining != 0);
+      fixture.check(source->count() == remaining, "pickup conserves remaining count");
+      fixture.check((*drop)->persistent() == (!take_by || remaining != 0), "only an animated final pickup clears persistence");
     }
-    EXPECT_EQ((*drop)->canTake(), false);
+    fixture.check((*drop)->can_take() == false, "drained drop is unavailable");
     auto empty = take();
-    ASSERT_TRUE(empty) << empty.error().what();
-    EXPECT_FALSE(*empty);
+    fixture.check(empty && !*empty, "taking an empty drop transfers nothing");
   }
+});
+
+const GameTestRegistration item_drop_merge("ItemTest", "MergeTransfersOneWholeStackAcrossSeamAndReplicatesCount", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  if (!fixture.check(bool(directory), "create private drop root directory")) return;
+  auto cleanup = make_scope_exit([&] { fixture.check(bool(File::remove_all(*directory)), "remove private drop root directory"); });
+  auto overlay = File::relative_to(*directory, "assets");
+  if (!fixture.check(bool(File::create_directory(overlay)), "create drop fixture assets")) return;
+  if (!fixture.check(bool(File::write_file(String(R"([
+    {"op":"replace","path":"/combineChance","value":2},
+    {"op":"replace","path":"/combineRadius","value":12}
+  ])"), File::relative_to(overlay, "itemdrop.config.patch"))), "fix merge chance and radius")) return;
+  if (!fixture.check(bool(File::write_file(String(R"(
+    function freeze()
+      itemDrop.setIntangibleTime(10)
+    end
+    function canTake()
+      calls = (calls or 0) + 1
+      if once and calls ~= 1 then return false end
+      if reenter then
+        if world.takeItemDrop(entity.id()) ~= nil or calls ~= 1 then return false end
+      end
+      if freezeTarget then world.callScriptedEntity(freezeTarget, "freeze") end
+      if freezeSelf then freeze() end
+      return true
+    end
+  )"), File::relative_to(overlay, "drop-merge-probe.lua"))), "write stateful pickup permission script")) return;
+
+  auto settings = fixture.rootSettings();
+  settings.assetSources.push_back(overlay);
+  settings.storageDirectory = File::relative_to(*directory, "storage");
+  settings.runtimeConfigFile.reset();
+  settings.logDirectory.reset();
+  settings.logFile.reset();
+  settings.includeUGC = false;
+  auto root = Root::create(std::move(settings));
+  if (!fixture.check(bool(root), "create private drop root")) return;
+  auto database = (*root)->itemDatabase();
+  auto storage = File::ephemeral_file((*root)->random());
+  if (!fixture.check(database && storage, "open drop catalog and world storage")) return;
+  auto created = WorldServer::create(**root, Vec2U(2048, 2048), *storage);
+  if (!fixture.check(bool(created), "create drop test world")) return;
+  auto world = std::move(*created);
+  auto close = make_scope_exit([&] { fixture.check(bool(world->close()), "close drop test world"); });
+  world->setSpawningEnabled(false);
+  if (!fixture.check(bool(world->generateRegion(RectI(-32, 984, 32, 1112))), "generate open seam region")) return;
+
+  auto make_drop = [&](Vec2F position, std::uint64_t count) -> std::shared_ptr<ItemDrop> {
+    auto item = inventoryTestItem(**database, "perfectlygenericitem", count, JsonObject{
+      {"maxStack", 5}, {"itemDrop", JsonObject{{"scripts", JsonArray{"/drop-merge-probe.lua"}}}}
+    });
+    if (!fixture.check(item && *item && (*item)->count() == count, "instantiate drop fixture stack")) return {};
+    auto drop = ItemDrop::create(**root, std::move(*item));
+    if (!fixture.check(drop && *drop, "create world drop")) return {};
+    (*drop)->set_position(position);
+    auto added = world->addEntity(*drop);
+    if (!fixture.check(bool(added), added ? "add world drop" : added.error().what())) return {};
+    return std::move(*drop);
+  };
+  auto script = [&](ItemDrop& drop, String const& code) {
+    auto result = drop.evalScript(code);
+    return fixture.check(result && *result && std::holds_alternative<bool>(**result) && std::get<bool>(**result),
+        result ? std::string_view(code.utf8()) : result.error().what());
+  };
+  float constexpr dt = 1.0f / 60.0f;
+
+  auto receiver = make_drop(Vec2F(2044, 1000), 2);
+  auto near = make_drop(Vec2F(5, 1000), 1);
+  auto farther = make_drop(Vec2F(7, 1000), 2);
+  if (!receiver || !near || !farther) return;
+  if (!script(*near, "once = true; reenter = true; return true")
+      || !script(*farther, "once = true; reenter = true; return true")) return;
+  auto const merge_bounds = RectF::with_center(receiver->position(), Vec2F::filled(24));
+  auto first = world->findEntity(merge_bounds, [&](std::shared_ptr<Entity> const& entity) {
+    return entity == near || entity == farther;
+  });
+  if (!fixture.check(first && *first, "observe first candidate in wrapped spatial query")) return;
+  auto& source = *first == near ? *near : *farther;
+  auto& other = *first == near ? *farther : *near;
+  auto const total = receiver->item()->count() + source.item()->count();
+  float const center_x = *first == near ? 0.5f : 1.5f;
+
+  auto store = receiver->net_store();
+  auto baseline = receiver->write_net_state();
+  if (!fixture.check(store && baseline, "write pre-merge receiver state")) return;
+  auto replica = ItemDrop::create(**root, std::move(*store));
+  if (!fixture.check(replica && *replica && (*replica)->init(*world, 100, EntityMode::Slave), "initialize receiver replica")) return;
+  auto uninit = make_scope_exit([&] { fixture.check(bool((*replica)->uninit()), "uninitialize receiver replica"); });
+  if (!fixture.check((*replica)->read_net_state(std::move(baseline->first)) && (*replica)->update(dt, 0)
+      && (*replica)->item()->count() == 2, "read original replica count")) return;
+  if (!fixture.check(bool(receiver->update(dt, 0)), "run one deterministic merge tick")) return;
+  fixture.check(receiver->item()->count() == total && source.item()->empty() && !other.item()->empty(),
+      "first accepted candidate transfers completely; next candidate is untouched");
+  fixture.check(source.shouldDestroy() == true, "drained source is ready for removal");
+  fixture.check(std::abs(receiver->position()[0] - center_x) < 0.01f, "receiver moves to wrapped midpoint");
+  script(source, "return calls == 1");
+  script(other, "return calls == nil");
+  auto delta = receiver->write_net_state(baseline->second);
+  fixture.check(delta && (*replica)->read_net_state(std::move(delta->first)) && (*replica)->update(dt, 1)
+      && (*replica)->item()->count() == total, "receiver count replicates in the incremental state");
+
+  auto full = make_drop(Vec2F(2, 1040), 3);
+  auto overfilled = make_drop(Vec2F(8, 1040), 4);
+  auto empty = make_drop(Vec2F(4, 1040), 1);
+  if (!full || !overfilled || !empty) return;
+  auto const full_position = full->position();
+  if (!fixture.check(overfilled->item()->set_count(12, true) == 0 && empty->item()->consume(1),
+      "seed overfilled and empty sources")) return;
+  fixture.check(full->update(dt, 0) && full->item()->count() == 3 && overfilled->item()->count() == 12
+      && empty->item()->empty() && full->position() == full_position, "zero or nonfitting transfer leaves counts and receiver position unchanged");
+
+  auto frozen = make_drop(Vec2F(2, 1080), 1);
+  auto changing_source = make_drop(Vec2F(8, 1080), 1);
+  if (!frozen || !changing_source
+      || !script(*changing_source, Star::format("freezeTarget = {}; return true", frozen->entityId()))) return;
+  fixture.check(frozen->update(dt, 0) && !frozen->pickup_available() && frozen->item()->count() == 1
+      && changing_source->item()->count() == 1, "source permission can revoke receiver eligibility before transfer");
+
+  auto pickup = make_drop(Vec2F(8, 1000), 1);
+  auto blocked = make_drop(Vec2F(8, 1003), 1);
+  if (!pickup || !blocked || !script(*pickup, "once = true; reenter = true; return true")
+      || !script(*blocked, "freezeSelf = true; return true")) return;
+  auto const client_id = min_client_connection_id;
+  auto added = world->addClient(client_id, SpawnTargetPosition(Vec2F(8, 1000)), true);
+  if (!fixture.check(added && *added, "attach pickup requester")) return;
+  auto handled = world->handleIncomingPackets(client_id, {
+      std::make_shared<WorldStartAcknowledgePacket>(),
+      std::make_shared<RequestDropPacket>(pickup->entityId()),
+      std::make_shared<RequestDropPacket>(blocked->entityId())
+  });
+  if (!fixture.check(bool(handled), "process both pickup requests")) return;
+  auto packets = world->getOutgoingPackets(client_id);
+  fixture.check(packets && std::ranges::count_if(*packets, [](std::shared_ptr<Packet> const& packet) {
+      auto payout = as<GiveItemPacket>(packet);
+      return payout && payout->item.count() == 1;
+    }) == 1 && pickup->item()->empty() && blocked->item()->count() == 1 && !blocked->pickup_available(),
+    "one authorized take pays out; script-induced intangibility blocks the other");
+  script(*pickup, "return calls == 1");
+  script(*blocked, "return calls == 1");
 });
 
 const GameTestRegistration item_base_tags("ItemTest", "TagsReadBaseConfigAndValidateTheEntireArray", [](GameTest& fixture) {
@@ -3345,3 +3482,261 @@ const GameTestRegistration item_descriptor_disk_envelope(
     fixture.check(wrong_id && !ItemDescriptor::load_store(**versions, *wrong_id), "reject another disk envelope type");
   }
 });
+
+namespace {
+
+struct DropImages : NullRenderCallback {
+  std::vector<std::pair<AssetPath, EntityRenderLayer>> images;
+
+  std::expected<void, StarException> add_drawable(Drawable drawable, EntityRenderLayer layer) override {
+    if (drawable.is_image())
+      images.emplace_back(std::move(drawable.image_part().image), layer);
+    return {};
+  }
+};
+
+const GameTestRegistration item_drop_aging_replacement("ItemTest", "DropAgingKeepsStateUntilReplacementCommits",
+    [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  if (!fixture.check(bool(directory), "create isolated asset directory")) return;
+  auto cleanup = make_scope_exit([&] { fixture.check(bool(File::remove_all(*directory)), "remove isolated assets"); });
+  auto overlay = File::relative_to(*directory, "assets");
+  if (!fixture.check(bool(File::create_directory(overlay)), "create asset overlay")) return;
+  auto write_asset = [&](String const& path, String const& content) {
+    return File::write_file(content, File::relative_to(overlay, path)).has_value();
+  };
+  if (!fixture.check(write_asset("dropagingprobe.item", R"JSON({
+    "itemName":"dropagingprobe", "inventoryIcon":"/assetmissing.png",
+    "shortdescription":"Aging probe", "description":"Aging probe",
+    "rarity":"common", "itemAgingScripts":["dropagingprobe_age.lua"],
+    "itemDrop":{"scripts":["/dropagingprobe_live.lua"]}
+  })JSON"), "write the aging item asset")
+      || !fixture.check(write_asset("dropagingprobe_live.lua", R"LUA(
+    local readName
+    function init() readName = item.name end
+    function seesOld() return readName() == "dropagingprobe" and item.count() == 4 end
+    function seesNew() return readName() == "dirtmaterial" and item.count() == 4 end
+  )LUA"), "write the live drop script")
+      || !fixture.check(write_asset("dropagingprobe_age.lua", R"LUA(
+    function ageItem(descriptor, aging)
+      assert(aging == 1000)
+      local stage = root.getConfiguration("itemDropAgingProbe")
+      if stage == "error" then error("drop aging failed") end
+      if stage == "null" then return "" end
+      return {name = "dirtmaterial", count = descriptor.count}
+    end
+  )LUA"), "write the aging script"))
+    return;
+
+  auto settings = fixture.rootSettings();
+  settings.assetSources.push_back(overlay);
+  settings.storageDirectory = File::relative_to(*directory, "storage");
+  settings.runtimeConfigFile = {};
+  settings.logDirectory = {};
+  settings.logFile = {};
+  settings.includeUGC = false;
+  auto created_root = Root::create(std::move(settings));
+  if (!fixture.check(bool(created_root), "load the isolated item assets")) return;
+  auto& root = **created_root;
+  auto database = root.itemDatabase();
+  auto config = root.configuration();
+  auto storage = File::ephemeral_file(root.random());
+  if (!fixture.check(database && config && storage, "open item database, configuration and world storage")) return;
+  auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
+  if (!fixture.check(bool(world), "create an isolated world")) return;
+  auto close = make_scope_exit([&] { fixture.check(bool((*world)->close()), "close isolated world"); });
+
+  auto original = inventoryTestItem(**database, "dropagingprobe", 4);
+  if (!fixture.check(original && *original, "construct the scripted aging item")) return;
+  auto stored_item = (*database)->disk_store(*original);
+  if (!fixture.check(bool(stored_item), "serialize the scripted item")) return;
+  EpochTimer aging;
+  aging.set_elapsed_time(1000);
+  auto drop = ItemDrop::create(root, Json(JsonObject{{"item", std::move(*stored_item)},
+      {"position", JsonArray{1024, 1024}}, {"mode", "Available"}, {"eternal", true},
+      {"dropAge", EpochTimer().to_json()}, {"ageItemsTimer", aging.to_json()}}));
+  if (!fixture.check(drop && (*drop)->init(**world, 101, EntityMode::Master), "initialize the scripted drop")) return;
+  auto uninit = make_scope_exit([&] { fixture.check(bool((*drop)->uninit()), "uninitialize the scripted drop"); });
+  std::weak_ptr<Item> old_item = (*drop)->item();
+  auto lua_check = [&](String const& code) {
+    auto result = (*drop)->evalScript(code);
+    return result && *result && std::holds_alternative<bool>(**result) && std::get<bool>(**result);
+  };
+  DropImages old_frame;
+  if (!fixture.check((*drop)->render(old_frame) && !old_frame.images.empty()
+          && old_frame.images.front().second == render_layer_item_drop && lua_check("return seesOld()"),
+          "prime the ordinary drawable cache and read the original item through Lua"))
+    return;
+  constexpr float dt = 1.0f / 60;
+  using AgingFailure = std::pair<String, std::string_view>;
+  for (auto const& [stage, error] : {AgingFailure{"error", "drop aging failed"},
+           AgingFailure{"null", "Item drop aging produced no item"}}) {
+    if (!fixture.check(bool((*config)->set("itemDropAgingProbe", stage)), "select the failing aging operation")) return;
+    auto update = (*drop)->update(dt, 0);
+    fixture.check(!update && std::string_view(update.error().what()).contains(error), "report the real aging failure");
+    DropImages retained;
+    fixture.check((*drop)->item() == old_item.lock() && (*drop)->render(retained)
+            && retained.images == old_frame.images && lua_check("return seesOld()"),
+        "retain the original item, cached drawables and Lua identity after aging failure");
+  }
+  if (!fixture.check((*config)->set("itemDropAgingProbe", "replace") && (*drop)->update(dt, 0),
+          "retry the still-due aging operation and commit the valid replacement"))
+    return;
+  DropImages new_frame;
+  fixture.check(old_item.expired() && lua_check("return seesNew()"), "saved Lua callbacks resolve the current item");
+  fixture.check((*drop)->render(new_frame) && !new_frame.images.empty()
+          && new_frame.images.front().first != old_frame.images.front().first
+          && new_frame.images.front().second == render_layer_foreground_tile,
+      "draw the aged material on the foreground layer instead of replaying the old drawable");
+});
+
+const GameTestRegistration item_drop_replica_replacement("ItemTest", "DropReplicaRetriesReplacementsAndKeepsOverflow",
+    [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  if (!fixture.check(bool(directory), "create private replica storage")) return;
+  auto cleanup = make_scope_exit([&] { fixture.check(bool(File::remove_all(*directory)), "clean replica storage"); });
+  auto settings = fixture.rootSettings();
+  settings.storageDirectory = *directory;
+  settings.runtimeConfigFile.reset();
+  settings.logDirectory.reset();
+  settings.logFile.reset();
+  settings.includeUGC = false;
+  auto isolated = Root::create(std::move(settings));
+  if (!fixture.check(bool(isolated), "create isolated catalog for deliberate load failures")) return;
+  auto& root = **isolated;
+  auto database = root.itemDatabase();
+  auto storage = File::ephemeral_file(root.random());
+  if (!fixture.check(database && storage, "open native item database and ephemeral world storage")) return;
+  auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
+  if (!fixture.check(bool(world), "create replica test world")) return;
+  auto close = make_scope_exit([&] { fixture.check(bool((*world)->close()), "close replica test world"); });
+  auto material = inventoryTestItem(**database, "dirtmaterial", 4);
+  if (!fixture.check(material && *material, "construct the real material item")) return;
+  auto material_master = ItemDrop::create(root, *material);
+  if (!fixture.check(bool(material_master), "create the first source drop")) return;
+  auto material_spawn = (*material_master)->net_store();
+  auto material_state = (*material_master)->write_net_state();
+  if (!fixture.check(material_spawn && material_state, "write drop spawn and full state")) return;
+  auto replica = ItemDrop::create(root, std::move(*material_spawn));
+  if (!fixture.check(replica && (*replica)->init(**world, 102, EntityMode::Slave), "initialize the replica drop")) return;
+  auto uninit_replica = make_scope_exit([&] { fixture.check(bool((*replica)->uninit()), "uninitialize the replica drop"); });
+  if (!fixture.check((*replica)->read_net_state(std::move(material_state->first)) && (*replica)->update(0, 0)
+          && (*replica)->enableInterpolation(), "synchronize material replica and enable interpolation"))
+    return;
+
+  // The legacy incremental record uses the fourth group field for the
+  // descriptor. Use that wire shape for deliberately invalid states.
+  auto send_descriptor = [&](ItemDescriptor const& descriptor, float delay = 0) {
+    DataStreamBuffer packet;
+    return packet.write(false) && packet.write_vlq_u(4) && packet.write(descriptor) && packet.write_vlq_u(0)
+        && (*replica)->read_net_state(packet.take_data(), delay);
+  };
+  DropImages material_frame;
+  if (!fixture.check((*replica)->render(material_frame) && !material_frame.images.empty()
+          && material_frame.images.front().second == render_layer_foreground_tile,
+          "prime the material drawable cache on the foreground layer"))
+    return;
+  auto old_item = (*replica)->item();
+  // Both the original decode and the normal generic fallback have to fail.
+  auto broken = ItemDescriptor::create("perfectlygenericitem", 1,
+      JsonObject{{"genericItemStorage", false}, {"maxStack", JsonArray{}}});
+  if (!fixture.check(bool(broken), "construct a descriptor that fails item decoding")) return;
+  for (ItemDescriptor const& descriptor : {ItemDescriptor(), *broken}) {
+    if (!fixture.check(send_descriptor(descriptor), "receive an invalid replacement descriptor")) return;
+    for (int attempt = 0; attempt != 2; ++attempt) {
+      DropImages unchanged;
+      fixture.check(!(*replica)->update(0, 0) && (*replica)->item() == old_item
+              && (*replica)->render(unchanged) && unchanged.images == material_frame.images,
+          "reject and retry the same invalid descriptor while keeping the old material drawable");
+    }
+  }
+
+  auto ordinary = inventoryTestItem(**database, "perfectlygenericitem", 5, JsonObject{{"maxStack", 5}});
+  if (!fixture.check(ordinary && *ordinary && (*ordinary)->set_count(12, true) == 0, "construct an overfilled item")) return;
+  auto master = ItemDrop::create(root, *ordinary);
+  if (!fixture.check(master && (*master)->init(**world, 103, EntityMode::Master), "initialize the overfilled authority")) return;
+  auto uninit_master = make_scope_exit([&] { fixture.check(bool((*master)->uninit()), "uninitialize the authority"); });
+  auto full = (*master)->write_net_state();
+  auto spawn = (*master)->net_store();
+  if (!fixture.check(full && spawn, "write the authoritative overfilled spawn state")) return;
+  auto spawned = ItemDrop::create(root, std::move(*spawn));
+  fixture.check(spawned && (*spawned)->item()->count() == 12, "spawn construction preserves the authoritative count");
+  if (!fixture.check(send_descriptor((*master)->item()->descriptor(), 0.25f)
+          && !(*replica)->update(0.125f, 0) && (*replica)->item() == old_item
+          && (*replica)->update(0.125f, 0), "a delayed valid delta supersedes the failing descriptor"))
+    return;
+  auto replaced = (*replica)->item();
+  DropImages ordinary_frame;
+  fixture.check(replaced != old_item && replaced->name() == "perfectlygenericitem" && replaced->count() == 12
+          && (*replica)->render(ordinary_frame) && !ordinary_frame.images.empty()
+          && ordinary_frame.images.front().first != material_frame.images.front().first
+          && ordinary_frame.images.front().second == render_layer_item_drop,
+      "valid replacement preserves overflow and drops the stale foreground image and layer");
+
+  auto picked_up = (*master)->take();
+  if (!fixture.check(picked_up && *picked_up && (*picked_up)->count() == 5 && (*master)->item()->count() == 7,
+          "partially pick up the genuinely overfilled master stack"))
+    return;
+  auto partial = (*master)->write_net_state(full->second);
+  DropImages remainder_frame;
+  fixture.check(partial && (*replica)->read_net_state(std::move(partial->first)) && (*replica)->update(0, 0)
+          && (*replica)->item() == replaced && replaced->count() == 7
+          && (*replica)->render(remainder_frame) && remainder_frame.images == ordinary_frame.images,
+      "count-only delta keeps the live object and presentation while preserving the overfilled remainder");
+});
+
+const GameTestRegistration item_drop_reentrant_callbacks("ItemTest", "LiveItemCallbackPinsInstanceAcrossReentry",
+    [](GameTest& fixture) {
+  class ReentrantItem final : public Item {
+  public:
+    ReentrantItem(Root& root, LuaContext& lua, std::shared_ptr<Item>& slot, std::shared_ptr<Item> replacement)
+        : Item(root), m_lua(lua), m_slot(slot), m_replacement(std::move(replacement)) {}
+    using Item::initialize;
+
+    std::expected<std::shared_ptr<Item>, StarException> clone() const override {
+      return std::shared_ptr<Item>(std::make_shared<ReentrantItem>(*this));
+    }
+
+    std::expected<String, StarException> pickup_sound() const override {
+      auto& lua = m_lua.get();
+      auto& slot = m_slot.get();
+      std::weak_ptr<Item> active = slot;
+      slot = m_replacement;
+      if (active.expired())
+        return std::unexpected(ItemException("Item callback did not retain its active instance"));
+      auto nested_name = lua.invoke_path<String>("item.name");
+      if (!nested_name)
+        return std::unexpected(std::move(nested_name.error()));
+      return name() + ":" + *nested_name;
+    }
+
+  private:
+    std::reference_wrapper<LuaContext> m_lua;
+    std::reference_wrapper<std::shared_ptr<Item>> m_slot;
+    std::shared_ptr<Item> m_replacement;
+  };
+
+  auto& root = fixture.root();
+  auto replacement = GenericItem::create(root, JsonObject{{"itemName", "replacement-item"}, {"rarity", "common"}}, "/", JsonObject{});
+  auto engine = LuaEngine::create();
+  if (!fixture.check(replacement && engine, "construct replacement and native Lua engine")) return;
+  auto lua = (*engine)->create_context();
+  if (!fixture.check(bool(lua), "make a native Lua context")) return;
+  std::shared_ptr<Item> slot;
+  auto initial = std::make_shared<ReentrantItem>(root, *lua, slot, std::move(*replacement));
+  if (!fixture.check(bool(initial->initialize(JsonObject{{"itemName", "initial-item"}, {"rarity", "common"}}, "/")),
+          "initialize an item that replaces its slot inside a virtual callback"))
+    return;
+  slot = std::move(initial);
+  std::weak_ptr<Item> original = slot;
+  auto callbacks = LuaBindings::make_item_slot_callbacks(std::cref(slot));
+  if (!fixture.check(callbacks && lua->set_callbacks("item", *callbacks), "install the actual live item Lua callbacks"))
+    return;
+  auto returned = lua->invoke_path<String>("item.pickupSound");
+  fixture.check(returned && *returned == "initial-item:replacement-item",
+      "nested Lua observes the replacement while the outer native call retains the original item");
+  fixture.check(original.expired() && lua->invoke_path<String>("item.name") == String("replacement-item"),
+      "release the old item when the active callback returns without stale registrations");
+});
+
+} // namespace
