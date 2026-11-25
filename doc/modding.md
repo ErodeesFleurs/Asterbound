@@ -189,6 +189,21 @@ The [per-item snapshot](workshop-top-rated-2026-11-25.tsv) records the first 200
 
 The 200 items contained 201 PAKs and 9,904 `.lua` files. The patched Lua 5.5.1 parser rejected 60 original files: 40 already had repairs and 11 received new ones. Eight unmounted scripts/tools and GIC's registered but unreferenced `gic_maxfoodscalingboost` were left unchanged; the latter calls a resource getter as if it installed a food-capacity modifier. The scan also checked literal imports, removed runtime-cache use, effect durations, random seeds, renamed asset paths and selected changed data schemas. This was not a playthrough of every mod or a test of all mod combinations.
 
+### Workshop Top Rated audit, ranks 201–400
+
+The [second snapshot](workshop-top-rated-201-400-2026-11-25.tsv) continues the same Steam ranking without overlap. It contains 200 official PAKs and 3,549 Lua sources. The patched Lua parser found 32 original failures: 19 were already covered, six received new fixes, and seven unmounted fixtures, prototypes or tools were left unchanged.
+
+| Workshop ranks | Newly repaired behavior |
+| --- | --- |
+| 205 NPC Mechs | Load the registered NPC mech script and seed procedural crew parts with an integer. |
+| 213 Cyberpunk 2077 UI and HUD | Preserve the six authored title-button offsets on the current title backdrop. Keep the Voice controls inside the themed Options pane and restore the themed chat offset, draft color and Say label. |
+| 256 Refraction | Renew held and progression effects with finite durations. Read native effect state for stance buffs and the burning reset, rather than reapplying the buffs every update. |
+| 283 Escalate, 284 Tougher Mobs, 339 Futara's Dragon Race, 343 StarTech | Repair registered Wavefield effects, the Ruin behavior, Grand Cross Zana's effect and the Stardust testing console for the current Lua parser. |
+| 289 Gokento's Hedgehog Race Mod | Keep applied buffs finite and renewable without tying renewal to the held emerald. Existing sound and animation wiring defects are not repaired by this change. |
+| 324 Inventory Interface Redone, 383 Arcana-style bk3k | Move all twelve native extra cosmetic slots onto a separate themed strip rather than overlapping armor or bag cells. Redone uses the current close-button art when its old images are missing. The Arcana skin still requires the matching bk3k layout. |
+
+Linux checks used exact source bytes with the packed compatibility component, and exercised real title, Options, voice and chat windows. Each extra cosmetic slot was clicked in both original inventories; modified equipment survived a cold restart. Focused runtime checks exercised NPC crew part generation and status lifecycle transitions. Refraction and Hedgehog lifecycle assertions passed, but those test processes still reported unrelated original-mod asset/sound errors. No full modpack, campaign, Windows or macOS acceptance is implied.
+
 ## Required third-party dependencies
 
 The compatibility pack does **not** download, install or fabricate dependencies.

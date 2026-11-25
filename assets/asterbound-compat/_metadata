@@ -53,7 +53,9 @@
     "[oSB]StarTechUltimateUpgrade", "StarTech", "antr_armorImplants",
     "Weapon Fusion Station", "DSBots", "SpawnableItemPack", "FrackinInterface",
     "RUS_FU", "RUS_Starbound_MrHimera", "Traducao_PTBR", "ak_crew",
-    "mechdetailedstats", "open_ui", "pat_throwablenpcs", "Русификатор SBT сообщества"
+    "mechdetailedstats", "open_ui", "pat_throwablenpcs", "Русификатор SBT сообщества",
+    "xs_crumex", "Cyberpunk 77 UI and HUD", "Floran's_ArcanaAddon",
+    "Futara's Dragon Race", "Gokento's Hedgehog Race Mod", "Inventory Interface Redone", "ArcanaXBk3k"
   ],
   "scripts" : {
     "onLoad" : [
@@ -64,8 +66,12 @@
       "/scripts/asterbound/compat/gic.lua",
       "/scripts/asterbound/compat/frackinuniverse.lua",
       "/scripts/asterbound/compat/openui.lua",
+      "/scripts/asterbound/compat/cyberpunk_ui.lua",
       "/scripts/asterbound/compat/collection.lua"
     ],
-    "postLoad" : ["/scripts/asterbound/compat/arcana.lua"]
+    "postLoad" : [
+      "/scripts/asterbound/compat/arcana.lua",
+      "/scripts/asterbound/compat/inventory_trays.lua"
+    ]
   }
 }

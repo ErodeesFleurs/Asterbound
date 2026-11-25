@@ -21,3 +21,25 @@ function asterboundRenewEffect(name, sourceEntityId, duration)
   end
   status.addEphemeralEffect(name, duration, sourceEntityId)
 end
+
+-- Used by the guarded effect's init. A replacement has a finite duration,
+-- so its own init takes the normal path instead of replacing itself again.
+function asterboundResumeOwnEffect()
+  local duration = effect.duration()
+  if duration and (duration ~= duration or duration == math.huge or duration == -math.huge) then
+    local name = effect.name()
+    status.removeEphemeralEffect(name)
+    status.addEphemeralEffect(name)
+    return true
+  end
+  return false
+end
+
+-- Keep the live instance on its authored default without reviving an effect
+-- that just called expire() or turning a persistent instance into a lease.
+function asterboundRenewOwnEffect(renewBelow)
+  local duration = effect.duration()
+  if duration and duration > 0 and duration <= renewBelow then
+    status.addEphemeralEffect(effect.name())
+  end
+end
