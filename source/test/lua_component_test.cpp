@@ -15,6 +15,7 @@ import star.configuration;
 import star.collection_database;
 import star.casting;
 import star.collision_block;
+import star.entity;
 import star.file;
 import star.game_test;
 import star.game_types;
@@ -37,11 +38,13 @@ import star.object;
 import star.object_database;
 import star.root;
 import star.rpc_promise;
+import star.scripted_entity;
 import star.scriptable_thread;
 import star.string;
 import star.test_universe;
 import star.vector;
 import star.thread;
+import star.tile_entity;
 import star.uuid;
 import star.warping;
 import star.world_client;
@@ -736,7 +739,8 @@ std::optional<EntityId> install_origin_probe(GameTest& fixture, WorldServer& ser
     JsonObject{{"clientEntityMode", "ClientMasterAllowed"}, {"scripts", JsonArray{}}, {"unbreakable", true}});
   if (!fixture.check(bool(object), "create client-owned probe object"))
     return std::nullopt;
-  if (!fixture.check(bool((*object)->setTilePosition(Vec2I::floor(position))), "position probe object"))
+  TileEntity& tile = **object;
+  if (!fixture.check(bool(tile.setTilePosition(Vec2I::floor(position))), "position probe object"))
     return std::nullopt;
   if (!fixture.check(bool(owner.addEntity(*object)), "publish probe object"))
     return std::nullopt;
@@ -750,7 +754,8 @@ std::optional<EntityId> install_origin_probe(GameTest& fixture, WorldServer& ser
   if (!fixture.check(replica && replica->isSlave(), "server holds a replica of the probe object"))
     return std::nullopt;
 
-  auto script = (*object)->eval_script(R"LUA(
+  ScriptedEntity& scripted = **object;
+  auto script = scripted.eval_script(R"LUA(
     message.setHandler("originProbe", function(_, localMessage, label)
       return {localMessage, label}
     end)
