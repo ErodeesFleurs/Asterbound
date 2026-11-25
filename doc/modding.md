@@ -175,34 +175,15 @@ Failed assets are not requeued after cache clearing while their cached error rem
 
 The collection still contains genuinely missing items, divergent identifier collisions and unfinished scripts. These repairs do not supply absent FU content, invent missing artwork/physics or make GIC and FU safe to combine. Test with isolated characters/universes; successful startup is not complete campaign or multiplayer acceptance.
 
-### Workshop Top Rated audit (2026-11-25)
+### Workshop compatibility
 
-The [per-item snapshot](workshop-top-rated-2026-11-25.tsv) records the first 200 entries in Steam's [Top Rated All Time](https://steamcommunity.com/workshop/browse/?appid=211820&browsesort=toprated&actualsort=toprated&section=readytouseitems&days=-1) order, not the most-subscribed list. It includes the Workshop ID, Steam manifest, package hashes and new repair paths. A blank repair column means no new repair in this audit, not a guarantee of compatibility. An existing rule's primary-source match does not imply that its optional dependencies are installed.
+These bundled repairs address confirmed issues from a 400-item Workshop audit:
 
-| Workshop ranks | Newly repaired behavior |
-| --- | --- |
-| 1 Arcana, 47 Frackin' Interface, 64 GIC, 146 Yet More Things For Crew to Do, 162 Mech Detallist | Load the paint/terminal panes, armor and tech scripts, crew effect and mech color picker with the target Lua parser. The crew effect reads its shipped positive and negative effect lists. |
-| 5 Stardust Core Lite, 66 Stardust Core, 36 Spawnable Item Pack | Keep one input update per tech tick when an owner already imported the input library. Full Stardust's tablet starts its local apps without editing the engine's require cache. SIP's bound key can close and reopen the actual pane. |
-| 9 and 180 Russian base translations, 29 StarCore Simplified Chinese, 118 Brazilian Portuguese | Expand the actual command list in localized `/help` headings instead of displaying a literal `%s`. |
-| 33 Frackin' Universe, 96 Russian FU translation, 128 Draconis | Correct the verified battlepack color, keep the translated SAIL argument handling and Shoggoth shield, and renew the dragon racial effect without an infinite network duration. |
-| 127 OpenUI, 175 throwable npcs | Use OpenUI's installed artwork on current panes without replacing the unified bindings controller. Register the throwable-NPC toggle against the current binds asset only when the original target is absent. Its default remains unbound. |
+- **Lua and APIs:** Fix scripts rejected by Lua 5.5, repeatable pane loaders that relied on the old `require` cache, and invalid RNG seeds.
+- **Gameplay:** Replace infinite effect durations with finite timers while retaining the intended renewal, removal and progression behavior.
+- **Interfaces and assets:** Restore localized `/help` output, keybinds, and themes such as OpenUI and Cyberpunk. Inventory Interface Redone and the Arcana-style bk3k skin keep all twelve extra cosmetic slots in a separate tray.
 
-The 200 items contained 201 PAKs and 9,904 `.lua` files. The patched Lua 5.5.1 parser rejected 60 original files: 40 already had repairs and 11 received new ones. Eight unmounted scripts/tools and GIC's registered but unreferenced `gic_maxfoodscalingboost` were left unchanged; the latter calls a resource getter as if it installed a food-capacity modifier. The scan also checked literal imports, removed runtime-cache use, effect durations, random seeds, renamed asset paths and selected changed data schemas. This was not a playthrough of every mod or a test of all mod combinations.
-
-### Workshop Top Rated audit, ranks 201–400
-
-The [second snapshot](workshop-top-rated-201-400-2026-11-25.tsv) continues the same Steam ranking without overlap. It contains 200 official PAKs and 3,549 Lua sources. The patched Lua parser found 32 original failures: 19 were already covered, six received new fixes, and seven unmounted fixtures, prototypes or tools were left unchanged.
-
-| Workshop ranks | Newly repaired behavior |
-| --- | --- |
-| 205 NPC Mechs | Load the registered NPC mech script and seed procedural crew parts with an integer. |
-| 213 Cyberpunk 2077 UI and HUD | Preserve the six authored title-button offsets on the current title backdrop. Keep the Voice controls inside the themed Options pane and restore the themed chat offset, draft color and Say label. |
-| 256 Refraction | Renew held and progression effects with finite durations. Read native effect state for stance buffs and the burning reset, rather than reapplying the buffs every update. |
-| 283 Escalate, 284 Tougher Mobs, 339 Futara's Dragon Race, 343 StarTech | Repair registered Wavefield effects, the Ruin behavior, Grand Cross Zana's effect and the Stardust testing console for the current Lua parser. |
-| 289 Gokento's Hedgehog Race Mod | Keep applied buffs finite and renewable without tying renewal to the held emerald. Existing sound and animation wiring defects are not repaired by this change. |
-| 324 Inventory Interface Redone, 383 Arcana-style bk3k | Move all twelve native extra cosmetic slots onto a separate themed strip rather than overlapping armor or bag cells. Redone uses the current close-button art when its old images are missing. The Arcana skin still requires the matching bk3k layout. |
-
-Linux checks used exact source bytes with the packed compatibility component, and exercised real title, Options, voice and chat windows. Each extra cosmetic slot was clicked in both original inventories; modified equipment survived a cold restart. Focused runtime checks exercised NPC crew part generation and status lifecycle transitions. Refraction and Hedgehog lifecycle assertions passed, but those test processes still reported unrelated original-mod asset/sound errors. No full modpack, campaign, Windows or macOS acceptance is implied.
+Targeted Linux checks used the packed compatibility component and exercised real UI controls, inventory persistence and effect lifecycles. These fixes do not cover unused test scripts, unrelated upstream defects, every gameplay path or arbitrary mod combinations.
 
 ## Required third-party dependencies
 
