@@ -158,8 +158,12 @@ public:
   [[nodiscard]] std::expected<std::shared_ptr<Configuration>, StarException> configuration() override;
 
   // Persistent services survive resource reloads and are borrowed until Root shutdown.
-  [[nodiscard]] std::expected<std::reference_wrapper<ModStorage>, StarException> modStorage();
-  [[nodiscard]] std::expected<String, StarException> modStorageId(Assets const& assets, String const& sourcePath);
+  [[nodiscard]] std::expected<std::reference_wrapper<ModStorage>, StarException> mod_storage() &;
+
+  // Assigned IDs are immutable and remain valid until this Root is destroyed,
+  // even after resource reloads or further source registrations.
+  [[nodiscard]] std::expected<std::reference_wrapper<String const>, StarException> mod_storage_id(
+      Assets const& assets, String const& source_path) &;
 
   [[nodiscard]] std::expected<std::shared_ptr<ObjectDatabase const>, StarException> objectDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<PlantDatabase const>, StarException> plantDatabase();
@@ -252,10 +256,11 @@ private:
   std::mutex m_modsMutex;
   StringList m_modDirectories;
 
-  std::mutex m_modStorageMutex;
-  std::unique_ptr<ModStorage> m_modStorage;
-  std::unordered_map<std::string, String> m_modStorageIds;
-  std::unordered_set<std::string> m_modStorageUsedIds;
+  std::mutex m_mod_storage_mutex;
+  std::unique_ptr<ModStorage> m_mod_storage;
+  std::unordered_map<std::string, String> m_mod_storage_ids;
+  // Views borrow immutable values in the node-based map above.
+  std::unordered_set<std::string_view> m_mod_storage_used_ids;
 
   ListenerGroup m_reload_listeners;
 

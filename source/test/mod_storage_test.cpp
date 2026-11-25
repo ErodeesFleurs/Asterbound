@@ -80,16 +80,16 @@ const GameTestRegistration exactQuota("ModStorageTest", "ExactQuotaRejectsWithou
   Logger logger;
   auto storage = ModStorage::create(logger, *directory);
   ASSERT_TRUE(storage);
-  Json boundary(String(std::string(ModStorage::MaxModDataSize - 8, 'x')));
+  Json boundary(String(std::string(ModStorage::max_mod_data_size - 8, 'x')));
   ASSERT_TRUE((*storage)->set("quota", "k", boundary));
   EXPECT_FALSE((*storage)->set("quota", "extra", 1));
-  EXPECT_FALSE((*storage)->set("quota", "k", String(std::string(ModStorage::MaxModDataSize - 7, 'x'))));
+  EXPECT_FALSE((*storage)->set("quota", "k", String(std::string(ModStorage::max_mod_data_size - 7, 'x'))));
   EXPECT_EQ((*storage)->get("quota", "k"), boundary);
   EXPECT_EQ((*storage)->get("quota", "extra"), Json());
   ASSERT_TRUE((*storage)->flush());
   auto file = File::open(storagePath(*directory, "quota"), IOMode::Read);
   ASSERT_TRUE(file);
-  EXPECT_EQ((*file)->size(), ModStorage::MaxModDataSize);
+  EXPECT_EQ((*file)->size(), ModStorage::max_mod_data_size);
   ASSERT_TRUE((*file)->close());
   ASSERT_TRUE((*storage)->set("quota", "k", Json()));
   ASSERT_TRUE((*storage)->set("quota", "quote\"", 2));
@@ -142,7 +142,7 @@ const GameTestRegistration loadRecovery("ModStorageTest", "InvalidFilesRemainUnt
   ASSERT_TRUE(File::write_file(String("{\"value\":1}"), path));
   EXPECT_EQ((*storage)->get("broken", "value"), Json(1));
   auto oversized = storagePath(*directory, "oversized");
-  ASSERT_TRUE(File::write_file(String(std::string(ModStorage::MaxModDataSize + 1, ' ')), oversized));
+  ASSERT_TRUE(File::write_file(String(std::string(ModStorage::max_mod_data_size + 1, ' ')), oversized));
   EXPECT_FALSE((*storage)->get("oversized", "value"));
   ASSERT_TRUE(File::write_file(String("{}"), oversized));
   EXPECT_EQ((*storage)->get("oversized", "value"), Json());
@@ -155,6 +155,9 @@ const GameTestRegistration finiteAndDepth("ModStorageTest", "InvalidValuesDoNotM
   Logger logger;
   auto storage = ModStorage::create(logger, *directory);
   ASSERT_TRUE(storage);
+  if (!fixture.check((*storage)->set("values", "integer", 1) && (*storage)->set("values", "integer", 1.0)
+      && (*storage)->set("values", "nested", JsonArray{2}) && (*storage)->set("values", "nested", JsonArray{2.0}),
+      "store numerically equivalent scalar and nested replacements")) return;
   ASSERT_TRUE((*storage)->set("values", "number", 1.0e20));
   auto nonfinite = std::bit_cast<double>(std::uint64_t{0x7ff0000000000000});
   EXPECT_FALSE((*storage)->set("values", "number", nonfinite));
@@ -167,6 +170,10 @@ const GameTestRegistration finiteAndDepth("ModStorageTest", "InvalidValuesDoNotM
   ASSERT_TRUE((*storage)->flush());
   auto reopened = ModStorage::create(logger, *directory);
   ASSERT_TRUE(reopened);
+  auto scalar = (*reopened)->get("values", "integer");
+  auto nested = (*reopened)->get("values", "nested").and_then([](Json const& array) { return array.get(0); });
+  fixture.check(scalar && scalar->is_type(Json::Type::Int) && nested && nested->is_type(Json::Type::Int),
+      "equivalent writes retain the previously stored number types on disk");
   EXPECT_EQ((*reopened)->get("values", "number"), Json(1.0e20));
 });
 
@@ -287,10 +294,10 @@ const GameTestRegistration luaScopes("ModStorageTest", "LuaAssetScopesExplicitNa
     ASSERT_TRUE(a->invoke_path<void>("erase"));
     EXPECT_EQ(a->invoke_path<Json>("read"), Json());
     ASSERT_TRUE(a->invoke_path<void>("save", 44));
-    auto before = (*root)->modStorage();
+    auto before = (*root)->mod_storage();
     ASSERT_TRUE(before);
     ASSERT_TRUE((*root)->reload());
-    auto after = (*root)->modStorage();
+    auto after = (*root)->mod_storage();
     ASSERT_TRUE(after);
     EXPECT_EQ(&before->get(), &after->get());
     EXPECT_EQ(a->invoke_path<int>("read"), 44);
@@ -340,15 +347,15 @@ const GameTestRegistration sourceCollisions("ModStorageTest", "DuplicateSourcesA
   auto assets = (*root)->assets();
   ASSERT_TRUE(assets);
   std::vector<String> ids;
-  auto storage = (*root)->modStorage();
+  auto storage = (*root)->mod_storage();
   ASSERT_TRUE(storage);
   for (std::size_t i = 0; i != sources.size(); ++i) {
-    auto id = (*root)->modStorageId(**assets, sources[i]);
+    auto id = (*root)->mod_storage_id(**assets, sources[i]);
     ASSERT_TRUE(id);
     for (auto const& previous : ids)
-      EXPECT_NE(*id, previous);
-    ASSERT_TRUE(storage->get().set(*id, "value", Json(i)));
-    ids.push_back(*id);
+      EXPECT_NE(id->get(), previous);
+    ASSERT_TRUE(storage->get().set(id->get(), "value", Json(i)));
+    ids.push_back(id->get());
   }
   for (std::size_t i = 0; i != ids.size(); ++i)
     EXPECT_EQ(storage->get().get(ids[i], "value"), Json(i));
@@ -357,16 +364,18 @@ const GameTestRegistration sourceCollisions("ModStorageTest", "DuplicateSourcesA
   ASSERT_TRUE(File::write_file(String("{\"name\":\"NewOwner\"}"), File::relative_to(sources[0], "_metadata")));
   auto secondRoot = Root::create(secondSettings);
   ASSERT_TRUE(secondRoot);
-  auto second = (*secondRoot)->modStorage();
+  auto second = (*secondRoot)->mod_storage();
   ASSERT_TRUE(second);
   EXPECT_EQ(second->get().get(ids[0], "value"), Json());
   auto secondAssets = (*secondRoot)->assets();
   ASSERT_TRUE(secondAssets);
-  auto secondId = (*secondRoot)->modStorageId(**secondAssets, sources[0]);
+  auto secondId = (*secondRoot)->mod_storage_id(**secondAssets, sources[0]);
   ASSERT_TRUE(secondId);
-  EXPECT_EQ(*secondId, String("NewOwner"));
-  EXPECT_NE(*secondId, ids[0]);
-  EXPECT_EQ((*root)->modStorageId(**assets, sources[0]), ids[0]);
+  EXPECT_EQ(secondId->get(), String("NewOwner"));
+  EXPECT_NE(secondId->get(), ids[0]);
+  auto firstId = (*root)->mod_storage_id(**assets, sources[0]);
+  ASSERT_TRUE(firstId);
+  EXPECT_EQ(firstId->get(), ids[0]);
 });
 
 }

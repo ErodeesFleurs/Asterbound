@@ -78,15 +78,17 @@ std::expected<void, StarException> JsonBuilderStream::put_string_utf8(std::strin
 std::expected<void, StarException> JsonBuilderStream::put_double(std::string_view s) {
   auto value = lexical_cast<double>(s);
   if (!value) return std::unexpected(JsonParserException("bad double", ExceptionDiagnostic(value.error())));
-  push(Json(*value));
+  push_double(*value);
   return {};
 }
 std::expected<void, StarException> JsonBuilderStream::put_integer(std::string_view s) {
   auto value = lexical_cast<long long>(s);
   if (!value) return std::unexpected(JsonParserException("bad integer", ExceptionDiagnostic(value.error())));
-  push(Json(*value));
+  push_integer(*value);
   return {};
 }
+void JsonBuilderStream::push_double(double value) { push(Json(value)); }
+void JsonBuilderStream::push_integer(std::int64_t value) { push(Json(value)); }
 std::expected<void, StarException> JsonBuilderStream::put_boolean(bool value) {
   push(Json(value));
   return {};

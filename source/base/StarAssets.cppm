@@ -227,6 +227,11 @@ public:
   // Return metadata for the given loaded asset source path
   [[nodiscard]] std::expected<JsonObject, StarException> asset_source_metadata(String const& source_path) const;
 
+  // Exact metadata name lookup in load order, excluding generated providers.
+  // The returned path is borrowed from this Assets generation.
+  [[nodiscard]] std::optional<std::reference_wrapper<String const>> asset_source_path_for_name(String const& name) const &;
+  std::optional<std::reference_wrapper<String const>> asset_source_path_for_name(String const&) const && = delete;
+
   // An imperfect sha256 digest of the contents of all combined asset sources.
   // Useful for detecting if there are mismatched assets between a client and
   // server or if assets sources have changed from a previous load.
@@ -463,6 +468,8 @@ private:
 
   // Paths of all used asset sources, in load order.
   StringList m_asset_sources;
+  // Built during initialization; values borrow paths from m_asset_sources.
+  StringMap<std::reference_wrapper<String const>> m_asset_source_paths_by_name;
 
   // Maps an asset path to the loaded asset source and vice versa
   BiMap<String, std::shared_ptr<AssetSource>> m_asset_source_paths;

@@ -332,7 +332,7 @@ Root::~Root() {
   if (auto written = write_config(); !written)
     EmergencyLog::error("Root: Could not write configuration during shutdown: {}", Star::output_exception(written.error(), true));
 
-  m_modStorage.reset();
+  m_mod_storage.reset();
 
 }
 
@@ -613,27 +613,32 @@ std::expected<std::shared_ptr<Assets const>, StarException> Root::assets() {
     });
 }
 
-std::expected<std::reference_wrapper<ModStorage>, StarException> Root::modStorage() {
-  std::lock_guard locker(m_modStorageMutex);
-  if (!m_modStorage) {
+std::expected<std::reference_wrapper<ModStorage>, StarException> Root::mod_storage() & {
+  std::lock_guard lock(m_mod_storage_mutex);
+  if (!m_mod_storage) {
     auto storage = ModStorage::create(m_logger, toStoragePath("modstorage"));
     if (!storage)
       return std::unexpected(std::move(storage.error()));
-    m_modStorage = std::move(*storage);
+    m_mod_storage = std::move(*storage);
   }
-  return std::ref(*m_modStorage);
+  return std::ref(*m_mod_storage);
 }
 
-std::expected<String, StarException> Root::modStorageId(Assets const& assets, String const& sourcePath) {
-  std::lock_guard locker(m_modStorageMutex);
-  if (auto id = m_modStorageIds.find(sourcePath.utf8()); id != m_modStorageIds.end())
-    return id->second;
+std::expected<std::reference_wrapper<String const>, StarException> Root::mod_storage_id(
+    Assets const& assets, String const& source_path) & {
+  std::lock_guard lock(m_mod_storage_mutex);
+  if (auto id = m_mod_storage_ids.find(source_path.utf8()); id != m_mod_storage_ids.end())
+    return std::cref(id->second);
+
+  auto paths = assets.asset_sources();
+  if (std::ranges::find(paths, source_path) == paths.end())
+    return std::unexpected(StarException("Mod storage source is not loaded"));
 
   // Reserve natural names before assigning generated names, so a duplicate's
   // suffix cannot take another loaded source's real metadata name.
   std::vector<std::pair<String, String>> sources;
-  std::unordered_set<std::string> naturalNames;
-  for (auto const& path : assets.asset_sources()) {
+  sources.reserve(paths.size());
+  for (auto& path : paths) {
     auto metadata = assets.asset_source_metadata(path);
     if (!metadata)
       return std::unexpected(std::move(metadata.error()));
@@ -645,31 +650,32 @@ std::expected<String, StarException> Root::modStorageId(Assets const& assets, St
       if (!named->empty())
         name = std::move(*named);
     }
-    naturalNames.insert(name.utf8());
-    sources.emplace_back(path, std::move(name));
+    sources.emplace_back(std::move(path), std::move(name));
   }
-  if (std::ranges::none_of(sources, [&](auto const& source) { return source.first == sourcePath; }))
-    return std::unexpected(StarException("Mod storage source is not loaded"));
+  std::unordered_set<std::string_view> natural_names;
+  natural_names.reserve(sources.size());
+  for (auto const& source : sources)
+    natural_names.insert(source.second.utf8());
 
   for (auto const& [path, name] : sources) {
-    if (m_modStorageIds.contains(path.utf8()))
+    if (m_mod_storage_ids.contains(path.utf8()))
       continue;
     String id = name;
-    if (m_modStorageUsedIds.contains(id.utf8())) {
+    if (m_mod_storage_used_ids.contains(id.utf8())) {
       auto base = Star::format("{} ({})", name, File::base_name(path));
       id = base;
-      if (m_modStorageUsedIds.contains(id.utf8()) || naturalNames.contains(id.utf8())) {
+      if (m_mod_storage_used_ids.contains(id.utf8()) || natural_names.contains(id.utf8())) {
         auto digest = hex_encode(sha256(path));
         id = Star::format("{} [{}]", base, digest);
         for (std::size_t suffix = 1;
-             m_modStorageUsedIds.contains(id.utf8()) || naturalNames.contains(id.utf8()); ++suffix)
+             m_mod_storage_used_ids.contains(id.utf8()) || natural_names.contains(id.utf8()); ++suffix)
           id = Star::format("{} [{}:{}]", base, digest, suffix);
       }
     }
-    m_modStorageUsedIds.insert(id.utf8());
-    m_modStorageIds.emplace(path.utf8(), std::move(id));
+    auto entry = m_mod_storage_ids.emplace(path.utf8(), std::move(id)).first;
+    m_mod_storage_used_ids.insert(entry->second.utf8());
   }
-  return m_modStorageIds.at(sourcePath.utf8());
+  return std::cref(m_mod_storage_ids.at(source_path.utf8()));
 }
 
 std::expected<std::shared_ptr<Configuration>, StarException> Root::configuration() {

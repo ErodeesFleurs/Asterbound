@@ -26,6 +26,9 @@ public:
   // uniform appearance).  Does *nothing else* (no validity checks, etc).
   static String convert_dir_separators(String const& path);
 
+  // Converts engine paths for use with std::filesystem in the native encoding.
+  [[nodiscard]] static std::expected<std::filesystem::path, StarException> filesystem_path(String const& path);
+
   // Fallible file operations return their IO diagnostics.
   // get the current working directory
   [[nodiscard]] static std::expected<String, StarException> current_directory();

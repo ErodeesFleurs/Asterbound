@@ -1013,6 +1013,13 @@ std::expected<void, StarException> Assets::initialize(RandomService& random, Log
     auto added = add_source(source_path, source);
     if (!added)
       return std::unexpected(std::move(added.error()));
+    auto const& metadata = source->metadata();
+    if (auto entry = metadata.find_ref("name"); entry && entry->get().is_type(Json::Type::String)) {
+      auto name = entry->get().to_string();
+      if (!name)
+        return std::unexpected(std::move(name.error()));
+      m_asset_source_paths_by_name.try_emplace(std::move(*name), std::cref(source_path));
+    }
     sources.push_back(std::make_pair(source_path, source));
     auto loaded = run_load_scripts("onLoad", source_path, source);
     if (!loaded)
@@ -1231,6 +1238,13 @@ std::expected<JsonObject, StarException> Assets::asset_source_metadata(String co
   if (!source)
     return std::unexpected(std::move(source.error()));
   return source->get()->metadata();
+}
+
+std::optional<std::reference_wrapper<String const>> Assets::asset_source_path_for_name(String const& name) const & {
+  auto source = m_asset_source_paths_by_name.find(name);
+  if (source != m_asset_source_paths_by_name.end())
+    return source->second;
+  return {};
 }
 
 ByteArray Assets::digest() const {

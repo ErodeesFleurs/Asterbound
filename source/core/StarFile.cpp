@@ -10,17 +10,18 @@ import star.algorithm;
 
 namespace Star {
 
-namespace {
-std::expected<std::filesystem::path, StarException> filesystem_path(String const& path) {
+std::expected<std::filesystem::path, StarException> File::filesystem_path(String const& path) {
 #ifdef STAR_SYSTEM_FAMILY_WINDOWS
-    auto native = path.to_wstring();
-    if (!native)
-      return std::unexpected(std::move(native.error()));
-    return std::filesystem::path(std::move(*native));
+  auto native = path.to_wstring();
+  if (!native)
+    return std::unexpected(std::move(native.error()));
+  return std::filesystem::path(std::move(*native));
 #else
-    return std::filesystem::path(path.utf8().c_str());
+  return std::filesystem::path(path.utf8().c_str());
 #endif
 }
+
+namespace {
 
 std::expected<std::size_t, StarException> read_file_tail(File& file, ByteArray& bytes, std::size_t amount, char first) {
   auto offset = bytes.size();

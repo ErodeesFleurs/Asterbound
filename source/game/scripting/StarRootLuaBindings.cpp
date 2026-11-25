@@ -201,6 +201,53 @@ auto const VariantTerrainLayerNames = EnumMap<VariantTerrainLayer>::create({
   {VariantTerrainLayer::Foreground, "Foreground"},
 });
 
+// The held generation supplies both named and implicit provider attribution.
+static std::expected<std::reference_wrapper<String const>, StarException> resolve_mod_storage_id(
+    Root& root, LuaEngine& engine, std::optional<String> const& mod_name) {
+  auto assets = root.assets();
+  if (!assets)
+    return std::unexpected(std::move(assets.error()));
+  if (mod_name) {
+    if (auto source_path = (*assets)->asset_source_path_for_name(*mod_name))
+      return root.mod_storage_id(**assets, source_path->get());
+    return std::unexpected(StarException(Star::format("Mod storage: no loaded mod is named '{}'", *mod_name)));
+  }
+
+  auto source = engine.script_source();
+  if (!source)
+    return std::unexpected(StarException("Mod storage requires a calling Lua script"));
+  String chunk = std::move(*source);
+  if (chunk.utf8().starts_with('@') || chunk.utf8().starts_with('=')) {
+    auto path = chunk.substr(1);
+    if (!path)
+      return std::unexpected(std::move(path.error()));
+    chunk = std::move(*path);
+  }
+  if (!chunk.utf8().starts_with('/'))
+    return std::unexpected(StarException("Mod storage is only available to scripts loaded from assets"));
+  auto descriptor = (*assets)->asset_descriptor(chunk);
+  if (!descriptor)
+    return std::unexpected(std::move(descriptor.error()));
+  if (!*descriptor)
+    return std::unexpected(StarException("Mod storage is only available to scripts loaded from assets"));
+  auto source_path = (*assets)->asset_source_path((*descriptor)->source);
+  if (!source_path)
+    return std::unexpected(StarException("Mod storage could not find the asset source of this script"));
+  return root.mod_storage_id(**assets, *source_path);
+}
+
+template <auto operation, typename... Args>
+  requires std::invocable<decltype(operation), ModStorage&, String const&, Args...>
+static auto mod_storage_callback(Root& root) {
+  return [&root](LuaEngine& engine, Args... args, std::optional<String> const& mod_name) {
+    return resolve_mod_storage_id(root, engine, mod_name).and_then([&](std::reference_wrapper<String const> id) {
+      return root.mod_storage().and_then([&](std::reference_wrapper<ModStorage> storage) {
+        return std::invoke(operation, storage.get(), id.get(), std::forward<Args>(args)...);
+      });
+    });
+  };
+}
+
 std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& root, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog) {
   LuaCallbacks callbacks;
 
@@ -216,85 +263,20 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
       return callback(**databaseOwner, std::forward<Args>(args)...);
     };
   };
-  // Resolve both implicit and named access through the same Root-owned identity
-  // cache, while retaining this assets generation throughout attribution.
-  auto storageMod = [&root](LuaEngine& engine, std::optional<String> const& modName) -> std::expected<String, StarException> {
-    auto assets = root.assets();
-    if (!assets)
-      return std::unexpected(std::move(assets.error()));
-    if (modName) {
-      for (auto const& sourcePath : (*assets)->asset_sources()) {
-        auto metadata = (*assets)->asset_source_metadata(sourcePath);
-        if (!metadata)
-          return std::unexpected(std::move(metadata.error()));
-        if (auto name = metadata->find_ref("name"); name && name->get().is_type(Json::Type::String)) {
-          auto text = name->get().to_string();
-          if (!text)
-            return std::unexpected(std::move(text.error()));
-          if (*text == *modName)
-            return root.modStorageId(**assets, sourcePath);
-        }
-      }
-      return std::unexpected(StarException(Star::format("Mod storage: no loaded mod is named '{}'", *modName)));
-    }
 
-    auto source = engine.script_source();
-    if (!source)
-      return std::unexpected(StarException("Mod storage requires a calling Lua script"));
-    String chunk = std::move(*source);
-    if (chunk.utf8().starts_with('@') || chunk.utf8().starts_with('=')) {
-      auto path = chunk.substr(1);
-      if (!path)
-        return std::unexpected(std::move(path.error()));
-      chunk = std::move(*path);
-    }
-    if (!chunk.utf8().starts_with('/'))
-      return std::unexpected(StarException("Mod storage is only available to scripts loaded from assets"));
-    auto descriptor = (*assets)->asset_descriptor(chunk);
-    if (!descriptor)
-      return std::unexpected(std::move(descriptor.error()));
-    if (!*descriptor)
-      return std::unexpected(StarException("Mod storage is only available to scripts loaded from assets"));
-    auto sourcePath = (*assets)->asset_source_path((*descriptor)->source);
-    if (!sourcePath)
-      return std::unexpected(StarException("Mod storage could not find the asset source of this script"));
-    return root.modStorageId(**assets, *sourcePath);
-  };
-
-  if (auto r = callbacks.register_callback("getModStorage", [&root, storageMod](LuaEngine& engine, String const& key, std::optional<String> const& mod) -> std::expected<Json, StarException> {
-    auto id = storageMod(engine, mod);
-    if (!id) return std::unexpected(std::move(id.error()));
-    auto storage = root.modStorage();
-    if (!storage) return std::unexpected(std::move(storage.error()));
-    return storage->get().get(*id, key);
-  }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.register_callback("setModStorage", [&root, storageMod](LuaEngine& engine, String const& key, Json const& value, std::optional<String> const& mod) -> std::expected<void, StarException> {
-    auto id = storageMod(engine, mod);
-    if (!id) return std::unexpected(std::move(id.error()));
-    auto storage = root.modStorage();
-    if (!storage) return std::unexpected(std::move(storage.error()));
-    return storage->get().set(*id, key, value);
-  }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.register_callback("modStorageKeys", [&root, storageMod](LuaEngine& engine, std::optional<String> const& mod) -> std::expected<JsonArray, StarException> {
-    auto id = storageMod(engine, mod);
-    if (!id) return std::unexpected(std::move(id.error()));
-    auto storage = root.modStorage();
-    if (!storage) return std::unexpected(std::move(storage.error()));
-    return storage->get().keys(*id);
-  }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.register_callback("clearModStorage", [&root, storageMod](LuaEngine& engine, std::optional<String> const& mod) -> std::expected<void, StarException> {
-    auto id = storageMod(engine, mod);
-    if (!id) return std::unexpected(std::move(id.error()));
-    auto storage = root.modStorage();
-    if (!storage) return std::unexpected(std::move(storage.error()));
-    return storage->get().clear(*id);
-  }); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = callbacks.register_callback("getModStorage", mod_storage_callback<&ModStorage::get, String const&>(root)); !r)
+    return std::unexpected(std::move(r.error()));
+  if (auto r = callbacks.register_callback("setModStorage", mod_storage_callback<&ModStorage::set, String const&, Json const&>(root)); !r)
+    return std::unexpected(std::move(r.error()));
+  if (auto r = callbacks.register_callback("modStorageKeys", mod_storage_callback<&ModStorage::keys>(root)); !r)
+    return std::unexpected(std::move(r.error()));
+  if (auto r = callbacks.register_callback("clearModStorage", mod_storage_callback<&ModStorage::clear>(root)); !r)
+    return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.register_callback("flushModStorage", [&root]() -> std::expected<void, StarException> {
-    auto storage = root.modStorage();
-    if (!storage) return std::unexpected(std::move(storage.error()));
-    return storage->get().flush();
+    return root.mod_storage().and_then([](std::reference_wrapper<ModStorage> storage) {
+      return storage.get().flush();
+    });
   }); !r) return std::unexpected(std::move(r.error()));
-
 
   if (auto r = callbacks.register_callback_with_signature<std::expected<String, StarException>, String, std::optional<bool>>(
         "assetData", [&root](String const& path, std::optional<bool> allowRemote) { return RootCallbacks::assetData(root, path, allowRemote); });

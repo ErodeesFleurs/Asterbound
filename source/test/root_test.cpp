@@ -1413,6 +1413,72 @@ const GameTestRegistration lua_configuration_paths("RootTest", "LuaConfiguration
   EXPECT_EQ((*configuration)->get("configurationVersion"), *version);
 });
 
+const GameTestRegistration mod_storage_metadata_reload("RootTest", "ModStorageMetadataReloadKeepsSourceIdentity", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto mods = File::relative_to(*directory, "mods");
+  auto source = File::relative_to(mods, "source");
+  auto metadata = File::relative_to(source, "_metadata");
+  ASSERT_TRUE(File::create_directory(mods));
+  ASSERT_TRUE(File::create_directory(source));
+  ASSERT_TRUE(File::write_file(String(R"({"name":"OriginalOwner"})"), metadata));
+  ASSERT_TRUE(File::write_file(String("[]"), File::relative_to(source, "preload.config")));
+  auto settings = fixture.rootSettings();
+  settings.assetDirectories = {mods};
+  settings.assetSources.clear();
+  settings.storageDirectory = File::relative_to(*directory, "storage");
+  settings.runtimeConfigFile = {};
+  settings.logDirectory = {};
+  settings.logFile = {};
+  settings.includeUGC = false;
+  auto root = Root::create(std::move(settings));
+  ASSERT_TRUE(root) << root.error().what();
+  auto old_assets = (*root)->assets();
+  ASSERT_TRUE(old_assets) << old_assets.error().what();
+  auto old_path = (*old_assets)->asset_source_path_for_name("OriginalOwner");
+  ASSERT_TRUE(old_path);
+  EXPECT_EQ(old_path->get(), source);
+  EXPECT_FALSE((*old_assets)->asset_source_path_for_name("originalowner"));
+  EXPECT_FALSE((*old_assets)->asset_source_path_for_name("source"));
+  auto old_id = (*root)->mod_storage_id(**old_assets, old_path->get());
+  ASSERT_TRUE(old_id) << old_id.error().what();
+  EXPECT_EQ(old_id->get(), "OriginalOwner");
+
+  auto lua = isolationLua(**root);
+  ASSERT_TRUE(lua) << lua.error().what();
+  auto context = (*lua)->create_context(StringList{});
+  ASSERT_TRUE(context) << context.error().what();
+  ASSERT_TRUE(context->eval<void>("root.setModStorage('value', 42, 'OriginalOwner')"));
+  ASSERT_TRUE(File::write_file(String(R"({"name":"RenamedOwner"})"), metadata));
+  ASSERT_TRUE((*root)->hotReload());
+  EXPECT_FALSE((*old_assets)->asset_source_path_for_name("RenamedOwner"));
+  EXPECT_EQ(context->eval<int>("root.getModStorage('value', 'OriginalOwner')"), 42);
+
+  auto other_source = File::relative_to(mods, "other-source");
+  ASSERT_TRUE(File::create_directory(other_source));
+  ASSERT_TRUE(File::write_file(String(R"({"name":"SeparateOwner"})"), File::relative_to(other_source, "_metadata")));
+  ASSERT_TRUE((*root)->reload());
+  auto new_assets = (*root)->assets();
+  ASSERT_TRUE(new_assets) << new_assets.error().what();
+  EXPECT_FALSE((*new_assets)->asset_source_path_for_name("OriginalOwner"));
+  auto new_path = (*new_assets)->asset_source_path_for_name("RenamedOwner");
+  ASSERT_TRUE(new_path);
+  EXPECT_EQ(new_path->get(), source);
+  auto other_id = (*root)->mod_storage_id(**new_assets, other_source);
+  ASSERT_TRUE(other_id) << other_id.error().what();
+  EXPECT_EQ(other_id->get(), "SeparateOwner");
+  auto new_id = (*root)->mod_storage_id(**new_assets, new_path->get());
+  ASSERT_TRUE(new_id) << new_id.error().what();
+  EXPECT_EQ(std::addressof(old_id->get()), std::addressof(new_id->get()));
+  EXPECT_EQ(old_path->get(), source);
+  EXPECT_TRUE((*old_assets)->asset_source_path_for_name("OriginalOwner"));
+  EXPECT_EQ(context->eval<int>("root.getModStorage('value', 'RenamedOwner')"), 42);
+  auto rejected = context->eval<Json>("root.getModStorage('value', 'OriginalOwner')");
+  ASSERT_FALSE(rejected);
+  EXPECT_NE(std::string_view(rejected.error().what()).find("no loaded mod is named 'OriginalOwner'"), std::string_view::npos);
+});
+
 const GameTestRegistration strictLuaTags("RootTest", "StrictLuaTagFormatting", [](GameTest& fixture) {
   auto lua = isolationLua(fixture.root(), true);
   ASSERT_TRUE(lua) << lua.error().what();

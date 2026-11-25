@@ -34,6 +34,11 @@ public:
   std::size_t stack_size();
   std::expected<Json, StarException> take_top();
 
+protected:
+  // Custom numeric parsers can insert an already converted value.
+  void push_double(double value);
+  void push_integer(std::int64_t value);
+
 private:
   void push(Json v);
   std::expected<Json, StarException> pop();
