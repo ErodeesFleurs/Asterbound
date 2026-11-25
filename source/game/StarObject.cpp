@@ -713,34 +713,29 @@ std::expected<void, StarException> Object::uninit() {
   return {};
 }
 
-std::expected<List<LightSource>, StarException> Object::lightSources() const {
-  return lightSources(nullptr);
+std::expected<List<LightSource>, StarException> Object::light_sources() const {
+  auto lights = m_networkedAnimator->light_sources(position() + m_animationPosition);
+  if (!lights)
+    return std::unexpected(std::move(lights.error()));
+  append_configured_light_source(*lights);
+  return lights;
 }
 
-std::expected<List<LightSource>, StarException> Object::lightSources(NetworkedAnimator::Sample const* sample) const {
-  auto lightsResult = sample ? sample->lightSources(position() + m_animationPosition)
-                            : m_networkedAnimator->lightSources(position() + m_animationPosition);
-  if (!lightsResult)
-    return std::unexpected(std::move(lightsResult.error()));
-  auto lights = std::move(*lightsResult);
+void Object::append_configured_light_source(List<LightSource>& lights) const {
   auto orientation = currentOrientation();
   if (!m_lightSourceColor.get().is_clear() && orientation) {
     Color color = m_lightSourceColor.get();
     if (m_lightFlickering)
       color.set_value(std::clamp(color.value() * m_lightFlickering->value(SinWeightOperator<float>()), 0.0f, 1.0f));
 
-    LightSource lightSource;
-    lightSource.position = position() + center_of_tile(orientation->lightPosition);
-    lightSource.color = color.to_rgb_f();
-    lightSource.type = m_config->lightType;
-    lightSource.pointBeam = m_config->pointBeam;
-    lightSource.beamAngle = orientation->beamAngle;
-    lightSource.beamAmbience = m_config->beamAmbience;
-
-    lights.push_back(lightSource);
+    lights.push_back(LightSource{
+        .position = position() + center_of_tile(orientation->lightPosition),
+        .color = color.to_rgb_f(),
+        .type = m_config->light_type,
+        .point_beam = m_config->point_beam,
+        .beam_angle = orientation->beam_angle,
+        .beam_ambience = m_config->beam_ambience});
   }
-
-  return lights;
 }
 
 Vec2F Object::position() const {
@@ -951,13 +946,13 @@ std::expected<void, StarException> Object::render(RenderCallback& render_callbac
 
 std::expected<void, StarException> Object::render_light_sources(RenderCallback& render_callback) {
   auto sample = m_networkedAnimator->sample(render_callback.presentation().interpolation());
-  auto lightsResult = lightSources(&sample);
-  if (!lightsResult)
-    return std::unexpected(std::move(lightsResult.error()));
-  if (auto added = render_callback.add_light_sources(*lightsResult); !added)
+  auto lights = sample.light_sources(position() + m_animationPosition);
+  if (!lights)
+    return std::unexpected(std::move(lights.error()));
+  append_configured_light_source(*lights);
+  if (auto added = render_callback.add_light_sources(*lights); !added)
     return std::unexpected(std::move(added.error()));
-  auto const& lights = m_scriptedAnimator.light_sources();
-  return render_callback.add_light_sources(lights);
+  return render_callback.add_light_sources(m_scriptedAnimator.light_sources());
 }
 
 std::expected<bool, StarException> Object::damageTiles(List<Vec2I> const&, Vec2F const&, TileDamage const& tileDamage) {

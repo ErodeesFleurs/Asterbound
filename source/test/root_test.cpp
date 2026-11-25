@@ -310,6 +310,74 @@ TEST(ConfigurationTest, RetainsSnapshotsAndCommitsOnlySuccessfulWrites) {
   EXPECT_EQ(config.get_default("items"), Json(JsonArray{1}));
 }
 
+const GameTestRegistration light_source_defaults("LightSourceTest", "SafeAggregateDefaults", [](GameTest& fixture) {
+  static_assert(std::is_aggregate_v<LightSource>);
+  LightSource light_source;
+  fixture.check(light_source.position == Vec2F(), "default position is the origin");
+  fixture.check(light_source.color == Vec3F(), "default color is black");
+  fixture.check(light_source.type == LightType::Spread, "default light type is Spread");
+  fixture.check(light_source.point_beam == 0.0f, "default beam strength is zero");
+  fixture.check(light_source.beam_angle == 0.0f, "default beam angle is zero");
+  fixture.check(light_source.beam_ambience == 0.0f, "default beam ambience is zero");
+});
+
+const GameTestRegistration light_source_wire("LightSourceTest", "LegacyWireAndTruncatedRead", [](GameTest& fixture) {
+  static_assert(stream_readable<LightSource> && stream_writable<LightSource>);
+
+  auto same_light_source = [](LightSource const& actual, LightSource const& expected) {
+    return actual.position == expected.position && actual.color == expected.color && actual.type == expected.type
+        && actual.point_beam == expected.point_beam && actual.beam_angle == expected.beam_angle
+        && actual.beam_ambience == expected.beam_ambience;
+  };
+
+  // Two position floats, three color floats, one type byte, then three beam floats.
+  LightSource light_source{Vec2F(1.0f, -2.0f), Vec3F(0.25f, 0.5f, 0.75f), LightType::Spread, 2.0f, -1.0f, 0.125f};
+  auto check_wire = [&](LightType type, std::string_view hex) {
+    light_source.type = type;
+    auto legacy_wire = hex_decode(hex);
+    auto encoded = DataStreamBuffer::serialize(light_source);
+    if (!encoded) {
+      fixture.check(false, encoded.error().what());
+      return;
+    }
+    fixture.check(*encoded == legacy_wire, "encoded light source matches legacy bytes");
+    auto decoded = DataStreamBuffer::deserialize<LightSource>(legacy_wire.span());
+    if (!decoded) {
+      fixture.check(false, decoded.error().what());
+      return;
+    }
+    fixture.check(same_light_source(*decoded, light_source), "legacy light source decodes all six fields");
+  };
+  check_wire(LightType::Spread, "3f800000c00000003e8000003f0000003f4000000040000000bf8000003e000000");
+  check_wire(LightType::Point, "3f800000c00000003e8000003f0000003f4000000140000000bf8000003e000000");
+  check_wire(LightType::PointAsSpread, "3f800000c00000003e8000003f0000003f4000000240000000bf8000003e000000");
+
+  auto legacy_wire = hex_decode("3f800000c00000003e8000003f0000003f4000000240000000bf8000003e000000");
+  LightSource const original{Vec2F(-4.0f, 8.0f), Vec3F(0.75f, 0.25f, 0.5f), LightType::Point, 3.0f, 1.0f, 0.5f};
+  for (std::size_t size = 0; size < legacy_wire.size(); ++size) {
+    auto retained = original;
+    if (DataStreamBuffer::deserialize(retained, legacy_wire.span().first(size)))
+      fixture.check(false, std::format("truncated legacy prefix of {} bytes was accepted", size));
+    if (!same_light_source(retained, original))
+      fixture.check(false, std::format("truncated legacy prefix of {} bytes changed the destination", size));
+  }
+});
+
+const GameTestRegistration light_source_config("LightSourceTest", "LegacyAssetNamesAndFallback", [](GameTest& fixture) {
+  fixture.check(parse_light_type(JsonObject{}) == LightType::Spread, "missing light type defaults to Spread");
+  fixture.check(parse_light_type(JsonObject{{"pointLight", false}}) == LightType::Spread, "pointLight false selects Spread");
+  fixture.check(parse_light_type(JsonObject{{"pointLight", true}}) == LightType::Point, "pointLight true selects Point");
+  fixture.check(parse_light_type(JsonObject{{"lightType", "Spread"}, {"pointLight", true}}) == LightType::Spread,
+      "explicit Spread takes precedence over pointLight true");
+  fixture.check(parse_light_type(JsonObject{{"lightType", "Point"}}) == LightType::Point, "explicit Point is accepted");
+  fixture.check(parse_light_type(JsonObject{{"lightType", "PointAsSpread"}, {"pointLight", "ignored"}}) == LightType::PointAsSpread,
+      "explicit PointAsSpread takes precedence over malformed pointLight");
+  fixture.check(!parse_light_type(JsonObject{{"lightType", "unknown"}, {"pointLight", true}}),
+      "unknown light type does not fall back to pointLight");
+  fixture.check(!parse_light_type(JsonObject{{"lightType", false}}), "non-string light type is rejected");
+  fixture.check(!parse_light_type(JsonObject{{"pointLight", "invalid"}}), "non-bool pointLight is rejected");
+});
+
 const GameTestRegistration warp_target_wire("WarpTargetTest", "LegacyWireAndJson", [](GameTest&) {
   // WorldId monostate, SpawnTarget alternative byte, then big-endian payload.
   auto check = [](SpawnTarget const& target, std::string_view hex) {
@@ -1770,9 +1838,9 @@ const GameTestRegistration status_lifecycle("StatusControllerTest", "ReentrantLu
   auto replicated = (*receiver)->activeUniqueStatusEffectSummary();
   ASSERT_EQ(replicated.size(), 1u);
   EXPECT_EQ(replicated.front().second, 7.0f / 8.0f);
-  auto lights = (*receiver)->lightSources();
-  ASSERT_TRUE(lights) << lights.error().what();
-  EXPECT_EQ(lights->size(), 1u);
+  List<LightSource> light_sources;
+  if (!fixture.check(bool((*receiver)->append_light_sources(light_sources)), "collect replicated effect lights")) return;
+  fixture.check(light_sources.size() == 1, "replica emits only the surviving effect's light");
 
   ASSERT_TRUE(status.receiveMessage("mark", true));
   EXPECT_TRUE(status.uniqueStatusEffectActive(*name)); // effect.expire schedules, it does not remove.

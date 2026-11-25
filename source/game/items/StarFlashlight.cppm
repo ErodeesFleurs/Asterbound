@@ -3,7 +3,6 @@ import std;
 import star.format;
 import star.type_identity;
 import star.json;
-import star.json_extra;
 import star.id_map;
 import star.casting;
 import star.strong_typedef;
@@ -92,16 +91,12 @@ public:
   std::expected<List<Drawable>, StarException> drawables() const override;
 
   [[nodiscard]]
-  std::expected<List<LightSource>, StarException> lightSources() const;
+  std::expected<void, StarException> append_light_sources(List<LightSource>& lights) const;
 
 private:
   explicit Flashlight(Root& root) : Item(root) {}
   String m_image;
-  Vec2F m_handPosition;
-  Vec2F m_lightPosition;
-  Color m_lightColor;
-  float m_beamWidth;
-  float m_ambientFactor;
+  HandheldLight m_light;
 };
 
 }
@@ -117,26 +112,11 @@ std::expected<std::shared_ptr<Flashlight>, StarException> Flashlight::create(Roo
   if (!image)
     return std::unexpected(std::move(image.error()));
   item->m_image = AssetPath::relative_to(directory, *image);
-  auto handPosition = item->instance_value("handPosition").and_then(json_to_vec2f);
-  if (!handPosition)
-    return std::unexpected(std::move(handPosition.error()));
-  item->m_handPosition = *handPosition;
-  auto lightPosition = item->instance_value("lightPosition").and_then(json_to_vec2f);
-  if (!lightPosition)
-    return std::unexpected(std::move(lightPosition.error()));
-  item->m_lightPosition = *lightPosition;
-  auto lightColor = item->instance_value("lightColor").and_then(json_to_color);
-  if (!lightColor)
-    return std::unexpected(std::move(lightColor.error()));
-  item->m_lightColor = *lightColor;
-  auto beamWidth = item->instance_value("beamLevel").and_then([](Json const& value) { return value.to_float(); });
-  if (!beamWidth)
-    return std::unexpected(std::move(beamWidth.error()));
-  item->m_beamWidth = *beamWidth;
-  auto ambientFactor = item->instance_value("beamAmbience").and_then([](Json const& value) { return value.to_float(); });
-  if (!ambientFactor)
-    return std::unexpected(std::move(ambientFactor.error()));
-  item->m_ambientFactor = *ambientFactor;
+  // Flashlight assets express the two offsets in pixels.
+  auto light = parse_handheld_light(*item, tile_pixels);
+  if (!light)
+    return std::unexpected(std::move(light.error()));
+  item->m_light = *light;
   return item;
 }
 
@@ -148,39 +128,14 @@ std::expected<List<Drawable>, StarException> Flashlight::drawables() const {
   auto metadata = root().image_metadata_database();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
-  auto drawable = Drawable::make_image(**metadata, m_image, 1.0f / tile_pixels, true, -m_handPosition / tile_pixels);
+  auto drawable = Drawable::make_image(**metadata, m_image, 1.0f / tile_pixels, true, m_light.drawable_offset);
   if (!drawable)
     return std::unexpected(std::move(drawable.error()));
   return List<Drawable>{std::move(*drawable)};
 }
 
-std::expected<List<LightSource>, StarException> Flashlight::lightSources() const {
-  if (!initialized())
-    return List<LightSource>{};
-  auto owner_result = owner();
-  if (!owner_result)
-    return std::unexpected(std::move(owner_result.error()));
-  auto world_result = world();
-  if (!world_result)
-    return std::unexpected(std::move(world_result.error()));
-  auto hand_result = hand();
-  if (!hand_result)
-    return std::unexpected(std::move(hand_result.error()));
-  auto owner_hand_position = owner_result->get().hand_position(*hand_result, (m_lightPosition - m_handPosition) / tile_pixels);
-  if (!owner_hand_position)
-    return std::unexpected(std::move(owner_hand_position.error()));
-  auto aim_position = owner_result->get().aimPosition();
-  if (!aim_position)
-    return std::unexpected(std::move(aim_position.error()));
-  float angle = world_result->get().geometry().diff(*aim_position, owner_result->get().position()).angle();
-  LightSource light_source;
-  light_source.type = LightType::Point;
-  light_source.position = owner_result->get().position() + *owner_hand_position;
-  light_source.color = m_lightColor.to_rgb_f();
-  light_source.pointBeam = m_beamWidth;
-  light_source.beamAngle = angle;
-  light_source.beamAmbience = m_ambientFactor;
-  return List<LightSource>{std::move(light_source)};
+std::expected<void, StarException> Flashlight::append_light_sources(List<LightSource>& lights) const {
+  return append_handheld_light(lights, m_light);
 }
 
 }

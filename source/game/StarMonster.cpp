@@ -876,14 +876,13 @@ if (!result136) return std::unexpected(std::move(result136.error()));
   return {};
 }
 
-std::expected<List<LightSource>, StarException> Monster::lightSources() const {
-  auto result138 = m_networkedAnimator->lightSources(position());
-if (!result138) return std::unexpected(std::move(result138.error()));
-auto lightSources = std::move(*result138);
-  auto result139 = m_statusController->lightSources();
-if (!result139) return std::unexpected(std::move(result139.error()));
-lightSources.append_range(std::move(*result139));
-return lightSources;
+std::expected<List<LightSource>, StarException> Monster::light_sources() const {
+  auto lights = m_networkedAnimator->light_sources(position());
+  if (!lights)
+    return std::unexpected(std::move(lights.error()));
+  if (auto result = m_statusController->append_light_sources(*lights); !result)
+    return std::unexpected(std::move(result.error()));
+  return lights;
 }
 
 std::expected<void, StarException> Monster::hitOther(EntityId targetEntityId, DamageRequest const& damageRequest) {
@@ -1034,17 +1033,17 @@ for (auto const& drawablePair : m_scriptedAnimator.drawables()) {
 
 std::expected<void, StarException> Monster::render_light_sources(RenderCallback& render_callback) {
   auto sample = m_networkedAnimator->sample(render_callback.presentation().interpolation());
-  auto result168 = sample.lightSources(position());
-if (!result168) return std::unexpected(std::move(result168.error()));
-auto result169 = render_callback.add_light_sources(*result168);
-if (!result169) return std::unexpected(std::move(result169.error()));
-  auto result170 = m_statusController->lightSources(render_callback.presentation().interpolation());
-if (!result170) return std::unexpected(std::move(result170.error()));
-auto result171 = render_callback.add_light_sources(*result170);
-if (!result171) return std::unexpected(std::move(result171.error()));
-  auto result172 = render_callback.add_light_sources(m_scriptedAnimator.light_sources());
-if (!result172) return std::unexpected(std::move(result172.error()));
-  return {};
+  auto lights = sample.light_sources(position());
+  if (!lights)
+    return std::unexpected(std::move(lights.error()));
+  if (auto added = render_callback.add_light_sources(*lights); !added)
+    return std::unexpected(std::move(added.error()));
+  lights->clear();
+  if (auto result = m_statusController->append_light_sources(*lights, render_callback.presentation().interpolation()); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto added = render_callback.add_light_sources(*lights); !added)
+    return std::unexpected(std::move(added.error()));
+  return render_callback.add_light_sources(m_scriptedAnimator.light_sources());
 }
 
 void Monster::setPosition(Vec2F const& pos) {

@@ -773,15 +773,16 @@ std::expected<List<Drawable>, StarException> StatusController::drawables(float i
   return output;
 }
 
-std::expected<List<LightSource>, StarException> StatusController::lightSources(float interpolation) const {
-  List<LightSource> output;
+std::expected<void, StarException> StatusController::append_light_sources(List<LightSource>& lights, float interpolation) const {
+  auto first_light = lights.size();
+  auto rollback = make_scope_exit([&] { lights.resize(first_light); });
   for (auto const& animator : m_effectAnimators.net_elements()) {
     auto sample = animator->animator->sample(interpolation);
-    auto values = sample.lightSources(m_movement_controller->get().position());
-    if (!values) return std::unexpected(std::move(values.error()));
-    output.append_range(std::move(*values));
+    if (auto result = sample.append_light_sources(lights, m_movement_controller->get().position()); !result)
+      return std::unexpected(std::move(result.error()));
   }
-  return output;
+  rollback.release();
+  return {};
 }
 
 std::expected<List<OverheadBar>, StarException> StatusController::overhead_bars() {

@@ -228,7 +228,7 @@ std::optional<std::reference_wrapper<Directives const>> select_directive(
 
 const float WorldClient::DropDist = 6.0f;
 WorldClient::WorldClient(Root& root, UniverseClient& universe)
-  : World(root), m_currentStep(0), m_current_time(0), m_pendingLightReady(false),
+  : World(root), m_currentStep(0), m_current_time(0), m_pending_light_ready(false),
     m_subWorldId(main_client_world_id), m_worldDimLevel(0), m_latency(0),
     m_ambient_sounds(root), m_music_track(root), m_alt_music_track(root),
     m_broadcast_public_key(std::string(root.identity().public_key().begin(), root.identity().public_key().end())),
@@ -394,7 +394,7 @@ std::expected<void, StarException> WorldClient::initialize(std::shared_ptr<Playe
   // Alternate tracks historically use the fade-in interval as their switch grace.
   m_alt_music_track.set_track_switch_grace(*result26);
   
-  m_pendingLightReady = false;
+  m_pending_light_ready = false;
   
   auto result31 = clearWorld();
   if (!result31)
@@ -1053,6 +1053,8 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
   
   if (!m_fullBright) {
     ClientRenderCallback lighting_callback(tile_drawer, presentation, m_presentationTimestep);
+    lighting_callback.light_sources = std::move(m_gather_lights);
+    lighting_callback.light_sources.clear();
     auto lights = m_entityMap->for_all_entities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
       if (m_startupHiddenEntities.contains(entity->entityId()))
         return {};
@@ -1064,14 +1066,14 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
     if (!lights)
       return std::unexpected(std::move(lights.error()));
     {
-      std::lock_guard prep_lock(m_lightMapPrepMutex);
-      m_pendingLights = std::move(lighting_callback.light_sources);
-      m_pendingParticleLights.clear();
+      std::lock_guard prep_lock(m_light_map_prep_mutex);
+      m_gather_lights = std::exchange(m_pending_lights, std::move(lighting_callback.light_sources));
+      m_pending_particle_lights.clear();
       for (auto const& particle : render_data.particles)
         if (particle.light != Color::palette_clear)
-          m_pendingParticleLights.push_back({particle.position, particle.light.to_rgb_f()});
-      m_pendingLightRange = window.padded(1);
-      m_pendingLightReady = true;
+          m_pending_particle_lights.push_back({particle.position, particle.light.to_rgb_f()});
+      m_pending_light_range = window.padded(1);
+      m_pending_light_ready = true;
     }
     //Kae: Padded by one to fix light spread issues at the edges of the frame.
     
@@ -1079,7 +1081,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
       m_lightingCond.notify_one();
     } else {
       std::lock_guard lighting_locker(m_lightingMutex);
-      auto result48 = lightingCalc();
+      auto result48 = calculate_lighting();
       if (!result48)
         return std::unexpected(std::move(result48.error()));
     }
@@ -2743,7 +2745,7 @@ std::expected<void, StarException> WorldClient::collectLiquid(List<Vec2I> const&
 }
 
 std::expected<bool, StarException> WorldClient::waitForLighting(std::optional<std::reference_wrapper<WorldRenderData>> renderData) {
-  std::lock_guard prepLocker(m_lightMapPrepMutex);
+  std::lock_guard prep_lock(m_light_map_prep_mutex);
   std::lock_guard lightMapLocker(m_lightMapMutex);
   if (renderData && m_lightMap.ready) {
     for (auto& preview_tile : m_preview_tiles) {
@@ -3153,7 +3155,7 @@ std::expected<void, StarException> WorldClient::lightingTileGather() {
   auto result236 = this->root().workers();
   if (!result236)
     return std::unexpected(std::move(result236.error()));
-  auto result237 = gatherClientLightingTiles(m_lightingCalculator, *m_tileArray, result236->get(), *materialDatabase,
+  auto result237 = gatherClientLightingTiles(m_lighting_calculator, *m_tileArray, result236->get(), *materialDatabase,
                                              *liquidsDatabase, environmentLight, undergroundLevel);
   if (!result237)
     return std::unexpected(std::move(result237.error()));
@@ -3161,110 +3163,90 @@ std::expected<void, StarException> WorldClient::lightingTileGather() {
   return {};
 }
 
-std::expected<void, StarException> WorldClient::lightingCalc() {
-  auto prepWaitStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
-  std::unique_lock prepLocker(m_lightMapPrepMutex);
-  auto prepStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
-  if (!m_pendingLightReady.load()) {
+std::expected<void, StarException> WorldClient::calculate_lighting() {
+  auto prep_wait_start = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
+  std::unique_lock prep_lock(m_light_map_prep_mutex);
+  auto prep_start = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
+  if (!m_pending_light_ready.load()) {
     return {};
   }
-  m_pendingLightReady = false;
-  RectI lightRange = m_pendingLightRange;
-  List<LightSource> lights = std::move(m_pendingLights);
-  List<std::pair<Vec2F, Vec3F>> particleLights = std::move(m_pendingParticleLights);
+  m_pending_light_ready = false;
+  RectI light_range = m_pending_light_range;
+  m_calculation_lights.swap(m_pending_lights);
+  List<std::pair<Vec2F, Vec3F>> particle_lights = std::move(m_pending_particle_lights);
   auto& root = this->root();
-  auto result238 = root.configuration();
-  if (!result238)
-    return std::unexpected(std::move(result238.error()));
-  auto configuration = (std::move(*result238));
-  auto result239 = configuration->get("newLighting");
-  if (!result239)
-    return std::unexpected(std::move(result239.error()));
-  auto result240 = (std::move(*result239)).opt_bool();
-  if (!result240)
-    return std::unexpected(std::move(result240.error()));
-  bool newLighting = (std::move(*result240)).value_or(true);
-  auto result241 = configuration->get("monochromeLighting");
-  if (!result241)
-    return std::unexpected(std::move(result241.error()));
-  auto result242 = (std::move(*result241)).to_bool();
-  if (!result242)
-    return std::unexpected(std::move(result242.error()));
-  bool monochrome = (std::move(*result242));
-  auto result243 = root.assets();
-  if (!result243)
-    return std::unexpected(std::move(result243.error()));
-  auto result244 = (std::move(*result243))->json("/lighting.config:lighting");
-  if (!result244)
-    return std::unexpected(std::move(result244.error()));
-  auto result245 = (std::move(*result244)).set("pointAdditive", newLighting);
-  if (!result245)
-    return std::unexpected(std::move(result245.error()));
-  auto result246 = m_lightingCalculator.set_parameters((std::move(*result245)));
-  if (!result246)
-    return std::unexpected(std::move(result246.error()));
-  auto result247 = m_lightingCalculator.set_monochrome(monochrome);
-  if (!result247)
-    return std::unexpected(std::move(result247.error()));
-  auto begun = m_lightingCalculator.begin(lightRange);
+  auto configuration = root.configuration();
+  if (!configuration)
+    return std::unexpected(std::move(configuration.error()));
+  auto mode = (*configuration)->get("newLighting").and_then([](Json const& value) { return value.opt_bool(); });
+  if (!mode)
+    return std::unexpected(std::move(mode.error()));
+  bool new_lighting = mode->value_or(true);
+  auto monochrome = (*configuration)->get("monochromeLighting").and_then([](Json const& value) { return value.to_bool(); });
+  if (!monochrome)
+    return std::unexpected(std::move(monochrome.error()));
+  auto assets = root.assets();
+  if (!assets)
+    return std::unexpected(std::move(assets.error()));
+  auto parameters = (*assets)->json("/lighting.config:lighting").and_then([new_lighting](Json const& value) {
+    return value.set("pointAdditive", new_lighting);
+  });
+  if (!parameters)
+    return std::unexpected(std::move(parameters.error()));
+  if (auto configured = m_lighting_calculator.set_parameters(*parameters); !configured)
+    return std::unexpected(std::move(configured.error()));
+  if (auto configured = m_lighting_calculator.set_monochrome(*monochrome); !configured)
+    return std::unexpected(std::move(configured.error()));
+  auto begun = m_lighting_calculator.begin(light_range);
   if (!begun) return std::unexpected(std::move(begun.error()));
   auto result248 = lightingTileGather();
   if (!result248)
     return std::unexpected(std::move(result248.error()));
 
-  auto prepEnd = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
-  prepLocker.unlock();
+  auto prep_end = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
+  prep_lock.unlock();
   
-  Vec2I regionMin = m_lightingCalculator.calculation_region().min();
-  auto resolvePosition = [&, &self = *this](Vec2F const& pos) -> Vec2F {
-    float xFloor = std::floor(pos[0]);
-    float xOffset =
-      static_cast<float>(self.m_geometry.pdiff(static_cast<int>(xFloor), regionMin[0])) + (pos[0] - xFloor);
-    return Vec2F(regionMin[0] + xOffset, pos[1]);
+  int region_min_x = m_lighting_calculator.calculation_region().min()[0];
+  auto resolve_position = [this, region_min_x](Vec2F pos) {
+    float x_floor = std::floor(pos[0]);
+    float offset = static_cast<float>(m_geometry.pdiff(static_cast<int>(x_floor), region_min_x)) + (pos[0] - x_floor);
+    return Vec2F(region_min_x + offset, pos[1]);
   };
   
-  for (auto const& light : lights) {
-    Vec2F position = resolvePosition(light.position);
-    if (light.type == LightType::Spread) {
-      m_lightingCalculator.add_spread_light(position, light.color);
-    } else {
-      if (light.type == LightType::PointAsSpread) {
-        if (!newLighting) {
-          m_lightingCalculator.add_spread_light(position, light.color);
-        } else {
-          // hybrid (used for auto-converted object lights) - 85% spread, 15% point (* .15 is applied in the calculation code)
-          m_lightingCalculator.add_spread_light(position, light.color * 0.85f);
-          m_lightingCalculator.add_point_light(position, light.color, light.pointBeam, light.beamAngle, light.beamAmbience, true);
-        }
-      } else {
-        m_lightingCalculator.add_point_light(position, light.color, light.pointBeam, light.beamAngle, light.beamAmbience);
-      }
+  for (auto const& light : m_calculation_lights) {
+    auto position = resolve_position(light.position);
+    bool hybrid = light.type == LightType::PointAsSpread;
+    if (light.type == LightType::Spread || (hybrid && !new_lighting)) {
+      m_lighting_calculator.add_spread_light(position, light.color);
+      continue;
     }
+    // The calculator applies the hybrid point component's 15% weight.
+    if (hybrid)
+      m_lighting_calculator.add_spread_light(position, light.color * 0.85f);
+    m_lighting_calculator.add_point_light(position, light.color, light.point_beam, light.beam_angle, light.beam_ambience, hybrid);
   }
   
-  for (auto const& lightPair : particleLights) {
-    Vec2F position = resolvePosition(lightPair.first);
-    m_lightingCalculator.add_spread_light(position, lightPair.second);
-  }
+  for (auto const& [position, color] : particle_lights)
+    m_lighting_calculator.add_spread_light(resolve_position(position), color);
   
-  auto result249 = m_lightingCalculator.calculate(m_pendingLightMap);
+  auto result249 = m_lighting_calculator.calculate(m_pending_light_map);
   if (!result249)
     return std::unexpected(std::move(result249.error()));
-  auto propagationEnd = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
-  std::chrono::time_point<std::chrono::steady_clock, std::chrono::microseconds> publicationStart;
+  auto propagation_end = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::microseconds> publication_start;
   {
-    std::lock_guard mapLocker(m_lightMapMutex);
-    publicationStart = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
-    m_lightMap.publish(m_pendingLightMap, lightRange.min());
+    std::lock_guard map_lock(m_lightMapMutex);
+    publication_start = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
+    m_lightMap.publish(m_pending_light_map, light_range.min());
   }
-  auto publicationEnd = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
-  root.logMap().set("client_render_world_async_light_prep_wait", Star::format("{:05d}\u00b5s", (prepStart - prepWaitStart).count()));
-  root.logMap().set("client_render_world_async_light_prep", Star::format("{:05d}\u00b5s", (prepEnd - prepStart).count()));
-  root.logMap().set("client_render_world_async_light_propagation", Star::format("{:05d}\u00b5s", (propagationEnd - prepEnd).count()));
+  auto publication_end = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
+  root.logMap().set("client_render_world_async_light_prep_wait", Star::format("{:05d}\u00b5s", (prep_start - prep_wait_start).count()));
+  root.logMap().set("client_render_world_async_light_prep", Star::format("{:05d}\u00b5s", (prep_end - prep_start).count()));
+  root.logMap().set("client_render_world_async_light_propagation", Star::format("{:05d}\u00b5s", (propagation_end - prep_end).count()));
   root.logMap().set("client_render_world_async_light_publication_wait",
-                    Star::format("{:05d}\u00b5s", (publicationStart - propagationEnd).count()));
+                    Star::format("{:05d}\u00b5s", (publication_start - propagation_end).count()));
   root.logMap().set("client_render_world_async_light_publication",
-                    Star::format("{:05d}\u00b5s", (publicationEnd - publicationStart).count()));
+                    Star::format("{:05d}\u00b5s", (publication_end - publication_start).count()));
   return {};
 }
 
@@ -3279,7 +3261,7 @@ std::expected<void, StarException> WorldClient::lightingMain(std::stop_token sto
     }
     
     auto start = std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500));
-    auto result250 = lightingCalc();
+    auto result250 = calculate_lighting();
     if (!result250)
       return std::unexpected(std::move(result250.error()));
     this->root().logMap().set("client_render_world_async_light_calc", Star::format("{:05d}\u00b5s", (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() + std::chrono::nanoseconds(500)) - start).count()));
@@ -3384,13 +3366,13 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
     auto result267 = (std::move(*result266)).to_bool();
     if (!result267)
       return std::unexpected(std::move(result267.error()));
-    auto result268 = m_lightingCalculator.set_monochrome((std::move(*result267)));
+    auto result268 = m_lighting_calculator.set_monochrome((std::move(*result267)));
     if (!result268)
       return std::unexpected(std::move(result268.error()));
     auto result269 = assets->json("/lighting.config:lighting");
     if (!result269)
       return std::unexpected(std::move(result269.error()));
-    auto result270 = m_lightingCalculator.set_parameters((std::move(*result269)));
+    auto result270 = m_lighting_calculator.set_parameters((std::move(*result269)));
     if (!result270)
       return std::unexpected(std::move(result270.error()));
     auto result271 = assets->json("/lighting.config:intensity");
@@ -3508,11 +3490,13 @@ std::expected<void, StarException> WorldClient::clearWorld() {
     // Drain propagation too: it runs after releasing the prep mutex and must
     // not publish an old world's map after this reset.
     std::lock_guard lightingLocker(m_lightingMutex);
-    std::lock_guard prepLocker(m_lightMapPrepMutex);
-    std::lock_guard mapLocker(m_lightMapMutex);
-    m_pendingLightReady = false;
-    m_pendingLights.clear();
-    m_pendingParticleLights.clear();
+    std::lock_guard prep_lock(m_light_map_prep_mutex);
+    std::lock_guard map_lock(m_lightMapMutex);
+    m_pending_light_ready = false;
+    m_gather_lights = List<LightSource>{};
+    m_pending_lights = List<LightSource>{};
+    m_calculation_lights = List<LightSource>{};
+    m_pending_particle_lights.clear();
     m_lightMap.reset();
   }
   resetPresentation();
@@ -3797,7 +3781,7 @@ std::expected<float, StarException> WorldClient::lightLevel(Vec2F const& pos) co
   if (!inWorld()) {
     return 0.0f;
   }
-  return WorldImpl::lightLevel(this->root(), m_tileArray, m_entityMap, m_geometry, m_worldTemplate, m_sky, m_lightIntensityCalculator, pos);
+  return WorldImpl::light_level(this->root(), m_tileArray, m_entityMap, m_geometry, m_worldTemplate, m_sky, m_lightIntensityCalculator, pos);
 }
 
 std::expected<bool, StarException> WorldClient::breathable(Vec2F const& pos) const {

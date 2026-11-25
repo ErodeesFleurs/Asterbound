@@ -824,21 +824,16 @@ if (!result1195) return std::unexpected(std::move(result1195.error()));
 
 std::expected<void, StarException> Vehicle::render_light_sources(RenderCallback& renderer) {
   auto sample = m_networkedAnimator->sample(renderer.presentation().interpolation());
-  auto result1183 = sample.lightSources(position());
-if (!result1183) return std::unexpected(std::move(result1183.error()));
-auto result1184 = renderer.add_light_sources(*result1183);
-if (!result1184) return std::unexpected(std::move(result1184.error()));
-  auto&& result1185 = m_scriptedAnimator.light_sources();
-auto result1186 = renderer.add_light_sources(result1185);
-if (!result1186) return std::unexpected(std::move(result1186.error()));
-  return {};
+  auto lights = sample.light_sources(position());
+  if (!lights)
+    return std::unexpected(std::move(lights.error()));
+  if (auto added = renderer.add_light_sources(*lights); !added)
+    return std::unexpected(std::move(added.error()));
+  return renderer.add_light_sources(m_scriptedAnimator.light_sources());
 }
 
-std::expected<List<LightSource>, StarException> Vehicle::lightSources() const {
-  auto result1182 = m_networkedAnimator->lightSources(position());
-if (!result1182) return std::unexpected(std::move(result1182.error()));
-auto lightSources = std::move(*result1182);
-  return lightSources;
+std::expected<List<LightSource>, StarException> Vehicle::light_sources() const {
+  return m_networkedAnimator->light_sources(position());
 }
 
 std::expected<bool, StarException> Vehicle::should_destroy() const {

@@ -102,7 +102,7 @@ std::expected<String, StarException> Entity::description() const {
   return "";
 }
 
-std::expected<List<LightSource>, StarException> Entity::lightSources() const {
+std::expected<List<LightSource>, StarException> Entity::light_sources() const {
   return List<LightSource>{};
 }
 

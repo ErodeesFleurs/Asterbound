@@ -67,7 +67,7 @@ public:
   ItemDescriptor primaryHandItemDescriptor() const;
   ItemDescriptor altHandItemDescriptor() const;
 
-  [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources(float interpolation = 1.0f) const;
+  [[nodiscard]] std::expected<void, StarException> append_light_sources(List<LightSource>& lights, float interpolation = 1.0f) const;
   [[nodiscard]] std::expected<void, StarException> effects(EffectEmitter& emitter) const;
   [[nodiscard]] std::expected<List<PersistentStatusEffect>, StarException> statusEffects() const;
 

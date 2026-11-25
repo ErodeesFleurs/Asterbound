@@ -363,12 +363,26 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
   return m_animator.queryDrawablesWithZLevel(translate, this);
 }
 
-std::expected<List<LightSource>, StarException> NetworkedAnimator::lightSources(Vec2F const& translate) const {
-  return queryLightSources(translate, nullptr);
+std::expected<List<LightSource>, StarException> NetworkedAnimator::light_sources(Vec2F const& translate) const {
+  List<LightSource> lights;
+  if (auto appended = append_light_sources(lights, translate); !appended)
+    return std::unexpected(std::move(appended.error()));
+  return lights;
 }
 
-std::expected<List<LightSource>, StarException> NetworkedAnimator::Sample::lightSources(Vec2F const& translate) const {
-  return m_animator.queryLightSources(translate, this);
+std::expected<void, StarException> NetworkedAnimator::append_light_sources(List<LightSource>& lights, Vec2F const& translate) const {
+  return append_light_sources(lights, translate, std::nullopt);
+}
+
+std::expected<List<LightSource>, StarException> NetworkedAnimator::Sample::light_sources(Vec2F const& translate) const {
+  List<LightSource> lights;
+  if (auto appended = append_light_sources(lights, translate); !appended)
+    return std::unexpected(std::move(appended.error()));
+  return lights;
+}
+
+std::expected<void, StarException> NetworkedAnimator::Sample::append_light_sources(List<LightSource>& lights, Vec2F const& translate) const {
+  return m_animator.append_light_sources(lights, translate, std::cref(*this));
 }
 
 std::expected<bool, StarException> NetworkedAnimator::Sample::hasState(String const& type, std::optional<String> const& state) const {
@@ -651,65 +665,65 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
     if (!active) return std::unexpected(std::move(active.error()));
     emitter.active.set(*active);
   }
-  auto lightsConfig = config.get("lights", JsonObject());
-  if (!lightsConfig) return std::unexpected(std::move(lightsConfig.error()));
-  auto lightsEntries = lightsConfig->iterate_object();
-  if (!lightsEntries) return std::unexpected(std::move(lightsEntries.error()));
-  for (auto const& pair : *lightsEntries) {
+  auto lights_config = config.get("lights", JsonObject());
+  if (!lights_config) return std::unexpected(std::move(lights_config.error()));
+  auto lights_entries = lights_config->iterate_object();
+  if (!lights_entries) return std::unexpected(std::move(lights_entries.error()));
+  for (auto const& pair : *lights_entries) {
     auto& light = m_lights[pair.first];
-    auto const& lightConfig = pair.second;
-    auto active = lightConfig.get_bool("active", true);
+    auto const& light_config = pair.second;
+    auto active = light_config.get_bool("active", true);
     if (!active) return std::unexpected(std::move(active.error()));
     light.active.set(*active);
-    Vec2F lightPosition{};
-    auto position = lightConfig.opt("position");
+    Vec2F light_position{};
+    auto position = light_config.opt("position");
     if (!position) return std::unexpected(std::move(position.error()));
     if (*position) {
-      auto positionValue = json_to_vec2f(**position);
-      if (!positionValue) return std::unexpected(std::move(positionValue.error()));
-      lightPosition = *positionValue;
+      auto position_value = json_to_vec2f(**position);
+      if (!position_value) return std::unexpected(std::move(position_value.error()));
+      light_position = *position_value;
     }
-    light.xPosition.set(lightPosition[0]);
-    light.yPosition.set(lightPosition[1]);
+    light.x_position.set(light_position[0]);
+    light.y_position.set(light_position[1]);
     Color color = Color::palette_white;
-    auto colorConfig = lightConfig.opt("color");
-    if (!colorConfig) return std::unexpected(std::move(colorConfig.error()));
-    if (*colorConfig) {
-      auto colorConfigValue = json_to_color(**colorConfig);
-      if (!colorConfigValue) return std::unexpected(std::move(colorConfigValue.error()));
-      color = *colorConfigValue;
+    auto color_config = light_config.opt("color");
+    if (!color_config) return std::unexpected(std::move(color_config.error()));
+    if (*color_config) {
+      auto color_config_value = json_to_color(**color_config);
+      if (!color_config_value) return std::unexpected(std::move(color_config_value.error()));
+      color = *color_config_value;
     }
     light.color.set(color);
-    auto anchor = lightConfig.opt_string("anchorPart");
+    auto anchor = light_config.opt_string("anchorPart");
     if (!anchor) return std::unexpected(std::move(anchor.error()));
-    light.anchorPart = std::move(*anchor);
-    auto groupsJson = lightConfig.get("transformationGroups", JsonArray());
-    if (!groupsJson) return std::unexpected(std::move(groupsJson.error()));
-    auto groups = json_to_string_list(*groupsJson);
+    light.anchor_part = std::move(*anchor);
+    auto groups_json = light_config.get("transformationGroups", JsonArray());
+    if (!groups_json) return std::unexpected(std::move(groups_json.error()));
+    auto groups = json_to_string_list(*groups_json);
     if (!groups) return std::unexpected(std::move(groups.error()));
-    light.transformationGroups = std::move(*groups);
-    auto rotation = lightConfig.opt_string("rotationGroup");
+    light.transformation_groups = std::move(*groups);
+    auto rotation = light_config.opt_string("rotationGroup");
     if (!rotation) return std::unexpected(std::move(rotation.error()));
-    light.rotationGroup = std::move(*rotation);
-    auto center = lightConfig.opt("rotationCenter");
+    light.rotation_group = std::move(*rotation);
+    auto center = light_config.opt("rotationCenter");
     if (!center) return std::unexpected(std::move(center.error()));
     if (*center) {
-      auto centerValue = json_to_vec2f(**center);
-      if (!centerValue) return std::unexpected(std::move(centerValue.error()));
-      light.rotationCenter = *centerValue;
+      auto center_value = json_to_vec2f(**center);
+      if (!center_value) return std::unexpected(std::move(center_value.error()));
+      light.rotation_center = *center_value;
     }
-    auto hasFlicker = lightConfig.contains("flickerPeriod");
-    if (!hasFlicker) return std::unexpected(std::move(hasFlicker.error()));
-    if (*hasFlicker) {
-      auto period = lightConfig.get_float("flickerPeriod");
+    auto has_flicker = light_config.contains("flickerPeriod");
+    if (!has_flicker) return std::unexpected(std::move(has_flicker.error()));
+    if (*has_flicker) {
+      auto period = light_config.get_float("flickerPeriod");
       if (!period) return std::unexpected(std::move(period.error()));
-      auto minimum = lightConfig.get_float("flickerMinIntensity", 0.0);
+      auto minimum = light_config.get_float("flickerMinIntensity", 0.0);
       if (!minimum) return std::unexpected(std::move(minimum.error()));
-      auto maximum = lightConfig.get_float("flickerMaxIntensity", 0.0);
+      auto maximum = light_config.get_float("flickerMaxIntensity", 0.0);
       if (!maximum) return std::unexpected(std::move(maximum.error()));
-      auto period_variance = lightConfig.get_float("flickerPeriodVariance", 0.0);
+      auto period_variance = light_config.get_float("flickerPeriodVariance", 0.0);
       if (!period_variance) return std::unexpected(std::move(period_variance.error()));
-      auto intensity_variance = lightConfig.get_float("flickerIntensityVariance", 0.0);
+      auto intensity_variance = light_config.get_float("flickerIntensityVariance", 0.0);
       if (!intensity_variance) return std::unexpected(std::move(intensity_variance.error()));
       auto flicker = PeriodicFunction<float>::create(root.random(), *period, *minimum, *maximum, *period_variance, *intensity_variance);
       if (!flicker)
@@ -717,18 +731,18 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
             std::move(flicker.error())));
       light.flicker = std::move(*flicker);
     }
-    auto angle = lightConfig.get_float("pointAngle", 0.0f);
+    auto angle = light_config.get_float("pointAngle", 0.0f);
     if (!angle) return std::unexpected(std::move(angle.error()));
-    light.pointAngle.set(*angle * Constants::degrees_to_radians);
-    auto point = lightConfig.get_bool("pointLight", false);
+    light.point_angle.set(*angle * Constants::degrees_to_radians);
+    auto point = light_config.get_bool("pointLight", false);
     if (!point) return std::unexpected(std::move(point.error()));
-    light.pointLight = std::move(*point);
-    auto beam = lightConfig.get_float("pointBeam", 0.0f);
+    light.point_light = std::move(*point);
+    auto beam = light_config.get_float("pointBeam", 0.0f);
     if (!beam) return std::unexpected(std::move(beam.error()));
-    light.pointBeam = std::move(*beam);
-    auto ambience = lightConfig.get_float("beamAmbience", 0.0f);
+    light.point_beam = std::move(*beam);
+    auto ambience = light_config.get_float("beamAmbience", 0.0f);
     if (!ambience) return std::unexpected(std::move(ambience.error()));
-    light.beamAmbience = std::move(*ambience);
+    light.beam_ambience = std::move(*ambience);
   }
   auto soundsConfig = config.get("sounds", JsonObject());
   if (!soundsConfig) return std::unexpected(std::move(soundsConfig.error()));
@@ -1456,37 +1470,37 @@ std::expected<void, StarException> NetworkedAnimator::burstParticleEmitter(Strin
   return {};
 }
 
-bool NetworkedAnimator::hasLight(String const& lightName) const {
-  return m_lights.contains(lightName);
+bool NetworkedAnimator::has_light(String const& light_name) const {
+  return m_lights.contains(light_name);
 }
 
-std::expected<void, StarException> NetworkedAnimator::setLightActive(String const& lightName, bool active) {
-  auto entry = m_lights.get(lightName);
+std::expected<void, StarException> NetworkedAnimator::set_light_active(String const& light_name, bool active) {
+  auto entry = m_lights.get(light_name);
   if (!entry) return std::unexpected(std::move(entry.error()));
   entry->get().active.set(active);
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::setLightPosition(String const& lightName, Vec2F position) {
-  auto lightResult = m_lights.get(lightName);
-  if (!lightResult) return std::unexpected(std::move(lightResult.error()));
-  auto& light = lightResult->get();
-  light.xPosition.set(position[0]);
-  light.yPosition.set(position[1]);
+std::expected<void, StarException> NetworkedAnimator::set_light_position(String const& light_name, Vec2F position) {
+  auto light_result = m_lights.get(light_name);
+  if (!light_result) return std::unexpected(std::move(light_result.error()));
+  auto& light = light_result->get();
+  light.x_position.set(position[0]);
+  light.y_position.set(position[1]);
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::setLightColor(String const& lightName, Color color) {
-  auto entry = m_lights.get(lightName);
+std::expected<void, StarException> NetworkedAnimator::set_light_color(String const& light_name, Color color) {
+  auto entry = m_lights.get(light_name);
   if (!entry) return std::unexpected(std::move(entry.error()));
   entry->get().color.set(color);
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::setLightPointAngle(String const& lightName, float angle) {
-  auto entry = m_lights.get(lightName);
+std::expected<void, StarException> NetworkedAnimator::set_light_point_angle(String const& light_name, float angle) {
+  auto entry = m_lights.get(light_name);
   if (!entry) return std::unexpected(std::move(entry.error()));
-  entry->get().pointAngle.set(angle * Constants::degrees_to_radians);
+  entry->get().point_angle.set(angle * Constants::degrees_to_radians);
   return {};
 }
 
@@ -1827,51 +1841,59 @@ std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator
   return drawables;
 }
 
-std::expected<List<LightSource>, StarException> NetworkedAnimator::queryLightSources(Vec2F const& translate, Sample const* sample) const {
-  List<LightSource> lightSources;
-  for (auto const& pair : m_lights) {
-    if (!pair.second.active.get())
+std::expected<void, StarException> NetworkedAnimator::append_light_sources(List<LightSource>& lights, Vec2F const& translate, std::optional<std::reference_wrapper<Sample const>> sample) const {
+  auto initial_size = lights.size();
+  auto rollback = [&](StarException&& error) {
+    lights.resize(initial_size);
+    return std::unexpected(std::move(error));
+  };
+  std::optional<Mat3F> global;
+  bool const flipped = m_flipped.get();
+  for (auto const& [name, light] : m_lights) {
+    if (!light.active.get())
       continue;
 
-    Vec2F position = {pair.second.xPosition.get(), pair.second.yPosition.get()};
-    float pointAngle = normalize_angle(pair.second.pointAngle.get());
+    Vec2F position = {light.x_position.get(), light.y_position.get()};
+    float point_angle = normalize_angle(light.point_angle.get());
     Mat3F transformation = Mat3F::identity();
-    if (pair.second.anchorPart) {
-      auto anchor = queryPartTransformation(*pair.second.anchorPart, sample);
-      if (!anchor) return std::unexpected(std::move(anchor.error()));
+    if (light.anchor_part) {
+      auto anchor = sample ? sample->get().partTransformation(*light.anchor_part) : partTransformation(*light.anchor_part);
+      if (!anchor) return rollback(std::move(anchor.error()));
       transformation = *anchor;
     }
-    auto group = sample ? sample->group_transformation(pair.second.transformationGroups) : group_transformation(pair.second.transformationGroups);
-    if (!group) return std::unexpected(std::move(group.error()));
+    auto group = query_group_transformation(light.transformation_groups, sample);
+    if (!group) return rollback(std::move(group.error()));
     transformation = *group * transformation;
     position = transformation.transform_point(position);
-    pointAngle = transformation.transform_angle(pointAngle);
-    if (pair.second.rotationGroup) {
-      auto rotation = m_rotationGroups.get(*pair.second.rotationGroup);
-      if (!rotation) return std::unexpected(std::move(rotation.error()));
+    point_angle = transformation.transform_angle(point_angle);
+    if (light.rotation_group) {
+      auto rotation = m_rotationGroups.get(*light.rotation_group);
+      if (!rotation) return rollback(std::move(rotation.error()));
       auto const& rg = rotation->get();
-      float angle = sample ? angle_lerp(sample->interpolation(), rg.previousAngle, rg.currentAngle) : rg.currentAngle;
-      position = (position - pair.second.rotationCenter.value_or(rg.rotationCenter)).rotate(angle)
-          + pair.second.rotationCenter.value_or(rg.rotationCenter);
-      pointAngle += angle;
+      float angle = sample ? angle_lerp(sample->get().interpolation(), rg.previousAngle, rg.currentAngle) : rg.currentAngle;
+      Vec2F center = light.rotation_center.value_or(rg.rotationCenter);
+      position = (position - center).rotate(angle) + center;
+      point_angle += angle;
     }
-    position = globalTransformation().transform_point(position);
-    if (m_flipped.get()) {
-      if (pointAngle > 0)
-        pointAngle = std::numbers::pi / 2 + normalize_angle(std::numbers::pi / 2 - pointAngle);
+    if (!global)
+      global.emplace(globalTransformation());
+    position = global->transform_point(position);
+    if (flipped) {
+      if (point_angle > 0)
+        point_angle = std::numbers::pi / 2 + normalize_angle(std::numbers::pi / 2 - point_angle);
       else
-        pointAngle = -std::numbers::pi / 2 - normalize_angle(pointAngle + std::numbers::pi / 2);
+        point_angle = -std::numbers::pi / 2 - normalize_angle(point_angle + std::numbers::pi / 2);
     }
 
-    Color color = pair.second.color.get();
-    if (pair.second.flicker)
-      color.set_value(std::clamp(color.value() * pair.second.flicker->value(SinWeightOperator<float>()), 0.0f, 1.0f));
+    Color color = light.color.get();
+    if (light.flicker)
+      color.set_value(std::clamp(color.value() * light.flicker->value(SinWeightOperator<float>()), 0.0f, 1.0f));
 
-    lightSources.push_back(LightSource{position + translate, color.to_rgb_f(),
-                                       pair.second.pointLight ? LightType::Point : LightType::Spread,
-                                       pair.second.pointBeam, pointAngle, pair.second.beamAmbience});
+    lights.push_back(LightSource{position + translate, color.to_rgb_f(),
+                                 light.point_light ? LightType::Point : LightType::Spread,
+                                 light.point_beam, point_angle, light.beam_ambience});
   }
-  return lightSources;
+  return {};
 }
 
 std::expected<void, StarException> NetworkedAnimator::update(float dt, std::optional<std::reference_wrapper<DynamicTarget>> dynamicTarget) {
@@ -1978,8 +2000,8 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         }
       }
 
-      if (auto lightsOn = activeState.properties.find_ref("lightsOn")) {
-        auto entries = lightsOn->get().iterate_array();
+      if (auto lights_on = activeState.properties.find_ref("lightsOn")) {
+        auto entries = lights_on->get().iterate_array();
         if (!entries) return std::unexpected(std::move(entries.error()));
         for (auto const& nameJson : *entries) {
           auto name = nameJson.to_string();
@@ -1989,8 +2011,8 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
           entry->get().active.set(true);
         }
       }
-      if (auto lightsOff = activeState.properties.find_ref("lightsOff")) {
-        auto entries = lightsOff->get().iterate_array();
+      if (auto lights_off = activeState.properties.find_ref("lightsOff")) {
+        auto entries = lights_off->get().iterate_array();
         if (!entries) return std::unexpected(std::move(entries.error()));
         for (auto const& nameJson : *entries) {
           auto name = nameJson.to_string();
@@ -2323,18 +2345,18 @@ std::expected<void, StarException> NetworkedAnimator::setupNetStates() {
 
   for (auto& pair : m_lights) {
     if (auto registered = add_net_element(pair.second.active); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.xPosition); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.yPosition); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.x_position); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.y_position); !registered) return std::unexpected(std::move(registered.error()));
     if (auto registered = add_net_element(pair.second.color); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.pointAngle); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.point_angle); !registered) return std::unexpected(std::move(registered.error()));
 
-    pair.second.xPosition.set_fixed_point_base(0.0125f);
-    pair.second.yPosition.set_fixed_point_base(0.0125f);
-    pair.second.pointAngle.set_fixed_point_base(0.01f);
+    pair.second.x_position.set_fixed_point_base(0.0125f);
+    pair.second.y_position.set_fixed_point_base(0.0125f);
+    pair.second.point_angle.set_fixed_point_base(0.01f);
 
-    pair.second.xPosition.set_interpolator(lerp<float, float>);
-    pair.second.yPosition.set_interpolator(lerp<float, float>);
-    pair.second.pointAngle.set_interpolator(angle_lerp<float, float>);
+    pair.second.x_position.set_interpolator(lerp<float, float>);
+    pair.second.y_position.set_interpolator(lerp<float, float>);
+    pair.second.point_angle.set_interpolator(angle_lerp<float, float>);
   }
 
   for (auto& pair : m_sounds) {

@@ -174,7 +174,7 @@ public:
 
   const DirectivesGroup& parentDirectives() const;
   [[nodiscard]] std::expected<List<Drawable>, StarException> drawables(float interpolation = 1.0f) const;
-  [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources(float interpolation = 1.0f) const;
+  [[nodiscard]] std::expected<void, StarException> append_light_sources(List<LightSource>& lights, float interpolation = 1.0f) const;
   [[nodiscard]] std::expected<List<OverheadBar>, StarException> overhead_bars();
   bool toolUsageSuppressed() const;
 

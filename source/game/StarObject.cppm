@@ -126,7 +126,7 @@ public:
   [[nodiscard]] std::expected<std::optional<String>, StarException>
   inspectionDescription(String const& species) const override;
 
-  [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources() const override;
+  [[nodiscard]] std::expected<List<LightSource>, StarException> light_sources() const override;
 
   [[nodiscard]] std::expected<bool, StarException> should_destroy() const override;
   [[nodiscard]] std::expected<void, StarException>
@@ -287,7 +287,7 @@ private:
   EntityRenderLayer renderLayer() const;
 
   // Lights are sampled for display; emissions are collected once per logic tick.
-  [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources(NetworkedAnimator::Sample const* sample) const;
+  void append_configured_light_source(List<LightSource>& lights) const;
   [[nodiscard]] std::expected<void, StarException> collectParticles(RenderCallback& render_callback);
   [[nodiscard]] std::expected<void, StarException> collectSounds(RenderCallback& render_callback);
 

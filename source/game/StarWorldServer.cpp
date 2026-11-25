@@ -4020,7 +4020,7 @@ std::expected<float, StarException> WorldServer::windLevel(Vec2F const& pos) con
 }
 
 std::expected<float, StarException> WorldServer::lightLevel(Vec2F const& pos) const {
-  auto result445 = WorldImpl::lightLevel(this->root(), m_tileArray, m_entityMap, m_geometry, m_worldTemplate, m_sky, m_lightIntensityCalculator, pos);
+  auto result445 = WorldImpl::light_level(this->root(), m_tileArray, m_entityMap, m_geometry, m_worldTemplate, m_sky, m_lightIntensityCalculator, pos);
   if (!result445)
     return std::unexpected(std::move(result445.error()));
   return std::move(*result445);

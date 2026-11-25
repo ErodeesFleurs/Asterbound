@@ -131,7 +131,7 @@ public:
 
   // Gameplay affecting light sources (separate from light sources added during
   // rendering)
-  [[nodiscard]] virtual std::expected<List<LightSource>, StarException> lightSources() const;
+  [[nodiscard]] virtual std::expected<List<LightSource>, StarException> light_sources() const;
 
   // All damage sources for this frame.
   [[nodiscard]] virtual std::expected<List<DamageSource>, StarException> damageSources() const;

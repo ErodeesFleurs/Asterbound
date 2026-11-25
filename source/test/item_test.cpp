@@ -3398,7 +3398,7 @@ const GameTestRegistration
       if (test.name == "domaindefaults") {
         EXPECT_EQ((*config)->damageTeam.type, TeamType::Environment);
         EXPECT_EQ((*config)->damageTeam.team, 0u);
-        EXPECT_EQ((*config)->lightType, LightType::Point);
+        EXPECT_EQ((*config)->light_type, LightType::Point);
         EXPECT_FALSE((*config)->lightFlickering);
       } else if (test.name == "domainlighting") {
         EXPECT_EQ((*config)->damageTeam.type, TeamType::Environment);
@@ -3407,9 +3407,9 @@ const GameTestRegistration
         auto color = (*config)->lightColors.maybe("default");
         ASSERT_TRUE(color);
         EXPECT_EQ(*color, Color::rgb(10, 20, 30));
-        EXPECT_EQ((*config)->lightType, LightType::Spread);
-        EXPECT_FLOAT_EQ((*config)->pointBeam, 0.75f);
-        EXPECT_FLOAT_EQ((*config)->beamAmbience, 0.25f);
+        EXPECT_EQ((*config)->light_type, LightType::Spread);
+        EXPECT_FLOAT_EQ((*config)->point_beam, 0.75f);
+        EXPECT_FLOAT_EQ((*config)->beam_ambience, 0.25f);
         EXPECT_TRUE((*config)->lightFlickering);
       } else if (test.name == "domaincolors") {
         ASSERT_EQ((*config)->lightColors.size(), 1u);
@@ -3418,9 +3418,9 @@ const GameTestRegistration
         EXPECT_EQ(*color, Color::rgb(40, 50, 60));
       } else {
         EXPECT_TRUE((*config)->lightColors.empty());
-        EXPECT_EQ((*config)->lightType, LightType::Spread);
-        EXPECT_FLOAT_EQ((*config)->pointBeam, 0.0f);
-        EXPECT_FLOAT_EQ((*config)->beamAmbience, 0.0f);
+        EXPECT_EQ((*config)->light_type, LightType::Spread);
+        EXPECT_FLOAT_EQ((*config)->point_beam, 0.0f);
+        EXPECT_FLOAT_EQ((*config)->beam_ambience, 0.0f);
         EXPECT_FALSE((*config)->lightFlickering);
       }
     }

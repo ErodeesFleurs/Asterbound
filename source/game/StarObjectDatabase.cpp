@@ -644,11 +644,10 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
       return std::unexpected(std::move(lightPositionResult.error()));
     auto lightPosition = std::move(*lightPositionResult);
     orientation->lightPosition = std::move(lightPosition);
-    auto beamAngleResult = orientationSettings.get_float("beamAngle", 0.0f);
-    if (!beamAngleResult)
-      return std::unexpected(std::move(beamAngleResult.error()));
-    auto beamAngle = std::move(*beamAngleResult);
-    orientation->beamAngle = beamAngle * Constants::degrees_to_radians;
+    auto beam_angle = orientationSettings.get_float("beamAngle", 0.0f);
+    if (!beam_angle)
+      return std::unexpected(std::move(beam_angle.error()));
+    orientation->beam_angle = *beam_angle * Constants::degrees_to_radians;
     if (auto containsResult = orientationSettings.contains("particleEmitter"); !containsResult)
       return std::unexpected(std::move(containsResult.error()));
     else if (*containsResult) {
@@ -966,28 +965,18 @@ std::expected<void, StarException> readObjectLighting(Root& root, Json const& co
       }
     }
   }
-  auto type = config.opt_string("lightType");
+  auto type = parse_light_type(config);
   if (!type)
     return std::unexpected(std::move(type.error()));
-  if (*type) {
-    auto namedType = enum_value<LightTypeNames>(**type);
-    if (!namedType)
-      return std::unexpected(std::move(namedType.error()));
-    object.lightType = *namedType;
-  } else {
-    auto pointLight = config.get_bool("pointLight", false);
-    if (!pointLight)
-      return std::unexpected(std::move(pointLight.error()));
-    object.lightType = static_cast<LightType>(*pointLight);
-  }
-  auto pointBeam = config.get_float("pointBeam", 0.0f);
-  if (!pointBeam)
-    return std::unexpected(std::move(pointBeam.error()));
-  object.pointBeam = *pointBeam;
+  object.light_type = *type;
+  auto point_beam = config.get_float("pointBeam", 0.0f);
+  if (!point_beam)
+    return std::unexpected(std::move(point_beam.error()));
+  object.point_beam = *point_beam;
   auto ambience = config.get_float("beamAmbience", 0.0f);
   if (!ambience)
     return std::unexpected(std::move(ambience.error()));
-  object.beamAmbience = *ambience;
+  object.beam_ambience = *ambience;
   auto flickering = config.contains("flickerPeriod");
   if (!flickering)
     return std::unexpected(std::move(flickering.error()));

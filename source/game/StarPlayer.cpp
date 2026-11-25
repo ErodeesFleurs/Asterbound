@@ -1326,35 +1326,25 @@ bool Player::underwater() const {
   return maybeWorld()->get().liquidLevel(Vec2I(position() + m_config->underwaterSensor)).level >= m_config->underwaterMinWaterLevel;
 }
 
-std::expected<List<LightSource>, StarException> Player::lightSources() const {
-  return presentationLightSources(1.0f);
+std::expected<List<LightSource>, StarException> Player::light_sources() const {
+  return presentation_light_sources(1.0f);
 }
 
-std::expected<List<LightSource>, StarException> Player::presentationLightSources(float interpolation) const {
+std::expected<List<LightSource>, StarException> Player::presentation_light_sources(float interpolation) const {
   List<LightSource> lights;
-  auto toolsResult = m_tools->lightSources(interpolation);
-  if (!toolsResult)
-    return std::unexpected(std::move(toolsResult.error()));
-  auto tools = std::move(*toolsResult);
-  lights.append_range(std::move(tools));
-  auto statusResult = m_statusController->lightSources(interpolation);
-  if (!statusResult)
-    return std::unexpected(std::move(statusResult.error()));
-  auto status = std::move(*statusResult);
-  lights.append_range(std::move(status));
-  auto techResult = m_techController->lightSources(interpolation);
-  if (!techResult)
-    return std::unexpected(std::move(techResult.error()));
-  auto tech = std::move(*techResult);
-  lights.append_range(std::move(tech));
-  auto humanoidSample = humanoid()->networked_animator()->get().sample(interpolation);
-  if (auto prepared = humanoid()->prepare_animator_pose(humanoidSample); !prepared)
+  if (auto result = m_tools->append_light_sources(lights, interpolation); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = m_statusController->append_light_sources(lights, interpolation); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = m_techController->append_light_sources(lights, interpolation); !result)
+    return std::unexpected(std::move(result.error()));
+
+  auto actor = humanoid();
+  auto sample = actor->networked_animator()->get().sample(interpolation);
+  if (auto prepared = actor->prepare_animator_pose(sample); !prepared)
     return std::unexpected(std::move(prepared.error()));
-  auto humanoidLightsResult = humanoidSample.lightSources();
-  if (!humanoidLightsResult)
-    return std::unexpected(std::move(humanoidLightsResult.error()));
-  auto humanoidLights = std::move(*humanoidLightsResult);
-  lights.append_range(std::move(humanoidLights));
+  if (auto result = sample.append_light_sources(lights); !result)
+    return std::unexpected(std::move(result.error()));
   return lights;
 }
 
@@ -2700,13 +2690,12 @@ std::expected<void, StarException> Player::render(RenderCallback& render_callbac
 }
 
 std::expected<void, StarException> Player::render_light_sources(RenderCallback& render_callback) {
-  auto lightsResult = presentationLightSources(render_callback.presentation().interpolation());
-  if (!lightsResult)
-    return std::unexpected(std::move(lightsResult.error()));
-  auto lights = std::move(*lightsResult);
-  if (auto result = render_callback.add_light_sources(lights); !result)
+  auto lights = presentation_light_sources(render_callback.presentation().interpolation());
+  if (!lights)
+    return std::unexpected(std::move(lights.error()));
+  if (auto result = render_callback.add_light_sources(*lights); !result)
     return std::unexpected(std::move(result.error()));
-  return m_deployment->renderLightSources(render_callback);
+  return m_deployment->render_light_sources(render_callback);
 }
 
 std::expected<void, StarException> Player::setRenderLayer(std::optional<EntityRenderLayer> layer) {

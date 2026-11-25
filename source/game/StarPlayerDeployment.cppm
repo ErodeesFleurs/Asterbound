@@ -66,7 +66,7 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback, Vec2F const& position);
 
-  [[nodiscard]] std::expected<void, StarException> renderLightSources(RenderCallback& render_callback);
+  [[nodiscard]] std::expected<void, StarException> render_light_sources(RenderCallback& render_callback);
 private:
   Root& m_root;
   Json m_config;

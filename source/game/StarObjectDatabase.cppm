@@ -130,7 +130,7 @@ struct ObjectOrientation {
   std::optional<List<Vec2I>> interactiveSpaces;
 
   Vec2F lightPosition;
-  float beamAngle;
+  float beam_angle;
 
   List<ParticleEmissionEntry> particleEmitters;
 
@@ -171,9 +171,9 @@ struct ObjectConfig {
   bool interactive;
 
   StringMap<Color> lightColors;
-  LightType lightType;
-  float pointBeam;
-  float beamAmbience;
+  LightType light_type;
+  float point_beam;
+  float beam_ambience;
   std::optional<PeriodicFunction<float>> lightFlickering;
 
   String soundEffect;

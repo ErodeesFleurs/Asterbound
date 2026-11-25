@@ -256,6 +256,14 @@ fresh result from recycled storage, and a completed result is consumed only once
 World reset drains propagation and clears readiness before releasing world state.
 Synchronous calculations serialize with the asynchronous worker.
 
+Entity light lists have three owners: frame collection, the latest complete
+pending frame, and the active calculation. A successful collection exchanges
+its list with the pending list; the calculator takes that list under the same
+lock. A superseded frame can therefore be recycled without changing the lights
+of an in-flight calculation. Actor and tool lights append in their original
+order. Flashlight offsets are authored in pixels; inspection-tool offsets are
+already in tiles.
+
 Render-side borrowing ends before the displayed map is exchanged; the threaded
 renderer owns its image copy before returning. Buffer reuse does not change the
 spread/point algorithms, liquid correction, or independent CPU `world.lightLevel`

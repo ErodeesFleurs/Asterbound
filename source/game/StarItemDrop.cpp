@@ -626,11 +626,10 @@ std::expected<void, StarException> ItemDrop::render(RenderCallback& render_callb
 }
 
 std::expected<void, StarException> ItemDrop::render_light_sources(RenderCallback& render_callback) {
-  LightSource light;
-  light.type = LightType::Spread;
-  light.color = Vec3F::filled(20.f / 255.f);
-  light.position = position();
-  return render_callback.add_light_source(std::move(light));
+  return render_callback.add_light_source({
+      .position = position(),
+      .color = Vec3F::filled(20.f / 255.f),
+  });
 }
 
 MovementController& ItemDrop::movement_controller() {

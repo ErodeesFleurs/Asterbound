@@ -141,7 +141,9 @@ public:
     [[nodiscard]] std::expected<float, StarException> currentRotationAngle(String const& rotationGroup) const;
     [[nodiscard]] std::expected<List<Drawable>, StarException> drawables(Vec2F const& translate = Vec2F()) const;
     [[nodiscard]] std::expected<List<std::pair<Drawable, float>>, StarException> drawablesWithZLevel(Vec2F const& translate = Vec2F()) const;
-    [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources(Vec2F const& translate = Vec2F()) const;
+    [[nodiscard]] std::expected<List<LightSource>, StarException> light_sources(Vec2F const& translate = Vec2F()) const;
+    // Appends in animator order, leaving existing entries intact on query failure.
+    [[nodiscard]] std::expected<void, StarException> append_light_sources(List<LightSource>& lights, Vec2F const& translate = Vec2F()) const;
     [[nodiscard]] std::expected<bool, StarException> hasState(String const& type, std::optional<String> const& state = {}) const;
     [[nodiscard]] std::expected<bool, StarException> setLocalState(String const& type, String const& state, bool startNew = false, bool reverse = false);
     void setLocalTag(String name, std::optional<String> value = {});
@@ -279,11 +281,11 @@ public:
   // burstCount times
   [[nodiscard]] std::expected<void, StarException> burstParticleEmitter(String const& emitterName);
 
-  bool hasLight(String const& lightName) const;
-  [[nodiscard]] std::expected<void, StarException> setLightActive(String const& lightName, bool active);
-  [[nodiscard]] std::expected<void, StarException> setLightPosition(String const& lightName, Vec2F position);
-  [[nodiscard]] std::expected<void, StarException> setLightColor(String const& lightName, Color color);
-  [[nodiscard]] std::expected<void, StarException> setLightPointAngle(String const& lightName, float angle);
+  bool has_light(String const& light_name) const;
+  [[nodiscard]] std::expected<void, StarException> set_light_active(String const& light_name, bool active);
+  [[nodiscard]] std::expected<void, StarException> set_light_position(String const& light_name, Vec2F position);
+  [[nodiscard]] std::expected<void, StarException> set_light_color(String const& light_name, Color color);
+  [[nodiscard]] std::expected<void, StarException> set_light_point_angle(String const& light_name, float angle);
 
   bool hasSound(String const& soundName) const;
   [[nodiscard]] std::expected<void, StarException> setSoundPool(String const& soundName, StringList soundPool);
@@ -307,7 +309,9 @@ public:
   [[nodiscard]] std::expected<List<Drawable>, StarException> drawables(Vec2F const& translate = Vec2F()) const;
   [[nodiscard]] std::expected<List<std::pair<Drawable, float>>, StarException> drawablesWithZLevel(Vec2F const& translate = Vec2F()) const;
 
-  [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources(Vec2F const& translate = Vec2F()) const;
+  [[nodiscard]] std::expected<List<LightSource>, StarException> light_sources(Vec2F const& translate = Vec2F()) const;
+  // Appends in animator order, leaving existing entries intact on query failure.
+  [[nodiscard]] std::expected<void, StarException> append_light_sources(List<LightSource>& lights, Vec2F const& translate = Vec2F()) const;
 
   // Dynamic target is optional, if not given, generated particles and sounds
   // will be discarded
@@ -353,7 +357,7 @@ private:
   [[nodiscard]] std::expected<float, StarException> queryCurrentRotationAngle(String const& rotationGroup, Sample const* sample) const;
   [[nodiscard]] std::expected<List<Drawable>, StarException> queryDrawables(Vec2F const& translate, Sample const* sample) const;
   [[nodiscard]] std::expected<List<std::pair<Drawable, float>>, StarException> queryDrawablesWithZLevel(Vec2F const& translate, Sample const* sample) const;
-  [[nodiscard]] std::expected<List<LightSource>, StarException> queryLightSources(Vec2F const& translate, Sample const* sample) const;
+  [[nodiscard]] std::expected<void, StarException> append_light_sources(List<LightSource>& lights, Vec2F const& translate, std::optional<std::reference_wrapper<Sample const>> sample) const;
   explicit NetworkedAnimator(Root& root);
 
   struct RotationGroup {
@@ -432,19 +436,19 @@ private:
 
   struct Light {
     NetElementBool active;
-    NetElementFloat xPosition;
-    NetElementFloat yPosition;
+    NetElementFloat x_position;
+    NetElementFloat y_position;
     NetElementData<Color> color;
-    NetElementFloat pointAngle;
-    std::optional<String> anchorPart;
-    StringList transformationGroups;
-    std::optional<String> rotationGroup;
-    std::optional<Vec2F> rotationCenter;
+    NetElementFloat point_angle;
+    std::optional<String> anchor_part;
+    StringList transformation_groups;
+    std::optional<String> rotation_group;
+    std::optional<Vec2F> rotation_center;
 
     std::optional<PeriodicFunction<float>> flicker;
-    bool pointLight;
-    float pointBeam;
-    float beamAmbience;
+    bool point_light;
+    float point_beam;
+    float beam_ambience;
   };
 
   enum class SoundSignal {

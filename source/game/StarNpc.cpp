@@ -1252,11 +1252,10 @@ if (!result260) return std::unexpected(std::move(result260.error()));
 }
 
 std::expected<void, StarException> Npc::render_light_sources(RenderCallback& render_callback) {
-  auto result263 = presentationLightSources(render_callback.presentation().interpolation());
-if (!result263) return std::unexpected(std::move(result263.error()));
-auto result264 = render_callback.add_light_sources(*result263);
-if (!result264) return std::unexpected(std::move(result264.error()));
-  return {};
+  auto lights = presentation_light_sources(render_callback.presentation().interpolation());
+  if (!lights)
+    return std::unexpected(std::move(lights.error()));
+  return render_callback.add_light_sources(*lights);
 }
 
 void Npc::setPosition(Vec2F const& pos) {
@@ -2318,28 +2317,26 @@ void Npc::disableWornArmor(bool disable) {
   m_disableWornArmor.set(disable);
 }
 
-std::expected<List<LightSource>, StarException> Npc::lightSources() const {
-  return presentationLightSources(1.0f);
+std::expected<List<LightSource>, StarException> Npc::light_sources() const {
+  return presentation_light_sources(1.0f);
 }
 
-std::expected<List<LightSource>, StarException> Npc::presentationLightSources(float interpolation) const {
+std::expected<List<LightSource>, StarException> Npc::presentation_light_sources(float interpolation) const {
   List<LightSource> lights;
-  auto result498 = m_tools->lightSources(interpolation);
-if (!result498) return std::unexpected(std::move(result498.error()));
-lights.append_range(std::move(*result498));
-auto result499 = m_statusController->lightSources(interpolation);
-if (!result499) return std::unexpected(std::move(result499.error()));
-lights.append_range(std::move(*result499));
-auto result500 = humanoid();
-if (!result500) return std::unexpected(std::move(result500.error()));
-auto animator = (*result500)->networked_animator();
-auto humanoidSample = animator->get().sample(interpolation);
-auto prepared = (*result500)->prepare_animator_pose(humanoidSample);
-if (!prepared) return std::unexpected(std::move(prepared.error()));
-auto result501 = humanoidSample.lightSources();
-if (!result501) return std::unexpected(std::move(result501.error()));
-lights.append_range(std::move(*result501));
-return lights;
+  if (auto result = m_tools->append_light_sources(lights, interpolation); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = m_statusController->append_light_sources(lights, interpolation); !result)
+    return std::unexpected(std::move(result.error()));
+
+  auto actor = humanoid();
+  if (!actor)
+    return std::unexpected(std::move(actor.error()));
+  auto sample = (*actor)->networked_animator()->get().sample(interpolation);
+  if (auto prepared = (*actor)->prepare_animator_pose(sample); !prepared)
+    return std::unexpected(std::move(prepared.error()));
+  if (auto result = sample.append_light_sources(lights); !result)
+    return std::unexpected(std::move(result.error()));
+  return lights;
 }
 
 MessageResponseResult Npc::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {

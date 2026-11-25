@@ -280,27 +280,16 @@ projectileConfig->renderLayer = std::move(*result110);
 if (!result111) return std::unexpected(std::move(result111.error()));
 auto result112 = json_to_color(std::move(*result111));
 if (!result112) return std::unexpected(std::move(result112.error()));
-projectileConfig->lightColor = std::move(*result112);
+projectileConfig->light_color = std::move(*result112);
   auto result113 = config.get("lightPosition", JsonArray{0, 0});
 if (!result113) return std::unexpected(std::move(result113.error()));
 auto result114 = json_to_vec2f(std::move(*result113));
 if (!result114) return std::unexpected(std::move(result114.error()));
-projectileConfig->lightPosition = std::move(*result114);
-  auto result115 = config.opt_string("lightType");
-if (!result115) return std::unexpected(std::move(result115.error()));
-if (auto lightType = std::move(*result115))
-    {
-  auto result116 = enum_value<LightTypeNames>(*lightType);
-  if (!result116)
-    return std::unexpected(std::move(result116.error()));
-  projectileConfig->lightType = *result116;
-}
-  else
-    {
-auto result117 = config.get_bool("pointLight", false);
-if (!result117) return std::unexpected(std::move(result117.error()));
-projectileConfig->lightType = static_cast<LightType>(std::move(*result117));
-}
+projectileConfig->light_position = std::move(*result114);
+  auto light_type = parse_light_type(config);
+  if (!light_type)
+    return std::unexpected(std::move(light_type.error()));
+  projectileConfig->light_type = *light_type;
 
   auto result118 = config.get_string("persistentAudio", "");
 if (!result118) return std::unexpected(std::move(result118.error()));

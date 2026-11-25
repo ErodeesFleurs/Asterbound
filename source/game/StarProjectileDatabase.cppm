@@ -97,9 +97,9 @@ struct ProjectileConfig {
   bool fullbright = false;
   EntityRenderLayer renderLayer;
 
-  Color lightColor;
-  Vec2F lightPosition;
-  LightType lightType = LightType::Spread;
+  Color light_color;
+  Vec2F light_position;
+  LightType light_type = LightType::Spread;
 
   String persistentAudio;
 

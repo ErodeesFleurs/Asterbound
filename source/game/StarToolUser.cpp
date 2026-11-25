@@ -254,30 +254,29 @@ ItemDescriptor ToolUser::altHandItemDescriptor() const {
   return uninitItem(m_altHandItem.get());
 }
 
-[[nodiscard]] std::expected<List<LightSource>, StarException> ToolUser::lightSources(float interpolation) const {
+std::expected<void, StarException> ToolUser::append_light_sources(List<LightSource>& lights, float interpolation) const {
   if (m_suppress.get() || !m_user)
     return {};
 
-  List<LightSource> lights;
+  auto first_light = lights.size();
+  auto rollback = make_scope_exit([&] { lights.resize(first_light); });
   for (auto const& item : {m_primaryHandItem.get(), m_altHandItem.get()}) {
-    if (auto active = as<ActiveItem>(item)) {
-      auto sources = active->lights(interpolation);
-      if (!sources) return std::unexpected(std::move(sources.error()));
-      lights.append_range(*sources);
+    auto item_ref = optional_ref(item);
+    if (auto active = as_ref<ActiveItem>(item_ref)) {
+      if (auto result = active->get().append_light_sources(lights, interpolation); !result)
+        return std::unexpected(std::move(result.error()));
     }
-    if (auto flashlight = as<Flashlight>(item)) {
-      auto sources = flashlight->lightSources();
-      if (!sources) return std::unexpected(std::move(sources.error()));
-      lights.append_range(*sources);
+    if (auto flashlight = as_ref<Flashlight>(item_ref)) {
+      if (auto result = flashlight->get().append_light_sources(lights); !result)
+        return std::unexpected(std::move(result.error()));
     }
-    if (auto inspection = as<InspectionTool>(item)) {
-      auto sources = inspection->lightSources();
-      if (!sources) return std::unexpected(std::move(sources.error()));
-      lights.append_range(*sources);
+    if (auto inspection = as_ref<InspectionTool>(item_ref)) {
+      if (auto result = inspection->get().append_light_sources(lights); !result)
+        return std::unexpected(std::move(result.error()));
     }
   }
-
-  return lights;
+  rollback.release();
+  return {};
 }
 
 [[nodiscard]] std::expected<void, StarException> ToolUser::effects(EffectEmitter& emitter) const {

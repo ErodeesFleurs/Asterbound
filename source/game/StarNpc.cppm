@@ -216,7 +216,7 @@ public:
   [[nodiscard]] std::expected<StringSet, StarException> turnInQuests() const override;
   [[nodiscard]] std::expected<Vec2F, StarException> questIndicatorPosition() const override;
 
-  [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources() const override;
+  [[nodiscard]] std::expected<List<LightSource>, StarException> light_sources() const override;
 
   [[nodiscard]] MessageResponseResult receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) override;
 
@@ -307,7 +307,7 @@ public:
 
 private:
   explicit Npc(Root& rootContext);
-  [[nodiscard]] std::expected<List<LightSource>, StarException> presentationLightSources(float interpolation) const;
+  [[nodiscard]] std::expected<List<LightSource>, StarException> presentation_light_sources(float interpolation) const;
   [[nodiscard]] std::expected<void, StarException> update_humanoid_directives();
   DirectivesGroup m_presentationHumanoidDirectives;
   [[nodiscard]] std::expected<void, StarException> initialize(NpcVariant const& npcVariant);

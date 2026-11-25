@@ -119,7 +119,7 @@ public:
   std::expected<List<Drawable>, StarException> drawables() const override;
 
   [[nodiscard]]
-  std::expected<List<LightSource>, StarException> lightSources() const;
+  std::expected<void, StarException> append_light_sources(List<LightSource>& lights) const;
 
   [[nodiscard]]
   std::expected<float, StarException> inspectionHighlightLevel(std::shared_ptr<InspectableEntity> const& inspectableEntity) const;
@@ -145,11 +145,7 @@ private:
   Vec2F m_currentPosition;
 
   String m_image;
-  Vec2F m_handPosition;
-  Vec2F m_lightPosition;
-  Color m_lightColor;
-  float m_beamWidth;
-  float m_ambientFactor;
+  HandheldLight m_light;
 
   bool m_showHighlights;
   bool m_allowScanning;
@@ -179,22 +175,11 @@ std::expected<std::shared_ptr<InspectionTool>, StarException> InspectionTool::cr
   if (!image)
     return std::unexpected(std::move(image.error()));
   item->m_image = AssetPath::relative_to(directory, *image);
-  for (auto const& [key, target] : {std::pair{std::string_view("handPosition"), std::ref(item->m_handPosition)}, std::pair{std::string_view("lightPosition"), std::ref(item->m_lightPosition)}}) {
-    auto value = item->instance_value(key).and_then(json_to_vec2f);
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    target.get() = *value;
-  }
-  auto color = item->instance_value("lightColor").and_then(json_to_color);
-  if (!color)
-    return std::unexpected(std::move(color.error()));
-  item->m_lightColor = *color;
-  for (auto const& [key, target] : {std::pair{std::string_view("beamLevel"), std::ref(item->m_beamWidth)}, std::pair{std::string_view("beamAmbience"), std::ref(item->m_ambientFactor)}}) {
-    auto value = item->instance_value(key).and_then([](Json const& value) { return value.to_float(); });
-    if (!value)
-      return std::unexpected(std::move(value.error()));
-    target.get() = *value;
-  }
+  // Inspection and scanning assets express the two offsets in tiles.
+  auto light = parse_handheld_light(*item, 1.0f);
+  if (!light)
+    return std::unexpected(std::move(light.error()));
+  item->m_light = *light;
   for (auto const& [key, target] : {std::pair{std::string_view("showHighlights"), std::ref(item->m_showHighlights)}, std::pair{std::string_view("allowScanning"), std::ref(item->m_allowScanning)}}) {
     auto value = item->instance_value(key).and_then([](Json const& value) { return value.to_bool(); });
     if (!value)
@@ -254,35 +239,20 @@ std::expected<std::shared_ptr<Item>, StarException> InspectionTool::clone() cons
   return std::make_shared<InspectionTool>(*this);
 }
 
-std::expected<void, StarException> InspectionTool::update(float, FireMode fireMode, bool, HashSet<MoveControlType> const&) {
-  auto itemWorld = world();
-  if (!itemWorld)
-    return std::unexpected(std::move(itemWorld.error()));
-  auto itemOwner = owner();
-  if (!itemOwner)
-    return std::unexpected(std::move(itemOwner.error()));
-  auto itemHand = hand();
-  if (!itemHand)
-    return std::unexpected(std::move(itemHand.error()));
-  auto aimPosition = itemOwner->get().aimPosition();
-  if (!aimPosition)
-    return std::unexpected(std::move(aimPosition.error()));
-  m_currentAngle = itemWorld->get().geometry().diff(*aimPosition, itemOwner->get().position()).angle();
-  auto position = itemOwner->get().hand_position(*itemHand, m_lightPosition - m_handPosition);
-  if (!position)
-    return std::unexpected(std::move(position.error()));
-  m_currentPosition = itemOwner->get().position() + *position;
+std::expected<void, StarException> InspectionTool::update(float, FireMode fire_mode, bool, HashSet<MoveControlType> const&) {
+  auto pose = aimed_hand(m_light.light_offset);
+  if (!pose)
+    return std::unexpected(std::move(pose.error()));
+  m_currentAngle = pose->angle;
+  m_currentPosition = pose->position;
   root().spatialLogger().log_point("world", m_currentPosition, {0, 0, 255, 255});
-  if (fireMode != m_lastFireMode && fireMode != FireMode::None) {
-    auto inspectionPosition = itemOwner->get().aimPosition();
-    if (!inspectionPosition)
-      return std::unexpected(std::move(inspectionPosition.error()));
-    auto result = inspect(*inspectionPosition);
+  if (fire_mode != m_lastFireMode && fire_mode != FireMode::None) {
+    auto result = inspect(pose->aim_position);
     if (!result)
       return std::unexpected(std::move(result.error()));
     m_inspectionResults.push_back(std::move(*result));
   }
-  m_lastFireMode = fireMode;
+  m_lastFireMode = fire_mode;
   return {};
 }
 
@@ -290,39 +260,14 @@ std::expected<List<Drawable>, StarException> InspectionTool::drawables() const {
   auto metadata = root().image_metadata_database();
   if (!metadata)
     return std::unexpected(std::move(metadata.error()));
-  auto drawable = Drawable::make_image(**metadata, m_image, 1.0f / tile_pixels, true, -m_handPosition);
+  auto drawable = Drawable::make_image(**metadata, m_image, 1.0f / tile_pixels, true, m_light.drawable_offset);
   if (!drawable)
     return std::unexpected(std::move(drawable.error()));
   return List<Drawable>{std::move(*drawable)};
 }
 
-std::expected<List<LightSource>, StarException> InspectionTool::lightSources() const {
-  if (!initialized())
-    return List<LightSource>{};
-  auto itemWorld = world();
-  if (!itemWorld)
-    return std::unexpected(std::move(itemWorld.error()));
-  auto itemOwner = owner();
-  if (!itemOwner)
-    return std::unexpected(std::move(itemOwner.error()));
-  auto itemHand = hand();
-  if (!itemHand)
-    return std::unexpected(std::move(itemHand.error()));
-  auto aimPosition = itemOwner->get().aimPosition();
-  if (!aimPosition)
-    return std::unexpected(std::move(aimPosition.error()));
-  float angle = itemWorld->get().geometry().diff(*aimPosition, itemOwner->get().position()).angle();
-  auto position = itemOwner->get().hand_position(*itemHand, m_lightPosition - m_handPosition);
-  if (!position)
-    return std::unexpected(std::move(position.error()));
-  LightSource lightSource;
-  lightSource.type = LightType::Point;
-  lightSource.position = itemOwner->get().position() + *position;
-  lightSource.color = m_lightColor.to_rgb_f();
-  lightSource.pointBeam = m_beamWidth;
-  lightSource.beamAngle = angle;
-  lightSource.beamAmbience = m_ambientFactor;
-  return List<LightSource>{std::move(lightSource)};
+std::expected<void, StarException> InspectionTool::append_light_sources(List<LightSource>& lights) const {
+  return append_handheld_light(lights, m_light);
 }
 
 std::expected<float, StarException> InspectionTool::inspectionHighlightLevel(std::shared_ptr<InspectableEntity> const& inspectable) const {

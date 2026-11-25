@@ -51,7 +51,7 @@ private:
   List<std::shared_ptr<AudioInstance>> m_pendingAudios;
   List<std::shared_ptr<AudioInstance>> m_activeAudio;
   List<std::pair<Drawable, std::optional<EntityRenderLayer>>> m_drawables;
-  List<LightSource> m_lightSources;
+  List<LightSource> m_light_sources;
 };
 
 [[nodiscard]] inline std::expected<void, StarException> LuaScriptAnimation::context_setup() {
@@ -123,7 +123,7 @@ private:
     return {};
   }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.register_callback("clearLightSources", [&self = *this]() { self.m_lightSources.clear(); }); !result)
+  if (auto result = callbacks.register_callback("clearLightSources", [&self = *this]() { self.m_light_sources.clear(); }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("addLightSource", [&self = *this](LuaTable const& table) -> std::expected<void, StarException> {
     auto position = table.get<Vec2F>("position");
@@ -144,12 +144,12 @@ private:
     auto ambience = table.get<std::optional<float>>("beamAmbience");
     if (!ambience)
       return std::unexpected(std::move(ambience.error()));
-    self.m_lightSources.push_back({.position = *position,
+    self.m_light_sources.push_back({.position = *position,
                                    .color = color->to_rgb_f(),
-                                   .type = static_cast<LightType>(point->value_or(false)),
-                                   .pointBeam = beam->value_or(float{}),
-                                   .beamAngle = angle->value_or(float{}),
-                                   .beamAmbience = ambience->value_or(float{})});
+                                   .type = point->value_or(false) ? LightType::Point : LightType::Spread,
+                                   .point_beam = beam->value_or(float{}),
+                                   .beam_angle = angle->value_or(float{}),
+                                   .beam_ambience = ambience->value_or(float{})});
     return {};
   }); !result)
     return std::unexpected(std::move(result.error()));
@@ -158,7 +158,7 @@ private:
 
 inline List<std::pair<Drawable, std::optional<EntityRenderLayer>>> const& LuaScriptAnimation::drawables() { return m_drawables; }
 
-inline List<LightSource> const& LuaScriptAnimation::light_sources() { return m_lightSources; }
+inline List<LightSource> const& LuaScriptAnimation::light_sources() { return m_light_sources; }
 
 inline List<Particle> LuaScriptAnimation::pull_new_particles() { return std::exchange(m_pendingParticles, {}); }
 

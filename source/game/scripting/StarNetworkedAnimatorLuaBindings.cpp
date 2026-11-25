@@ -334,28 +334,28 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeNetworkedAnimatorCal
   if (auto result = callbacks.register_callback_with_signature<void, String, bool>(
         "setLightActive",
         [&networkedAnimator](String const& light, bool active) {
-          return networkedAnimator.setLightActive(light, active);
+          return networkedAnimator.set_light_active(light, active);
         });
       !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback_with_signature<void, String, Vec2F>(
         "setLightPosition",
         [&networkedAnimator](String const& light, Vec2F position) {
-          return networkedAnimator.setLightPosition(light, position);
+          return networkedAnimator.set_light_position(light, position);
         });
       !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback_with_signature<void, String, Color>(
         "setLightColor",
         [&networkedAnimator](String const& light, Color color) {
-          return networkedAnimator.setLightColor(light, color);
+          return networkedAnimator.set_light_color(light, color);
         });
       !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback_with_signature<void, String, float>(
         "setLightPointAngle",
         [&networkedAnimator](String const& light, float angle) {
-          return networkedAnimator.setLightPointAngle(light, angle);
+          return networkedAnimator.set_light_point_angle(light, angle);
         });
       !result)
     return std::unexpected(std::move(result.error()));

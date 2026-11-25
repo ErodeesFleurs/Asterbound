@@ -111,10 +111,10 @@ namespace WorldImpl {
   };
 
   template <typename Tiles>
-  concept collision_cache_tiles = std::derived_from<typename Tiles::Tile, WorldTile>
+  concept world_tile_array = std::derived_from<typename Tiles::Tile, WorldTile>
       && std::same_as<Tiles, TileSectorArray<typename Tiles::Tile, Tiles::sector_size>>;
 
-  template <collision_cache_tiles Tiles>
+  template <world_tile_array Tiles>
   void invalidate_collision_cache(Tiles& tiles, RectI const& changed) {
     auto size = tiles.size();
     if (changed.is_empty() || !size[0] || !size[1]) return;
@@ -139,7 +139,7 @@ namespace WorldImpl {
     });
   }
 
-  template <collision_cache_tiles Tiles>
+  template <world_tile_array Tiles>
   [[nodiscard]] std::expected<void, StarException> refresh_collision_cache(Tiles& tiles, RectI const& region,
       CollisionGenerator const& generator) {
     return tiles.visit_loaded_sectors(region, [&](typename Tiles::Array& sector, RectI const& window,
@@ -174,7 +174,7 @@ namespace WorldImpl {
     });
   }
 
-  template <collision_cache_tiles Tiles, typename KindFor>
+  template <world_tile_array Tiles, typename KindFor>
     requires std::invocable<KindFor&, Vec2I const&, typename Tiles::Tile const&>
         && std::same_as<std::invoke_result_t<KindFor&, Vec2I const&, typename Tiles::Tile const&>, CollisionKind>
   [[nodiscard]] std::expected<bool, StarException> collision_blocks_satisfy(Tiles& tiles, RectI const& region,
@@ -243,10 +243,10 @@ namespace WorldImpl {
   std::expected<bool, StarException> breathable(Root& root, World const& world, std::shared_ptr<TileSectorArray> const& tileSectorArray, HashMap<DungeonId, bool> const& breathableMap,
       std::shared_ptr<WorldTemplate const> const& worldTemplate, Vec2F const& pos);
 
-  template <typename TileSectorArray>
+  template <world_tile_array Tiles>
   [[nodiscard]]
-  std::expected<float, StarException> lightLevel(Root& root, std::shared_ptr<TileSectorArray> const& tileSectorArray, std::shared_ptr<EntityMap> const& entityMap, WorldGeometry const& worldGeometry,
-      std::shared_ptr<WorldTemplate const> const& worldTemplate, std::shared_ptr<Sky const> const& sky, CellularLightIntensityCalculator& lighting, Vec2F pos);
+  std::expected<float, StarException> light_level(Root& root, std::shared_ptr<Tiles> const& tiles, std::shared_ptr<EntityMap> const& entity_map, WorldGeometry const& world_geometry,
+      std::shared_ptr<WorldTemplate const> const& world_template, std::shared_ptr<Sky const> const& sky, CellularLightIntensityCalculator& lighting, Vec2F pos);
 
   [[nodiscard]]
   std::expected<std::shared_ptr<InteractiveEntity>, StarException> getInteractiveInRange(WorldGeometry const& geometry, std::shared_ptr<EntityMap> const& entityMap,
@@ -708,71 +708,71 @@ namespace WorldImpl {
     return environmentBreathable && foregroundBreathable && liquidBreathable;
   }
 
-  template <typename TileSectorArray>
+  template <world_tile_array Tiles>
   [[nodiscard]]
-  std::expected<float, StarException> lightLevel(Root& root, std::shared_ptr<TileSectorArray> const& tileSectorArray, std::shared_ptr<EntityMap> const& entityMap, WorldGeometry const& worldGeometry,
-      std::shared_ptr<WorldTemplate const> const& worldTemplate, std::shared_ptr<Sky const> const& sky, CellularLightIntensityCalculator& lighting, Vec2F pos) {
-    if (pos[1] < 0 || pos[1] >= worldGeometry.height())
+  std::expected<float, StarException> light_level(Root& root, std::shared_ptr<Tiles> const& tiles, std::shared_ptr<EntityMap> const& entity_map, WorldGeometry const& world_geometry,
+      std::shared_ptr<WorldTemplate const> const& world_template, std::shared_ptr<Sky const> const& sky, CellularLightIntensityCalculator& lighting, Vec2F pos) {
+    if (pos[1] < 0 || pos[1] >= world_geometry.height())
       return 0;
 
     // Normalize the floating-point input before constructing integer lighting bounds.
-    pos = worldGeometry.xwrap(pos);
+    pos = world_geometry.xwrap(pos);
 
-    Vec3F environmentLight = sky->environmentLight().to_rgb_f();
-    float undergroundLevel = worldTemplate->undergroundLevel();
-    auto materialDatabase = root.materialDatabase();
-    if (!materialDatabase)
-      return std::unexpected(std::move(materialDatabase.error()));
-    auto liquidsDatabase = root.liquidsDatabase();
-    if (!liquidsDatabase)
-      return std::unexpected(std::move(liquidsDatabase.error()));
+    Vec3F environment_light = sky->environmentLight().to_rgb_f();
+    float underground_level = world_template->undergroundLevel();
+    auto materials = root.materialDatabase();
+    if (!materials)
+      return std::unexpected(std::move(materials.error()));
+    auto liquids = root.liquidsDatabase();
+    if (!liquids)
+      return std::unexpected(std::move(liquids.error()));
 
     auto begun = lighting.begin(pos);
     if (!begun) return std::unexpected(std::move(begun.error()));
 
     // Each column in tile_eval_columns is guaranteed to be no larger than the
     // sector size.
-    CellularLightIntensityCalculator::Cell lightingCellColumn[world_sector_size];
-    auto evaluated = tileSectorArray->tile_eval_columns(lighting.calculation_region(), [&](Vec2I const& pos, std::span<typename TileSectorArray::Tile> column) -> std::expected<void, StarException> {
+    std::array<CellularLightIntensityCalculator::Cell, Tiles::sector_size> lighting_column;
+    auto evaluated = tiles->tile_eval_columns(lighting.calculation_region(), [&](Vec2I const& pos, std::span<typename Tiles::Tile> column) -> std::expected<void, StarException> {
         for (std::size_t y = 0; y < column.size(); ++y) {
           auto& tile = column[y];
-          auto& cell = lightingCellColumn[y];
+          auto& cell = lighting_column[y];
 
-          auto backgroundTransparent = (*materialDatabase)->backgroundLightTransparent(tile.background);
-          if (!backgroundTransparent)
-            return std::unexpected(std::move(backgroundTransparent.error()));
-          auto foregroundTransparency = (*materialDatabase)->foregroundLightTransparent(tile.foreground);
-          if (!foregroundTransparency)
-            return std::unexpected(std::move(foregroundTransparency.error()));
-          bool foregroundTransparent = *foregroundTransparency && tile.getCollision() != CollisionKind::Dynamic;
+          auto background_transparent = (*materials)->backgroundLightTransparent(tile.background);
+          if (!background_transparent)
+            return std::unexpected(std::move(background_transparent.error()));
+          auto foreground_transparency = (*materials)->foregroundLightTransparent(tile.foreground);
+          if (!foreground_transparency)
+            return std::unexpected(std::move(foreground_transparency.error()));
+          bool foreground_transparent = *foreground_transparency && tile.getCollision() != CollisionKind::Dynamic;
 
-          cell = {(*materialDatabase)->radiantLight(tile.foreground, tile.foregroundMod).sum() / 3.0f, !foregroundTransparent};
-          cell.light += (*liquidsDatabase)->radiantLight(tile.liquid).sum() / 3.0f;
-          if (foregroundTransparent) {
-            cell.light += (*materialDatabase)->radiantLight(tile.background, tile.backgroundMod).sum() / 3.0f;
-            if (*backgroundTransparent && pos[1] > undergroundLevel)
-              cell.light += environmentLight.sum() / 3.0f;
+          cell = {(*materials)->radiantLight(tile.foreground, tile.foregroundMod).sum() / 3.0f, !foreground_transparent};
+          cell.light += (*liquids)->radiantLight(tile.liquid).sum() / 3.0f;
+          if (foreground_transparent) {
+            cell.light += (*materials)->radiantLight(tile.background, tile.backgroundMod).sum() / 3.0f;
+            if (*background_transparent && pos[1] > underground_level)
+              cell.light += environment_light.sum() / 3.0f;
           }
         }
-        lighting.set_cell_column(pos, std::span(lightingCellColumn).first(column.size()));
+        lighting.set_cell_column(pos, std::span(lighting_column).first(column.size()));
         return {};
       });
 
     if (!evaluated)
       return std::unexpected(std::move(evaluated.error()));
-    auto entities = entityMap->entity_query(RectF(lighting.calculation_region()));
+    auto entities = entity_map->entity_query(RectF(lighting.calculation_region()));
     if (!entities)
       return std::unexpected(std::move(entities.error()));
     for (auto const& entity : *entities) {
-      auto lights = entity->lightSources();
+      auto lights = entity->light_sources();
       if (!lights)
         return std::unexpected(std::move(lights.error()));
       for (auto const& light : *lights) {
-        Vec2F position = worldGeometry.nearest_to(Vec2F(lighting.calculation_region().min()), light.position);
+        Vec2F position = world_geometry.nearest_to(Vec2F(lighting.calculation_region().min()), light.position);
         if (light.type == LightType::Spread)
           lighting.add_spread_light(position, light.color.sum() / 3.0f);
         else
-          lighting.add_point_light(position, light.color.sum() / 3.0f, light.pointBeam, light.beamAngle, light.beamAmbience);
+          lighting.add_point_light(position, light.color.sum() / 3.0f, light.point_beam, light.beam_angle, light.beam_ambience);
       }
     }
 
@@ -919,7 +919,7 @@ export namespace Star::WorldImpl {
   using ::Star::WorldImpl::splitTileModifications;
   using ::Star::WorldImpl::windLevel;
   using ::Star::WorldImpl::breathable;
-  using ::Star::WorldImpl::lightLevel;
+  using ::Star::WorldImpl::light_level;
   using ::Star::WorldImpl::getInteractiveInRange;
   using ::Star::WorldImpl::isTileEntityInRange;
   using ::Star::WorldImpl::can_reach_entity;

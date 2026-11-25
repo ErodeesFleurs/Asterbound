@@ -698,12 +698,9 @@ if (!result904) return std::unexpected(std::move(result904.error()));
 }
 
 std::expected<void, StarException> Projectile::render_light_sources(RenderCallback& render_callback) {
-  auto lights = render_callback.add_light_sources(m_renderLights);
-  if (!lights)
-    return std::unexpected(std::move(lights.error()));
-  auto result899 = render_callback.add_light_source({position(), m_config->lightColor.to_rgb_f(), m_config->lightType, 0.0f, 0.0f, 0.0f});
-if (!result899) return std::unexpected(std::move(result899.error()));
-  return {};
+  if (auto added = render_callback.add_light_sources(m_render_lights); !added)
+    return std::unexpected(std::move(added.error()));
+  return render_callback.add_light_source({position(), m_config->light_color.to_rgb_f(), m_config->light_type});
 }
 
 MessageResponseResult Projectile::receiveMessage(ConnectionId sendingConnection, String const& message, JsonArray const& args) {
@@ -1506,19 +1503,19 @@ sound->set_pitch_multiplier(std::move(*result868));
 m_pendingRenderables.push_back(std::move(sound));
 
   } else if (command == "light") {
-    auto result869 = world();
-if (!result869) return std::unexpected(std::move(result869.error()));
-if (!result869->get().isClient())
+    auto current_world = world();
+    if (!current_world)
+      return std::unexpected(std::move(current_world.error()));
+    if (!current_world->get().isClient())
       return {};
 
-    auto result870 = parameters.get("color");
-if (!result870) return std::unexpected(std::move(result870.error()));
-auto result871 = json_to_color(std::move(*result870));
-if (!result871) return std::unexpected(std::move(result871.error()));
-auto result872 = parameters.get_bool("pointLight", true);
-if (!result872) return std::unexpected(std::move(result872.error()));
-m_pendingRenderables.push_back(LightSource{position(), std::move(*result871).to_rgb_f(),
-                                           static_cast<LightType>(std::move(*result872)), 0.0f, 0.0f, 0.0f});
+    auto color = parameters.get("color").and_then([](Json const& value) { return json_to_color(value); });
+    if (!color)
+      return std::unexpected(std::move(color.error()));
+    auto point = parameters.get_bool("pointLight", true);
+    if (!point)
+      return std::unexpected(std::move(point.error()));
+    m_pendingRenderables.push_back(LightSource{position(), color->to_rgb_f(), *point ? LightType::Point : LightType::Spread});
 
   } else if (command == "option") {
     auto result873 = parameters.get_array("options");
@@ -1826,7 +1823,7 @@ if (!result680) return std::unexpected(std::move(result680.error()));
 }
 
 std::expected<void, StarException> Projectile::collectPendingRenderEvents(RenderCallback& render_callback) {
-  m_renderLights.clear();
+  m_render_lights.clear();
   for (auto const& renderable : m_pendingRenderables) {
     if (std::holds_alternative<std::shared_ptr<AudioInstance>>(renderable))
       {
@@ -1838,8 +1835,8 @@ if (!result668) return std::unexpected(std::move(result668.error()));
 auto result669 = render_callback.add_particle(Particle(std::get<Particle>(renderable)));
 if (!result669) return std::unexpected(std::move(result669.error()));
 }
-    else if (auto light = std::get_if<LightSource>(&renderable))
-  m_renderLights.push_back(*light);
+    else
+      m_render_lights.push_back(std::get<LightSource>(renderable));
   }
   m_pendingRenderables.clear();
   return {};

@@ -284,7 +284,7 @@ public:
   [[nodiscard]] std::expected<String, StarException> description() const override;
   void setDescription(String const& description);
 
-  [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources() const override;
+  [[nodiscard]] std::expected<List<LightSource>, StarException> light_sources() const override;
 
   Direction walkingDirection() const override;
   Direction facingDirection() const override;
@@ -648,7 +648,7 @@ private:
   [[nodiscard]] std::expected<void, StarException> setNetArmorSecrets(bool includeEmpty = false);
 
   [[nodiscard]] std::expected<List<Drawable>, StarException> drawables(float interpolation = 1.0f) const;
-  [[nodiscard]] std::expected<List<LightSource>, StarException> presentationLightSources(float interpolation) const;
+  [[nodiscard]] std::expected<List<LightSource>, StarException> presentation_light_sources(float interpolation) const;
   [[nodiscard]] std::expected<void, StarException> update_humanoid_directives();
   [[nodiscard]] std::expected<List<Particle>, StarException> particles();
   [[nodiscard]] std::expected<String, StarException> getFootstepSound(Vec2I const& sensor) const;

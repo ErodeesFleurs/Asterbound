@@ -151,7 +151,7 @@ public:
   [[nodiscard]] std::expected<String, StarException> name() const override;
   [[nodiscard]] std::expected<String, StarException> description() const override;
 
-  [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources() const override;
+  [[nodiscard]] std::expected<List<LightSource>, StarException> light_sources() const override;
 
   [[nodiscard]] std::expected<std::optional<HitType>, StarException> queryHit(DamageSource const& source) const override;
   [[nodiscard]] std::expected<std::optional<PolyF>, StarException> hitPoly() const override;

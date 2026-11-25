@@ -137,7 +137,7 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> render_light_sources(RenderCallback& renderer) override;
 
-  [[nodiscard]] std::expected<List<LightSource>, StarException> lightSources() const override;
+  [[nodiscard]] std::expected<List<LightSource>, StarException> light_sources() const override;
 
   [[nodiscard]] std::expected<bool, StarException> should_destroy() const override;
   [[nodiscard]] std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) override;

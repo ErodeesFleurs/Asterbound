@@ -261,7 +261,7 @@ private:
   OrderedHashMap<String, PhysicsCollisionConfig> m_physicsCollisions;
 
   List<std::variant<std::shared_ptr<AudioInstance>, Particle, LightSource>> m_pendingRenderables;
-  List<LightSource> m_renderLights;
+  List<LightSource> m_render_lights;
 };
 
 }

@@ -234,7 +234,7 @@ std::expected<void, StarException> PlayerDeployment::render(RenderCallback& rend
   return {};
 }
 
-std::expected<void, StarException> PlayerDeployment::renderLightSources(RenderCallback& render_callback) {
+std::expected<void, StarException> PlayerDeployment::render_light_sources(RenderCallback& render_callback) {
   return render_callback.add_light_sources(m_scriptComponent.light_sources());
 }
 

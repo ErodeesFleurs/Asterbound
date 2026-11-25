@@ -51,6 +51,7 @@ import star.string;
 import star.string_view;
 import star.liquid_types;
 import star.material_types;
+import star.tool_user;
 import star.uuid;
 import star.vector;
 import star.world_server;
@@ -174,6 +175,39 @@ std::expected<std::unique_ptr<Root>, StarException> human_animation_root(GameTes
   return Root::create(std::move(settings));
 }
 }// namespace
+
+const GameTestRegistration handheld_light_units(
+  "LightSourceTest", "EquippedToolsKeepTheirAuthoredOffsetUnits", [](GameTest& fixture) {
+    PlayerWorldContext setup;
+    auto& root = fixture.root();
+    if (!fixture.check(bool(setup.init(root)), "initialize player world")) return;
+    auto& player = *setup.player;
+    if (!fixture.check(bool(player.moveTo(Vec2F(100, 100))), "position player")) return;
+    player.aim(player.position() + Vec2F(20, 0));
+    auto tools = ToolUser::create(root);
+    if (!fixture.check(tools && (*tools)->init(player), "initialize tool hands")) return;
+    auto cleanup = make_scope_exit([&] { fixture.check(bool((*tools)->uninit()), "release tool hands"); });
+    auto database = root.itemDatabase();
+    if (!fixture.check(bool(database), "load item database")) return;
+
+    using ToolScale = std::pair<std::string_view, float>;
+    for (auto const& [name, units_per_tile] : {ToolScale{"flashlight", tile_pixels}, ToolScale{"scanmode", 1.f}}) {
+      auto descriptor = ItemDescriptor::create(name, 1, JsonObject{
+        {"handPosition", JsonArray{1, 2}}, {"lightPosition", JsonArray{5, 3}},
+        {"beamLevel", .75}, {"beamAmbience", .125}});
+      if (!fixture.check(bool(descriptor), "create tool descriptor")) return;
+      auto item = (*database)->item(*descriptor);
+      if (!fixture.check(item && (*tools)->setItems(*item, {}), "equip tool")) return;
+      List<LightSource> lights;
+      if (!fixture.check(bool((*tools)->append_light_sources(lights)) && lights.size() == 1, name)) return;
+      auto expected_hand = player.hand_position(ToolHand::Primary, Vec2F(4, 1) / units_per_tile);
+      if (!fixture.check(bool(expected_hand), "resolve hand anchor")) return;
+      auto const& light = lights.front();
+      fixture.check(light.position == player.position() + *expected_hand, name);
+      fixture.check(light.type == LightType::Point && light.point_beam == .75f &&
+          light.beam_ambience == .125f && light.beam_angle == 0.f, "keep authored beam and aim");
+    }
+  });
 
 const GameTestRegistration self_damage_history(
   "StatusControllerTest", "SelfDamageRecordedOnceForObserversAndPendingDelivery", [](GameTest& fixture) {
@@ -806,7 +840,7 @@ const GameTestRegistration animatorSemanticSampling(
     auto config = Json::parse(R"({
       "version":1,
       "transformationGroups":{"moving":{}},
-      "rotationGroups":{"aim":{"angularVelocity":2}},
+      "rotationGroups":{"aim":{"angularVelocity":2,"rotationCenter":[1,2]}},
       "animatedParts":{
         "stateTypes":{"movement":{"default":"walk","states":{
           "walk":{"frames":2,"cycle":1,"mode":"loop"},
@@ -820,7 +854,13 @@ const GameTestRegistration animatorSemanticSampling(
           }}}
         }}
       },
-      "lights":{"glow":{"active":true,"position":[0,0],"color":[255,255,255],"anchorPart":"body"}}
+      "lights":{
+        "glow":{"position":[0,0],"color":[255,255,255],"anchorPart":"body"},
+        "beam":{"position":[2,1],"pointLight":true,"pointAngle":-30,"pointBeam":0.75,"beamAmbience":0.25,
+                "rotationGroup":"aim","rotationCenter":[2,0]},
+        "rim":{"position":[2,2],"pointLight":true,"pointAngle":30,"rotationGroup":"aim"},
+        "zBroken":{"active":false,"anchorPart":"missing"}
+      }
     })");
     ASSERT_TRUE(config);
     auto made = NetworkedAnimator::create(fixture.root(), *config);
@@ -859,10 +899,55 @@ const GameTestRegistration animatorSemanticSampling(
       auto expected = line;
       expected.transform(Mat3F::translation({2.8f, 0}));
       EXPECT_NEAR((*drawables)[0].position[0], expected.position[0], 1e-5f);
-      auto lights = sample.lightSources();
-      ASSERT_TRUE(lights);
-      ASSERT_EQ(lights->size(), 1u);
-      EXPECT_NEAR((*lights)[0].position[0], 2.8f, 1e-5f);
+      constexpr float pi = std::numbers::pi_v<float>;
+      Vec2F const translation{3, -4};
+      auto lights = sample.light_sources(translation);
+      if (!fixture.check(bool(lights), "sampled animator lights")
+          || !fixture.check(lights->size() == 3u, "three active lights in animator order"))
+        return;
+      auto const& beam = (*lights)[0];
+      auto check_near = [&](float actual, float expected, std::string_view what,
+                            std::source_location at = std::source_location::current()) {
+        fixture.check(std::abs(actual - expected) <= 1e-5f, what, at);
+      };
+      fixture.check(beam.type == LightType::Point, "beam is a point light");
+      fixture.check(beam.point_beam == .75f, "configured beam strength");
+      fixture.check(beam.beam_ambience == .25f, "configured beam ambience");
+      check_near(beam.position[0], 5.f - std::sin(.25f), "beam x uses the overridden pivot");
+      check_near(beam.position[1], -4.f + std::cos(.25f), "beam y uses the overridden pivot");
+      check_near(beam.beam_angle, -pi / 6 + .25f, "beam angle includes sampled rotation");
+      check_near((*lights)[1].position[0], 5.8f, "glow tracks the animated anchor");
+      check_near((*lights)[2].position[0], 4.f + std::cos(.25f), "rim x uses the inherited pivot");
+      check_near((*lights)[2].position[1], -2.f + std::sin(.25f), "rim y uses the inherited pivot");
+      check_near((*lights)[2].beam_angle, pi / 6 + .25f, "rim angle includes sampled rotation");
+
+      animator.setZoom(2);
+      animator.setFlipped(true, 1);
+      List<LightSource> appended{beam};
+      if (!fixture.check(bool(sample.append_light_sources(appended, translation)), "append flipped sampled lights")
+          || !fixture.check(appended.size() == 4u, "three lights were appended"))
+        return;
+      fixture.check(appended[0].position == beam.position, "append preserves the existing light");
+      check_near(appended[1].position[0], 1.f + 2.f * std::sin(.25f), "flipped beam x uses the global center and zoom");
+      check_near(appended[1].position[1], -4.f + 2.f * std::cos(.25f), "flipped beam y uses global zoom");
+      check_near(appended[1].beam_angle, -pi - beam.beam_angle, "flipped negative beam angle");
+      check_near(appended[2].position[0], -.6f, "flipped glow still tracks the animated anchor");
+      check_near(appended[3].beam_angle, pi - (*lights)[2].beam_angle, "flipped positive beam angle");
+      auto logical_lights = animator.light_sources(translation);
+      if (!fixture.check(bool(logical_lights), "logical animator lights")
+          || !fixture.check(logical_lights->size() == 3u, "three active logical lights"))
+        return;
+      check_near((*logical_lights)[0].position[0], 1.f + 2.f * std::sin(.5f), "logical beam uses current rather than sampled rotation");
+      check_near((*logical_lights)[0].beam_angle, -pi + pi / 6 - .5f, "logical flipped beam angle");
+      if (!fixture.check(bool(animator.set_light_active("zBroken", true)), "enable the invalid light"))
+        return;
+      fixture.check(!sample.append_light_sources(appended, translation), "invalid anchor fails the append");
+      fixture.check(appended.size() == 4u, "failed append rolls back new lights");
+      fixture.check(!appended.empty() && appended[0].position == beam.position, "failed append preserves the original light");
+      if (!fixture.check(bool(animator.set_light_active("zBroken", false)), "disable the invalid light"))
+        return;
+      animator.setFlipped(false);
+      animator.setZoom(1);
       ASSERT_TRUE(sample.setLocalState("movement", "stop"));
       EXPECT_FALSE(sample.setLocalState("movement", "missing"));
       sample.setLocalTag("pose", "sampled");
@@ -980,7 +1065,7 @@ const GameTestRegistration sampledPartTransformOverrides(
       auto final = global * child;
       auto point = view.partPoint("child", "point");
       auto poly = view.partPoly("child", "poly");
-      auto lights = view.lightSources();
+      auto lights = view.light_sources();
       auto drawables = view.drawables();
       ASSERT_TRUE(point);
       ASSERT_TRUE(*point);
@@ -1656,25 +1741,25 @@ const GameTestRegistration humanoidTickOwnedPose(
     ASSERT_TRUE(logicalHead);
     ASSERT_TRUE(logicalArm);
     for (float alpha : {0.f, .5f, 1.f, .5f}) {
-      List<LightSource> sampledLights;
+      List<LightSource> sampled_lights;
       {
         auto sample = animator.sample(alpha);
         ASSERT_TRUE(humanoid.prepare_animator_pose(sample));
-        auto freshLights = sample.lightSources();
-        ASSERT_TRUE(freshLights);
-        ASSERT_EQ(freshLights->size(), 2u);
-        sampledLights = *freshLights;
+        if (!fixture.check(bool(sample.append_light_sources(sampled_lights)), "append lights before rendering")
+            || !fixture.check(sampled_lights.size() == 2u, "two lights before rendering"))
+          return;
       }
       {
         auto sample = animator.sample(alpha);
         auto drawables = humanoid.render(sample, true, true);
         ASSERT_TRUE(drawables) << drawables.error().what();
-        auto afterGeometry = sample.lightSources();
-        ASSERT_TRUE(afterGeometry);
-        ASSERT_EQ(afterGeometry->size(), sampledLights.size());
-        for (std::size_t i = 0; i != sampledLights.size(); ++i) {
-          EXPECT_NEAR((*afterGeometry)[i].position[0], sampledLights[i].position[0], 1e-5f);
-          EXPECT_NEAR((*afterGeometry)[i].position[1], sampledLights[i].position[1], 1e-5f);
+        auto after_geometry = sample.light_sources();
+        if (!fixture.check(bool(after_geometry), "query lights after rendering")
+            || !fixture.check(after_geometry->size() == sampled_lights.size(), "rendering preserves the light count"))
+          return;
+        for (std::size_t i = 0; i != sampled_lights.size(); ++i) {
+          fixture.check(std::abs((*after_geometry)[i].position[0] - sampled_lights[i].position[0]) <= 1e-5f, "rendering preserves the light x position");
+          fixture.check(std::abs((*after_geometry)[i].position[1] - sampled_lights[i].position[1]) <= 1e-5f, "rendering preserves the light y position");
         }
       }
       auto preservedMouth = humanoid.mouth_offset();

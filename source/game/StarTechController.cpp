@@ -437,20 +437,18 @@ std::expected<List<Drawable>, StarException> TechController::frontDrawables(floa
   return drawables;
 }
 
-std::expected<List<LightSource>, StarException> TechController::lightSources(float interpolation) const {
-  List<LightSource> lightSources;
-
+std::expected<void, StarException> TechController::append_light_sources(List<LightSource>& lights, float interpolation) const {
+  auto first_light = lights.size();
+  auto rollback = make_scope_exit([&] { lights.resize(first_light); });
   for (auto const& animator : m_techAnimators.net_elements()) {
-    if (animator->isVisible()) {
-      auto sample = animator->animator->sample(interpolation);
-      auto lights = sample.lightSources(m_movement_controller->get().position());
-      if (!lights)
-        return std::unexpected(std::move(lights.error()));
-      lightSources.append_range(std::move(*lights));
-    }
+    if (!animator->isVisible())
+      continue;
+    auto sample = animator->animator->sample(interpolation);
+    if (auto result = sample.append_light_sources(lights, m_movement_controller->get().position()); !result)
+      return std::unexpected(std::move(result.error()));
   }
-
-  return lightSources;
+  rollback.release();
+  return {};
 }
 
 List<std::shared_ptr<AudioInstance>> TechController::pullNewAudios() {

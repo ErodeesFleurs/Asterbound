@@ -437,7 +437,7 @@ private:
   using ClientTileGetter = std::function<std::expected<std::reference_wrapper<ClientTile const>, StarException>(Vec2I)>;
 
   [[nodiscard]] std::expected<void, StarException> lightingTileGather();
-  [[nodiscard]] std::expected<void, StarException> lightingCalc();
+  [[nodiscard]] std::expected<void, StarException> calculate_lighting();
   [[nodiscard]] std::expected<void, StarException> lightingMain(std::stop_token stopToken);
 
   [[nodiscard]] std::expected<void, StarException> initWorld(WorldStartPacket const& packet);
@@ -497,7 +497,7 @@ private:
   double m_current_time;
   bool m_fullBright = false;
   bool m_asyncLighting = false;
-  CellularLightingCalculator m_lightingCalculator;
+  CellularLightingCalculator m_lighting_calculator;
   mutable CellularLightIntensityCalculator m_lightIntensityCalculator;
   ThreadFunction<void> m_lightingThread;
   bool m_lightingThreadStarted = false;
@@ -506,15 +506,18 @@ private:
   std::condition_variable m_lightingCond;
   std::stop_source m_lightingStopSource{std::nostopstate};
 
-  std::mutex m_lightMapPrepMutex;
+  std::mutex m_light_map_prep_mutex;
   std::mutex m_lightMapMutex;
 
-  Lightmap m_pendingLightMap;
+  Lightmap m_pending_light_map;
   ClientLightingResult m_lightMap;
-  List<LightSource> m_pendingLights;
-  List<std::pair<Vec2F, Vec3F>> m_pendingParticleLights;
-  RectI m_pendingLightRange;
-  std::atomic<bool> m_pendingLightReady;
+  // Render thread, pending under the prep mutex, and consumer under the lighting mutex.
+  List<LightSource> m_gather_lights;
+  List<LightSource> m_pending_lights;
+  List<LightSource> m_calculation_lights;
+  List<std::pair<Vec2F, Vec3F>> m_pending_particle_lights;
+  RectI m_pending_light_range;
+  std::atomic<bool> m_pending_light_ready;
   List<PreviewTile> m_preview_tiles;
 
   std::shared_ptr<Sky> m_sky;

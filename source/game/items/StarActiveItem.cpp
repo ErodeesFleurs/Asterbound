@@ -581,32 +581,34 @@ std::expected<List<std::pair<Drawable, std::optional<EntityRenderLayer>>>, StarE
   return m_scriptedAnimator.drawables();
 }
 
-std::expected<List<LightSource>, StarException> ActiveItem::lights(float interpolation) const {
+std::expected<void, StarException> ActiveItem::append_light_sources(List<LightSource>& lights, float interpolation) const {
+  auto first_light = lights.size();
+  auto rollback = make_scope_exit([&] { lights.resize(first_light); });
   auto sample = m_itemAnimator->sample(interpolation);
-  // Same as pullNewAudios, we translate and flip ourselves.
-  List<LightSource> result;
-  auto lights = sample.lightSources();
-  if (!lights)
-    return std::unexpected(std::move(lights.error()));
-  for (auto& light : *lights) {
-    auto itemOwner = owner();
-    if (!itemOwner)
-      return std::unexpected(std::move(itemOwner.error()));
-    auto position = handPosition(light.position);
-    if (!position)
-      return std::unexpected(std::move(position.error()));
-    light.position = itemOwner->get().position() + *position;
-    light.beamAngle += m_armAngle.get();
-    if (itemOwner->get().facingDirection() == Direction::Left) {
-      if (light.beamAngle > 0)
-        light.beamAngle = std::numbers::pi / 2 + normalize_angle(std::numbers::pi / 2 - light.beamAngle);
+  if (auto result = sample.append_light_sources(lights); !result)
+    return std::unexpected(std::move(result.error()));
+
+  // Like audio, only the item animator's output starts in hand space.
+  for (auto i = first_light; i < lights.size(); ++i) {
+    auto& light = lights[i];
+    auto item_owner = owner();
+    if (!item_owner)
+      return std::unexpected(std::move(item_owner.error()));
+    auto offset = handPosition(light.position);
+    if (!offset)
+      return std::unexpected(std::move(offset.error()));
+    light.position = item_owner->get().position() + *offset;
+    light.beam_angle += m_armAngle.get();
+    if (item_owner->get().facingDirection() == Direction::Left) {
+      if (light.beam_angle > 0)
+        light.beam_angle = std::numbers::pi / 2 + normalize_angle(std::numbers::pi / 2 - light.beam_angle);
       else
-        light.beamAngle = -std::numbers::pi / 2 - normalize_angle(light.beamAngle + std::numbers::pi / 2);
+        light.beam_angle = -std::numbers::pi / 2 - normalize_angle(light.beam_angle + std::numbers::pi / 2);
     }
-    result.push_back(std::move(light));
   }
-  result.append_range(m_scriptedAnimator.light_sources());
-  return result;
+  lights.append_range(m_scriptedAnimator.light_sources());
+  rollback.release();
+  return {};
 }
 
 std::expected<List<std::shared_ptr<AudioInstance>>, StarException> ActiveItem::pullNewAudios() {
