@@ -873,7 +873,7 @@ Sets the dungeonId of all tiles within the specified area.
 
 #### `Promise<Vec2I>` world.enqueuePlacement(`List<Json>` distributionConfigs, [`DungeonId` id])
 
-Enqueues a biome distribution config for placement through world generation. The returned promise is fulfilled with the position of the placement, once it has been placed.
+Enqueues biome distributions for microdungeon placement during world generation. At least one distribution must be able to select a microdungeon; otherwise the call raises an error instead of returning a promise. If the current sector has no suitable site, the request stays pending for later sectors. On success the promise returns the selected position after biome materials have been resolved and the optional dungeon ID has been applied.
 
 ---
 

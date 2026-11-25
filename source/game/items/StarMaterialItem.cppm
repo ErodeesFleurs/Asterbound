@@ -1134,7 +1134,7 @@ std::expected<MaterialHue, StarException> MaterialItem::placement_hue_at(Placeme
   auto biome_index = world_template.blockBiomeIndex(position[0], position[1]);
   if (!biome_index)
     return std::unexpected(std::move(biome_index.error()));
-  return world_template.biomeMaterialHueShift(*biome_index, m_material);
+  return world_template.biome_material_hue_shift(*biome_index, m_material);
 }
 
 }

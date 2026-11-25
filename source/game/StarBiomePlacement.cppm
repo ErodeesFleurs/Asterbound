@@ -29,7 +29,10 @@ struct TreasureBoxSet {
 };
 
 struct MicroDungeonNames {
-  StringSet names;
+  explicit MicroDungeonNames(StringSet&& selection)
+    : names(std::make_shared<StringSet const>(std::move(selection))) {}
+
+  std::shared_ptr<StringSet const> names;
 };
 
 using BiomeItem = std::variant<GrassVariant, BushVariant, TreePair, ObjectPool, TreasureBoxSet, MicroDungeonNames>;
@@ -69,6 +72,7 @@ public:
   BiomePlacementMode mode() const { return m_mode; }
   float priority() const { return m_priority; }
   std::size_t size() const;
+  [[nodiscard]] bool can_place_micro_dungeon() const;
 
   [[nodiscard]] std::optional<std::reference_wrapper<TreeVariant const>> first_tree() const &;
   std::optional<std::reference_wrapper<TreeVariant const>> first_tree() && = delete;

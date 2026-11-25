@@ -86,6 +86,7 @@ class LiquidsDatabase;
 }
 
 import star.micro_dungeon;
+import star.world_template;
 import star.spawn_type_database;
 import star.spawner;
 
@@ -199,20 +200,46 @@ public:
   [[nodiscard]] std::expected<void, StarException> destructEntity(WorldStorage& worldStorage, std::shared_ptr<Entity> const& entity) override;
   [[nodiscard]] std::expected<bool, StarException> entityKeepAlive(WorldStorage& worldStorage, std::shared_ptr<Entity> const& entity) const override;
   [[nodiscard]] std::expected<bool, StarException> entityPersistent(WorldStorage& worldStorage, std::shared_ptr<Entity> const& entity) const override;
-  [[nodiscard]] std::expected<RpcPromise<Vec2I>, StarException> enqueuePlacement(List<BiomeItemDistribution> distributions, std::optional<DungeonId> id) override;
+  [[nodiscard]] std::expected<RpcPromise<Vec2I>, StarException> enqueue_placement(List<BiomeItemDistribution> distributions, std::optional<DungeonId> id) override;
 
-  [[nodiscard]] std::expected<void, StarException> replaceBiomeBlocks(ServerTile& tile);
+  [[nodiscard]] std::expected<void, StarException> replace_biome_blocks(ServerTile& tile);
 
 private:
+  enum class QueuedPlacementState { Pending, Placing, Fulfilled };
+
   struct QueuedPlacement {
-    List<BiomeItemDistribution> distributions;
-    std::optional<DungeonId> dungeonId;
+    List<BiomeItemDistribution> const distributions;
+    std::optional<DungeonId> dungeon_id;
     RpcPromiseKeeper<Vec2I> promise;
-    bool fulfilled;
+    QueuedPlacementState state = QueuedPlacementState::Pending;
+  };
+
+  struct MicroDungeonTrial {
+    WorldTemplate::MicroDungeonItem item;
+    // Zero means natural; other values index the sector's own queue snapshot.
+    std::size_t queue_order;
+  };
+
+  struct MicroDungeonProgress {
+    List<std::shared_ptr<QueuedPlacement>> queue;
+    List<MicroDungeonTrial> trials;
+    std::size_t next_trial = 0;
+    std::optional<Set<Vec2I>> modified_tiles;
+    std::size_t next_tile = 0;
+    bool painted = false;
+  };
+
+  struct ActiveMicroDungeonSector {
+    Sector sector;
+    std::optional<std::reference_wrapper<ActiveMicroDungeonSector const>> previous;
   };
 
   [[nodiscard]] std::expected<void, StarException> prepareTiles(WorldStorage& worldStorage, Sector const& sector);
-  [[nodiscard]] std::expected<void, StarException> generateMicroDungeons(WorldStorage& worldStorage, Sector const& sector);
+  [[nodiscard]] std::expected<void, StarException> generate_micro_dungeons(WorldStorage& worldStorage, Sector const& sector);
+  [[nodiscard]] std::expected<void, StarException> collect_micro_dungeon_trials(WorldTemplate const& world_template,
+      RectI const& sector_tiles, MicroDungeonProgress& progress) const;
+  [[nodiscard]] std::expected<void, StarException> run_micro_dungeon_trials(WorldTemplate const& world_template,
+      RectI const& bounds, MicroDungeonProgress& progress);
   [[nodiscard]] std::expected<void, StarException> generateCaveLiquid(WorldStorage& worldStorage, Sector const& sector);
   [[nodiscard]] std::expected<void, StarException> prepareSector(WorldStorage& worldStorage, Sector const& sector);
   [[nodiscard]] std::expected<void, StarException> prepareSectorBiomeBlocks(WorldStorage& worldStorage, Sector const& sector);
@@ -230,8 +257,10 @@ private:
   [[nodiscard]] std::expected<bool, StarException> placePlant(WorldStorage& worldStorage, std::shared_ptr<Plant> const& plant, Vec2I const& position);
 
   WorldServer& m_worldServer;
-  std::shared_ptr<MicroDungeonFactory> m_microDungeonFactory;
-  List<QueuedPlacement> m_queuedPlacements;
+  MicroDungeonFactory m_micro_dungeon_factory;
+  List<std::shared_ptr<QueuedPlacement>> m_queued_placements;
+  std::optional<std::reference_wrapper<ActiveMicroDungeonSector const>> m_active_micro_dungeon_sector;
+  std::map<Sector, MicroDungeonProgress> m_micro_dungeon_retries;
 };
 
 }

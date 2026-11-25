@@ -178,7 +178,7 @@ import star.algorithm;
 namespace Star {
 namespace {
 
-bool isPreservedTileCollisionOverride(CollisionKind collision) {
+bool is_preserved_tile_collision_override(CollisionKind collision) {
   return collision == CollisionKind::None
       || collision == CollisionKind::Platform
       || collision == CollisionKind::Block;
@@ -188,10 +188,12 @@ bool isPreservedTileCollisionOverride(CollisionKind collision) {
     MaterialDatabase const& materials, MaterialId old_foreground, MaterialId new_foreground, CollisionKind current_collision) {
   auto old_collision = materials.material_collision_kind(old_foreground);
   if (!old_collision) return std::unexpected(std::move(old_collision.error()));
+  if (old_foreground == new_foreground)
+    return is_preserved_tile_collision_override(current_collision) ? current_collision : *old_collision;
   auto new_collision = materials.material_collision_kind(new_foreground);
   if (!new_collision) return std::unexpected(std::move(new_collision.error()));
 
-  if (current_collision != *old_collision && isPreservedTileCollisionOverride(current_collision))
+  if (current_collision != *old_collision && is_preserved_tile_collision_override(current_collision))
     return current_collision;
 
   return *new_collision;
@@ -1297,9 +1299,8 @@ std::shared_ptr<Entity> SpawnerWorld::getEntity(EntityId entityId) const {
   return m_worldServer.entity(entityId);
 }
 
-WorldGenerator::WorldGenerator(WorldServer& server) : m_worldServer(server) {
-  m_microDungeonFactory = std::make_shared<MicroDungeonFactory>(m_worldServer.root());
-}
+WorldGenerator::WorldGenerator(WorldServer& server)
+  : m_worldServer(server), m_micro_dungeon_factory(server.root()) {}
 
 std::expected<void, StarException> WorldGenerator::generateSectorLevel(WorldStorage& worldStorage, Sector const& sector, SectorGenerationLevel generationLevel) {
   if (generationLevel == SectorGenerationLevel::BaseTiles) {
@@ -1309,10 +1310,7 @@ std::expected<void, StarException> WorldGenerator::generateSectorLevel(WorldStor
     }
   } else if (generationLevel == SectorGenerationLevel::MicroDungeons) {
     if (!worldStorage.floatingDungeonWorld())
-      {
-        auto operationResult1 = generateMicroDungeons(worldStorage, sector);
-        if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-      }
+      return generate_micro_dungeons(worldStorage, sector);
   } else if (generationLevel == SectorGenerationLevel::CaveLiquid) {
     if (!worldStorage.floatingDungeonWorld())
       {
@@ -1389,55 +1387,57 @@ std::expected<bool, StarException> WorldGenerator::entityPersistent(WorldStorage
   return entity->isMaster() && entity->persistent();
 }
 
-std::expected<RpcPromise<Vec2I>, StarException> WorldGenerator::enqueuePlacement(List<BiomeItemDistribution> distributions, std::optional<DungeonId> id) {
+std::expected<RpcPromise<Vec2I>, StarException> WorldGenerator::enqueue_placement(List<BiomeItemDistribution> distributions, std::optional<DungeonId> id) {
+  if (std::ranges::none_of(distributions, &BiomeItemDistribution::can_place_micro_dungeon))
+    return std::unexpected(StarException("Queued placement cannot produce a microdungeon"));
+
   auto promise = RpcPromise<Vec2I>::make_pair();
-  m_queuedPlacements.push_back(QueuedPlacement{
-    .distributions = std::move(distributions),
-    .dungeonId = id,
-    .promise = promise.second,
-    .fulfilled = false,
-  });
-  return promise.first;
+  m_queued_placements.push_back(std::make_shared<QueuedPlacement>(
+      std::move(distributions), id, std::move(promise.second)));
+  return std::move(promise.first);
 }
 
-std::expected<void, StarException> WorldGenerator::replaceBiomeBlocks(ServerTile& tile) {
+std::expected<void, StarException> WorldGenerator::replace_biome_blocks(ServerTile& tile) {
   auto& root = m_worldServer.root();
   auto const world_template = m_worldServer.worldTemplate();
   auto material_database = root.material_database();
   if (!material_database) return std::unexpected(std::move(material_database.error()));
-  auto const old_foreground = tile.foreground;
 
   auto biome_result = world_template->biome(tile.blockBiomeIndex);
   if (!biome_result) return std::unexpected(std::move(biome_result.error()));
   auto const& block_biome = *biome_result;
-  auto resolve_layer = [&](MaterialId& material, MaterialHue& hue, ModId& mod, MaterialHue& mod_hue) -> std::expected<void, StarException> {
-    if (!block_biome) {
-      if (is_biome_material(material)) {
-        material = empty_material_id;
-        hue = 0;
-      }
-      if (is_biome_mod(mod)) {
-        mod = no_mod_id;
-        mod_hue = 0;
-      }
-    } else if (is_biome_material(material)) {
-      auto const& sub_blocks = block_biome->sub_blocks;
-      material = material == biome_material_id || sub_blocks.empty()
-          ? block_biome->main_block
-          : sub_blocks[static_cast<std::size_t>(material - biome1_material_id) % sub_blocks.size()];
-      auto resolved_hue = world_template->biomeMaterialHueShift(tile.blockBiomeIndex, material);
-      if (!resolved_hue) return std::unexpected(std::move(resolved_hue.error()));
-      hue = *resolved_hue;
-    }
-    return {};
+  struct Layer {
+    MaterialId material;
+    MaterialHue hue;
   };
-  auto foreground = resolve_layer(tile.foreground, tile.foregroundHueShift, tile.foregroundMod, tile.foregroundModHueShift);
-  if (!foreground) return std::unexpected(std::move(foreground.error()));
-  auto background = resolve_layer(tile.background, tile.backgroundHueShift, tile.backgroundMod, tile.backgroundModHueShift);
-  if (!background) return std::unexpected(std::move(background.error()));
+  auto resolve_layer = [&](MaterialId material, MaterialHue hue) -> Layer {
+    if (!is_biome_material(material)) return {material, hue};
+    if (!block_biome) return {empty_material_id, 0};
+    auto const& sub_blocks = block_biome->sub_blocks;
+    auto resolved = material == biome_material_id || sub_blocks.empty() ? block_biome->main_block
+        : sub_blocks[static_cast<std::size_t>(material - biome1_material_id) % sub_blocks.size()];
+    return {resolved, block_biome->hue_for_material(resolved)};
+  };
 
-  auto collision = biome_foreground_collision(**material_database, old_foreground, tile.foreground, tile.collision);
+  auto foreground = resolve_layer(tile.foreground, tile.foregroundHueShift);
+  auto background = resolve_layer(tile.background, tile.backgroundHueShift);
+  auto collision = biome_foreground_collision(**material_database, tile.foreground, foreground.material, tile.collision);
   if (!collision) return std::unexpected(std::move(collision.error()));
+  // A failed lookup must leave the original placeholders intact for replay.
+  tile.foreground = foreground.material;
+  tile.foregroundHueShift = foreground.hue;
+  tile.background = background.material;
+  tile.backgroundHueShift = background.hue;
+  if (!block_biome) {
+    if (is_biome_mod(tile.foregroundMod)) {
+      tile.foregroundMod = no_mod_id;
+      tile.foregroundModHueShift = 0;
+    }
+    if (is_biome_mod(tile.backgroundMod)) {
+      tile.backgroundMod = no_mod_id;
+      tile.backgroundModHueShift = 0;
+    }
+  }
   tile.update_collision(*collision);
 
   return {};
@@ -1473,7 +1473,7 @@ std::expected<void, StarException> WorldGenerator::prepareTiles(WorldStorage& wo
       if (tile->get().foreground == null_material_id) {
         tile->get().foreground = blockInfo.foreground;
         tile->get().foregroundColorVariant = default_material_color_variant;
-        auto tileforegroundHueShiftResult1 = planet->biomeMaterialHueShift(tile->get().blockBiomeIndex, tile->get().foreground);
+        auto tileforegroundHueShiftResult1 = planet->biome_material_hue_shift(tile->get().blockBiomeIndex, tile->get().foreground);
         if (!tileforegroundHueShiftResult1) return std::unexpected(std::move(tileforegroundHueShiftResult1.error()));
         tile->get().foregroundHueShift = std::move((*tileforegroundHueShiftResult1));
 
@@ -1490,7 +1490,7 @@ std::expected<void, StarException> WorldGenerator::prepareTiles(WorldStorage& wo
       if (tile->get().background == null_material_id) {
         tile->get().background = blockInfo.background;
         tile->get().backgroundColorVariant = default_material_color_variant;
-        auto tilebackgroundHueShiftResult1 = planet->biomeMaterialHueShift(tile->get().blockBiomeIndex, tile->get().background);
+        auto tilebackgroundHueShiftResult1 = planet->biome_material_hue_shift(tile->get().blockBiomeIndex, tile->get().background);
         if (!tilebackgroundHueShiftResult1) return std::unexpected(std::move(tilebackgroundHueShiftResult1.error()));
         tile->get().backgroundHueShift = std::move((*tilebackgroundHueShiftResult1));
 
@@ -1519,100 +1519,141 @@ std::expected<void, StarException> WorldGenerator::prepareTiles(WorldStorage& wo
   return {};
 }
 
-std::expected<void, StarException> WorldGenerator::generateMicroDungeons(WorldStorage& worldStorage, ServerTileSectorArray::Sector const& sector) {
-  auto const& world_template = m_worldServer.worldTemplate();
-  auto facade = std::make_shared<DungeonGeneratorWorld>(m_worldServer, false);
+std::expected<void, StarException> WorldGenerator::generate_micro_dungeons(WorldStorage& world_storage, Sector const& sector) {
+  for (auto cursor = m_active_micro_dungeon_sector; cursor; cursor = cursor->get().previous) {
+    if (cursor->get().sector == sector)
+      return std::unexpected(StarException("Microdungeon generation for this sector is already in progress"));
+  }
+  ActiveMicroDungeonSector const active{sector, m_active_micro_dungeon_sector};
+  m_active_micro_dungeon_sector = std::cref(active);
+  auto leave_sector = make_scope_exit([this, &active] { m_active_micro_dungeon_sector = active.previous; });
 
-  RectI sectorTiles = worldStorage.tileArray()->sector_region(sector);
-  RectI bounds = sectorTiles.padded(world_sector_size - 1);
+  auto world_template = m_worldServer.worldTemplate();
+  RectI sector_tiles = world_storage.tileArray()->sector_region(active.sector);
+  RectI bounds = sector_tiles.padded(world_sector_size - 1);
+  if (auto retry = m_micro_dungeon_retries.find(active.sector); retry != m_micro_dungeon_retries.end()) {
+    // Nested generation of other sectors cannot invalidate a map node.
+    auto ran = run_micro_dungeon_trials(*world_template, bounds, retry->second);
+    if (!ran) return std::unexpected(std::move(ran.error()));
+    m_micro_dungeon_retries.erase(retry);
+  } else {
+    MicroDungeonProgress progress;
+    auto collected = collect_micro_dungeon_trials(*world_template, sector_tiles, progress);
+    if (!collected) return std::unexpected(std::move(collected.error()));
+    auto ran = run_micro_dungeon_trials(*world_template, bounds, progress);
+    if (!ran) {
+      // Flush writes to the world before biome replacement. Preserve the exact
+      // sorted inputs and cursors once any of those writes have succeeded.
+      if (progress.painted)
+        m_micro_dungeon_retries.try_emplace(active.sector, std::move(progress));
+      return std::unexpected(std::move(ran.error()));
+    }
+  }
 
-  struct PlacementEntry {
-    BiomeItemPlacement placement;
-    std::optional<std::reference_wrapper<QueuedPlacement>> queued;
-    std::size_t queue_order;
-  };
-  List<PlacementEntry> placement_queue;
-  for (int x = sectorTiles.x_min(); x < sectorTiles.x_max(); ++x) {
-    for (int y = sectorTiles.y_min(); y < sectorTiles.y_max(); ++y) {
-      auto potential = world_template->potential_biome_items_at(x, y);
+  auto fulfilled = std::ranges::remove_if(m_queued_placements, [](std::shared_ptr<QueuedPlacement> const& placement) {
+    return placement->state == QueuedPlacementState::Fulfilled;
+  });
+  m_queued_placements.erase(fulfilled.begin(), fulfilled.end());
+  return {};
+}
+
+std::expected<void, StarException> WorldGenerator::collect_micro_dungeon_trials(WorldTemplate const& world_template,
+    RectI const& sector_tiles, MicroDungeonProgress& progress) const {
+  progress.queue = m_queued_placements;
+
+  WorldTemplate::PotentialMicroDungeonItems scratch;
+  for (int x = sector_tiles.x_min(); x < sector_tiles.x_max(); ++x) {
+    for (int y = sector_tiles.y_min(); y < sector_tiles.y_max(); ++y) {
+      auto potential = world_template.potential_micro_dungeon_items_at(x, y, scratch);
       if (!potential) return std::unexpected(std::move(potential.error()));
-      auto placements = world_template->valid_biome_items(x, y, std::move(*potential));
-      if (!placements) return std::unexpected(std::move(placements.error()));
-      for (auto& placement : *placements)
-        placement_queue.push_back({.placement = std::move(placement), .queued = {}, .queue_order = 0});
+      auto validity = world_template.biome_item_validity_at(x, y);
+      if (!validity) return std::unexpected(std::move(validity.error()));
+      auto append_valid = [&](std::size_t queue_order) {
+        scratch.append_valid(*validity, [&](WorldTemplate::MicroDungeonItem&& item) {
+          progress.trials.push_back({std::move(item), queue_order});
+        });
+      };
+      append_valid(0);
 
-      for (std::size_t queue_index = 0; queue_index < m_queuedPlacements.size(); ++queue_index) {
-        auto& queued = m_queuedPlacements[queue_index];
-        WorldTemplate::PotentialBiomeItems queued_items;
-        for (auto area : {BiomePlacementArea::Surface, BiomePlacementArea::Underground}) {
-          auto added = world_template->add_potential_biome_items(x, y, queued_items, queued.distributions, area);
-          if (!added) return std::unexpected(std::move(added.error()));
-        }
-        auto queued_placements = world_template->valid_biome_items(x, y, std::move(queued_items));
-        if (!queued_placements) return std::unexpected(std::move(queued_placements.error()));
-        for (auto& placement : *queued_placements)
-          placement_queue.push_back(
-            {.placement = std::move(placement), .queued = std::ref(queued), .queue_order = queue_index + 1});
+      for (std::size_t index = 0; index < progress.queue.size(); ++index) {
+        auto sampled = world_template.add_potential_micro_dungeon_items(x, y, scratch, progress.queue[index]->distributions);
+        if (!sampled) return std::unexpected(std::move(sampled.error()));
+        append_valid(index + 1);
       }
     }
   }
 
-  std::sort(placement_queue.begin(), placement_queue.end(), [](PlacementEntry const& a, PlacementEntry const& b) {
-    if (a.placement < b.placement) return true;
-    if (b.placement < a.placement) return false;
-    // Preserve null-before-queued and contiguous queue order without address borrows.
+  // Non-dungeon candidates must participate in this non-stable sort: their
+  // equal keys can affect the order of otherwise indistinguishable anchors.
+  std::sort(progress.trials.begin(), progress.trials.end(), [](MicroDungeonTrial const& a, MicroDungeonTrial const& b) {
+    if (a.item.priority < b.item.priority) return true;
+    if (b.item.priority < a.item.priority) return false;
     return a.queue_order < b.queue_order;
   });
-  for (auto const& p : placement_queue) {
-    auto const& placement = p.placement;
-    auto queued = p.queued;
-    if (queued && queued->get().fulfilled)
+  return {};
+}
+
+std::expected<void, StarException> WorldGenerator::run_micro_dungeon_trials(WorldTemplate const& world_template,
+    RectI const& bounds, MicroDungeonProgress& progress) {
+  std::optional<DungeonGeneratorWorld> facade;
+  for (; progress.next_trial < progress.trials.size(); ++progress.next_trial) {
+    auto const& [item, queue_order] = progress.trials[progress.next_trial];
+    if (!item.dungeon_names)
       continue;
 
-    if (std::holds_alternative<MicroDungeonNames>(placement.item)) {
-      auto seed = world_template->seedFor(placement.position[0], placement.position[1]);
-      auto selected_dungeon = static_random_from(std::get<MicroDungeonNames>(placement.item).names, seed);
-      if (!selected_dungeon)
-        return std::unexpected(std::move(selected_dungeon.error()));
-      auto const& dungeonName = std::move(selected_dungeon->get());
-      std::optional<DungeonId> dungeonId;
-      if constexpr (Star::debug_enabled) {
-        Star::star_assert_failed((!dungeonName.empty()));
+    std::optional<std::reference_wrapper<QueuedPlacement>> queued;
+    if (queue_order != 0)
+      queued = std::ref(*progress.queue[queue_order - 1]);
+
+    if (!progress.modified_tiles) {
+      if (queued && queued->get().state != QueuedPlacementState::Pending)
+        continue;
+      auto seed = world_template.seedFor(item.position[0], item.position[1]);
+      auto selected = static_random_from(*item.dungeon_names, seed);
+      if (!selected) return std::unexpected(std::move(selected.error()));
+      auto threat = m_worldServer.threatLevel();
+      if (!threat) return std::unexpected(std::move(threat.error()));
+      if (!facade)
+        facade.emplace(m_worldServer, false);
+
+      // Reserve the request through draw callbacks and any suspended
+      // postprocessing; another sector must not draw it at a different site.
+      if (queued)
+        queued->get().state = QueuedPlacementState::Placing;
+      auto drawn = m_micro_dungeon_factory.generate(bounds, selected->get(), item.position, seed, *threat, *facade);
+      if (!drawn || !*drawn) {
+        if (queued)
+          queued->get().state = QueuedPlacementState::Pending;
+        if (!drawn) return std::unexpected(std::move(drawn.error()));
+        continue;
       }
-      auto generateResultCheckedResult1 = m_worldServer.threatLevel();
-      if (!generateResultCheckedResult1) return std::unexpected(std::move(generateResultCheckedResult1.error()));
-      auto generateResultCheckedResult2 = m_microDungeonFactory->generate(bounds, dungeonName, placement.position, seed, (*generateResultCheckedResult1), facade);
-      if (!generateResultCheckedResult2) return std::unexpected(std::move(generateResultCheckedResult2.error()));
-      if (auto generateResult = std::move((*generateResultCheckedResult2))) {
-        if (queued) {
-          dungeonId = queued->get().dungeonId;
-          {
-            auto operationResult1 = queued->get().promise.fulfill(placement.position);
-            if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-          }
-          queued->get().fulfilled = true;
-        }
-        for (auto position : generateResult->second) {
-          auto tileCheckedResult1 = m_worldServer.modifyServerTile(position);
-          if (!tileCheckedResult1) return std::unexpected(std::move(tileCheckedResult1.error()));
-          if (auto tile = std::move((*tileCheckedResult1))) {
-            {
-              auto operationResult1 = replaceBiomeBlocks(tile->get());
-              if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-            }
-            tile->get().dungeonId = dungeonId.value_or(tile->get().dungeonId);
-          }
-        }
+      progress.modified_tiles.emplace(std::move((*drawn)->modified_tiles));
+      progress.painted = true;
+    }
+
+    auto const& modified_tiles = *progress.modified_tiles;
+    auto tile_position = modified_tiles.begin();
+    std::ranges::advance(tile_position, progress.next_tile);
+    for (; tile_position != modified_tiles.end(); ++tile_position, ++progress.next_tile) {
+      auto tile = m_worldServer.modifyServerTile(*tile_position);
+      if (!tile) return std::unexpected(std::move(tile.error()));
+      if (*tile) {
+        auto& tile_value = (*tile)->get();
+        auto replaced = replace_biome_blocks(tile_value);
+        if (!replaced) return std::unexpected(std::move(replaced.error()));
+        if (queued && queued->get().dungeon_id)
+          tile_value.dungeonId = *queued->get().dungeon_id;
       }
     }
-  }
-  
-  // placement_queue's borrows are no longer used once compaction begins.
-  auto fulfilledPlacements = std::ranges::remove_if(m_queuedPlacements, [](QueuedPlacement const& p) {
-    return p.fulfilled;
-  });
-  m_queuedPlacements.erase(fulfilledPlacements.begin(), fulfilledPlacements.end());
 
+    if (queued) {
+      auto fulfilled = queued->get().promise.fulfill(item.position);
+      if (!fulfilled) return std::unexpected(std::move(fulfilled.error()));
+      queued->get().state = QueuedPlacementState::Fulfilled;
+    }
+    progress.modified_tiles.reset();
+    progress.next_tile = 0;
+  }
   return {};
 }
 
@@ -1815,7 +1856,7 @@ std::expected<void, StarException> WorldGenerator::prepareSector(WorldStorage& w
       if (!is_real_material(tile->get().background))
         tile->get().backgroundColorVariant = default_material_color_variant;
       {
-        auto operationResult1 = replaceBiomeBlocks(tile->get());
+        auto operationResult1 = replace_biome_blocks(tile->get());
         if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
       }
       {
@@ -1919,7 +1960,7 @@ std::expected<void, StarException> WorldGenerator::prepareSectorBiomeBlocks(Worl
       Vec2I position(x, y);
       auto tile = tileArray->modify_tile(position);
       {
-        auto operationResult1 = replaceBiomeBlocks(tile->get());
+        auto operationResult1 = replace_biome_blocks(tile->get());
         if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
       }
       {

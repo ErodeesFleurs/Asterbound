@@ -407,8 +407,8 @@ std::expected<void, StarException> WorldStorage::triggerTerraformSector(Sector s
   return result;
 }
 
-std::expected<RpcPromise<Vec2I>, StarException> WorldStorage::enqueuePlacement(List<BiomeItemDistribution> distributions, std::optional<DungeonId> id) {
-  return m_generatorFacade->enqueuePlacement(std::move(distributions), id);
+std::expected<RpcPromise<Vec2I>, StarException> WorldStorage::enqueue_placement(List<BiomeItemDistribution> distributions, std::optional<DungeonId> id) {
+  return m_generatorFacade->enqueue_placement(std::move(distributions), id);
 }
 
 std::optional<float> WorldStorage::sectorTimeToLive(Sector sector) const {

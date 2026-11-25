@@ -1,103 +1,95 @@
 module;
-import star.json;
-import star.image;
-import star.data_stream;
-import star.bi_map;
-import star.vector;
-import star.game_types;
-import star.random;
-import star.set;
-import star.thread;
-import star.ordered_map;
-import star.lru_cache;
-import star.rect;
-import star.string;
-import star.io_device;
-import star.list;
-import star.image_processing;
-import star.hash;
-import star.string_view;
-import star.directives;
-import star.asset_path;
-import star.ref_ptr;
-import star.listener;
+
 import std;
-import star.format;
-import star.logging;
-
-
-import star.item_descriptor;
-import star.world_geometry;
+import star.algorithm;
 import star.dungeon_generator;
-import star.asset_source;
-import star.assets;
-import star.configuration;
+import star.format;
+import star.game_types;
+import star.logging;
+import star.rect;
 import star.root;
+import star.string;
+import star.vector;
 
 module star.micro_dungeon;
 
-import star.algorithm;
 namespace Star {
 
 MicroDungeonFactory::MicroDungeonFactory(Root& root) : m_root(root) {}
 
-std::expected<std::optional<std::pair<List<RectI>, Set<Vec2I>>>, StarException> MicroDungeonFactory::generate(RectI const& bounds,
-    String const& dungeonName,
+std::expected<std::optional<DungeonBuildResult>, StarException> MicroDungeonFactory::generate(RectI const& bounds,
+    String const& dungeon_name,
     Vec2I const& position,
     std::uint64_t seed,
-    float threatLevel,
-    std::shared_ptr<DungeonGeneratorWorldFacade> facade,
-    bool forcePlacement) {
-  Dungeon::DungeonGeneratorWriter writer(m_root, facade, {}, {});
+    float threat_level,
+    DungeonGeneratorWorldFacade& facade,
+    bool force_placement) {
   if (m_generating)
     return std::unexpected(DungeonException("Not reentrant."));
   m_generating = true;
-  auto generatingGuard = make_scope_exit([this]() { m_generating = false; });
-  auto dungeonGenerator = DungeonGenerator::create(m_root, dungeonName, seed, threatLevel, biome_micro_dungeon_id);
-  if (!dungeonGenerator) return std::unexpected(std::move(dungeonGenerator.error()));
+  auto generating_guard = make_scope_exit([&] { m_generating = false; });
+  auto generator = DungeonGenerator::create(m_root, dungeon_name, seed, threat_level, biome_micro_dungeon_id);
+  if (!generator) return std::unexpected(std::move(generator.error()));
 
-  auto generate = [&]() -> std::expected<std::optional<std::pair<List<RectI>, Set<Vec2I>>>, StarException> {
-    auto anchorPart = (*dungeonGenerator)->pickAnchor();
-    if (!anchorPart) return std::unexpected(std::move(anchorPart.error()));
-    if (!*anchorPart) {
+  auto generate = [&]() -> std::expected<std::optional<DungeonBuildResult>, StarException> {
+    auto picked = generator->pick_anchor();
+    if (!picked) return std::unexpected(std::move(picked.error()));
+    if (!*picked) {
       auto logged = m_root.logger().debug("No valid anchor piece found for microdungeon at {}, skipping", position);
       if (!logged) return std::unexpected(std::move(logged.error()));
       return {};
     }
-    if (forcePlacement) {
-      auto built = (*dungeonGenerator)->buildDungeon(*anchorPart, position - (*anchorPart)->anchorPoint(), writer, forcePlacement);
-      if (!built) return std::unexpected(std::move(built.error()));
-      return std::optional<std::pair<List<RectI>, Set<Vec2I>>>(std::move(*built));
-    }
-    static constexpr std::array placement_shifts{0, 1, 2, 3, -1, -2, -3};
-    for (int dy : placement_shifts) {
-      auto pos = position - (*anchorPart)->anchorPoint() + Vec2I{0, dy};
-      if (!bounds.contains(pos) || !bounds.contains(pos + Vec2I{(*anchorPart)->size()} - Vec2I{1, 1}))
-        continue;
-      bool collision = false;
-      for (auto offset : (*anchorPart)->occupied_offsets()) {
-        auto dungeon_id = facade->getDungeonIdAt(pos + offset);
-        if (!dungeon_id) return std::unexpected(std::move(dungeon_id.error()));
-        if (*dungeon_id != no_dungeon_id) {
-          collision = true;
+
+    auto const& anchor = (*picked)->get();
+    using WidePosition = Vector<std::int64_t, 2>;
+    auto const anchor_base = WidePosition(position) - WidePosition(anchor.anchorPoint());
+    Dungeon::DungeonGeneratorWriter writer(m_root, facade, {}, {});
+    std::optional<Vec2I> placement;
+    if (force_placement) {
+      if (!std::in_range<int>(anchor_base[0]) || !std::in_range<int>(anchor_base[1]))
+        return std::unexpected(DungeonException("Dungeon anchor position is outside the coordinate range"));
+      placement.emplace(anchor_base);
+    } else {
+      static constexpr std::array placement_shifts{0, 1, 2, 3, -1, -2, -3};
+      Rect<std::int64_t> const wide_bounds(bounds);
+      auto const anchor_last_tile = anchor_base + WidePosition(anchor.size()) - WidePosition{1, 1};
+      for (int dy : placement_shifts) {
+        WidePosition const shift{0, dy};
+        auto const shifted = anchor_base + shift;
+        if (!wide_bounds.contains(shifted) || !wide_bounds.contains(anchor_last_tile + shift))
+          continue;
+        Vec2I const pos(shifted);
+        bool collision = false;
+        for (auto offset : anchor.occupied_offsets()) {
+          auto const occupied = shifted + WidePosition(offset);
+          if (!std::in_range<int>(occupied[0]) || !std::in_range<int>(occupied[1]))
+            return std::unexpected(DungeonException("Dungeon tile position is outside the coordinate range"));
+          auto dungeon_id = facade.getDungeonIdAt(Vec2I(occupied));
+          if (!dungeon_id) return std::unexpected(std::move(dungeon_id.error()));
+          if (*dungeon_id != no_dungeon_id) {
+            collision = true;
+            break;
+          }
+        }
+        if (collision)
+          continue;
+        auto can_place = anchor.canPlace(pos, writer);
+        if (!can_place) return std::unexpected(std::move(can_place.error()));
+        if (*can_place) {
+          placement = pos;
           break;
         }
       }
-      if (!collision) {
-        auto canPlace = (*anchorPart)->canPlace(pos, writer);
-        if (!canPlace) return std::unexpected(std::move(canPlace.error()));
-        if (*canPlace) {
-          auto built = (*dungeonGenerator)->buildDungeon(*anchorPart, pos, writer, forcePlacement);
-          if (!built) return std::unexpected(std::move(built.error()));
-          return std::optional<std::pair<List<RectI>, Set<Vec2I>>>(std::move(*built));
-        }
-      }
     }
-    return {};
+    if (!placement)
+      return {};
+    auto built = generator->build_dungeon(anchor, *placement, writer, force_placement);
+    if (!built) return std::unexpected(std::move(built.error()));
+    return std::optional<DungeonBuildResult>(std::move(*built));
   };
   auto result = generate();
   if (!result)
-    return std::unexpected(DungeonException(Star::format("Error generating microdungeon named '{}'", (*dungeonGenerator)->definition()->name()), ExceptionDiagnostic(result.error())));
+    return std::unexpected(DungeonException(Star::format("Error generating microdungeon named '{}'", generator->definition().name()), ExceptionDiagnostic(result.error())));
   return result;
 }
 

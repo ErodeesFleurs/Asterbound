@@ -2377,25 +2377,24 @@ std::expected<bool, StarException> WorldServer::placeDungeon(String const& dunge
   });
 
   auto seed = worldTemplate()->seedFor(position[0], position[1]);
-  auto facade = std::make_shared<DungeonGeneratorWorld>(*this, true);
+  DungeonGeneratorWorld facade(*this, true);
   bool placed = false;
-  auto result261 = DungeonGenerator::create(this->root(), dungeonName, seed, m_worldTemplate->threatLevel(), dungeonId);
-  if (!result261)
-    return std::unexpected(std::move(result261.error()));
-  auto dungeonGenerator = std::move(*result261);
-  auto result262 = dungeonGenerator->generate(facade, position, false, forcePlacement);
-  if (!result262)
-    return std::unexpected(std::move(result262.error()));
-  if (auto generateResult = std::move(*result262)) {
-    auto worldGenerator = std::make_shared<WorldGenerator>(*this);
-    for (auto position : generateResult->second) {
-      auto result263 = modifyServerTile(position);
-      if (!result263)
-        return std::unexpected(std::move(result263.error()));
-      if (auto tile = std::move(*result263)) {
-        auto result264 = worldGenerator->replaceBiomeBlocks(tile->get());
-        if (!result264)
-          return std::unexpected(std::move(result264.error()));
+  auto dungeon_generator = DungeonGenerator::create(root(), dungeonName, seed, m_worldTemplate->threatLevel(), dungeonId);
+  if (!dungeon_generator)
+    return std::unexpected(std::move(dungeon_generator.error()));
+  auto generated = dungeon_generator->generate(facade, position, false, forcePlacement);
+  if (!generated)
+    return std::unexpected(std::move(generated.error()));
+  if (auto const& result = *generated) {
+    WorldGenerator world_generator(*this);
+    for (auto tile_position : result->modified_tiles) {
+      auto tile = modifyServerTile(tile_position);
+      if (!tile)
+        return std::unexpected(std::move(tile.error()));
+      if (*tile) {
+        auto replaced = world_generator.replace_biome_blocks((*tile)->get());
+        if (!replaced)
+          return std::unexpected(std::move(replaced.error()));
       }
     }
     placed = true;
@@ -2854,29 +2853,29 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
       int retryCounter = std::move(*result322);
       while (retryCounter > 0) {
         --retryCounter;
-        auto dungeonFacade = std::make_shared<DungeonGeneratorWorld>(world, true);
+        DungeonGeneratorWorld facade(world, true);
         auto result323 = rnd.uniform_int(0, dungeon.xVariance);
         if (!result323)
           return std::unexpected(std::move(result323.error()));
         Vec2I position = Vec2I((dungeon.baseX + std::move(*result323)) % world.m_geometry.width(), dungeon.baseHeight);
-        auto result324 = DungeonGenerator::create(world.root(), dungeon.dungeon, world.m_worldTemplate->worldSeed(), world.m_worldTemplate->threatLevel(), currentDungeonId);
-        if (!result324)
-          return std::unexpected(std::move(result324.error()));
-        auto dungeonGenerator = std::move(*result324);
-        auto result325 = dungeonGenerator->generate(dungeonFacade, position, dungeon.blendWithTerrain, dungeon.force);
-        if (!result325)
-          return std::unexpected(std::move(result325.error()));
-        if (auto generateResult = std::move(*result325)) {
-          if (dungeonGenerator->definition()->isProtected()) {
+        auto dungeon_generator = DungeonGenerator::create(world.root(), dungeon.dungeon, world.m_worldTemplate->worldSeed(), world.m_worldTemplate->threatLevel(), currentDungeonId);
+        if (!dungeon_generator)
+          return std::unexpected(std::move(dungeon_generator.error()));
+        auto generated = dungeon_generator->generate(facade, position, dungeon.blendWithTerrain, dungeon.force);
+        if (!generated)
+          return std::unexpected(std::move(generated.error()));
+        if (auto const& result = *generated) {
+          auto const& definition = dungeon_generator->definition();
+          if (definition.isProtected()) {
             auto result326 = world.setTileProtection(currentDungeonId, true);
             if (!result326)
               return std::unexpected(std::move(result326.error()));
           }
 
-          if (auto gravity = dungeonGenerator->definition()->gravity())
+          if (auto gravity = definition.gravity())
             world.m_dungeonIdGravity[currentDungeonId] = *gravity;
 
-          if (auto breathable = dungeonGenerator->definition()->breathable())
+          if (auto breathable = definition.breathable())
             world.m_dungeonIdBreathable[currentDungeonId] = *breathable;
 
           currentDungeonId++;
@@ -2884,7 +2883,7 @@ std::expected<void, StarException> WorldServer::init(bool firstTime) {
           // floating dungeon worlds should force immediate generation (since there won't be terrain) to avoid
           // bottlenecking "generation" of empty generation levels during loading
           if (world.isFloatingDungeonWorld()) {
-            for (auto const& region : generateResult->first) {
+            for (auto const& region : result->bounds) {
               auto result327 = world.generateRegion(region);
               if (!result327)
                 return std::unexpected(std::move(result327.error()));
@@ -2996,7 +2995,7 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
         tile->get().background = placeMaterial.material;
         if (placeMaterial.materialHueShift)
           tile->get().backgroundHueShift = *placeMaterial.materialHueShift; else {
-          auto result337 = m_worldTemplate->biomeMaterialHueShift(tile->get().blockBiomeIndex, placeMaterial.material);
+          auto result337 = m_worldTemplate->biome_material_hue_shift(tile->get().blockBiomeIndex, placeMaterial.material);
           if (!result337)
             return std::unexpected(std::move(result337.error()));
           tile->get().backgroundHueShift = std::move(*result337);
@@ -3014,7 +3013,7 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
         tile->get().foreground = placeMaterial.material;
         if (placeMaterial.materialHueShift)
           tile->get().foregroundHueShift = *placeMaterial.materialHueShift; else {
-          auto result338 = m_worldTemplate->biomeMaterialHueShift(tile->get().blockBiomeIndex, placeMaterial.material);
+          auto result338 = m_worldTemplate->biome_material_hue_shift(tile->get().blockBiomeIndex, placeMaterial.material);
           if (!result338)
             return std::unexpected(std::move(result338.error()));
           tile->get().foregroundHueShift = std::move(*result338);
@@ -3338,8 +3337,8 @@ std::shared_ptr<WorldServer::ScriptComponent> WorldServer::scriptContext(String 
     return {};
 }
 
-std::expected<RpcPromise<Vec2I>, StarException> WorldServer::enqueuePlacement(List<BiomeItemDistribution> distributions, std::optional<DungeonId> id) {
-  return m_worldStorage->enqueuePlacement(std::move(distributions), id);
+std::expected<RpcPromise<Vec2I>, StarException> WorldServer::enqueue_placement(List<BiomeItemDistribution> distributions, std::optional<DungeonId> id) {
+  return m_worldStorage->enqueue_placement(std::move(distributions), id);
 }
 
 std::expected<std::reference_wrapper<ServerTile const>, StarException> WorldServer::getServerTile(Vec2I const& position, bool withSignal) {

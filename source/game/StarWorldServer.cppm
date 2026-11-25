@@ -317,7 +317,7 @@ public:
   List<EntityId> entity_ids() const override;
 
   // Queues a microdungeon for placement
-  [[nodiscard]] std::expected<RpcPromise<Vec2I>, StarException> enqueuePlacement(List<BiomeItemDistribution> distributions, std::optional<DungeonId> id);
+  [[nodiscard]] std::expected<RpcPromise<Vec2I>, StarException> enqueue_placement(List<BiomeItemDistribution> distributions, std::optional<DungeonId> id);
 
   [[nodiscard]] std::expected<std::reference_wrapper<ServerTile const>, StarException> getServerTile(Vec2I const& position, bool withSignal = false);
   // Borrows a loaded mutable server tile and marks it as needing updates to all

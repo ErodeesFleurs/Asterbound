@@ -43,6 +43,10 @@ struct Biome {
   [[nodiscard]]
   std::expected<Json, StarException> to_json() const;
 
+  [[nodiscard]] MaterialHue hue_for_material(MaterialId material) const noexcept {
+    return material == main_block ? material_hue_shift : MaterialHue{};
+  }
+
   String base_name;
   String description;
 

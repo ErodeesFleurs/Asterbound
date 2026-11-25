@@ -1,13 +1,10 @@
 module;
 import std;
-import star.type_identity;
 import star.string;
 import star.list;
 import star.map;
 import star.format;
 import star.json;
-import star.image;
-import star.data_stream;
 import star.bi_map;
 import star.poly;
 import star.vector;
@@ -16,9 +13,9 @@ import star.liquid_types;
 import star.material_types;
 import star.random;
 import star.set;
-import star.thread;
 import star.ordered_map;
 import star.lru_cache;
+import star.type_identity;
 
 import star.item_descriptor;
 import star.world_geometry;
@@ -82,7 +79,8 @@ namespace Dungeon {
     Root& m_root;
   public:
     Root& root() const { return m_root; }
-    DungeonGeneratorWriter(Root& root, std::shared_ptr<DungeonGeneratorWorldFacade> facade, std::optional<int> terrainMarkingSurfaceLevel, std::optional<int> terrainSurfaceSpaceExtends);
+    // The facade must outlive the writer.
+    DungeonGeneratorWriter(Root& root, DungeonGeneratorWorldFacade& facade, std::optional<int> terrain_marking_surface_level, std::optional<int> terrain_surface_space_extends);
 
     Vec2I wrapPosition(Vec2I const& pos) const;
 
@@ -117,9 +115,8 @@ namespace Dungeon {
     [[nodiscard]] std::expected<void, StarException> clearTileEntities(RectI const& bounds, Set<Vec2I> const& positions, bool clearAnchoredObjects);
 
     [[nodiscard]] std::expected<void, StarException> flush_liquids();
-    [[nodiscard]] std::expected<void, StarException> flush();
-
-    List<RectI> boundingBoxes() const;
+    // Transfer the written regions only after the facade has consumed them.
+    [[nodiscard]] std::expected<List<RectI>, StarException> flush();
 
     void reset();
 
@@ -145,7 +142,7 @@ namespace Dungeon {
       Json parameters;
     };
 
-    std::shared_ptr<DungeonGeneratorWorldFacade> m_facade;
+    DungeonGeneratorWorldFacade& m_facade;
     std::optional<int> m_terrainMarkingSurfaceLevel;
     std::optional<int> m_terrainSurfaceSpaceExtends;
 
@@ -791,21 +788,27 @@ private:
   mutable HashLruCache<String, std::shared_ptr<DungeonDefinition>> m_definitionCache;
 };
 
+struct DungeonBuildResult {
+  List<RectI> bounds;
+  Set<Vec2I> modified_tiles;
+};
+
 class DungeonGenerator {
   Root& m_root;
 public:
   Root& root() const { return m_root; }
-    [[nodiscard]] static std::expected<std::shared_ptr<DungeonGenerator>, StarException> create(Root& root, String const& dungeonName, std::uint64_t seed, float threatLevel, std::optional<DungeonId> dungeonId);
+  [[nodiscard]] static std::expected<DungeonGenerator, StarException> create(Root& root, String const& dungeon_name, std::uint64_t seed, float threat_level, std::optional<DungeonId> dungeon_id);
 
-  [[nodiscard]] std::expected<std::optional<std::pair<List<RectI>, Set<Vec2I>>>, StarException> generate(std::shared_ptr<DungeonGeneratorWorldFacade> facade, Vec2I position, bool markSurfaceAndTerrain, bool forcePlacement);
+  [[nodiscard]] std::expected<std::optional<DungeonBuildResult>, StarException> generate(DungeonGeneratorWorldFacade& facade, Vec2I position, bool mark_surface_and_terrain, bool force_placement);
 
-  [[nodiscard]] std::expected<std::pair<List<RectI>, Set<Vec2I>>, StarException> buildDungeon(std::shared_ptr<Dungeon::Part const> anchor, Vec2I pos, Dungeon::DungeonGeneratorWriter& writer, bool forcePlacement);
-  [[nodiscard]] std::expected<std::shared_ptr<Dungeon::Part const>, StarException> pickAnchor();
+  [[nodiscard]] std::expected<DungeonBuildResult, StarException> build_dungeon(Dungeon::Part const& anchor, Vec2I base_pos, Dungeon::DungeonGeneratorWriter& writer, bool force_placement);
+  // The anchor borrows from this generator's definition.
+  [[nodiscard]] std::expected<std::optional<std::reference_wrapper<Dungeon::Part const>>, StarException> pick_anchor();
 
-  std::shared_ptr<DungeonDefinition const> definition() const;
+  DungeonDefinition const& definition() const;
 
 private:
-  DungeonGenerator(Root& root, std::uint64_t seed, float threatLevel, std::optional<DungeonId> dungeonId);
+  DungeonGenerator(Root& root, std::shared_ptr<DungeonDefinition const> definition, std::uint64_t seed, float threat_level, std::optional<DungeonId> dungeon_id);
   std::shared_ptr<DungeonDefinition const> m_def;
 
   RandomSource m_rand;
@@ -824,6 +827,7 @@ export namespace Star {
   using ::Star::DungeonDefinition;
   using ::Star::DungeonDefinitions;
   using ::Star::DungeonGenerator;
+  using ::Star::DungeonBuildResult;
 }
 
 export namespace Star::Dungeon {

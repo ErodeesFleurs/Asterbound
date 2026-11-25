@@ -20,6 +20,15 @@ import star.root;
 import star.static_random;
 import star.math_common;
 namespace Star {
+namespace {
+std::expected<BiomeItem, StarException> read_micro_dungeon_names(Json const& value) {
+  auto names = json_to_string_set(value);
+  if (!names) return std::unexpected(std::move(names.error()));
+  if (names->empty() || names->contains(String{}))
+    return std::unexpected(BiomeException("Microdungeon selection needs at least one name and cannot contain an empty name"));
+  return MicroDungeonNames{std::move(*names)};
+}
+}
 
 std::expected<BiomeItem, StarException> variant_to_biome_item(Assets const& assets, Json const& store) {
   auto type = store.get(0);
@@ -69,9 +78,7 @@ std::expected<BiomeItem, StarException> variant_to_biome_item(Assets const& asse
     if (!name) return std::unexpected(std::move(name.error()));
     return BiomeItem{TreasureBoxSet(std::move(*name))};
   } else if (tag == "microDungeon") {
-    auto names = json_to_string_set(*value);
-    if (!names) return std::unexpected(std::move(names.error()));
-    return BiomeItem{MicroDungeonNames(std::move(*names))};
+    return read_micro_dungeon_names(*value);
   }
   auto text = type->repr();
   if (!text) return std::unexpected(std::move(text.error()));
@@ -121,7 +128,7 @@ struct StoreBiomeItem {
   }
 
   Result operator()(MicroDungeonNames const& dungeons) const {
-    return json_pair("microDungeon", json_from_string_set(dungeons.names));
+    return json_pair("microDungeon", json_from_string_set(*dungeons.names));
   }
 };
 
@@ -333,11 +340,9 @@ std::expected<std::optional<BiomeItem>, StarException> create_item(
     return BiomeItem{TreasureBoxSet(std::move(*name))};
   } else if (auto match = type->equals_ignore_case("microdungeon"); !match) return std::unexpected(std::move(match.error()));
   else if (*match) {
-    auto names_config = config.get("microdungeons", JsonArray());
-    if (!names_config) return std::unexpected(std::move(names_config.error()));
-    auto names = json_to_string_set(*names_config);
+    auto names = config.get("microdungeons");
     if (!names) return std::unexpected(std::move(names.error()));
-    return BiomeItem{MicroDungeonNames(std::move(*names))};
+    return read_micro_dungeon_names(*names);
   } else {
     return std::unexpected(BiomeException(Star::format("No such item type '{}' in item distribution", *type)));
   }
@@ -524,6 +529,13 @@ std::expected<BiomeItemDistribution, StarException> BiomeItemDistribution::creat
     result.m_weighted_items.emplace_back(std::move(*item), std::move(*weight));
   }
   return result;
+}
+
+bool BiomeItemDistribution::can_place_micro_dungeon() const {
+  auto is_micro = [](BiomeItem const& item) { return std::holds_alternative<MicroDungeonNames>(item); };
+  if (m_distribution == DistributionType::Random)
+    return m_block_probability >= 0 && std::ranges::any_of(m_random_items, is_micro);
+  return std::ranges::any_of(m_weighted_items, is_micro, &PeriodicWeightedItem::item);
 }
 
 std::expected<Json, StarException> BiomeItemDistribution::to_json() const {

@@ -78,6 +78,7 @@ import star.tile_entity;
 import star.inspectable_entity;
 import star.plant;
 import star.plant_database;
+import star.biome;
 import star.biome_placement;
 import star.versioning_database;
 import star.world_storage;
@@ -172,6 +173,10 @@ struct WorldServerTestAccess {
     return world.processingLimit(limit);
   }
 
+  static WorldStorage& world_storage(WorldServer& world) {
+    return *world.m_worldStorage;
+  }
+
   static std::expected<void, StarException> generate_queued_sectors(WorldServer& world) {
     return world.m_worldStorage->generateQueue({});
   }
@@ -229,6 +234,211 @@ const GameTestRegistration server_break_clock("GameTimers", "GlobalBreakRequests
     EXPECT_EQ(chair->checks - before, step / 4) << step;
   }
 });
+
+namespace {
+
+class MicroDungeonFlushObserver : public LogSink {
+public:
+  std::expected<void, StarException> log(std::string_view message, LogLevel level) override {
+    if (level == LogLevel::Debug && message == "Flushing dungeon into the worldgen.") {
+      ++draws;
+      if (draws == 3)
+        return on_third_draw();
+    }
+    return {};
+  }
+
+  unsigned draws = 0;
+  std::function<std::expected<void, StarException>()> on_third_draw;
+};
+
+template<typename Result>
+concept placement_test_result = std::same_as<Result, std::expected<typename Result::value_type, StarException>>;
+
+const GameTestRegistration micro_dungeon_retry("MicroDungeonPlacement", "DrawAndTileCursorsSurviveReentrantQueueGrowthAndCompaction",
+    [](GameTest& fixture) {
+  auto checked = [&](placement_test_result auto const& result, std::string_view label,
+      std::source_location at = std::source_location::current()) {
+    return result || fixture.check(false, std::format("{}: {}", label, result.error().what()), at);
+  };
+  auto directory = File::temporary_directory(fixture.root().random());
+  if (!checked(directory, "create temporary test directory")) return;
+  auto cleanup = make_scope_exit([&] { fixture.check(static_cast<bool>(File::remove_all(*directory)), "remove test directory"); });
+  auto overlay = File::relative_to(*directory, "assets");
+  if (!checked(File::create_directory(overlay), "create asset overlay")) return;
+  auto write_asset = [&](String const& name, String const& text) { return File::write_file(text, File::relative_to(overlay, name)); };
+  if (!checked(write_asset("micro-retry.dungeon", R"({
+      "metadata":{"name":"asterboundTestMicroRetry","species":"generic","anchor":["anchor"]},
+      "parts":[{"name":"anchor","rules":[],"def":["tmx","micro-retry.json"]}]
+    })"), "write dungeon definition")) return;
+  if (!checked(write_asset("micro-retry.json", R"({
+      "width":3,"height":1,"tilewidth":8,"tileheight":8,"tilesets":[{"source":"/micro-retry-tiles.json","firstgid":1}],
+      "layers":[{"type":"tilelayer","name":"front","width":3,"height":1,"data":[1,1,1]}]
+    })"), "write dungeon map")) return;
+  if (!checked(write_asset("micro-retry-tiles.json", R"({"tilecount":1,"tileproperties":{"0":{"surface":"0"}}})"),
+      "write surface tile")) return;
+
+  auto settings = fixture.rootSettings();
+  settings.assetSources.push_back(overlay);
+  settings.storageDirectory = File::relative_to(*directory, "storage");
+  settings.runtimeConfigFile = {};
+  settings.logDirectory = {};
+  settings.logFile = {};
+  settings.includeUGC = false;
+  auto root_result = Root::create(std::move(settings));
+  if (!checked(root_result, "create fixture root")) return;
+  auto& root = **root_result;
+  auto assets = root.assets();
+  auto materials = root.material_database();
+  if (!checked(assets, "load assets") || !checked(materials, "load materials")) return;
+  auto dirt = (*materials)->material_id("dirt");
+  if (!checked(dirt, "resolve dirt material")) return;
+
+  auto distribution = [&](int x, int priority) -> std::expected<BiomeItemDistribution, StarException> {
+    auto configured = BiomeItemDistribution::create(root, JsonObject{{"type", "microdungeon"},
+      {"microdungeons", JsonArray{"asterboundTestMicroRetry"}}, {"priority", priority},
+      {"distribution", JsonObject{{"type", "periodic"}, {"modulus", 128}}}}, 42);
+    if (!configured) return std::unexpected(std::move(configured.error()));
+    return configured->to_json()
+        .and_then([&](Json const& stored) { return stored.set("modulusOffset", -x); })
+        .and_then([&](Json const& stored) { return BiomeItemDistribution::create(**assets, stored); });
+  };
+  auto natural_first = distribution(40, -20);
+  auto queued_first = distribution(48, -10);
+  auto queued_retry = distribution(56, 0);
+  auto queued_alternate = distribution(78, 0);
+  auto natural_last = distribution(61, 10);
+  auto queued_reentrant = distribution(85, 5);
+  if (!checked(natural_first, "configure first natural trial") || !checked(queued_first, "configure first queue trial")
+      || !checked(queued_retry, "configure failing queue trial") || !checked(queued_alternate, "configure alternate queue trial")
+      || !checked(natural_last, "configure last natural trial") || !checked(queued_reentrant, "configure reentrant queue trial")) return;
+
+  auto file = File::ephemeral_file(root.random());
+  if (!checked(file, "create sector storage")) return;
+  auto world_result = WorldServer::create(root, Vec2U{128, 128}, *file);
+  if (!checked(world_result, "create blank world")) return;
+  auto& world = **world_result;
+  auto close = make_scope_exit([&] { checked(world.close(), "close world"); });
+  auto& storage = WorldServerTestAccess::world_storage(world);
+  WorldGenerator generator(world);
+  auto world_template = world.worldTemplate();
+  WorldRegion region;
+  region.terrainSelectorIndex = 1;
+  region.blockBiomeIndex = region.environmentBiomeIndex = 1;
+  region.regionLiquids = {};
+  auto layout = [&root, &region](Biome const& biome, bool with_terrain) -> std::expected<std::shared_ptr<WorldLayout>, StarException> {
+    auto biome_json = biome.to_json();
+    if (!biome_json) return std::unexpected(std::move(biome_json.error()));
+    JsonObject terrain{{"type", "flatSurface"}, {"config", JsonObject{}}, {"parameters", JsonObject{
+      {"worldWidth", 128}, {"baseHeight", 48}, {"seed", 42}, {"commonality", 1}}}};
+    JsonObject layer{{"yStart", 0}, {"boundaries", JsonArray{}}, {"cells", JsonArray{region.toJson()}}};
+    return WorldLayout::create(root, JsonObject{{"worldSize", JsonArray{128, 128}}, {"biomes", JsonArray{std::move(*biome_json)}},
+      {"terrainSelectors", with_terrain ? JsonArray{std::move(terrain)} : JsonArray{}},
+      {"layers", with_terrain ? JsonArray{std::move(layer)} : JsonArray{}},
+      {"regionBlending", 1}, {"playerStartSearchRegions", JsonArray{}}});
+  };
+  Biome biome;
+  biome.main_block = *dirt;
+  biome.material_hue_shift = 37;
+  biome.surface_placeables.item_distributions = {std::move(*natural_first), std::move(*natural_last)};
+  auto starting_layout = layout(biome, true);
+  if (!checked(starting_layout, "create flat terrain")) return;
+  world_template->setWorldLayout(std::move(*starting_layout));
+  biome.surface_placeables.item_distributions.clear();
+
+  // Call the real generation stage directly. Storage-wide invalidation on its
+  // public generation entry points intentionally rolls back and closes the DB.
+  WorldStorage::Sector const original{1, 1}, other{2, 1}, empty{3, 1};
+  for (auto sector : {original, other, empty}) {
+    if (!checked(storage.loadSector(sector), "load base tiles")
+        || !checked(generator.generateSectorLevel(storage, sector, SectorGenerationLevel::BaseTiles), "prepare base tiles")) return;
+  }
+  auto generate = [&](WorldStorage::Sector const& sector) {
+    return generator.generateSectorLevel(storage, sector, SectorGenerationLevel::MicroDungeons);
+  };
+  auto tile_at = [&](Vec2I const& position) -> ServerTile& { return storage.tileArray()->modify_tile(position).value().get(); };
+  auto painted = [&](Vec2I const& position, DungeonId id) {
+    auto const& tile = tile_at(position);
+    return tile.foreground == *dirt && tile.background == *dirt && tile.foregroundHueShift == 37 && tile.dungeonId == id;
+  };
+  auto non_dungeon = BiomeItemDistribution::create(root, JsonObject{{"type", "treasureBox"}, {"treasureBoxSets", JsonArray{"unused"}},
+      {"distribution", JsonObject{{"type", "random"}, {"blockProbability", 1}}}}, 42);
+  if (!checked(non_dungeon, "configure ordinary biome distribution")) return;
+  fixture.check(!generator.enqueue_placement({}, 99), "reject an empty queue request");
+  fixture.check(!generator.enqueue_placement({std::move(*non_dungeon)}, 99), "reject an ordinary-only queue request");
+  auto first = generator.enqueue_placement({std::move(*queued_first)}, 101);
+  auto retry = generator.enqueue_placement({std::move(*queued_retry), std::move(*queued_alternate)}, 102);
+  if (!checked(first, "enqueue first placement") || !checked(retry, "enqueue retrying placement")) return;
+
+  // Find the same progress boundary as the dungeon's modified-tile traversal:
+  // one tile has been resolved, then the invalid biome index fails replacement.
+  constexpr int painted_y = 47; // This one-row TMX anchor draws one tile below its selected position.
+  Set<Vec2I> footprint;
+  for (int x = 55; x <= 57; ++x)
+    footprint.insert(Vec2I{x, painted_y});
+  auto order = footprint.values();
+  auto done = order[0], fail = order[1], remaining = order[2];
+  tile_at(fail).blockBiomeIndex = 250;
+  std::optional<RpcPromise<Vec2I>> appended;
+  auto observer = std::make_shared<MicroDungeonFlushObserver>();
+  observer->set_level(LogLevel::Debug);
+  observer->on_third_draw = [&]() -> std::expected<void, StarException> {
+    if (generate(original))
+      return std::unexpected(StarException("same-sector reentry returned success"));
+    auto added = generator.enqueue_placement({std::move(*queued_reentrant)}, 103);
+    if (!added) return std::unexpected(std::move(added.error()));
+    appended = std::move(*added);
+    return generate(empty); // Compacts the earlier fulfilled queue entry while the draw is active.
+  };
+  root.logger().add_sink(observer);
+  auto remove_observer = make_scope_exit([&] { root.logger().remove_sink(observer); });
+
+  auto failed = generate(original);
+  if (!fixture.check(!failed && observer->draws == 3 && appended.has_value(), "fail postprocessing after three native draws")
+      || !fixture.check(painted(done, 102) && tile_at(fail).foreground == biome_material_id
+          && tile_at(remaining).foreground == biome_material_id, "stop on the failing tile after completing its predecessor"))
+    return;
+  fixture.check(first->result().value_or(std::nullopt) == Vec2I{48, 48}, "finish the earlier queued draw once");
+  fixture.check(retry->status() == RpcPromiseStatus::Pending, "promise remains pending until all tiles resolve");
+  if (!checked(generate(other), "generate a second sector while the first is suspended")) return;
+  fixture.check(observer->draws == 4 && appended->result().value_or(std::nullopt) == Vec2I{85, 48},
+      "fulfill only the reentrant append in the other sector");
+  fixture.check(retry->status() == RpcPromiseStatus::Pending && tile_at({78, painted_y}).dungeonId == no_dungeon_id,
+      "do not draw the suspended request at an alternate anchor");
+
+  tile_at(fail).blockBiomeIndex = 1;
+  tile_at(done).blockBiomeIndex = 250; // Reprocessing an already committed tile would now fail.
+  auto no_candidates = layout(biome, false);
+  if (!checked(no_candidates, "remove all eligible terrain before retry")) return;
+  world_template->setWorldLayout(*no_candidates);
+  if (!checked(generate(original), "resume original stage without re-sampling")) return;
+  fixture.check(observer->draws == 5 && painted({40, painted_y}, biome_micro_dungeon_id)
+      && painted({61, painted_y}, biome_micro_dungeon_id), "do not redraw the earlier natural trial; draw the retained later trial");
+  fixture.check(painted(fail, 102) && painted(remaining, 102) && retry->result().value_or(std::nullopt) == Vec2I{56, 48},
+      "apply the original request ID to every remaining tile before fulfilling the original promise");
+  if (!checked(generate(original), "reenter the completed stage with no candidates")) return;
+  fixture.check(observer->draws == 5, "no painting or second fulfillment after completion");
+
+  auto natural_retry = distribution(106, 0);
+  if (!checked(natural_retry, "configure suspended natural trial")) return;
+  biome.surface_placeables.item_distributions.push_back(std::move(*natural_retry));
+  auto natural_layout = layout(biome, true);
+  if (!checked(natural_layout, "restore terrain for natural trial")) return;
+  world_template->setWorldLayout(std::move(*natural_layout));
+  Vec2I const natural_failure{106, painted_y};
+  tile_at(natural_failure).blockBiomeIndex = 250;
+  auto natural_failed = generate(empty);
+  if (!fixture.check(!natural_failed && observer->draws == 6 && tile_at(natural_failure).foreground == biome_material_id,
+      "suspend a natural draw on the real biome replacement error")) return;
+  tile_at(natural_failure).blockBiomeIndex = 1;
+  world_template->setWorldLayout(std::move(*no_candidates));
+  if (!checked(generate(empty), "resume suspended natural draw")) return;
+  for (int x = 105; x <= 107; ++x)
+    fixture.check(observer->draws == 6 && painted({x, painted_y}, biome_micro_dungeon_id),
+        "resolve natural tiles exactly once with native dungeon IDs");
+});
+
+}
 
 const GameTestRegistration falling_block_world_edges("FallingBlocksWorld", "UnloadedSectorEdgesAndWrappedMoves", [](GameTest& fixture) {
   auto created = createSchedulingWorld(fixture.root());

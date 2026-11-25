@@ -138,7 +138,7 @@ struct WorldGeneratorFacade {
 
   // Queues up a microdungeon. Fulfills the rpc promise with the position the
   // microdungeon was placed at
-  [[nodiscard]] virtual std::expected<RpcPromise<Vec2I>, StarException> enqueuePlacement(List<BiomeItemDistribution> placements, std::optional<DungeonId> id) = 0;
+  [[nodiscard]] virtual std::expected<RpcPromise<Vec2I>, StarException> enqueue_placement(List<BiomeItemDistribution> placements, std::optional<DungeonId> id) = 0;
 };
 
 // Handles paging entity and tile data in / out of disk backed storage for
@@ -209,7 +209,7 @@ public:
 
   // Queues up a microdungeon. Fulfills the rpc promise with the position the
   // microdungeon was placed at
-  [[nodiscard]] std::expected<RpcPromise<Vec2I>, StarException> enqueuePlacement(List<BiomeItemDistribution> placements, std::optional<DungeonId> id);
+  [[nodiscard]] std::expected<RpcPromise<Vec2I>, StarException> enqueue_placement(List<BiomeItemDistribution> placements, std::optional<DungeonId> id);
 
   // Return the remaining time to live for a sector, if loaded.  A sector's
   // time to live is reset when loaded or generated, and when the time to live

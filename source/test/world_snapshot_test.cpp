@@ -95,6 +95,7 @@ import star.inspectable_entity;
 import star.plant;
 import star.plant_database;
 import star.biome_placement;
+import star.biome;
 import star.versioning_database;
 import star.world_storage;
 import star.player_types;
@@ -614,6 +615,80 @@ const GameTestRegistration celestial_chunk_response(
       ASSERT_TRUE(objects) << objects.error().what();
       EXPECT_EQ(*objects, system_wire.data());
     }
+  });
+
+const GameTestRegistration compact_candidates_retain_names(
+  "WorldTemplate", "CompactCandidatesRetainNamesAcrossSourceReplacement", [](GameTest& fixture) {
+    auto& root = fixture.root();
+    auto ocean_dungeon = [&](String name) {
+      return BiomeItemDistribution::create(root, JsonObject{
+          {"mode", "ocean"}, {"priority", 0.5}, {"type", "microdungeon"}, {"microdungeons", JsonArray{std::move(name)}},
+          {"distribution", JsonObject{{"type", "random"}, {"blockProbability", 1}}}}, 42);
+    };
+    auto natural = ocean_dungeon("natural-anchor");
+    auto queued = ocean_dungeon("queued-anchor");
+    auto ordinary = BiomeItemDistribution::create(root, JsonObject{
+        {"mode", "ocean"}, {"priority", 0.5}, {"type", "treasureBox"}, {"treasureBoxSets", JsonArray{"unused"}},
+        {"distribution", JsonObject{{"type", "random"}, {"blockProbability", 1}}}}, 43);
+    if (!fixture.check(natural && queued && ordinary, "create three guaranteed ocean samples")) return;
+
+    Biome biome;
+    biome.surface_placeables.item_distributions.push_back(std::move(*ordinary));
+    biome.surface_placeables.item_distributions.push_back(std::move(*natural));
+    auto stored_biome = biome.to_json();
+    if (!fixture.check(stored_biome.has_value(), "store the natural placement distributions")) return;
+
+    WorldRegion region;
+    region.blockBiomeIndex = 1;
+    region.regionLiquids.oceanLiquid = 1;
+    region.regionLiquids.oceanLiquidLevel = 5;
+    auto layout = WorldLayout::create(root, JsonObject{
+        {"worldSize", JsonArray{16, 16}}, {"biomes", JsonArray{std::move(*stored_biome)}}, {"terrainSelectors", JsonArray{}},
+        {"layers", JsonArray{JsonObject{{"yStart", 0}, {"boundaries", JsonArray{}}, {"cells", JsonArray{region.toJson()}}}}},
+        {"regionBlending", 1}, {"playerStartSearchRegions", JsonArray{}}});
+    auto world = WorldTemplate::create(root, Vec2U(16, 16));
+    if (!fixture.check(layout && world, "build a world template with an ocean site")) return;
+    (*world)->setWorldLayout(std::move(*layout));
+    auto source = (*world)->biome(1);
+    if (!fixture.check(source && *source, "read the original biome owner")) return;
+    std::weak_ptr<Biome const> natural_owner = *source;
+    auto observe_names = [](BiomeItemDistribution const& distribution, int x) -> std::weak_ptr<StringSet const> {
+      auto sample = distribution.item_at(x, 5);
+      if (!sample || !*sample) return {};
+      auto const& item = (**sample).get();
+      if (!std::holds_alternative<MicroDungeonNames>(item)) return {};
+      return std::get<MicroDungeonNames>(item).names;
+    };
+    auto natural_names = observe_names((*source)->surface_placeables.item_distributions[1], 12);
+    auto queued_names = observe_names(*queued, -4);
+    if (!fixture.check(!natural_names.expired() && !queued_names.expired(), "observe both immutable dungeon-name sets")) return;
+    source->reset();
+
+    List<BiomeItemDistribution> distributions;
+    distributions.push_back(std::move(*queued));
+    WorldTemplate::PotentialMicroDungeonItems scratch;
+    if (!fixture.check((*world)->potential_micro_dungeon_items_at(-4, 5, scratch).has_value(), "sample the natural biome across the seam")) return;
+    auto validity = (*world)->biome_item_validity_at(-4, 5);
+    if (!fixture.check(validity.has_value(), "evaluate terrain once for both sources")) return;
+    std::vector<WorldTemplate::MicroDungeonItem> candidates;
+    auto append = [&](WorldTemplate::MicroDungeonItem&& item) { candidates.push_back(std::move(item)); };
+    scratch.append_valid(*validity, append);
+    if (!fixture.check((*world)->add_potential_micro_dungeon_items(-4, 5, scratch, distributions).has_value(), "sample the queued distributions")) return;
+    scratch.append_valid(*validity, append);
+    if (!fixture.check(candidates.size() == 3, "emit exactly two natural samples and one queued sample")) return;
+
+    (*world)->setWorldLayout({});
+    distributions.clear();
+    if (!fixture.check(natural_owner.expired() && !natural_names.expired() && !queued_names.expired(),
+        "retained candidates keep their name sets, not the original distributions")) return;
+    fixture.check(candidates[0].position == Vec2I(12, 5) && candidates[0].priority == 0.5f && !candidates[0].dungeon_names,
+        "natural non-dungeon sample retains its priority and first append position");
+    fixture.check(candidates[1].position == Vec2I(12, 5) && candidates[1].dungeon_names && candidates[1].dungeon_names->contains("natural-anchor"),
+        "natural candidate uses wrapped coordinates and keeps its original names");
+    fixture.check(candidates[2].position == Vec2I(-4, 5) && candidates[2].dungeon_names && candidates[2].dungeon_names->contains("queued-anchor"),
+        "queued candidate keeps its raw sampling coordinates and original names");
+    candidates.clear();
+    fixture.check(natural_names.expired() && queued_names.expired(), "the last candidates release both name sets");
   });
 
 // This configured asset/math-profile baseline catches unintended world changes.

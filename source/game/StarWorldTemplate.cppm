@@ -63,6 +63,17 @@ namespace Star {
 class CelestialDatabase;
 struct AmbientNoisesDescription;
 
+template <typename Sink, typename... Args>
+concept biome_item_sink = requires(Sink& sink, Args&&... args) {
+  { sink(std::forward<Args>(args)...) } -> std::same_as<void>;
+};
+
+template <typename Visitor>
+concept natural_biome_distribution_visitor = requires(Visitor& visit, int x, int y,
+    List<BiomeItemDistribution> const& distributions, BiomePlacementArea area, BiomePlacementMode mode) {
+  { visit(x, y, distributions, area, mode) } -> std::same_as<std::expected<void, StarException>>;
+};
+
 // Reference object that describes the generation of a single world, and all
 // of the world metadata.  Meant to remain static (or relatively static)
 // throughout the life of a World.
@@ -70,6 +81,9 @@ class Root;
 class WorldTemplate {
   Root& m_root;
   Root& root() const { return m_root; }
+
+  // Declaration order is the order in which valid items enter the placement sort.
+  enum class BiomeItemSite { Surface, CaveFloor, CaveCeiling, CaveBackground, Ocean, Count };
 public:
   struct WeatherDomain {
     String name;
@@ -121,19 +135,59 @@ public:
     Json toJson() const;
   };
 
-  struct PotentialBiomeItems {
+  using BiomeItemValidity = std::array<bool, static_cast<std::size_t>(BiomeItemSite::Count)>;
+
+  struct MicroDungeonItem {
+    Vec2I position;
+    float priority;
+    // Null marks a non-dungeon sample that must still participate in sorting.
+    std::shared_ptr<StringSet const> dungeon_names;
+  };
+
+private:
+  template <typename Item>
+    requires (std::same_as<Item, BiomeItemPlacement> || std::same_as<Item, MicroDungeonItem>)
+  struct BiomeItemBuckets {
     // Potential items that would spawn at the given block assuming it is at
     // the surface.
-    List<BiomeItemPlacement> surface_biome_items;
+    List<Item> surface_biome_items;
     // ... Or on a cave surface.
-    List<BiomeItemPlacement> cave_surface_biome_items;
+    List<Item> cave_surface_biome_items;
     // ... Or on a cave ceiling.
-    List<BiomeItemPlacement> cave_ceiling_biome_items;
+    List<Item> cave_ceiling_biome_items;
     // ... Or on a cave background wall.
-    List<BiomeItemPlacement> cave_background_biome_items;
+    List<Item> cave_background_biome_items;
     // ... Or in the ocean
-    List<BiomeItemPlacement> ocean_items;
+    List<Item> ocean_items;
+
+    template <biome_item_sink<Item> Sink>
+    void append_valid(BiomeItemValidity const& validity, Sink&& sink) {
+      for (std::size_t index = 0; index < validity.size(); ++index) {
+        auto& items = bucket(static_cast<BiomeItemSite>(index));
+        if (validity[index]) {
+          for (auto& item : items)
+            sink(std::move(item));
+        }
+        items.clear();
+      }
+    }
+
+    List<Item>& bucket(BiomeItemSite site) {
+      switch (site) {
+        case BiomeItemSite::Surface: return surface_biome_items;
+        case BiomeItemSite::CaveFloor: return cave_surface_biome_items;
+        case BiomeItemSite::CaveCeiling: return cave_ceiling_biome_items;
+        case BiomeItemSite::CaveBackground: return cave_background_biome_items;
+        case BiomeItemSite::Ocean: return ocean_items;
+        case BiomeItemSite::Count: break;
+      }
+      std::unreachable();
+    }
   };
+
+public:
+  using PotentialBiomeItems = BiomeItemBuckets<BiomeItemPlacement>;
+  using PotentialMicroDungeonItems = BiomeItemBuckets<MicroDungeonItem>;
 
   // Creates a blank world with the given size
   [[nodiscard]] static std::expected<std::shared_ptr<WorldTemplate>, StarException> create(Root& root, Vec2U const& size);
@@ -211,7 +265,7 @@ public:
 
 
   // Material and mod hue shifts for this biome.
-  [[nodiscard]] std::expected<MaterialHue, StarException> biomeMaterialHueShift(BiomeIndex biomeIndex, MaterialId material) const;
+  [[nodiscard]] std::expected<MaterialHue, StarException> biome_material_hue_shift(BiomeIndex biome_index, MaterialId material) const;
   [[nodiscard]] std::expected<MaterialHue, StarException> biomeModHueShift(BiomeIndex biomeIndex, ModId mod) const;
 
   [[nodiscard]] std::expected<std::shared_ptr<AmbientNoisesDescription const>, StarException> ambient_noises(int x, int y) const;
@@ -233,6 +287,11 @@ public:
   // Return only the potential items that can spawn at the given block.
   [[nodiscard]] std::expected<List<BiomeItemPlacement>, StarException> valid_biome_items(int x, int y, PotentialBiomeItems potential_biome_items) const;
 
+  // Sample before checking terrain so rejected sites still surface sampling errors.
+  [[nodiscard]] std::expected<void, StarException> potential_micro_dungeon_items_at(int x, int y, PotentialMicroDungeonItems& items) const;
+  [[nodiscard]] std::expected<void, StarException> add_potential_micro_dungeon_items(int x, int y, PotentialMicroDungeonItems& items, List<BiomeItemDistribution> const& distributions) const;
+  [[nodiscard]] std::expected<BiomeItemValidity, StarException> biome_item_validity_at(int x, int y) const;
+
   [[nodiscard]] std::expected<float, StarException> gravity() const;
   float threatLevel() const;
 
@@ -240,6 +299,17 @@ public:
   std::uint64_t seedFor(int x, int y) const;
 
 private:
+  template <typename Sink>
+  [[nodiscard]] static std::expected<void, StarException> sample_biome_items(int x, int y,
+      List<BiomeItemDistribution> const& distributions, BiomePlacementArea area, std::optional<BiomePlacementMode> mode, Sink&& sink)
+    requires biome_item_sink<Sink, BiomeItemSite&, Vec2I, float, BiomeItem const&>;
+
+  [[nodiscard]] static std::expected<void, StarException> sample_micro_dungeon_items(int x, int y, PotentialMicroDungeonItems& items,
+      List<BiomeItemDistribution> const& distributions, BiomePlacementArea area, std::optional<BiomePlacementMode> mode);
+
+  template <natural_biome_distribution_visitor Visitor>
+  [[nodiscard]] std::expected<void, StarException> visit_natural_biome_distributions(int x, int y, Visitor&& visitor) const;
+
   struct CustomTerrainRegion {
     PolyF region;
     RectF regionBounds;
@@ -288,4 +358,6 @@ export namespace Star {
   using ::Star::WorldTemplate;
   using ::Star::CelestialDatabase;
   using ::Star::AmbientNoisesDescription;
+  using ::Star::biome_item_sink;
+  using ::Star::natural_biome_distribution_visitor;
 }

@@ -17,6 +17,7 @@ import star.string;
 import star.vector;
 import star.dungeon_generator;
 import star.dungeon_tmx_part;
+import star.micro_dungeon;
 import star.tileset_database;
 import star.world_generation;
 import star.world_layout;
@@ -161,8 +162,8 @@ const GameTestRegistration surface_layers("DungeonTmxTest", "PaintAndResolveSurf
   auto close_world = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
   ASSERT_TRUE((*world)->generateRegion(RectI::with_size({120, 12}, {10, 6})));
 
-  auto facade = std::make_shared<DungeonGeneratorWorld>(**world, false);
-  DungeonGeneratorWriter writer(root, std::move(facade), {}, {});
+  DungeonGeneratorWorld facade(**world, false);
+  DungeonGeneratorWriter writer(root, facade, {}, {});
   constexpr std::array placeholders{biome_material_id, biome1_material_id, biome2_material_id,
       biome3_material_id, biome4_material_id, biome5_material_id};
   for (int variant = 0; variant < static_cast<int>(placeholders.size()); ++variant) {
@@ -205,6 +206,21 @@ const GameTestRegistration surface_layers("DungeonTmxTest", "PaintAndResolveSurf
   (*world)->worldTemplate()->setWorldLayout(*layout);
   auto clear_layout = make_scope_exit([&] { (*world)->worldTemplate()->setWorldLayout({}); });
   WorldGenerator generator(**world);
+  MaterialId missing = 1;
+  while (is_real_material(missing) && (*materials)->is_valid_material_id(missing))
+    ++missing;
+  if (!fixture.check(is_real_material(missing), "find an unregistered real material")) return;
+  ServerTile retry_tile;
+  retry_tile.blockBiomeIndex = 1;
+  retry_tile.foreground = missing;
+  retry_tile.background = biome_material_id;
+  retry_tile.backgroundHueShift = 37;
+  if (!fixture.check(!generator.replace_biome_blocks(retry_tile)
+      && retry_tile.background == biome_material_id && retry_tile.backgroundHueShift == 37,
+      "a collision lookup error must not partially resolve the background")) return;
+  retry_tile.foreground = *dirt;
+  if (!fixture.check(generator.replace_biome_blocks(retry_tile) && retry_tile.background == *dirt
+      && retry_tile.backgroundHueShift == 191, "retry resolves the original placeholder and hue")) return;
 
   auto tinted_tile = (*world)->getServerTile(tinted_pos);
   ASSERT_TRUE(tinted_tile) << tinted_tile.error().what();
@@ -235,7 +251,7 @@ const GameTestRegistration surface_layers("DungeonTmxTest", "PaintAndResolveSurf
     original.backgroundModHueShift = 42;
     auto tile = original;
     tile.blockBiomeIndex = 1;
-    ASSERT_TRUE(generator.replaceBiomeBlocks(tile));
+    ASSERT_TRUE(generator.replace_biome_blocks(tile));
     EXPECT_EQ(tile.foreground, expected[index]);
     EXPECT_EQ(tile.background, expected[reverse]);
     EXPECT_EQ(tile.foregroundHueShift, index == 0 ? 191 : 0);
@@ -249,7 +265,7 @@ const GameTestRegistration surface_layers("DungeonTmxTest", "PaintAndResolveSurf
     tile = original;
     tile.blockBiomeIndex = 2;
     tile.update_collision(CollisionKind::Platform);
-    ASSERT_TRUE(generator.replaceBiomeBlocks(tile));
+    ASSERT_TRUE(generator.replace_biome_blocks(tile));
     EXPECT_EQ(tile.foreground, *dirt);
     EXPECT_EQ(tile.background, *dirt);
     EXPECT_EQ(tile.foregroundHueShift, 191);
@@ -258,7 +274,7 @@ const GameTestRegistration surface_layers("DungeonTmxTest", "PaintAndResolveSurf
 
     tile = original;
     tile.blockBiomeIndex = NullBiomeIndex;
-    ASSERT_TRUE(generator.replaceBiomeBlocks(tile));
+    ASSERT_TRUE(generator.replace_biome_blocks(tile));
     EXPECT_EQ(tile.foreground, empty_material_id);
     EXPECT_EQ(tile.background, empty_material_id);
     EXPECT_EQ(tile.foregroundHueShift, 0);
@@ -269,5 +285,125 @@ const GameTestRegistration surface_layers("DungeonTmxTest", "PaintAndResolveSurf
     EXPECT_EQ(tile.backgroundModHueShift, index % 2 == 0 ? 42 : 0);
     EXPECT_EQ(tile.collision, CollisionKind::None);
   }
+});
+
+class TracingDungeonWorld final : public DungeonGeneratorWorld {
+public:
+  explicit TracingDungeonWorld(WorldServer& world) : DungeonGeneratorWorld(world, false) {}
+
+  std::expected<DungeonId, StarException> getDungeonIdAt(Vec2I const& position) override {
+    probes.push_back(position);
+    if (auto callback = std::exchange(on_probe, {}))
+      callback();
+    if (position == failing_probe)
+      return std::unexpected(StarException("Microdungeon tile probe failed"));
+    return DungeonGeneratorWorld::getDungeonIdAt(position);
+  }
+
+  std::expected<void, StarException> markRegion(RectI const& region) override {
+    marked_regions.push_back(region);
+    return DungeonGeneratorWorld::markRegion(region);
+  }
+
+  std::vector<Vec2I> probes;
+  List<RectI> marked_regions;
+  std::function<void()> on_probe;
+  std::optional<Vec2I> failing_probe;
+};
+
+const GameTestRegistration micro_dungeon_anchor("DungeonTmxTest", "MicroDungeonAnchorShiftOrderForceAndReentry", [](GameTest& fixture) {
+  auto checked = [&](auto const& result, std::string_view action) {
+    return fixture.check(bool(result), result ? action : result.error().what());
+  };
+  auto directory = File::temporary_directory(fixture.root().random());
+  if (!checked(directory, "create microdungeon test directory")) return;
+  auto cleanup = make_scope_exit([&] { checked(File::remove_all(*directory), "remove microdungeon test directory"); });
+  auto overlay = File::relative_to(*directory, "assets");
+  if (!checked(File::create_directory(overlay), "create microdungeon asset overlay")) return;
+  auto put = [&](String const& name, String const& text) {
+    return checked(File::write_file(text, File::relative_to(overlay, name)), name.utf8());
+  };
+  String const name = "micro_anchor_probe";
+  if (!put("micro_anchor_probe.dungeon", R"({
+      "metadata":{"name":"micro_anchor_probe","species":"human","anchor":["anchor"]},
+      "parts":[{"name":"anchor","rules":[],"def":["tmx","micro_anchor_probe.json"]}]
+    })")
+      || !put("micro_anchor_probe_tiles.json", R"({"tilecount":1,"tileproperties":{"0":{"front":"dirt"}}})")
+      || !put("micro_anchor_probe.json", R"({
+      "width":2,"height":2,"tilewidth":8,"tileheight":8,"tilesets":[{"source":"/micro_anchor_probe_tiles.json","firstgid":1}],
+      "layers":[{"type":"tilelayer","name":"front","x":1,"y":1,"width":1,"height":1,"data":[1]}]
+    })"))
+    return;
+
+  auto settings = fixture.rootSettings();
+  settings.assetSources.push_back(overlay);
+  settings.storageDirectory = File::relative_to(*directory, "storage");
+  settings.runtimeConfigFile.reset();
+  settings.logDirectory.reset();
+  settings.logFile.reset();
+  settings.includeUGC = false;
+  auto root = Root::create(std::move(settings));
+  if (!checked(root, "load root with microdungeon fixture")) return;
+  auto storage = File::ephemeral_file((*root)->random());
+  if (!checked(storage, "create temporary world storage")) return;
+  auto world = WorldServer::create(**root, Vec2U{128, 128}, *storage);
+  if (!checked(world, "create empty test world")) return;
+  auto close_world = make_scope_exit([&] { checked((*world)->close(), "close microdungeon test world"); });
+  if (!checked((*world)->generateRegion(RectI::with_size({126, 16}, {6, 12})), "generate tiles across the seam"))
+    return;
+
+  MicroDungeonFactory factory(**root);
+  TracingDungeonWorld facade(**world);
+  Vec2I const position{0, 22};
+  // The painted tile is at local (1,0), the anchor point is (1,2).
+  RectI const bounds({-1, 17}, {0, 24});
+  auto generate = [&](RectI const& area, bool force = false) {
+    return factory.generate(area, name, position, 43, 0.0f, facade, force);
+  };
+
+  facade.failing_probe = Vec2I{0, 20};
+  auto failed = generate(bounds);
+  fixture.check(!failed && std::string_view(failed.error().what()).contains(name.utf8()), "probe failure retains dungeon name");
+  fixture.check(facade.probes == std::vector<Vec2I>{{0, 20}} && facade.marked_regions.empty(), "probe error stops before drawing or trying another shift");
+  facade.failing_probe.reset();
+  facade.probes.clear();
+
+  constexpr DungeonId occupied_id = 41;
+  for (int y = 18; y <= 23; ++y)
+    if (!checked(facade.setDungeonIdAt({0, y}, occupied_id), "mark occupied trial tile")) return;
+  bool reentered = false;
+  facade.on_probe = [&] {
+    auto nested = generate(bounds, true);
+    fixture.check(!nested && std::string_view(nested.error().what()).contains("Not reentrant."), "reject a nested force attempt on the same factory");
+    reentered = true;
+  };
+  auto shifted = generate(bounds);
+  if (!checked(shifted, "place the shifted microdungeon") || !fixture.check(shifted->has_value(), "find a free trial")) return;
+  fixture.check(reentered, "exercise factory reentry during the facade probe");
+  fixture.check(facade.probes == std::vector<Vec2I>{{0, 20}, {0, 21}, {0, 22}, {0, 23}, {0, 19}, {0, 18}, {0, 17}, {0, 17}},
+      "visit 0,+1,+2,+3,-1,-2,-3; only the winning shift reaches tile rules");
+  auto check_placement = [&](DungeonBuildResult const& result, Vec2I tile_position) {
+    fixture.check(result.modified_tiles.size() == 1 && result.modified_tiles.contains(tile_position), "return the one painted tile");
+    fixture.check(result.bounds == List<RectI>{RectI(tile_position, tile_position)} && facade.marked_regions == result.bounds,
+        "flush the exact region once before returning it");
+    auto tile = (*world)->getServerTile(tile_position);
+    if (checked(tile, "read painted server tile"))
+      fixture.check(tile->get().dungeonId == biome_micro_dungeon_id, "write the biome dungeon ID");
+  };
+  check_placement(**shifted, {0, 17});
+
+  facade.marked_regions.clear();
+  facade.probes.clear();
+  RectI const unrelated_bounds({4, 4}, {4, 4});
+  auto skipped = generate(unrelated_bounds);
+  fixture.check(skipped && !*skipped && facade.probes.empty() && facade.marked_regions.empty(), "reject out-of-bounds trials without querying the world");
+  auto forced = generate(unrelated_bounds, true);
+  if (!checked(forced, "force microdungeon placement") || !fixture.check(forced->has_value(), "force placement ignores bounds and occupation")) return;
+  fixture.check(facade.probes.empty(), "force does not query any candidate or tile rule");
+  check_placement(**forced, {0, 20});
+
+  facade.marked_regions.clear();
+  auto overflow = factory.generate(RectI::inf(), name, {std::numeric_limits<int>::max(), 22}, 43, 0.0f, facade, true);
+  fixture.check(!overflow && facade.probes.empty() && facade.marked_regions.empty(), "reject an unrepresentable exclusive part bound before writing");
 });
 }

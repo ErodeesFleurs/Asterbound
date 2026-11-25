@@ -1257,17 +1257,17 @@ namespace LuaBindings {
         }); !result)
         return std::unexpected(std::move(result.error()));
 
-      if (auto result = callbacks.register_callback("enqueuePlacement", [serverWorld](List<Json> distributionConfigs, std::optional<DungeonId> id) -> std::expected<RpcPromise<Vec2I>, StarException> {
+      if (auto result = callbacks.register_callback("enqueuePlacement", [server_world = serverWorld](List<Json> const& configs, std::optional<DungeonId> id) -> std::expected<RpcPromise<Vec2I>, StarException> {
+        auto& root = server_world->get().root();
         List<BiomeItemDistribution> distributions;
-        distributions.reserve(distributionConfigs.size());
-        for (auto const& config : distributionConfigs) {
-          auto distributionResult = BiomeItemDistribution::create(serverWorld->get().root(), config, serverWorld->get().root().random().next_u64());
-          if (!distributionResult)
-            return std::unexpected(std::move(distributionResult.error()));
-          auto distribution = std::move(*distributionResult);
-          distributions.push_back(std::move(distribution));
+        distributions.reserve(configs.size());
+        for (auto const& config : configs) {
+          auto distribution = BiomeItemDistribution::create(root, config, root.random().next_u64());
+          if (!distribution)
+            return std::unexpected(std::move(distribution.error()));
+          distributions.push_back(std::move(*distribution));
         }
-        return serverWorld->get().enqueuePlacement(std::move(distributions), id);
+        return server_world->get().enqueue_placement(std::move(distributions), id);
       }); !result)
         return std::unexpected(std::move(result.error()));
       if (auto result = callbacks.register_callback("template", [serverWorld]() {

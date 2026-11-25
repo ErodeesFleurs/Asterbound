@@ -617,12 +617,10 @@ std::expected<std::shared_ptr<Biome const>, StarException> WorldTemplate::enviro
   return biome(*index);
 }
 
-std::expected<MaterialHue, StarException> WorldTemplate::biomeMaterialHueShift(BiomeIndex biomeIndex, MaterialId material) const {
-  auto result = biome(biomeIndex);
+std::expected<MaterialHue, StarException> WorldTemplate::biome_material_hue_shift(BiomeIndex biome_index, MaterialId material) const {
+  auto result = biome(biome_index);
   if (!result) return std::unexpected(std::move(result.error()));
-  if (*result && material == (*result)->main_block)
-    return (*result)->material_hue_shift;
-  return MaterialHue();
+  return *result ? (*result)->hue_for_material(material) : MaterialHue{};
 }
 
 std::expected<MaterialHue, StarException> WorldTemplate::biomeModHueShift(BiomeIndex biomeIndex, ModId mod) const {
@@ -692,15 +690,18 @@ bool WorldTemplate::breathable(int, int) const {
   return true;
 }
 
-std::expected<void, StarException> WorldTemplate::add_potential_biome_items(int x, int y, PotentialBiomeItems& items, List<BiomeItemDistribution> const& distributions, BiomePlacementArea area, std::optional<BiomePlacementMode> mode) const {
-  auto destination = [&](BiomePlacementMode placement_mode) -> std::optional<std::reference_wrapper<List<BiomeItemPlacement>>> {
+template <typename Sink>
+std::expected<void, StarException> WorldTemplate::sample_biome_items(int x, int y, List<BiomeItemDistribution> const& distributions,
+    BiomePlacementArea area, std::optional<BiomePlacementMode> mode, Sink&& sink)
+  requires biome_item_sink<Sink, BiomeItemSite&, Vec2I, float, BiomeItem const&> {
+  auto site_for_mode = [&](BiomePlacementMode placement_mode) -> std::optional<BiomeItemSite> {
     if (area == BiomePlacementArea::Surface) {
-      if (placement_mode == BiomePlacementMode::Floor) return items.surface_biome_items;
-      if (placement_mode == BiomePlacementMode::Ocean) return items.ocean_items;
+      if (placement_mode == BiomePlacementMode::Floor) return BiomeItemSite::Surface;
+      if (placement_mode == BiomePlacementMode::Ocean) return BiomeItemSite::Ocean;
     } else if (area == BiomePlacementArea::Underground) {
-      if (placement_mode == BiomePlacementMode::Floor) return items.cave_surface_biome_items;
-      if (placement_mode == BiomePlacementMode::Ceiling) return items.cave_ceiling_biome_items;
-      if (placement_mode == BiomePlacementMode::Background) return items.cave_background_biome_items;
+      if (placement_mode == BiomePlacementMode::Floor) return BiomeItemSite::CaveFloor;
+      if (placement_mode == BiomePlacementMode::Ceiling) return BiomeItemSite::CaveCeiling;
+      if (placement_mode == BiomePlacementMode::Background) return BiomeItemSite::CaveBackground;
     }
     return std::nullopt;
   };
@@ -708,17 +709,41 @@ std::expected<void, StarException> WorldTemplate::add_potential_biome_items(int 
   for (auto const& distribution : distributions) {
     auto placement_mode = distribution.mode();
     if (mode && placement_mode != *mode) continue;
-    auto target = destination(placement_mode);
-    if (!target) continue;
-    auto placement = distribution.item_to_place(x, y);
-    if (!placement) return std::unexpected(std::move(placement.error()));
-    if (*placement) target->get().push_back(std::move(**placement));
+    auto site = site_for_mode(placement_mode);
+    if (!site) continue;
+    auto item = distribution.item_at(x, y);
+    if (!item) return std::unexpected(std::move(item.error()));
+    if (*item) sink(*site, Vec2I(x, y), distribution.priority(), (**item).get());
   }
   return {};
 }
 
+std::expected<void, StarException> WorldTemplate::add_potential_biome_items(int x, int y, PotentialBiomeItems& items,
+    List<BiomeItemDistribution> const& distributions, BiomePlacementArea area, std::optional<BiomePlacementMode> mode) const {
+  return sample_biome_items(x, y, distributions, area, mode, [&](BiomeItemSite site, Vec2I const& position, float priority, BiomeItem const& item) {
+    items.bucket(site).emplace_back(item, position, priority);
+  });
+}
 
-std::expected<WorldTemplate::PotentialBiomeItems, StarException> WorldTemplate::potential_biome_items_at(int x, int y) const {
+std::expected<void, StarException> WorldTemplate::sample_micro_dungeon_items(int x, int y, PotentialMicroDungeonItems& items,
+    List<BiomeItemDistribution> const& distributions, BiomePlacementArea area, std::optional<BiomePlacementMode> mode) {
+  return sample_biome_items(x, y, distributions, area, mode, [&](BiomeItemSite site, Vec2I const& position, float priority, BiomeItem const& item) {
+    std::shared_ptr<StringSet const> dungeon_names;
+    if (std::holds_alternative<MicroDungeonNames>(item))
+      dungeon_names = std::get<MicroDungeonNames>(item).names;
+    items.bucket(site).emplace_back(position, priority, std::move(dungeon_names));
+  });
+}
+
+std::expected<void, StarException> WorldTemplate::add_potential_micro_dungeon_items(int x, int y, PotentialMicroDungeonItems& items,
+    List<BiomeItemDistribution> const& distributions) const {
+  auto surface = sample_micro_dungeon_items(x, y, items, distributions, BiomePlacementArea::Surface, {});
+  if (!surface) return std::unexpected(std::move(surface.error()));
+  return sample_micro_dungeon_items(x, y, items, distributions, BiomePlacementArea::Underground, {});
+}
+
+template <natural_biome_distribution_visitor Visitor>
+std::expected<void, StarException> WorldTemplate::visit_natural_biome_distributions(int x, int y, Visitor&& visitor) const {
   if (!m_layout || y <= 0 || y >= static_cast<int>(m_geometry.height()) - 1)
     return {};
   x = m_geometry.xwrap(x);
@@ -729,7 +754,7 @@ std::expected<WorldTemplate::PotentialBiomeItems, StarException> WorldTemplate::
     if (*index == NullBiomeIndex) return std::nullopt;
     auto biome = m_layout->getBiome(*index);
     if (!biome) return std::unexpected(std::move(biome.error()));
-    return optional_ref(biome->get());
+    return std::cref(*biome->get());
   };
 
   auto lower_block_biome = block_biome(y - 1);
@@ -739,37 +764,45 @@ std::expected<WorldTemplate::PotentialBiomeItems, StarException> WorldTemplate::
   auto this_block_biome = block_biome(y);
   if (!this_block_biome) return std::unexpected(std::move(this_block_biome.error()));
 
-  PotentialBiomeItems potential_biome_items;
-  // surface floor, surface ocean
-  if (*lower_block_biome) {
-    auto added = add_potential_biome_items(x, y, potential_biome_items, (*lower_block_biome)->get().surface_placeables.item_distributions, BiomePlacementArea::Surface, BiomePlacementMode::Floor);
-    if (!added) return std::unexpected(std::move(added.error()));
-  }
-  if (*this_block_biome) {
-    auto added = add_potential_biome_items(x, y, potential_biome_items, (*this_block_biome)->get().surface_placeables.item_distributions, BiomePlacementArea::Surface, BiomePlacementMode::Ocean);
-    if (!added) return std::unexpected(std::move(added.error()));
-  }
+  auto visit = [&](std::optional<std::reference_wrapper<Biome const>> const& biome, BiomePlacementArea area, BiomePlacementMode mode) -> std::expected<void, StarException> {
+    if (!biome) return {};
+    auto const& placeables = area == BiomePlacementArea::Surface ? biome->get().surface_placeables : biome->get().underground_placeables;
+    return visitor(x, y, placeables.item_distributions, area, mode);
+  };
 
-  // underground floor, ceiling, background
-  if (*lower_block_biome) {
-    auto added = add_potential_biome_items(x, y, potential_biome_items, (*lower_block_biome)->get().underground_placeables.item_distributions, BiomePlacementArea::Underground, BiomePlacementMode::Floor);
-    if (!added) return std::unexpected(std::move(added.error()));
-  }
-  if (*upper_block_biome) {
-    auto added = add_potential_biome_items(x, y, potential_biome_items, (*upper_block_biome)->get().underground_placeables.item_distributions, BiomePlacementArea::Underground, BiomePlacementMode::Ceiling);
-    if (!added) return std::unexpected(std::move(added.error()));
-  }
-  if (*this_block_biome) {
-    auto added = add_potential_biome_items(x, y, potential_biome_items, (*this_block_biome)->get().underground_placeables.item_distributions, BiomePlacementArea::Underground, BiomePlacementMode::Background);
-    if (!added) return std::unexpected(std::move(added.error()));
-  }
+  // Sampling order is distinct from the order in which valid buckets are appended.
+  auto sampled = visit(*lower_block_biome, BiomePlacementArea::Surface, BiomePlacementMode::Floor);
+  if (!sampled) return std::unexpected(std::move(sampled.error()));
+  sampled = visit(*this_block_biome, BiomePlacementArea::Surface, BiomePlacementMode::Ocean);
+  if (!sampled) return std::unexpected(std::move(sampled.error()));
+  sampled = visit(*lower_block_biome, BiomePlacementArea::Underground, BiomePlacementMode::Floor);
+  if (!sampled) return std::unexpected(std::move(sampled.error()));
+  sampled = visit(*upper_block_biome, BiomePlacementArea::Underground, BiomePlacementMode::Ceiling);
+  if (!sampled) return std::unexpected(std::move(sampled.error()));
+  return visit(*this_block_biome, BiomePlacementArea::Underground, BiomePlacementMode::Background);
+}
+
+std::expected<WorldTemplate::PotentialBiomeItems, StarException> WorldTemplate::potential_biome_items_at(int x, int y) const {
+  PotentialBiomeItems potential_biome_items;
+  auto sampled = visit_natural_biome_distributions(x, y, [&](int sample_x, int sample_y,
+      List<BiomeItemDistribution> const& distributions, BiomePlacementArea area, BiomePlacementMode mode) {
+    return add_potential_biome_items(sample_x, sample_y, potential_biome_items, distributions, area, mode);
+  });
+  if (!sampled) return std::unexpected(std::move(sampled.error()));
 
   return potential_biome_items;
 }
 
-std::expected<List<BiomeItemPlacement>, StarException> WorldTemplate::valid_biome_items(int x, int y, PotentialBiomeItems potential_biome_items) const {
+std::expected<void, StarException> WorldTemplate::potential_micro_dungeon_items_at(int x, int y, PotentialMicroDungeonItems& items) const {
+  return visit_natural_biome_distributions(x, y, [&](int sample_x, int sample_y,
+      List<BiomeItemDistribution> const& distributions, BiomePlacementArea area, BiomePlacementMode mode) {
+    return sample_micro_dungeon_items(sample_x, sample_y, items, distributions, area, mode);
+  });
+}
+
+std::expected<WorldTemplate::BiomeItemValidity, StarException> WorldTemplate::biome_item_validity_at(int x, int y) const {
   if (y <= 0 || y >= static_cast<int>(m_geometry.height()) - 1)
-    return {};
+    return BiomeItemValidity{};
 
   x = m_geometry.xwrap(x);
 
@@ -777,28 +810,29 @@ std::expected<List<BiomeItemPlacement>, StarException> WorldTemplate::valid_biom
   if (!block) return std::unexpected(std::move(block.error()));
 
   if (block->biomeTransition)
-    return {};
-  List<BiomeItemPlacement> biome_items;
+    return BiomeItemValidity{};
 
   auto block_above = getBlockInfo(x, y + 1);
   if (!block_above) return std::unexpected(std::move(block_above.error()));
   auto block_below = getBlockInfo(x, y - 1);
   if (!block_below) return std::unexpected(std::move(block_below.error()));
 
-  if (!block_below->biomeTransition && block_below->terrain && !block->terrain && !block_below->foregroundCave)
-    biome_items.append_range(std::move(potential_biome_items.surface_biome_items));
+  return BiomeItemValidity{
+    !block_below->biomeTransition && block_below->terrain && !block->terrain && !block_below->foregroundCave,
+    !block_below->biomeTransition && block_below->terrain && block->terrain && !block_below->foregroundCave && block->foregroundCave,
+    !block_above->biomeTransition && block_above->terrain && block->terrain && !block_above->foregroundCave && block->foregroundCave,
+    block->terrain && block->foregroundCave && !block->backgroundCave,
+    block->oceanLiquid != empty_liquid_id && y == block->oceanLiquidLevel
+  };
+}
 
-  if (!block_below->biomeTransition && block_below->terrain && block->terrain && !block_below->foregroundCave && block->foregroundCave)
-    biome_items.append_range(std::move(potential_biome_items.cave_surface_biome_items));
-
-  if (!block_above->biomeTransition && block_above->terrain && block->terrain && !block_above->foregroundCave && block->foregroundCave)
-    biome_items.append_range(std::move(potential_biome_items.cave_ceiling_biome_items));
-
-  if (block->terrain && block->foregroundCave && !block->backgroundCave)
-    biome_items.append_range(std::move(potential_biome_items.cave_background_biome_items));
-
-  if (block->oceanLiquid != empty_liquid_id && y == block->oceanLiquidLevel)
-    biome_items.append_range(std::move(potential_biome_items.ocean_items));
+std::expected<List<BiomeItemPlacement>, StarException> WorldTemplate::valid_biome_items(int x, int y, PotentialBiomeItems potential_biome_items) const {
+  auto validity = biome_item_validity_at(x, y);
+  if (!validity) return std::unexpected(std::move(validity.error()));
+  List<BiomeItemPlacement> biome_items;
+  potential_biome_items.append_valid(*validity, [&](BiomeItemPlacement&& item) {
+    biome_items.push_back(std::move(item));
+  });
 
   return biome_items;
 }

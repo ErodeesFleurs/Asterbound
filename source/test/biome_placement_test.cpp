@@ -101,6 +101,17 @@ const GameTestRegistration storage_round_trip("BiomePlacement", "ConfigAndStorag
   }
 });
 
+const GameTestRegistration micro_names("BiomePlacement", "RejectEmptyMicroDungeonSelections", [](GameTest& fixture) {
+  auto assets = fixture.root().assets();
+  if (!fixture.check(bool(assets), "load biome assets")) return;
+  for (Json names : std::array<Json, 2>{JsonArray{}, JsonArray{"valid", ""}}) {
+    Json config = JsonObject{{"mode", "floor"}, {"type", "microdungeon"}, {"variants", 1}, {"microdungeons", names},
+        {"distribution", JsonObject{{"type", "random"}, {"blockProbability", 1}}}};
+    fixture.check(!BiomeItemDistribution::create(fixture.root(), config, 42), "reject unselectable names in config");
+    fixture.check(!variant_to_biome_item(**assets, JsonArray{"microDungeon", names}), "reject unselectable names in storage");
+  }
+});
+
 const GameTestRegistration empty_random("BiomePlacement", "EmptyRandomPoolDoesNotPlaceDefaultGrass", [](GameTest& fixture) {
   auto& root = fixture.root();
   auto assets = root.assets();
