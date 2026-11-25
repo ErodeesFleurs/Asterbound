@@ -195,8 +195,11 @@ namespace WorldImpl {
     });
   }
 
+  // The result borrows either the catalog or the caller's combined storage.
   [[nodiscard]]
-  inline std::expected<TileDamageParameters, StarException> tile_damage_parameters(Root& root, WorldTile const& tile, TileLayer layer, TileDamage const& tile_damage);
+  inline std::expected<std::reference_wrapper<TileDamageParameters const>, StarException> tile_damage_parameters(
+      MaterialDatabase const& materials, WorldTile const& tile, TileLayer layer, TileDamageType damage_type,
+      std::optional<TileDamageParameters>& combined);
   template <typename Tiles>
   concept damage_tile_source = std::derived_from<typename Tiles::Tile, WorldTile>
       && requires(Tiles& tiles, Vec2I const& pos) {
@@ -444,38 +447,43 @@ namespace WorldImpl {
     return candidates;
   }
 
-  inline std::expected<TileDamageParameters, StarException> tile_damage_parameters(Root& root, WorldTile const& tile, TileLayer layer, TileDamage const& tile_damage) {
-    bool foreground = layer == TileLayer::Foreground;
-    auto material_database = root.materialDatabase();
-    if (!material_database)
-      return std::unexpected(std::move(material_database.error()));
-    auto target = foreground ? tile.foreground : tile.background;
-    auto mod = foreground ? tile.foregroundMod : tile.backgroundMod;
-    if (!isRealMod(mod) || tile_damage_is_penetrating(tile_damage.type))
-      return (*material_database)->materialDamageParameters(target);
-    auto breaks_with_tile = (*material_database)->modBreaksWithTile(mod);
+  inline std::expected<std::reference_wrapper<TileDamageParameters const>, StarException> tile_damage_parameters(
+      MaterialDatabase const& materials, WorldTile const& tile, TileLayer layer, TileDamageType damage_type,
+      std::optional<TileDamageParameters>& combined) {
+    auto target = tile.material(layer);
+    auto mod = tile.mod(layer);
+    if (!isRealMod(mod) || tile_damage_is_penetrating(damage_type))
+      return materials.material_damage_parameters(target);
+    auto breaks_with_tile = materials.mod_breaks_with_tile(mod);
     if (!breaks_with_tile)
       return std::unexpected(std::move(breaks_with_tile.error()));
-    auto mod_damage = (*material_database)->modDamageParameters(mod);
+    auto mod_damage = materials.mod_damage_parameters(mod);
     if (!mod_damage)
       return std::unexpected(std::move(mod_damage.error()));
     if (!*breaks_with_tile)
-      return std::move(*mod_damage);
-    auto material_damage = (*material_database)->materialDamageParameters(target);
+      return *mod_damage;
+    auto material_damage = materials.material_damage_parameters(target);
     if (!material_damage)
       return std::unexpected(std::move(material_damage.error()));
-    return std::move(*mod_damage).sum(*material_damage);
+    auto sum = mod_damage->get().sum(material_damage->get());
+    if (!sum)
+      return std::unexpected(std::move(sum.error()));
+    return std::cref(combined.emplace(std::move(*sum)));
   }
 
   template <damage_tile_source TileSectorArray>
   [[nodiscard]]
   std::expected<bool, StarException> damage_would_destroy(Root& root, TileSectorArray& tile_sector_array, Vec2I pos, TileLayer layer, TileDamage const& tile_damage) {
     if (auto tile = tile_sector_array.modify_tile(pos)) {
-      auto damage_parameters = tile_damage_parameters(root, tile->get(), layer, tile_damage);
+      auto materials = root.material_database();
+      if (!materials)
+        return std::unexpected(std::move(materials.error()));
+      std::optional<TileDamageParameters> combined;
+      auto damage_parameters = tile_damage_parameters(**materials, tile->get(), layer, tile_damage.type, combined);
       if (!damage_parameters)
         return std::unexpected(std::move(damage_parameters.error()));
       auto const& damage = layer == TileLayer::Foreground ? tile->get().foregroundDamage : tile->get().backgroundDamage;
-      return damage_parameters->damage_fraction(tile_damage) + damage.damage_percentage() >= 1.0f;
+      return damage_parameters->get().damage_fraction(tile_damage) + damage.damage_percentage() >= 1.0f;
     }
 
     return false;
@@ -485,9 +493,9 @@ namespace WorldImpl {
   [[nodiscard]]
   std::expected<bool, StarException> canPlaceMaterial(Root& root, std::shared_ptr<EntityMap> const& entityMap,
       Vec2I const& pos, TileLayer layer, MaterialId material, bool allowEntityOverlap, bool allowTileOverlap, GetTileFunction& getTile) {
-    auto materialDatabase = root.materialDatabase();
-    if (!materialDatabase)
-      return std::unexpected(std::move(materialDatabase.error()));
+    auto material_database = root.material_database();
+    if (!material_database)
+      return std::unexpected(std::move(material_database.error()));
     if (!isRealMaterial(material))
       return false;
 
@@ -512,10 +520,10 @@ namespace WorldImpl {
       return false;
     };
 
-    auto canPlace = (*materialDatabase)->canPlaceInLayer(material, layer);
-    if (!canPlace)
-      return std::unexpected(std::move(canPlace.error()));
-    if (!*canPlace)
+    auto can_place = (*material_database)->can_place_in_layer(material, layer);
+    if (!can_place)
+      return std::unexpected(std::move(can_place.error()));
+    if (!*can_place)
       return false;
     auto tile = getTile(pos);
     if (!tile)
@@ -558,15 +566,15 @@ namespace WorldImpl {
   [[nodiscard]]
   std::expected<bool, StarException> perhapsCanPlaceMaterial(Root& root, std::shared_ptr<EntityMap> const& entityMap,
       Vec2I const& pos, TileLayer layer, MaterialId material, bool allowEntityOverlap, bool allowTileOverlap, GetTileFunction& getTile) {
-    auto materialDatabase = root.materialDatabase();
-    if (!materialDatabase)
-      return std::unexpected(std::move(materialDatabase.error()));
+    auto material_database = root.material_database();
+    if (!material_database)
+      return std::unexpected(std::move(material_database.error()));
     if (!isRealMaterial(material))
       return false;
-    auto canPlace = (*materialDatabase)->canPlaceInLayer(material, layer);
-    if (!canPlace)
-      return std::unexpected(std::move(canPlace.error()));
-    if (!*canPlace)
+    auto can_place = (*material_database)->can_place_in_layer(material, layer);
+    if (!can_place)
+      return std::unexpected(std::move(can_place.error()));
+    if (!*can_place)
       return false;
     auto tile = getTile(pos);
     if (!tile)
@@ -595,9 +603,9 @@ namespace WorldImpl {
   template <typename GetTileFunction>
   [[nodiscard]]
   std::expected<bool, StarException> canPlaceMaterialColorVariant(Root& root, Vec2I const& pos, TileLayer layer, MaterialColorVariant color, GetTileFunction& getTile) {
-    auto materialDatabase = root.materialDatabase();
-    if (!materialDatabase)
-      return std::unexpected(std::move(materialDatabase.error()));
+    auto material_database = root.material_database();
+    if (!material_database)
+      return std::unexpected(std::move(material_database.error()));
     auto tile = getTile(pos);
     if (!tile)
       return std::unexpected(std::move(tile.error()));
@@ -607,7 +615,7 @@ namespace WorldImpl {
       return true;
     if (existingColor == color)
       return false;
-    return (*materialDatabase)->isMultiColor(tile->get().material(layer));
+    return (*material_database)->is_multi_color(tile->get().material(layer));
   }
 
   template <typename GetTileFunction>
@@ -615,15 +623,15 @@ namespace WorldImpl {
   std::expected<bool, StarException> canPlaceMod(Root& root, Vec2I const& pos, TileLayer layer, ModId mod, GetTileFunction& getTile) {
     if (!isRealMod(mod))
       return false;
-    auto materialDatabase = root.materialDatabase();
-    if (!materialDatabase)
-      return std::unexpected(std::move(materialDatabase.error()));
+    auto material_database = root.material_database();
+    if (!material_database)
+      return std::unexpected(std::move(material_database.error()));
     auto tile = getTile(pos);
     if (!tile)
       return std::unexpected(std::move(tile.error()));
     if (tile->get().mod(layer) == mod)
       return false;
-    return (*materialDatabase)->supportsMod(tile->get().material(layer), mod);
+    return (*material_database)->supports_mod(tile->get().material(layer), mod);
   }
 
   template <typename GetTileFunction>
@@ -662,10 +670,10 @@ namespace WorldImpl {
       auto const& placeMaterial = std::get<PlaceMaterial>(modification);
       if (!isRealMaterial(placeMaterial.material))
         return false;
-      auto materialDatabase = root.materialDatabase();
-      if (!materialDatabase)
-        return std::unexpected(std::move(materialDatabase.error()));
-      return (*materialDatabase)->canPlaceInLayer(placeMaterial.material, placeMaterial.layer);
+      auto material_database = root.material_database();
+      if (!material_database)
+        return std::unexpected(std::move(material_database.error()));
+      return (*material_database)->can_place_in_layer(placeMaterial.material, placeMaterial.layer);
     }
     return false;
   }
@@ -749,7 +757,7 @@ namespace WorldImpl {
 
     Vec3F environment_light = sky->environmentLight().to_rgb_f();
     float underground_level = world_template->undergroundLevel();
-    auto materials = root.materialDatabase();
+    auto materials = root.material_database();
     if (!materials)
       return std::unexpected(std::move(materials.error()));
     auto liquids = root.liquids_database();
@@ -767,18 +775,18 @@ namespace WorldImpl {
           auto& tile = column[y];
           auto& cell = lighting_column[y];
 
-          auto background_transparent = (*materials)->backgroundLightTransparent(tile.background);
+          auto background_transparent = (*materials)->background_light_transparent(tile.background);
           if (!background_transparent)
             return std::unexpected(std::move(background_transparent.error()));
-          auto foreground_transparency = (*materials)->foregroundLightTransparent(tile.foreground);
+          auto foreground_transparency = (*materials)->foreground_light_transparent(tile.foreground);
           if (!foreground_transparency)
             return std::unexpected(std::move(foreground_transparency.error()));
           bool foreground_transparent = *foreground_transparency && tile.getCollision() != CollisionKind::Dynamic;
 
-          cell = {(*materials)->radiantLight(tile.foreground, tile.foregroundMod).sum() / 3.0f, !foreground_transparent};
+          cell = {(*materials)->radiant_light(tile.foreground, tile.foregroundMod).sum() / 3.0f, !foreground_transparent};
           cell.light += (*liquids)->radiant_light(tile.liquid).sum() / 3.0f;
           if (foreground_transparent) {
-            cell.light += (*materials)->radiantLight(tile.background, tile.backgroundMod).sum() / 3.0f;
+            cell.light += (*materials)->radiant_light(tile.background, tile.backgroundMod).sum() / 3.0f;
             if (*background_transparent && pos[1] > underground_level)
               cell.light += environment_light.sum() / 3.0f;
           }

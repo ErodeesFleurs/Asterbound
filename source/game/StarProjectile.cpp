@@ -821,9 +821,9 @@ std::expected<List<Particle>, StarException> Projectile::sparkBlock(Root& rootCo
   auto result885 = root.assets();
 if (!result885) return std::unexpected(std::move(result885.error()));
 auto assets = std::move(*result885);
-  auto result886 = root.materialDatabase();
+  auto result886 = root.material_database();
 if (!result886) return std::unexpected(std::move(result886.error()));
-auto materialDatabase = std::move(*result886);
+auto material_database = std::move(*result886);
 
   auto result887 = assets->json("/client.config:blockDamageParticle");
 if (!result887) return std::unexpected(std::move(result887.error()));
@@ -844,7 +844,7 @@ auto blockDamageVariance = std::move(*result890);
       auto particle = blockDamageParticle;
       particle.position += center_of_tile(position);
       particle.velocity = particle.velocity.magnitude() * vnorm(world.geometry().diff(damageSource, particle.position));
-      auto result892 = materialDatabase->materialParticleColor(material, hueShift);
+      auto result892 = material_database->material_particle_color(material, hueShift);
 if (!result892) return std::unexpected(std::move(result892.error()));
 particle.color = std::move(*result892);
       particle.applyVariance(rootContext, blockDamageVariance);
@@ -944,9 +944,9 @@ result659->get().timer(static_cast<float>(stepsDelay) / 60.f, function);
     if (isSlave())
       return {};
 
-    auto result733 = this->root().materialDatabase();
+    auto result733 = this->root().material_database();
 if (!result733) return std::unexpected(std::move(result733.error()));
-auto materialDatabase = std::move(*result733);
+auto material_database = std::move(*result733);
     List<MaterialId> tileDrops;
     unsigned totalDrops = 0;
     auto result734 = parameters.get_array("materials");
@@ -959,7 +959,7 @@ for (auto const& sets : std::move(*result734)) {
   auto result736 = sets.get_string("kind");
   if (!result736)
     return std::unexpected(std::move(result736.error()));
-  auto result737 = materialDatabase->materialId(std::move(*result736));
+  auto result737 = material_database->material_id(std::move(*result736));
   if (!result737)
     return std::unexpected(std::move(result737.error()));
   auto mat = std::move(*result737);
@@ -992,7 +992,7 @@ if (!result743) return std::unexpected(std::move(result743.error()));
 auto result746 = result743->get().modifyTile(std::get<0>(tile), PlaceMaterial{TileLayer::Foreground, std::get<1>(tile), MaterialHue()}, allowEntityOverlap);
 if (!result746) return std::unexpected(std::move(result746.error()));
 if (!std::move(*result746)) {
-auto result748 = materialDatabase->materialItemDrop(std::get<1>(tile));
+auto result748 = material_database->material_item_drop(std::get<1>(tile));
 if (!result748) return std::unexpected(std::move(result748.error()));
 auto result750 = ItemDrop::create_randomized_drop(this->root(), std::move(*result748), Vec2F(std::get<0>(tile)));
 if (!result750) return std::unexpected(std::move(result750.error()));
@@ -1008,20 +1008,20 @@ if (!result752) return std::unexpected(std::move(result752.error()));
     if (isSlave())
       return {};
 
-    auto result753 = this->root().materialDatabase();
+    auto result753 = this->root().material_database();
 if (!result753) return std::unexpected(std::move(result753.error()));
-auto materialDatabase = std::move(*result753);
+auto material_database = std::move(*result753);
     std::optional<ModId> previousMod;
     auto result754 = parameters.opt_string("previousMod");
 if (!result754) return std::unexpected(std::move(result754.error()));
 if (auto previousName = std::move(*result754)) {
-auto result755 = materialDatabase->modId(*previousName);
+auto result755 = material_database->mod_id(*previousName);
 if (!result755) return std::unexpected(std::move(result755.error()));
 previousMod = std::move(*result755);
 }
     auto result756 = parameters.get_string("newMod");
 if (!result756) return std::unexpected(std::move(result756.error()));
-auto result757 = materialDatabase->modId(std::move(*result756));
+auto result757 = material_database->mod_id(std::move(*result756));
 if (!result757) return std::unexpected(std::move(result757.error()));
 ModId newMod = std::move(*result757);
     auto result758 = parameters.get_int("radius", 0);

@@ -101,9 +101,9 @@ const GameTestRegistration movementTerrainContactPreservesPositionAndVelocity(
     // gravity() rounds the final position, so the corner can sample the wall
     // rather than the neighboring empty tile. Keep both domain gravities fixed.
     ASSERT_TRUE(world->setDungeonGravity(construction_dungeon_id, 60.0f));
-    auto materials = root.materialDatabase();
+    auto materials = root.material_database();
     ASSERT_TRUE(materials) << materials.error().what();
-    auto dirt = (*materials)->materialId("dirt");
+    auto dirt = (*materials)->material_id("dirt");
     ASSERT_TRUE(dirt) << dirt.error().what();
 
     auto place = [&](Vec2I position, TileCollisionOverride collision) -> std::expected<void, StarException> {

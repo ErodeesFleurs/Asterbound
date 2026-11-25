@@ -3868,21 +3868,21 @@ std::expected<void, StarException> Player::processStateChanges(float dt) {
 }
 
 std::expected<String, StarException> Player::getFootstepSound(Vec2I const& sensor) const {
-  auto databaseResult = root().materialDatabase();
-  if (!databaseResult)
-    return std::unexpected(std::move(databaseResult.error()));
-  auto database = std::move(*databaseResult);
+  auto database_result = root().material_database();
+  if (!database_result)
+    return std::unexpected(std::move(database_result.error()));
+  auto const& database = **database_result;
   auto currentWorldResult = world();
   if (!currentWorldResult)
     return std::unexpected(std::move(currentWorldResult.error()));
   auto& currentWorld = currentWorldResult->get();
-  String fallback = database->defaultFootstepSound();
+  String fallback = database.default_footstep_sound();
   List<Vec2I> scanOrder{{0, 0}, {0, -1}, {-1, 0}, {1, 0}, {-1, -1}, {1, -1}};
   for (auto const& subSensor : scanOrder) {
-    auto soundResult = database->footstepSound(currentWorld.material(sensor + subSensor, TileLayer::Foreground), currentWorld.mod(sensor + subSensor, TileLayer::Foreground));
-    if (!soundResult)
-      return std::unexpected(std::move(soundResult.error()));
-    auto sound = std::move(*soundResult);
+    auto sound_result = database.footstep_sound(currentWorld.material(sensor + subSensor, TileLayer::Foreground), currentWorld.mod(sensor + subSensor, TileLayer::Foreground));
+    if (!sound_result)
+      return std::unexpected(std::move(sound_result.error()));
+    auto sound = std::move(*sound_result);
     if (!sound.empty() && sound != fallback)
       return sound;
   }

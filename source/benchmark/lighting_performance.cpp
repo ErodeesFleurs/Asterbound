@@ -40,7 +40,7 @@ struct LightingFixture {
 };
 
 std::expected<std::shared_ptr<LightingFixture>, StarException> prepareLighting(Root& root) {
-  auto materials = root.materialDatabase();
+  auto materials = root.material_database();
   if (!materials)
     return std::unexpected(std::move(materials.error()));
   auto liquids = root.liquids_database();
@@ -62,30 +62,30 @@ std::expected<std::shared_ptr<LightingFixture>, StarException> prepareLighting(R
   fixture->parameters = std::move(*additive);
   std::vector<MaterialSample> samples;
   std::vector<MaterialSample> radiantSamples;
-  auto names = fixture->materials->materialNames();
+  auto names = fixture->materials->material_names();
   std::ranges::sort(names);
   for (auto const& name : names) {
-    auto id = fixture->materials->materialId(name);
+    auto id = fixture->materials->material_id(name);
     if (!id)
       return std::unexpected(std::move(id.error()));
     if (!isRealMaterial(*id))
       continue;
-    auto foreground = fixture->materials->foregroundLightTransparent(*id);
+    auto foreground = fixture->materials->foreground_light_transparent(*id);
     if (!foreground)
       return std::unexpected(std::move(foreground.error()));
-    auto background = fixture->materials->backgroundLightTransparent(*id);
+    auto background = fixture->materials->background_light_transparent(*id);
     if (!background)
       return std::unexpected(std::move(background.error()));
     MaterialSample sample{*id, *foreground, *background};
     samples.push_back(sample);
-    if (fixture->materials->radiantLight(*id, NoModId).max() > 0.0f)
+    if (fixture->materials->radiant_light(*id, NoModId).max() > 0.0f)
       radiantSamples.push_back(sample);
   }
   std::vector<ModId> mods{NoModId};
-  auto modNames = fixture->materials->modNames();
-  std::ranges::sort(modNames);
-  for (auto const& name : modNames) {
-    auto id = fixture->materials->modId(name);
+  auto mod_names = fixture->materials->mod_names();
+  std::ranges::sort(mod_names);
+  for (auto const& name : mod_names) {
+    auto id = fixture->materials->mod_id(name);
     if (!id)
       return std::unexpected(std::move(id.error()));
     mods.push_back(*id);
@@ -150,12 +150,12 @@ std::expected<void, StarException> gatherReference(LightingFixture const& fixtur
       auto const& tile = fixture.tiles.tile(position);
       Vec3F light;
       if (tile.foreground != EmptyMaterialId || tile.foregroundMod != NoModId)
-        light += fixture.materials->radiantLight(tile.foreground, tile.foregroundMod);
+        light += fixture.materials->radiant_light(tile.foreground, tile.foregroundMod);
       if (tile.liquid.liquid != empty_liquid_id && tile.liquid.level != 0.0f)
         light += fixture.liquids->radiant_light(tile.liquid);
       if (tile.foregroundLightTransparent) {
         if (tile.background != EmptyMaterialId || tile.backgroundMod != NoModId)
-          light += fixture.materials->radiantLight(tile.background, tile.backgroundMod);
+          light += fixture.materials->radiant_light(tile.background, tile.backgroundMod);
         if (tile.backgroundLightTransparent && y > fixture.underground)
           light += fixture.environment;
       }

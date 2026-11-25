@@ -186,8 +186,9 @@ namespace Star::LuaBindings {
     [[nodiscard]] std::expected<JsonArray, StarException> monsterPortrait(Root& root, String const& typeName, std::optional<JsonObject> const& parameters);
     [[nodiscard]] std::expected<bool, StarException> isTreasurePool(Root& root, String const& pool);
     [[nodiscard]] std::expected<JsonArray, StarException> createTreasure(Root& root, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog, String const& pool, float level, std::optional<std::uint64_t> seed);
-    [[nodiscard]] std::expected<std::optional<String>, StarException> materialMiningSound(Root& root, String const& materialName, std::optional<String> const& modName);
-    [[nodiscard]] std::expected<std::optional<String>, StarException> materialFootstepSound(Root& root, String const& materialName, std::optional<String> const& modName);
+    enum class MaterialSound { Mining, Footstep };
+    [[nodiscard]] std::expected<std::optional<String>, StarException> material_sound(
+        Root& root, String const& material_name, std::optional<String> const& mod_name, MaterialSound kind);
   }
 }
 
@@ -443,7 +444,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
                                                        std::optional<String>>(
         "materialMiningSound",
         [&root](String const& material, std::optional<String> const& mod) {
-          return RootCallbacks::materialMiningSound(root, material, mod);
+          return RootCallbacks::material_sound(root, material, mod, RootCallbacks::MaterialSound::Mining);
         });
       !r)
     return std::unexpected(std::move(r.error()));
@@ -451,7 +452,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
                                                        std::optional<String>>(
         "materialFootstepSound",
         [&root](String const& material, std::optional<String> const& mod) {
-          return RootCallbacks::materialFootstepSound(root, material, mod);
+          return RootCallbacks::material_sound(root, material, mod, RootCallbacks::MaterialSound::Footstep);
         });
       !r)
     return std::unexpected(std::move(r.error()));
@@ -573,44 +574,29 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
     return (*database)->item_file(itemName);
   }); !r) return std::unexpected(std::move(r.error()));
 
-  if (auto r = callbacks.register_callback("materialConfig", [&root](std::variant<MaterialId, String> const& materialNameOrId) -> std::expected<Json, StarException> {
-    auto database = root.materialDatabase();
+  auto asset_config = [&root](std::variant<MaterialId, String> const& name_or_id, bool is_mod) -> std::expected<Json, StarException> {
+    auto database = root.material_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    MaterialId materialId;
-    if (std::holds_alternative<MaterialId>(materialNameOrId)) {
-      materialId = std::get<MaterialId>(materialNameOrId);
+    MaterialId id;
+    if (std::holds_alternative<String>(name_or_id)) {
+      auto const& name = std::get<String>(name_or_id);
+      auto resolved = is_mod ? (*database)->mod_id(name) : (*database)->material_id(name);
+      if (!resolved) return std::unexpected(std::move(resolved.error()));
+      id = *resolved;
     } else {
-      auto resolvedId = (*database)->materialId(std::get<String>(materialNameOrId));
-      if (!resolvedId) return std::unexpected(std::move(resolvedId.error()));
-      materialId = *resolvedId;
+      id = std::get<MaterialId>(name_or_id);
     }
-    auto path = (*database)->materialPath(materialId);
-    if (!path) return std::unexpected(std::move(path.error()));
-    if (!*path) return Json();
-    auto config = (*database)->materialConfig(materialId);
-    if (!config) return std::unexpected(std::move(config.error()));
-    if (!*config) return std::unexpected(StarException("Material path has no configuration"));
-    return JsonObject{{"path", **path}, {"config", **config}};
+    auto asset = is_mod ? (*database)->mod_asset(id) : (*database)->material_asset(id);
+    if (!asset) return std::unexpected(std::move(asset.error()));
+    if (!*asset) return Json();
+    auto const& entry = (*asset)->get();
+    return JsonObject{{"path", entry.path}, {"config", entry.config}};
+  };
+  if (auto r = callbacks.register_callback("materialConfig", [asset_config](std::variant<MaterialId, String> const& name_or_id) {
+    return asset_config(name_or_id, false);
   }); !r) return std::unexpected(std::move(r.error()));
-
-  if (auto r = callbacks.register_callback("modConfig", [&root](std::variant<ModId, String> const& modNameOrId) -> std::expected<Json, StarException> {
-    auto database = root.materialDatabase();
-    if (!database) return std::unexpected(std::move(database.error()));
-    ModId modId;
-    if (std::holds_alternative<ModId>(modNameOrId)) {
-      modId = std::get<ModId>(modNameOrId);
-    } else {
-      auto resolvedId = (*database)->modId(std::get<String>(modNameOrId));
-      if (!resolvedId) return std::unexpected(std::move(resolvedId.error()));
-      modId = *resolvedId;
-    }
-    auto path = (*database)->modPath(modId);
-    if (!path) return std::unexpected(std::move(path.error()));
-    if (!*path) return Json();
-    auto config = (*database)->modConfig(modId);
-    if (!config) return std::unexpected(std::move(config.error()));
-    if (!*config) return std::unexpected(StarException("Mod path has no configuration"));
-    return JsonObject{{"path", **path}, {"config", **config}};
+  if (auto r = callbacks.register_callback("modConfig", [asset_config](std::variant<ModId, String> const& name_or_id) {
+    return asset_config(name_or_id, true);
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.register_callback("liquidConfig", [&root](LuaEngine& engine, LuaValue name_or_id) -> std::expected<Json, StarException> {
@@ -685,14 +671,14 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
     return json;
   }); !r) return std::unexpected(std::move(r.error()));
 
-  if (auto r = callbacks.register_callback("materialHealth", [&root](String const& materialName) -> std::expected<float, StarException> {
-    auto database = root.materialDatabase();
+  if (auto r = callbacks.register_callback("materialHealth", [&root](String const& material_name) -> std::expected<float, StarException> {
+    auto database = root.material_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    auto id = (*database)->materialId(materialName);
+    auto id = (*database)->material_id(material_name);
     if (!id) return std::unexpected(std::move(id.error()));
-    auto parameters = (*database)->materialDamageParameters(*id);
+    auto parameters = (*database)->material_damage_parameters(*id);
     if (!parameters) return std::unexpected(std::move(parameters.error()));
-    return parameters->total_health();
+    return parameters->get().total_health();
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.register_callback("techType", [&root](String const& techName) -> std::expected<String, StarException> {
@@ -1172,37 +1158,20 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::createTreasu
   return treasure->transformed([](std::shared_ptr<Item> const& item) { return item->descriptor().to_json(); });
 }
 
-std::expected<std::optional<String>, StarException> LuaBindings::RootCallbacks::materialMiningSound(
-    Root& root, String const& materialName, std::optional<String> const& modName) {
-  auto database = root.materialDatabase();
+std::expected<std::optional<String>, StarException> LuaBindings::RootCallbacks::material_sound(
+    Root& root, String const& material_name, std::optional<String> const& mod_name, MaterialSound kind) {
+  auto database = root.material_database();
   if (!database) return std::unexpected(std::move(database.error()));
-  auto materialId = (*database)->materialId(materialName);
-  if (!materialId) return std::unexpected(std::move(materialId.error()));
-  ModId modId = NoModId;
-  if (modName) {
-    auto id = (*database)->modId(*modName);
+  auto material_id = (*database)->material_id(material_name);
+  if (!material_id) return std::unexpected(std::move(material_id.error()));
+  ModId mod_id = NoModId;
+  if (mod_name) {
+    auto id = (*database)->mod_id(*mod_name);
     if (!id) return std::unexpected(std::move(id.error()));
-    modId = *id;
+    mod_id = *id;
   }
-  auto sound = (*database)->miningSound(*materialId, modId);
-  if (!sound) return std::unexpected(std::move(sound.error()));
-  if (sound->empty()) return std::nullopt;
-  return std::move(*sound);
-}
-
-std::expected<std::optional<String>, StarException> LuaBindings::RootCallbacks::materialFootstepSound(
-    Root& root, String const& materialName, std::optional<String> const& modName) {
-  auto database = root.materialDatabase();
-  if (!database) return std::unexpected(std::move(database.error()));
-  auto materialId = (*database)->materialId(materialName);
-  if (!materialId) return std::unexpected(std::move(materialId.error()));
-  ModId modId = NoModId;
-  if (modName) {
-    auto id = (*database)->modId(*modName);
-    if (!id) return std::unexpected(std::move(id.error()));
-    modId = *id;
-  }
-  auto sound = (*database)->footstepSound(*materialId, modId);
+  auto sound = kind == MaterialSound::Mining ? (*database)->mining_sound(*material_id, mod_id)
+                                            : (*database)->footstep_sound(*material_id, mod_id);
   if (!sound) return std::unexpected(std::move(sound.error()));
   if (sound->empty()) return std::nullopt;
   return std::move(*sound);

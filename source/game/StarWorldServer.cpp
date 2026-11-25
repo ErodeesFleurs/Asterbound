@@ -487,10 +487,10 @@ std::expected<WorldStructure, StarException> WorldServer::setCentralStructure(Wo
   m_playerStart = Vec2F(result15->get()) + Vec2F(0, 1);
   m_adjustPlayerStart = false;
 
-  auto result16 = this->root().materialDatabase();
+  auto result16 = this->root().material_database();
   if (!result16)
     return std::unexpected(std::move(result16.error()));
-  auto materialDatabase = std::move(*result16);
+  auto material_database = std::move(*result16);
   for (auto const& foregroundBlock : m_centralStructure.foregroundBlocks()) {
     auto result17 = generateRegion(RectI::with_size(foregroundBlock.position, {1, 1}));
     if (!result17)
@@ -501,7 +501,7 @@ std::expected<WorldStructure, StarException> WorldServer::setCentralStructure(Wo
         tile->get().foregroundColorVariant = foregroundBlock.materialColor;
         tile->get().foregroundHueShift = foregroundBlock.materialHue;
         tile->get().foregroundMod = foregroundBlock.materialMod;
-        auto result18 = materialDatabase->materialCollisionKind(foregroundBlock.materialId);
+        auto result18 = material_database->material_collision_kind(foregroundBlock.materialId);
         if (!result18)
           return std::unexpected(std::move(result18.error()));
         if (tile->get().update_collision(*result18))
@@ -904,10 +904,10 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       auto liquids_database = this->root().liquids_database();
       if (!liquids_database)
         return std::unexpected(std::move(liquids_database.error()));
-      auto result73 = this->root().materialDatabase();
+      auto result73 = this->root().material_database();
       if (!result73)
         return std::unexpected(std::move(result73.error()));
-      auto materialDb = std::move(*result73);
+      auto material_db = std::move(*result73);
       TileModificationList sanitized;
       TileModificationList rejected;
       sanitized.reserve(mtpacket->modifications.size());
@@ -916,8 +916,8 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         if (std::holds_alternative<PlaceLiquid>(pair.second))
           ok = (*liquids_database)->is_valid_liquid_id(std::get<PlaceLiquid>(pair.second).liquid);
         else if (std::holds_alternative<PlaceMaterial>(pair.second))
-          ok = materialDb->isValidMaterialId(std::get<PlaceMaterial>(pair.second).material); else if (std::holds_alternative<PlaceMod>(pair.second))
-          ok = materialDb->isValidModId(std::get<PlaceMod>(pair.second).mod);
+          ok = material_db->is_valid_material_id(std::get<PlaceMaterial>(pair.second).material); else if (std::holds_alternative<PlaceMod>(pair.second))
+          ok = material_db->is_valid_mod_id(std::get<PlaceMod>(pair.second).mod);
         if (ok)
           sanitized.push_back(pair);
         else {
@@ -935,16 +935,16 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       if (!unappliedModifications.empty())
         clientInfo->outgoingPackets.push_back(std::make_shared<TileModificationFailurePacket>(unappliedModifications));
     } else if (auto rtpacket = as<ReplaceTileListPacket>(packet)) {
-      auto result76 = this->root().materialDatabase();
+      auto result76 = this->root().material_database();
       if (!result76)
         return std::unexpected(std::move(result76.error()));
-      auto materialDb = std::move(*result76);
+      auto material_db = std::move(*result76);
       TileModificationList sanitized;
       TileModificationList rejected;
       for (auto const& pair : rtpacket->modifications) {
         bool ok = true;
         if (std::holds_alternative<PlaceMaterial>(pair.second))
-          ok = materialDb->isValidMaterialId(std::get<PlaceMaterial>(pair.second).material);
+          ok = material_db->is_valid_material_id(std::get<PlaceMaterial>(pair.second).material);
         if (ok)
           sanitized.push_back(pair);
         else {
@@ -1994,11 +1994,14 @@ std::expected<bool, StarException> WorldServer::replaceTile(Vec2I const& pos, Ti
       return false;
 
     if (auto tile = m_tileArray->modify_tile(pos)) {
-      auto result225 = WorldImpl::tile_damage_parameters(this->root(), tile->get(), placeMaterial.layer, tileDamage);
-      if (!result225)
-        return std::unexpected(std::move(result225.error()));
-      auto damageParameters = std::move(*result225);
-      bool harvested = tileDamage.amount >= 0 && tileDamage.harvest_level >= damageParameters.required_harvest_level();
+      auto materials = root().material_database();
+      if (!materials)
+        return std::unexpected(std::move(materials.error()));
+      std::optional<TileDamageParameters> combined;
+      auto damage_parameters = WorldImpl::tile_damage_parameters(**materials, tile->get(), placeMaterial.layer, tileDamage.type, combined);
+      if (!damage_parameters)
+        return std::unexpected(std::move(damage_parameters.error()));
+      bool harvested = tileDamage.amount >= 0 && tileDamage.harvest_level >= damage_parameters->get().required_harvest_level();
       auto damage = placeMaterial.layer == TileLayer::Foreground ? tile->get().foregroundDamage : tile->get().backgroundDamage;
       Vec2F drop_position = center_of_tile(pos);
 
@@ -2187,14 +2190,17 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
       // Penetrating damage should carry through to the blocks behind this
       // entity.
       if (tileRes == TileDamageResult::None || tile_damage_is_penetrating(tileDamage.type)) {
-        auto result244 = WorldImpl::tile_damage_parameters(this->root(), tile->get(), layer, tileDamage);
-        if (!result244)
-          return std::unexpected(std::move(result244.error()));
-        auto damageParameters = std::move(*result244);
+        auto materials = root().material_database();
+        if (!materials)
+          return std::unexpected(std::move(materials.error()));
+        std::optional<TileDamageParameters> combined;
+        auto damage_parameters = WorldImpl::tile_damage_parameters(**materials, tile->get(), layer, tileDamage.type, combined);
+        if (!damage_parameters)
+          return std::unexpected(std::move(damage_parameters.error()));
 
         if (layer == TileLayer::Foreground && isRealMaterial(tile->get().foreground)) {
           if (!tile->get().rootSource || damagedEntities.empty()) {
-            tile->get().foregroundDamage.damage(damageParameters, sourcePosition, tileDamage);
+            tile->get().foregroundDamage.damage(damage_parameters->get(), sourcePosition, tileDamage);
 
             // if the tile is broken, send a message back to the source entity with position, layer, dungeonId, and whether the tile was harvested
             if (sourceEntity.has_value() && tile->get().foregroundDamage.dead()) {
@@ -2224,7 +2230,7 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
             }
           }
         } else if (layer == TileLayer::Background && isRealMaterial(tile->get().background)) {
-          tile->get().backgroundDamage.damage(damageParameters, sourcePosition, tileDamage);
+          tile->get().backgroundDamage.damage(damage_parameters->get(), sourcePosition, tileDamage);
 
           // if the tile is broken, send a message back to the source entity with position and whether the tile was harvested
           if (sourceEntity.has_value() && tile->get().backgroundDamage.dead()) {
@@ -2957,10 +2963,10 @@ std::expected<std::optional<std::uint64_t>, StarException> WorldServer::processi
 }
 
 std::expected<TileModificationList, StarException> WorldServer::doApplyTileModifications(TileModificationList const& modificationList, bool allowEntityOverlap, bool ignoreTileProtection, bool updateNeighbors) {
-  auto result333 = this->root().materialDatabase();
+  auto result333 = this->root().material_database();
   if (!result333)
     return std::unexpected(std::move(result333.error()));
-  auto materialDatabase = std::move(*result333);
+  auto material_database = std::move(*result333);
 
   TileModificationList unapplied = modificationList;
   std::size_t unappliedSize = unapplied.size();
@@ -3020,7 +3026,7 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
         if (placeMaterial.collisionOverride != TileCollisionOverride::None) {
           kind = collisionKindFromOverride(placeMaterial.collisionOverride);
         } else {
-          auto material_kind = materialDatabase->materialCollisionKind(tile->get().foreground);
+          auto material_kind = material_database->material_collision_kind(tile->get().foreground);
           if (!material_kind) return std::unexpected(std::move(material_kind.error()));
           kind = *material_kind;
         }
@@ -3030,7 +3036,7 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
           // Remove the foreground mod if removing the foreground.
           tile->get().foregroundMod = NoModId;
         }
-        auto result340 = materialDatabase->blocksLiquidFlow(tile->get().foreground);
+        auto result340 = material_database->blocks_liquid_flow(tile->get().foreground);
         if (!result340)
           return std::unexpected(std::move(result340.error()));
         if (std::move(*result340))
@@ -3100,7 +3106,7 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
 
       if (placeMaterialColor.layer == TileLayer::Background) {
         tile->get().backgroundHueShift = 0;
-        auto result349 = materialDatabase->isMultiColor(tile->get().background);
+        auto result349 = material_database->is_multi_color(tile->get().background);
         if (!result349)
           return std::unexpected(std::move(result349.error()));
         if (!std::move(*result349))
@@ -3108,7 +3114,7 @@ std::expected<TileModificationList, StarException> WorldServer::doApplyTileModif
         tile->get().backgroundColorVariant = placeMaterialColor.color;
       } else {
         tile->get().foregroundHueShift = 0;
-        auto result350 = materialDatabase->isMultiColor(tile->get().foreground);
+        auto result350 = material_database->is_multi_color(tile->get().foreground);
         if (!result350)
           return std::unexpected(std::move(result350.error()));
         if (!std::move(*result350))
@@ -3173,10 +3179,10 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
     return {};
   }
 
-  auto result355 = this->root().materialDatabase();
+  auto result355 = this->root().material_database();
   if (!result355)
     return std::unexpected(std::move(result355.error()));
-  auto materialDatabase = std::move(*result355);
+  auto material_database = std::move(*result355);
 
   // remove all old roots
   for (auto const& rootPos : spaces.roots) {
@@ -3235,7 +3241,7 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
         if (isRealMaterial(materialSpace.material))
           tile->get().rootSource = entity->tilePosition();
         passedSpaces.emplace_back(materialSpace);
-        auto result358 = materialDatabase->materialCollisionKind(materialSpace.material);
+        auto result358 = material_database->material_collision_kind(materialSpace.material);
         if (!result358)
           return std::unexpected(std::move(result358.error()));
         collision_changed = tile->get().update_object_collision(*result358);
@@ -3386,13 +3392,13 @@ std::expected<void, StarException> WorldServer::modifyLiquid(Vec2I const& pos, L
     quantity = 0;
 
   if (auto tile = m_tileArray->modify_tile(pos)) {
-    auto result373 = this->root().materialDatabase();
+    auto result373 = this->root().material_database();
     if (!result373)
       return std::unexpected(std::move(result373.error()));
-    auto materialDatabase = std::move(*result373);
+    auto material_database = std::move(*result373);
     bool condition375 = static_cast<bool>(tile->get().foreground == EmptyMaterialId);
     if (!condition375) {
-      auto result374 = materialDatabase->materialCollisionKind(tile->get().foreground);
+      auto result374 = material_database->material_collision_kind(tile->get().foreground);
       if (!result374)
         return std::unexpected(std::move(result374.error()));
       condition375 = static_cast<bool>(!isSolidColliding(std::move(*result374)));
@@ -3427,10 +3433,10 @@ std::expected<void, StarException> WorldServer::setLiquid(Vec2I const& pos, Liqu
 }
 
 std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(TileLayer layer, Vec2I const& pos, bool genItems, bool destroyModFirst, bool updateNeighbors) {
-  auto result378 = this->root().materialDatabase();
+  auto result378 = this->root().material_database();
   if (!result378)
     return std::unexpected(std::move(result378.error()));
-  auto materialDatabase = std::move(*result378);
+  auto material_database = std::move(*result378);
 
   auto tile = m_tileArray->modify_tile(pos);
   if (!tile)
@@ -3441,14 +3447,14 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
   if (layer == TileLayer::Background) {
     bool condition380 = static_cast<bool>(isRealMod(tile->get().backgroundMod) && destroyModFirst);
     if (condition380) {
-      auto result379 = materialDatabase->modBreaksWithTile(tile->get().backgroundMod);
+      auto result379 = material_database->mod_breaks_with_tile(tile->get().backgroundMod);
       if (!result379)
         return std::unexpected(std::move(result379.error()));
       condition380 = static_cast<bool>(!std::move(*result379));
     }
     if (condition380) {
       if (genItems) {
-        auto result381 = materialDatabase->modItemDrop(tile->get().backgroundMod);
+        auto result381 = material_database->mod_item_drop(tile->get().backgroundMod);
         if (!result381)
           return std::unexpected(std::move(result381.error()));
         if (auto drop = std::move(*result381))
@@ -3457,12 +3463,12 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
       tile->get().backgroundMod = NoModId;
     } else {
       if (genItems) {
-        auto result382 = materialDatabase->materialItemDrop(tile->get().background);
+        auto result382 = material_database->material_item_drop(tile->get().background);
         if (!result382)
           return std::unexpected(std::move(result382.error()));
         if (auto drop = std::move(*result382))
           drops.push_back(drop);
-        auto result383 = materialDatabase->modItemDrop(tile->get().backgroundMod);
+        auto result383 = material_database->mod_item_drop(tile->get().backgroundMod);
         if (!result383)
           return std::unexpected(std::move(result383.error()));
         if (auto drop = std::move(*result383))
@@ -3478,14 +3484,14 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
   } else {
     bool condition385 = static_cast<bool>(isRealMod(tile->get().foregroundMod) && destroyModFirst);
     if (condition385) {
-      auto result384 = materialDatabase->modBreaksWithTile(tile->get().foregroundMod);
+      auto result384 = material_database->mod_breaks_with_tile(tile->get().foregroundMod);
       if (!result384)
         return std::unexpected(std::move(result384.error()));
       condition385 = static_cast<bool>(!std::move(*result384));
     }
     if (condition385) {
       if (genItems) {
-        auto result386 = materialDatabase->modItemDrop(tile->get().foregroundMod);
+        auto result386 = material_database->mod_item_drop(tile->get().foregroundMod);
         if (!result386)
           return std::unexpected(std::move(result386.error()));
         if (auto drop = std::move(*result386))
@@ -3494,12 +3500,12 @@ std::expected<List<ItemDescriptor>, StarException> WorldServer::destroyBlock(Til
       tile->get().foregroundMod = NoModId;
     } else {
       if (genItems) {
-        auto result387 = materialDatabase->materialItemDrop(tile->get().foreground);
+        auto result387 = material_database->material_item_drop(tile->get().foreground);
         if (!result387)
           return std::unexpected(std::move(result387.error()));
         if (auto drop = std::move(*result387))
           drops.push_back(drop);
-        auto result388 = materialDatabase->modItemDrop(tile->get().foregroundMod);
+        auto result388 = material_database->mod_item_drop(tile->get().foregroundMod);
         if (!result388)
           return std::unexpected(std::move(result388.error()));
         if (auto drop = std::move(*result388))
@@ -3789,10 +3795,22 @@ std::expected<WorldChunks, StarException> WorldServer::readChunks() {
 }
 
 std::expected<void, StarException> WorldServer::updateDamagedBlocks(float dt) {
-  auto result416 = this->root().materialDatabase();
-  if (!result416)
-    return std::unexpected(std::move(result416.error()));
-  auto materialDatabase = std::move(*result416);
+  auto materials = root().material_database();
+  if (!materials)
+    return std::unexpected(std::move(materials.error()));
+
+  auto recover_damage = [&materials, dt](WorldTile const& tile, TileLayer layer, TileDamageStatus& damage) -> std::expected<void, StarException> {
+    if (!isRealMaterial(tile.material(layer))) {
+      damage.reset();
+      return {};
+    }
+    std::optional<TileDamageParameters> combined;
+    auto parameters = WorldImpl::tile_damage_parameters(**materials, tile, layer, damage.damage_type(), combined);
+    if (!parameters)
+      return std::unexpected(std::move(parameters.error()));
+    damage.recover(parameters->get(), dt);
+    return {};
+  };
 
   for (auto pos : m_damagedBlocks.values()) {
     auto tile = m_tileArray->modify_tile(pos);
@@ -3816,44 +3834,9 @@ std::expected<void, StarException> WorldServer::updateDamagedBlocks(float dt) {
           return std::unexpected(std::move(result419.error()));
       }
     } else if (tile->get().foregroundDamage.damaged()) {
-      if (isRealMaterial(tile->get().foreground)) {
-        if (isRealMod(tile->get().foregroundMod)) {
-          if (tile_damage_is_penetrating(tile->get().foregroundDamage.damage_type())) {
-            auto result420 = materialDatabase->materialDamageParameters(tile->get().foreground);
-            if (!result420)
-              return std::unexpected(std::move(result420.error()));
-            tile->get().foregroundDamage.recover(std::move(*result420), dt);
-          } else {
-            auto result421 = materialDatabase->modBreaksWithTile(tile->get().foregroundMod);
-            if (!result421)
-              return std::unexpected(std::move(result421.error()));
-            if (std::move(*result421)) {
-              auto result422 = materialDatabase->modDamageParameters(tile->get().foregroundMod);
-              if (!result422)
-                return std::unexpected(std::move(result422.error()));
-              auto result423 = materialDatabase->materialDamageParameters(tile->get().foreground);
-              if (!result423)
-                return std::unexpected(std::move(result423.error()));
-              auto combined = std::move(*result422).sum(*result423);
-              if (!combined)
-                return std::unexpected(std::move(combined.error()));
-              tile->get().foregroundDamage.recover(*combined, dt);
-            } else {
-              auto result424 = materialDatabase->modDamageParameters(tile->get().foregroundMod);
-              if (!result424)
-                return std::unexpected(std::move(result424.error()));
-              tile->get().foregroundDamage.recover(std::move(*result424), dt);
-            }
-          }
-        } else {
-          auto result425 = materialDatabase->materialDamageParameters(tile->get().foreground);
-          if (!result425)
-            return std::unexpected(std::move(result425.error()));
-          tile->get().foregroundDamage.recover(std::move(*result425), dt);
-        }
-      } else {
-        tile->get().foregroundDamage.reset();
-      }
+      auto recovered = recover_damage(tile->get(), TileLayer::Foreground, tile->get().foregroundDamage);
+      if (!recovered)
+        return std::unexpected(std::move(recovered.error()));
 
       auto result426 = queueTileDamageUpdates(pos, TileLayer::Foreground);
       if (!result426)
@@ -3874,44 +3857,9 @@ std::expected<void, StarException> WorldServer::updateDamagedBlocks(float dt) {
           return std::unexpected(std::move(result429.error()));
       }
     } else if (tile->get().backgroundDamage.damaged()) {
-      if (isRealMaterial(tile->get().background)) {
-        if (isRealMod(tile->get().backgroundMod)) {
-          if (tile_damage_is_penetrating(tile->get().backgroundDamage.damage_type())) {
-            auto result430 = materialDatabase->materialDamageParameters(tile->get().background);
-            if (!result430)
-              return std::unexpected(std::move(result430.error()));
-            tile->get().backgroundDamage.recover(std::move(*result430), dt);
-          } else {
-            auto result431 = materialDatabase->modBreaksWithTile(tile->get().backgroundMod);
-            if (!result431)
-              return std::unexpected(std::move(result431.error()));
-            if (std::move(*result431)) {
-              auto result432 = materialDatabase->modDamageParameters(tile->get().backgroundMod);
-              if (!result432)
-                return std::unexpected(std::move(result432.error()));
-              auto result433 = materialDatabase->materialDamageParameters(tile->get().background);
-              if (!result433)
-                return std::unexpected(std::move(result433.error()));
-              auto combined = std::move(*result432).sum(*result433);
-              if (!combined)
-                return std::unexpected(std::move(combined.error()));
-              tile->get().backgroundDamage.recover(*combined, dt);
-            } else {
-              auto result434 = materialDatabase->modDamageParameters(tile->get().backgroundMod);
-              if (!result434)
-                return std::unexpected(std::move(result434.error()));
-              tile->get().backgroundDamage.recover(std::move(*result434), dt);
-            }
-          }
-        } else {
-          auto result435 = materialDatabase->materialDamageParameters(tile->get().background);
-          if (!result435)
-            return std::unexpected(std::move(result435.error()));
-          tile->get().backgroundDamage.recover(std::move(*result435), dt);
-        }
-      } else {
-        tile->get().backgroundDamage.reset();
-      }
+      auto recovered = recover_damage(tile->get(), TileLayer::Background, tile->get().backgroundDamage);
+      if (!recovered)
+        return std::unexpected(std::move(recovered.error()));
 
       auto result436 = queueTileDamageUpdates(pos, TileLayer::Background);
       if (!result436)

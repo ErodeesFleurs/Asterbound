@@ -838,9 +838,9 @@ std::expected<ByteArray, StarException> WorldStorage::tileSectorKey(Sector const
 
 std::expected<WorldStorage::TileSectorStore, StarException> WorldStorage::readTileSector(ByteArray const& data) {
   auto& root = this->root();
-  auto automatDatabaseResult1 = root.materialDatabase();
-  if (!automatDatabaseResult1) return std::unexpected(std::move(automatDatabaseResult1.error()));
-  auto matDatabase = std::move((*automatDatabaseResult1));
+  auto material_database_result = root.material_database();
+  if (!material_database_result) return std::unexpected(std::move(material_database_result.error()));
+  auto mat_database = std::move((*material_database_result));
   auto liquids_database = root.liquids_database();
   if (!liquids_database) return std::unexpected(std::move(liquids_database.error()));
   auto autostorageConfigResult1 = root.assets();
@@ -872,22 +872,22 @@ std::expected<WorldStorage::TileSectorStore, StarException> WorldStorage::readTi
         if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
       }
 
-      if (!matDatabase->isValidMaterialId(tile.foreground)) {
+      if (!mat_database->is_valid_material_id(tile.foreground)) {
         auto tileforegroundResult1 = storageConfig.get_uint("replacementMaterialId");
         if (!tileforegroundResult1) return std::unexpected(std::move(tileforegroundResult1.error()));
         tile.foreground = std::move((*tileforegroundResult1));
       }
-      if (!matDatabase->isValidMaterialId(tile.background)) {
+      if (!mat_database->is_valid_material_id(tile.background)) {
         auto tilebackgroundResult1 = storageConfig.get_uint("replacementMaterialId");
         if (!tilebackgroundResult1) return std::unexpected(std::move(tilebackgroundResult1.error()));
         tile.background = std::move((*tilebackgroundResult1));
       }
-      if (!matDatabase->isValidModId(tile.foregroundMod)) {
+      if (!mat_database->is_valid_mod_id(tile.foregroundMod)) {
         auto tileforegroundModResult1 = storageConfig.get_uint("replacementModId");
         if (!tileforegroundModResult1) return std::unexpected(std::move(tileforegroundModResult1.error()));
         tile.foregroundMod = std::move((*tileforegroundModResult1));
       }
-      if (!matDatabase->isValidModId(tile.backgroundMod)) {
+      if (!mat_database->is_valid_mod_id(tile.backgroundMod)) {
         auto tilebackgroundModResult1 = storageConfig.get_uint("replacementModId");
         if (!tilebackgroundModResult1) return std::unexpected(std::move(tilebackgroundModResult1.error()));
         tile.backgroundMod = std::move((*tilebackgroundModResult1));

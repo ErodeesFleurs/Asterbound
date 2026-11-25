@@ -159,12 +159,12 @@ void gatherTileOracle(CellularLightingCalculator& calculator, ClientTileSectorAr
       auto const& tile = tiles.tile(position);
       Vec3F emission;
       if (tile.foreground != EmptyMaterialId || tile.foregroundMod != NoModId)
-        emission += materials.radiantLight(tile.foreground, tile.foregroundMod);
+        emission += materials.radiant_light(tile.foreground, tile.foregroundMod);
       if (tile.liquid.liquid != empty_liquid_id && tile.liquid.level != 0.0f)
         emission += liquids.radiant_light(tile.liquid);
       if (tile.foregroundLightTransparent) {
         if (tile.background != EmptyMaterialId || tile.backgroundMod != NoModId)
-          emission += materials.radiantLight(tile.background, tile.backgroundMod);
+          emission += materials.radiant_light(tile.background, tile.backgroundMod);
         if (tile.backgroundLightTransparent && y > underground)
           emission += environment;
       }
@@ -174,7 +174,7 @@ void gatherTileOracle(CellularLightingCalculator& calculator, ClientTileSectorAr
 }
 
 void checkWideLightingSnapshot(GameTest& fixture, RectI const& query) {
-  auto materials = fixture.root().materialDatabase();
+  auto materials = fixture.root().material_database();
   ASSERT_TRUE(materials);
   auto liquids = fixture.root().liquids_database();
   ASSERT_TRUE(liquids);
@@ -187,12 +187,12 @@ void checkWideLightingSnapshot(GameTest& fixture, RectI const& query) {
   WorkerPool caller("Lighting wide snapshot caller");
 
   std::optional<MaterialId> radiantMaterial;
-  auto names = (*materials)->materialNames();
+  auto names = (*materials)->material_names();
   std::ranges::sort(names);
   for (auto const& name : names) {
-    auto id = (*materials)->materialId(name);
+    auto id = (*materials)->material_id(name);
     ASSERT_TRUE(id);
-    if ((*materials)->radiantLight(*id, NoModId).max() > 0.0f) {
+    if ((*materials)->radiant_light(*id, NoModId).max() > 0.0f) {
       radiantMaterial = *id;
       break;
     }
@@ -579,7 +579,7 @@ const GameTestRegistration
 
 const GameTestRegistration
   clientLightingGatherMatchesTileSnapshot("ClientLighting", "GatherMatchesTileSnapshot", [](GameTest& fixture) {
-    auto materials = fixture.root().materialDatabase();
+    auto materials = fixture.root().material_database();
     ASSERT_TRUE(materials);
     auto liquids = fixture.root().liquids_database();
     ASSERT_TRUE(liquids);
@@ -591,13 +591,13 @@ const GameTestRegistration
     ASSERT_TRUE(workers);
     WorkerPool caller("Lighting serial regression");
 
-    auto names = (*materials)->materialNames();
+    auto names = (*materials)->material_names();
     std::ranges::sort(names);
     std::optional<MaterialId> radiantMaterial;
     for (auto const& name : names) {
-      auto id = (*materials)->materialId(name);
+      auto id = (*materials)->material_id(name);
       ASSERT_TRUE(id);
-      if ((*materials)->radiantLight(*id, NoModId).max() > 0.0f) {
+      if ((*materials)->radiant_light(*id, NoModId).max() > 0.0f) {
         radiantMaterial = *id;
         break;
       }
@@ -616,12 +616,12 @@ const GameTestRegistration
     }
     ASSERT_TRUE(radiant_liquid);
     std::optional<ModId> radiantMod;
-    auto modNames = (*materials)->modNames();
-    std::ranges::sort(modNames);
-    for (auto const& name : modNames) {
-      auto id = (*materials)->modId(name);
+    auto mod_names = (*materials)->mod_names();
+    std::ranges::sort(mod_names);
+    for (auto const& name : mod_names) {
+      auto id = (*materials)->mod_id(name);
       ASSERT_TRUE(id);
-      if ((*materials)->radiantLight(EmptyMaterialId, *id).max() > 0.0f) {
+      if ((*materials)->radiant_light(EmptyMaterialId, *id).max() > 0.0f) {
         radiantMod = *id;
         break;
       }

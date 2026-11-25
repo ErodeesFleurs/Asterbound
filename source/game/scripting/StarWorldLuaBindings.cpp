@@ -3960,21 +3960,19 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
       return std::unexpected(StarException(Star::format("Unsupported material layer {}", layerName)));
     }
 
-    auto materialId = world.material(Vec2I::floor(position), layer);
-    if (materialId == NullMaterialId) {
+    auto material_id = world.material(Vec2I::floor(position), layer);
+    if (material_id == NullMaterialId) {
       return lua_nil;
-    } else if (materialId == EmptyMaterialId) {
+    } else if (material_id == EmptyMaterialId) {
       return false;
     } else {
-      auto materialDatabaseResult = world.root().materialDatabase();
-      if (!materialDatabaseResult)
-        return std::unexpected(std::move(materialDatabaseResult.error()));
-      auto materialDatabase = std::move(*materialDatabaseResult);
-      auto nameResult = materialDatabase->materialName(materialId);
-      if (!nameResult)
-        return std::unexpected(std::move(nameResult.error()));
-      auto name = std::move(*nameResult);
-      return engine.create_string(name);
+      auto materials = world.root().material_database();
+      if (!materials)
+        return std::unexpected(std::move(materials.error()));
+      auto name = (*materials)->material_name(material_id);
+      if (!name)
+        return std::unexpected(std::move(name.error()));
+      return engine.create_string(*name);
     }
   }
 
@@ -3988,17 +3986,15 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
       return std::unexpected(StarException(Star::format("Unsupported mod layer {}", layerName)));
     }
 
-    auto modId = world.mod(Vec2I::floor(position), layer);
-    if (isRealMod(modId)) {
-      auto materialDatabaseResult = world.root().materialDatabase();
-      if (!materialDatabaseResult)
-        return std::unexpected(std::move(materialDatabaseResult.error()));
-      auto materialDatabase = std::move(*materialDatabaseResult);
-      auto nameResult = materialDatabase->modName(modId);
-      if (!nameResult)
-        return std::unexpected(std::move(nameResult.error()));
-      auto const& name = nameResult->get();
-      return engine.create_string(name);
+    auto mod_id = world.mod(Vec2I::floor(position), layer);
+    if (isRealMod(mod_id)) {
+      auto materials = world.root().material_database();
+      if (!materials)
+        return std::unexpected(std::move(materials.error()));
+      auto name = (*materials)->mod_name(mod_id);
+      if (!name)
+        return std::unexpected(std::move(name.error()));
+      return engine.create_string(name->get());
     }
 
     return lua_nil;
@@ -4139,18 +4135,16 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
     else
       return std::unexpected(StarException(Star::format("Unsupported tile layer {}", layerName)));
 
-    auto materialName = arg3;
-    auto materialDatabaseResult = world.root().materialDatabase();
-      if (!materialDatabaseResult)
-        return std::unexpected(std::move(materialDatabaseResult.error()));
-      auto materialDatabase = std::move(*materialDatabaseResult);
-    if (!materialDatabase->materialNames().contains(materialName))
-      return std::unexpected(StarException(Star::format("Unknown material name {}", materialName)));
-    auto idResult = materialDatabase->materialId(materialName);
-    if (!idResult)
-      return std::unexpected(std::move(idResult.error()));
-    auto id = std::move(*idResult);
-    placeMaterial.material = id;
+    auto const& material_name = arg3;
+    auto materials = world.root().material_database();
+    if (!materials)
+      return std::unexpected(std::move(materials.error()));
+    if (!(*materials)->is_material_name(material_name))
+      return std::unexpected(StarException(Star::format("Unknown material name {}", material_name)));
+    auto material_id = (*materials)->material_id(material_name);
+    if (!material_id)
+      return std::unexpected(std::move(material_id.error()));
+    placeMaterial.material = *material_id;
 
     if (arg4)
       placeMaterial.materialHueShift = static_cast<MaterialHue>(*arg4);
@@ -4163,7 +4157,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
   std::expected<bool, StarException> WorldEnvironmentCallbacks::replaceMaterials(World& world,
       List<Vec2I> const& tilePositions,
       String const& layer,
-      String const& materialName,
+      String const& material_name,
       std::optional<int> const& hueShift,
       bool enableDrops) {
     PlaceMaterial placeMaterial;
@@ -4190,17 +4184,15 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
     else
       return std::unexpected(StarException(Star::format("Unsupported tile layer {}", layerName)));
 
-    auto materialDatabaseResult = world.root().materialDatabase();
-      if (!materialDatabaseResult)
-        return std::unexpected(std::move(materialDatabaseResult.error()));
-      auto materialDatabase = std::move(*materialDatabaseResult);
-    if (!materialDatabase->materialNames().contains(materialName))
-      return std::unexpected(StarException(Star::format("Unknown material name {}", materialName)));
-    auto idResult = materialDatabase->materialId(materialName);
-    if (!idResult)
-      return std::unexpected(std::move(idResult.error()));
-    auto id = std::move(*idResult);
-    placeMaterial.material = id;
+    auto materials = world.root().material_database();
+    if (!materials)
+      return std::unexpected(std::move(materials.error()));
+    if (!(*materials)->is_material_name(material_name))
+      return std::unexpected(StarException(Star::format("Unknown material name {}", material_name)));
+    auto material_id = (*materials)->material_id(material_name);
+    if (!material_id)
+      return std::unexpected(std::move(material_id.error()));
+    placeMaterial.material = *material_id;
 
     if (hueShift)
       placeMaterial.materialHueShift = static_cast<MaterialHue>(*hueShift);
@@ -4259,18 +4251,16 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
       return std::unexpected(StarException(Star::format("Unsupported tile layer {}", layerName)));
     }
 
-    auto modName = arg3;
-    auto materialDatabaseResult = world.root().materialDatabase();
-      if (!materialDatabaseResult)
-        return std::unexpected(std::move(materialDatabaseResult.error()));
-      auto materialDatabase = std::move(*materialDatabaseResult);
-    if (!materialDatabase->modNames().contains(modName))
-      return std::unexpected(StarException(Star::format("Unknown mod name {}", modName)));
-    auto idResult = materialDatabase->modId(modName);
-    if (!idResult)
-      return std::unexpected(std::move(idResult.error()));
-    auto id = std::move(*idResult);
-    placeMod.mod = id;
+    auto const& mod_name = arg3;
+    auto materials = world.root().material_database();
+    if (!materials)
+      return std::unexpected(std::move(materials.error()));
+    if (!(*materials)->is_mod_name(mod_name))
+      return std::unexpected(StarException(Star::format("Unknown mod name {}", mod_name)));
+    auto mod_id = (*materials)->mod_id(mod_name);
+    if (!mod_id)
+      return std::unexpected(std::move(mod_id.error()));
+    placeMod.mod = *mod_id;
 
     if (arg4)
       placeMod.modHueShift = static_cast<MaterialHue>(*arg4);

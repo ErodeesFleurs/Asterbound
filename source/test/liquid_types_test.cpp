@@ -378,15 +378,15 @@ const GameTestRegistration liquid_material_config("LiquidConfigTest", "Consumpti
         File::relative_to(*directory, "fixture.matmod"))), "write material mod reactions")) return;
     auto assets = open_liquid_fixture_assets(fixture, *directory, logger);
     if (!fixture.check(bool(assets), assets ? "open material fixture assets" : assets.error().what())) return;
-    auto database = MaterialDatabase::create(*assets, *particles, **image_metadata, logger, root.random());
+    auto database = MaterialDatabase::create(**assets, **particles, **image_metadata, logger, root.random());
     if (material == "0" && mod == "0") {
       if (!fixture.check(bool(database), database ? "load valid material reactions" : database.error().what())) return;
       for (LiquidId id : {1, 2, 3}) {
-        auto material_rule = (*database)->liquidMaterialInteraction(id, 1);
-        auto mod_rule = (*database)->liquidModInteraction(id, 1);
+        auto material_rule = (*database)->liquid_material_interaction(id, 1);
+        auto mod_rule = (*database)->liquid_mod_interaction(id, 1);
         float expected = id == 3 ? 0.25f : 0.0f;
-        fixture.check(material_rule && material_rule->consumeLiquid == expected, "preserve valid material consumption");
-        fixture.check(mod_rule && mod_rule->consumeLiquid == expected, "preserve valid mod consumption");
+        fixture.check(material_rule && material_rule->consume_liquid == expected, "preserve valid material consumption");
+        fixture.check(mod_rule && mod_rule->consume_liquid == expected, "preserve valid mod consumption");
       }
     } else {
       fixture.check(!database && database.error().is<MaterialException>(),
@@ -419,7 +419,7 @@ std::expected<std::shared_ptr<LiquidsDatabase>, StarException> liquids_fixture(
   auto assets = open_liquid_fixture_assets(fixture, directory, logger);
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto materials = fixture.root().materialDatabase();
+  auto materials = fixture.root().material_database();
   if (!materials)
     return std::unexpected(std::move(materials.error()));
   return LiquidsDatabase::create(**assets, **materials);
@@ -557,10 +557,10 @@ const GameTestRegistration liquid_catalog_lookup(
   if (!fixture.check(bool(directory), "create isolated liquid test directory"))
     return;
   auto cleanup = make_scope_exit([&] { fixture.check(bool(File::remove_all(*directory)), "remove liquid test directory"); });
-  auto materials = fixture.root().materialDatabase();
+  auto materials = fixture.root().material_database();
   if (!fixture.check(bool(materials), materials ? "load materials" : materials.error().what()))
     return;
-  auto dirt = (*materials)->materialId("dirt");
+  auto dirt = (*materials)->material_id("dirt");
   if (!fixture.check(bool(dirt), dirt ? "resolve dirt material" : dirt.error().what()))
     return;
 

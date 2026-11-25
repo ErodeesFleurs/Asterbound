@@ -94,50 +94,51 @@ Vec3B const SourceLiquidBorderColor(0x80, 0x80, 0x00);
 
 [[nodiscard]]
 std::expected<void, StarException> scanMaterials(Root& root, TilesetUpdater& updater) {
-  auto materialsResult = root.materialDatabase();
-  if (!materialsResult)
-    return std::unexpected(std::move(materialsResult.error()));
-  auto materials = *materialsResult;
-  auto assetsResult = root.assets();
-  if (!assetsResult)
-    return std::unexpected(std::move(assetsResult.error()));
-  auto assets = *assetsResult;
-  for (String materialName : materials->materialNames()) {
-    auto id = materials->materialId(materialName);
+  auto materials_result = root.material_database();
+  if (!materials_result)
+    return std::unexpected(std::move(materials_result.error()));
+  auto const& materials = **materials_result;
+  auto assets_result = root.assets();
+  if (!assets_result)
+    return std::unexpected(std::move(assets_result.error()));
+  auto const& assets = **assets_result;
+  for (auto const& material_name : materials.material_names()) {
+    auto id = materials.material_id(material_name);
     if (!id)
       return std::unexpected(std::move(id.error()));
-    auto path = materials->materialPath(*id);
-    if (!path)
-      return std::unexpected(std::move(path.error()));
-    if (!*path)
+    auto asset = materials.material_asset(*id);
+    if (!asset)
+      return std::unexpected(std::move(asset.error()));
+    if (!*asset)
       continue;
-    auto source = assets->asset_source(**path);
+    auto source = assets.asset_source((*asset)->get().path);
     if (!source)
       return std::unexpected(std::move(source.error()));
-    auto renderProfile = materials->materialRenderProfile(*id);
-    if (!renderProfile)
+    auto render_profile = materials.material_render_profile(*id);
+    if (!render_profile)
       continue;
-    auto tileset = materials->materialCategory(*id);
+    auto tileset = materials.material_category(*id);
     if (!tileset)
       return std::unexpected(std::move(tileset.error()));
-    auto imagePath = renderProfile->pieceImage(renderProfile->representativePiece, 0);
-    if (!imagePath)
-      return std::unexpected(std::move(imagePath.error()));
-    auto image = assets->image(*imagePath);
+    auto const& profile = render_profile->get();
+    auto image_path = profile.pieceImage(profile.representativePiece, 0);
+    if (!image_path)
+      return std::unexpected(std::move(image_path.error()));
+    auto image = assets.image(*image_path);
     if (!image)
       return std::unexpected(std::move(image.error()));
-    auto shortDescription = materials->materialShortDescription(*id);
-    if (!shortDescription)
-      return std::unexpected(std::move(shortDescription.error()));
-    auto description = materials->materialDescription(*id);
+    auto short_description = materials.material_short_description(*id);
+    if (!short_description)
+      return std::unexpected(std::move(short_description.error()));
+    auto description = materials.material_description(*id);
     if (!description)
       return std::unexpected(std::move(description.error()));
-    Json properties = JsonObject{{"material", materialName}, {"//name", materialName},
-        {"//shortdescription", *shortDescription}, {"//description", *description}};
+    Json properties = JsonObject{{"material", material_name}, {"//name", material_name},
+        {"//shortdescription", *short_description}, {"//description", *description}};
     auto category = tileset->to_lower();
     if (!category)
       return std::unexpected(std::move(category.error()));
-    updater.defineTile(std::make_shared<Tile>(Tile{*source, "materials", *category, materialName, *image, properties}));
+    updater.defineTile(std::make_shared<Tile>(Tile{*source, "materials", *category, material_name, *image, properties}));
   }
   return {};
 }

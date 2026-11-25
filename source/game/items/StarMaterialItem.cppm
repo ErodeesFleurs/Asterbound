@@ -279,7 +279,7 @@ std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create
   if (!hue)
     return std::unexpected(std::move(hue.error()));
   item->m_materialHueShift = materialHueFromDegrees(*hue);
-  auto database = root.materialDatabase();
+  auto database = root.material_database();
   if (!database)
     return std::unexpected(std::move(database.error()));
   if (item->materialHueShift() != MaterialHue()) {
@@ -339,7 +339,7 @@ std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create
     return std::unexpected(std::move(collisionOverride.error()));
   item->m_collisionOverride = collisionOverride->value_or(TileCollisionOverride::None);
   item->m_blockSwap = false;
-  auto collision = (*database)->materialCollisionKind(item->m_material);
+  auto collision = (*database)->material_collision_kind(item->m_material);
   if (!collision)
     return std::unexpected(std::move(collision.error()));
   auto multiplace = config.get_bool("allowMultiplace", BlockCollisionSet.contains(*collision));
@@ -351,18 +351,18 @@ std::expected<std::shared_ptr<MaterialItem>, StarException> MaterialItem::create
     return std::unexpected(std::move(sounds.error()));
   item->m_placeSounds = std::move(*sounds);
   if (item->m_placeSounds.empty()) {
-    auto mining = (*database)->miningSound(item->m_material);
+    auto mining = (*database)->mining_sound(item->m_material);
     if (!mining)
       return std::unexpected(std::move(mining.error()));
     if (!mining->empty())
       item->m_placeSounds.push_back(std::move(*mining));
-    auto step = (*database)->footstepSound(item->m_material);
+    auto step = (*database)->footstep_sound(item->m_material);
     if (!step)
       return std::unexpected(std::move(step.error()));
     if (!step->empty())
       item->m_placeSounds.push_back(std::move(*step));
     else if (item->m_placeSounds.empty())
-      item->m_placeSounds.push_back((*database)->defaultFootstepSound());
+      item->m_placeSounds.push_back((*database)->default_footstep_sound());
   }
   item->m_shifting = false;
   item->m_lastTileAreaRadiusCache = 0.0f;
@@ -419,17 +419,17 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
   if (auto player = as_ref<Player>(itemOwner->get())) {
     if (auto input = itemOwner->get().isMaster() ? player->get().input() : std::nullopt) {
       if (auto presses = input->get().bind_down("opensb", "materialCollisionCycle")) {
-        auto database = root().materialDatabase();
+        auto database = root().material_database();
         if (!database)
           return std::unexpected(std::move(database.error()));
-        auto baseKind = (*database)->materialCollisionKind(m_material);
-        if (!baseKind)
-          return std::unexpected(std::move(baseKind.error()));
+        auto base_kind = (*database)->material_collision_kind(m_material);
+        if (!base_kind)
+          return std::unexpected(std::move(base_kind.error()));
         for (std::size_t i = 0; i != *presses; ++i) {
           constexpr auto limit = static_cast<std::uint8_t>(TileCollisionOverride::Block) + 1;
           while (true) {
             m_collisionOverride = TileCollisionOverride((static_cast<std::uint8_t>(m_collisionOverride) + 1) % limit);
-            if (collisionKindFromOverride(m_collisionOverride) != *baseKind)
+            if (collisionKindFromOverride(m_collisionOverride) != *base_kind)
               break;
           }
           auto name = enum_name<TileCollisionOverrideNames>(m_collisionOverride);
@@ -598,10 +598,10 @@ std::expected<void, StarException> MaterialItem::fire(FireMode mode, bool shifti
   if (m_collisionOverride != TileCollisionOverride::None) {
     collisionKind = collisionKindFromOverride(m_collisionOverride);
   } else {
-    auto database = root().materialDatabase();
+    auto database = root().material_database();
     if (!database)
       return std::unexpected(std::move(database.error()));
-    auto kind = (*database)->materialCollisionKind(m_material);
+    auto kind = (*database)->material_collision_kind(m_material);
     if (!kind)
       return std::unexpected(std::move(kind.error()));
     collisionKind = *kind;
@@ -775,16 +775,16 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
   if (willDamage.empty())
     return success;
 
-  auto materialDatabase = root().materialDatabase();
-  if (!materialDatabase)
-    return std::unexpected(std::move(materialDatabase.error()));
+  auto material_database = root().material_database();
+  if (!material_database)
+    return std::unexpected(std::move(material_database.error()));
   auto assets = root().assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
   String blockSound;
 
   for (auto pos : willDamage) {
-    auto sound = (*materialDatabase)->miningSound(itemWorld->get().material(pos, layer), itemWorld->get().mod(pos, layer));
+    auto sound = (*material_database)->mining_sound(itemWorld->get().material(pos, layer), itemWorld->get().mod(pos, layer));
     if (!sound)
       return std::unexpected(std::move(sound.error()));
     blockSound = std::move(*sound);
@@ -794,7 +794,7 @@ std::expected<std::size_t, StarException> MaterialItem::blockSwap(float radius, 
 
   if (blockSound.empty()) {
     for (auto pos : willDamage) {
-      auto sound = (*materialDatabase)->footstepSound(itemWorld->get().material(pos, layer), itemWorld->get().mod(pos, layer));
+      auto sound = (*material_database)->footstep_sound(itemWorld->get().material(pos, layer), itemWorld->get().mod(pos, layer));
       if (!sound)
         return std::unexpected(std::move(sound.error()));
       blockSound = std::move(*sound);
@@ -862,10 +862,10 @@ std::expected<std::reference_wrapper<List<Drawable> const>, StarException> Mater
 
       List<Drawable> drawables;
       TileDrawer::Drawables tileDrawables;
-      auto database = root().materialDatabase();
+      auto database = root().material_database();
       if (!database)
         return std::unexpected(std::move(database.error()));
-      auto collision = (*database)->materialCollisionKind(m_material);
+      auto collision = (*database)->material_collision_kind(m_material);
       if (!collision)
         return std::unexpected(std::move(collision.error()));
       bool isBlock = BlockCollisionSet.contains(*collision);

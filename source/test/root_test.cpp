@@ -530,7 +530,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
     ASSERT_NO_FATAL_FAILURE(expectCatalog("entityFactory", root.entityFactory()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("nameGenerator", root.nameGenerator()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("itemDatabase", root.itemDatabase()));
-    ASSERT_NO_FATAL_FAILURE(expectCatalog("materialDatabase", root.materialDatabase()));
+    ASSERT_NO_FATAL_FAILURE(expectCatalog("materialDatabase", root.material_database()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("terrainDatabase", root.terrainDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("biome_database", root.biome_database()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("liquids_database", root.liquids_database()));
@@ -705,6 +705,23 @@ const GameTestRegistration liquid_config_binding("LiquidsDatabaseTest", "LuaLook
     return root.liquidName(id) == "water"
   )LUA");
   fixture.check(checked && *checked, checked ? "liquid name round-trip" : checked.error().what());
+});
+
+const GameTestRegistration material_config_binding("MaterialDatabaseTest", "LuaLookupDistinguishesRealAndMetaAssets", [](GameTest& fixture) {
+  auto lua = isolationLua(fixture.root());
+  if (!fixture.check(bool(lua), "create Lua root")) return;
+  auto context = (*lua)->create_context(StringList{});
+  if (!fixture.check(bool(context), "create material lookup context")) return;
+  auto checked = context->eval<bool>(R"LUA(
+    local dirt = root.materialConfig("dirt")
+    assert(root.materialConfig(dirt.config.materialId).path == dirt.path)
+    assert(root.assetJson(dirt.path).materialName == "dirt")
+    assert(root.materialConfig("metamaterial:empty") == nil and root.modConfig("metamod:none") == nil)
+    assert(not pcall(root.materialConfig, "missing_material_lookup_fixture"))
+    assert(not pcall(root.modConfig, "missing_mod_lookup_fixture"))
+    return root.materialHealth("dirt") > 0
+  )LUA");
+  fixture.check(checked && *checked, checked ? "material lookup contract" : checked.error().what());
 });
 
 [[nodiscard]] std::expected<bool, StarException> isolationLogContains(String const& path, String const& text) {
@@ -1164,9 +1181,9 @@ const GameTestRegistration prediction_liquid_update("WorldClientTest", "LiquidPa
   ASSERT_TRUE((*universe)->warpPlayer(InstanceWorldId("outpost")));
   auto world = (*universe)->worldClient();
   ASSERT_TRUE(world);
-  auto materials = root.materialDatabase();
+  auto materials = root.material_database();
   ASSERT_TRUE(materials) << materials.error().what();
-  auto dirt = (*materials)->materialId("dirt");
+  auto dirt = (*materials)->material_id("dirt");
   ASSERT_TRUE(dirt) << dirt.error().what();
   // A local packet batch gives us a known loaded neighborhood, independently
   // of the outpost layout. No network tick can acknowledge our pending edit.
@@ -1198,8 +1215,8 @@ const GameTestRegistration prediction_liquid_update("WorldClientTest", "LiquidPa
   ASSERT_TRUE(rebuilt) << rebuilt.error().what();
   EXPECT_TRUE(*rebuilt) << "Neighbor refresh lost a foreground prediction after an unrelated liquid packet";
 
-  auto falling = (*materials)->materialId("redtoyblock");
-  auto cascading = (*materials)->materialId("sand");
+  auto falling = (*materials)->material_id("redtoyblock");
+  auto cascading = (*materials)->material_id("sand");
   ASSERT_TRUE(falling);
   ASSERT_TRUE(cascading);
   Vec2I const falling_pos(10, 11), cascading_pos(12, 11), invalid_pos(11, 12);
@@ -1210,7 +1227,7 @@ const GameTestRegistration prediction_liquid_update("WorldClientTest", "LiquidPa
   ASSERT_TRUE(placements) << placements.error().what();
   ASSERT_TRUE(placements->empty());
   MaterialId missing = 0;
-  while (isRealMaterial(missing) && (*materials)->isValidMaterialId(missing))
+  while (isRealMaterial(missing) && (*materials)->is_valid_material_id(missing))
     ++missing;
   ASSERT_TRUE(isRealMaterial(missing));
   EXPECT_FALSE(world->applyTileModifications({{invalid_pos, PlaceMaterial{TileLayer::Foreground, missing, 83}}}, true));
@@ -2727,10 +2744,10 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
 const GameTestRegistration simultaneousWorldMaterials("RootTest", "SimultaneousWorldMaterials", [](GameTest& fixture) {
   // Select a genuinely unused real ID, rather than assuming a mod collection
   // leaves a hard-coded material slot free.
-  auto materials = fixture.root().materialDatabase();
+  auto materials = fixture.root().material_database();
   ASSERT_TRUE(materials) << materials.error().what();
   MaterialId material = 0;
-  while (material < FirstMetaMaterialId && (*materials)->isValidMaterialId(material))
+  while (material < FirstMetaMaterialId && (*materials)->is_valid_material_id(material))
     ++material;
   ASSERT_LT(material, FirstMetaMaterialId);
 
@@ -2770,12 +2787,12 @@ const GameTestRegistration simultaneousWorldMaterials("RootTest", "SimultaneousW
   auto worldB = std::move(*createdWorldB);
   auto closeWorldB = make_scope_exit([&] { EXPECT_TRUE(worldB->close()); });
   {
-    auto materialsA = rootA->materialDatabase();
-    ASSERT_TRUE(materialsA) << materialsA.error().what();
-    auto materialsB = rootB->materialDatabase();
-    ASSERT_TRUE(materialsB) << materialsB.error().what();
-    EXPECT_EQ((*materialsA)->materialId("root-isolation"), material);
-    EXPECT_EQ((*materialsB)->materialId("root-isolation"), material);
+    auto materials_a = rootA->material_database();
+    ASSERT_TRUE(materials_a) << materials_a.error().what();
+    auto materials_b = rootB->material_database();
+    ASSERT_TRUE(materials_b) << materials_b.error().what();
+    EXPECT_EQ((*materials_a)->material_id("root-isolation"), material);
+    EXPECT_EQ((*materials_b)->material_id("root-isolation"), material);
   }
 
   // Identical material IDs and placement requests produce different actual

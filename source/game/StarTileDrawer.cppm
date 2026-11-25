@@ -82,7 +82,8 @@ public:
   using Drawables = HashMap<QuadZLevel, List<Drawable>>;
 
   using MaterialRenderPieceIndex = std::size_t;
-  using MaterialPieceResultList = List<std::pair<std::shared_ptr<MaterialRenderPiece const>, Vec2F>>;
+  // Pieces borrow the catalog that owns the matched render profiles.
+  using MaterialPieceResultList = List<std::pair<std::reference_wrapper<MaterialRenderPiece const>, Vec2F>>;
 
   enum class TerrainLayer { Background, Midground, Foreground };
 
@@ -112,8 +113,8 @@ private:
   static QuadZLevel modZLevel(std::uint32_t zLevel, ModId mod, MaterialHue hue, MaterialColorVariant colorVariant);
   static QuadZLevel damageZLevel();
 
-  [[nodiscard]] static std::expected<bool, StarException> determineMatchingPieces(MaterialPieceResultList& resultList, std::optional<std::reference_wrapper<bool>> occlude, std::shared_ptr<MaterialDatabase const> const& materialDb, MaterialRenderMatchList const& matchList,
-    WorldRenderData const& renderData, Vec2I const& basePos, TileLayer layer, bool isMod);
+  [[nodiscard]] static std::expected<bool, StarException> determine_matching_pieces(MaterialPieceResultList& result_list, std::optional<std::reference_wrapper<bool>> occlude, MaterialDatabase const& material_database, MaterialRenderMatchList const& match_list,
+    WorldRenderData const& renderData, Vec2I const& base_pos, TileLayer layer, bool is_mod);
 
   Root& m_root;
   Vec4B m_backgroundLayerColor;

@@ -144,10 +144,10 @@ std::expected<void, StarException> TileDrawer::initializeTileDrawer() {
 
 std::expected<bool, StarException> TileDrawer::produceTerrainDrawables(Drawables& drawables,
   TerrainLayer terrainLayer, Vec2I const& pos, WorldRenderData const& renderData, float scale, Vec2I offset, std::optional<TerrainLayer> variantLayer) {
-  auto materialDatabaseResult = m_root.materialDatabase();
-  if (!materialDatabaseResult)
-    return std::unexpected(std::move(materialDatabaseResult.error()));
-  auto const& materialDatabase = *materialDatabaseResult;
+  auto material_database_result = m_root.material_database();
+  if (!material_database_result)
+    return std::unexpected(std::move(material_database_result.error()));
+  auto const& material_database = **material_database_result;
   auto image_metadata_result = m_root.image_metadata_database();
   if (!image_metadata_result)
     return std::unexpected(std::move(image_metadata_result.error()));
@@ -187,17 +187,17 @@ std::expected<bool, StarException> TileDrawer::produceTerrainDrawables(Drawables
   }
 
   // render non-block colliding things in the midground
-  auto collision = materialDatabase->materialCollisionKind(material);
+  auto collision = material_database.material_collision_kind(material);
   if (!collision)
     return std::unexpected(std::move(collision.error()));
   bool isBlock = BlockCollisionSet.contains(*collision);
   if ((isBlock && terrainLayer == TerrainLayer::Midground) || (!isBlock && terrainLayer == TerrainLayer::Foreground))
     return false;
 
-  auto getPieceImage = [](std::shared_ptr<MaterialRenderPiece const> const& piece, Box<float, 2> const& box, MaterialHue hue, std::optional<std::reference_wrapper<Directives const>> directives) -> AssetPath {
+  auto get_piece_image = [](MaterialRenderPiece const& piece, Box<float, 2> const& box, MaterialHue hue, std::optional<std::reference_wrapper<Directives const>> directives) -> AssetPath {
     String path = (hue == 0)
-      ? Star::format("{}?crop={};{};{};{}", piece->texture, box.x_min(), box.y_min(), box.x_max(), box.y_max())
-      : Star::format("{}?crop={};{};{};{}?hueshift={}", piece->texture, box.x_min(), box.y_min(), box.x_max(), box.y_max(), materialHueToDegrees(hue));
+      ? Star::format("{}?crop={};{};{};{}", piece.texture, box.x_min(), box.y_min(), box.x_max(), box.y_max())
+      : Star::format("{}?crop={};{};{};{}?hueshift={}", piece.texture, box.x_min(), box.y_min(), box.x_max(), box.y_max(), materialHueToDegrees(hue));
 
     AssetPath image(path);
     if (directives)
@@ -206,84 +206,86 @@ std::expected<bool, StarException> TileDrawer::produceTerrainDrawables(Drawables
     return image;
   };
 
-  auto materialRenderProfile = materialDatabase->materialRenderProfile(material);
-  auto modRenderProfile = materialDatabase->modRenderProfile(mod);
+  auto material_profile = material_database.material_render_profile(material);
+  auto mod_profile = material_database.mod_render_profile(mod);
 
-  if (materialRenderProfile) {
-    occlude = materialRenderProfile->occludesBehind;
-    auto materialColorVariant = materialRenderProfile->colorVariants > 0 ? colorVariant % materialRenderProfile->colorVariants : 0;
+  if (material_profile) {
+    auto const& profile = material_profile->get();
+    occlude = profile.occludesBehind;
+    auto material_color_variant = profile.colorVariants > 0 ? colorVariant % profile.colorVariants : 0;
     std::uint32_t variance = static_random_u32(renderData.geometry.xwrap(pos[0]) + offset[0], pos[1] + offset[1],
                                                static_cast<int>(variantLayer.value_or(terrainLayer)), "main");
-    auto& drawList = drawables[materialZLevel(materialRenderProfile->zLevel, material, materialHue, materialColorVariant)];
+    auto& drawList = drawables[materialZLevel(profile.zLevel, material, materialHue, material_color_variant)];
 
     MaterialPieceResultList pieces;
-    auto matched = determineMatchingPieces(pieces, std::ref(occlude), materialDatabase, materialRenderProfile->mainMatchList, renderData, pos,
+    auto matched = determine_matching_pieces(pieces, std::ref(occlude), material_database, profile.mainMatchList, renderData, pos,
         terrainLayer == TerrainLayer::Background ? TileLayer::Background : TileLayer::Foreground, false);
     if (!matched)
       return std::unexpected(std::move(matched.error()));
     std::optional<std::reference_wrapper<Directives const>> directives;
-    if (!materialRenderProfile->colorDirectives.empty()) {
-      auto selected = materialRenderProfile->colorDirectives.wrap(materialColorVariant);
+    if (!profile.colorDirectives.empty()) {
+      auto selected = profile.colorDirectives.wrap(material_color_variant);
       if (!selected)
         return std::unexpected(std::move(selected.error()));
       directives = selected->get();
     }
-    for (auto const& piecePair : pieces) {
-      auto variant = piecePair.first->variants.find_ref(materialColorVariant);
+    for (auto const& piece_pair : pieces) {
+      auto variant = piece_pair.first.get().variants.find_ref(material_color_variant);
       if (!variant)
-        variant = piecePair.first->variants.find_ref(0);
+        variant = piece_pair.first.get().variants.find_ref(0);
       if (!variant) continue;
       auto textureCoords = variant->get().wrap(variance);
       if (!textureCoords)
         return std::unexpected(std::move(textureCoords.error()));
-      auto image = getPieceImage(piecePair.first, textureCoords->get(), materialHue, directives);
-      auto drawable = Drawable::make_image(*image_metadata, image, scale, false, piecePair.second * scale + Vec2F(pos), color);
+      auto image = get_piece_image(piece_pair.first.get(), textureCoords->get(), materialHue, directives);
+      auto drawable = Drawable::make_image(*image_metadata, image, scale, false, piece_pair.second * scale + Vec2F(pos), color);
       if (!drawable)
         return std::unexpected(std::move(drawable.error()));
       drawList.emplace_back(std::move(*drawable));
     }
   }
 
-  if (modRenderProfile) {
-    auto modColorVariant = modRenderProfile->colorVariants > 0 ? colorVariant % modRenderProfile->colorVariants : 0;
+  if (mod_profile) {
+    auto const& profile = mod_profile->get();
+    auto mod_color_variant = profile.colorVariants > 0 ? colorVariant % profile.colorVariants : 0;
     std::uint32_t variance = static_random_u32(renderData.geometry.xwrap(pos[0]), pos[1],
                                                static_cast<int>(variantLayer.value_or(terrainLayer)), "mod");
-    auto& drawList = drawables[modZLevel(modRenderProfile->zLevel, mod, modHue, modColorVariant)];
+    auto& drawList = drawables[modZLevel(profile.zLevel, mod, modHue, mod_color_variant)];
 
     MaterialPieceResultList pieces;
-    auto matched = determineMatchingPieces(pieces, std::ref(occlude), materialDatabase, modRenderProfile->mainMatchList, renderData, pos,
+    auto matched = determine_matching_pieces(pieces, std::ref(occlude), material_database, profile.mainMatchList, renderData, pos,
         terrainLayer == TerrainLayer::Background ? TileLayer::Background : TileLayer::Foreground, true);
     if (!matched)
       return std::unexpected(std::move(matched.error()));
     std::optional<std::reference_wrapper<Directives const>> directives;
-    if (!modRenderProfile->colorDirectives.empty()) {
-      auto selected = modRenderProfile->colorDirectives.wrap(modColorVariant);
+    if (!profile.colorDirectives.empty()) {
+      auto selected = profile.colorDirectives.wrap(mod_color_variant);
       if (!selected)
         return std::unexpected(std::move(selected.error()));
       directives = selected->get();
     }
-    for (auto const& piecePair : pieces) {
-      auto variant = piecePair.first->variants.find_ref(modColorVariant);
+    for (auto const& piece_pair : pieces) {
+      auto variant = piece_pair.first.get().variants.find_ref(mod_color_variant);
       if (!variant)
-        variant = piecePair.first->variants.find_ref(0);
+        variant = piece_pair.first.get().variants.find_ref(0);
       if (!variant) continue;
       auto textureCoords = variant->get().wrap(variance);
       if (!textureCoords)
         return std::unexpected(std::move(textureCoords.error()));
-      auto image = getPieceImage(piecePair.first, textureCoords->get(), modHue, directives);
-      auto drawable = Drawable::make_image(*image_metadata, image, scale, false, piecePair.second * scale + Vec2F(pos), color);
+      auto image = get_piece_image(piece_pair.first.get(), textureCoords->get(), modHue, directives);
+      auto drawable = Drawable::make_image(*image_metadata, image, scale, false, piece_pair.second * scale + Vec2F(pos), color);
       if (!drawable)
         return std::unexpected(std::move(drawable.error()));
       drawList.emplace_back(std::move(*drawable));
     }
   }
 
-  if (materialRenderProfile && damageLevel > 0 && isBlock) {
+  if (material_profile && damageLevel > 0 && isBlock) {
     auto& drawList = drawables[damageZLevel()];
-    auto crackingImage = materialRenderProfile->damageImage(damageLevel, damageType);
-    if (!crackingImage)
-      return std::unexpected(std::move(crackingImage.error()));
-    auto drawable = Drawable::make_image(*image_metadata, crackingImage->get().first, scale, false, crackingImage->get().second * scale + Vec2F(pos), color);
+    auto cracking_image = material_profile->get().damageImage(damageLevel, damageType);
+    if (!cracking_image)
+      return std::unexpected(std::move(cracking_image.error()));
+    auto drawable = Drawable::make_image(*image_metadata, cracking_image->get().first, scale, false, cracking_image->get().second * scale + Vec2F(pos), color);
     if (!drawable)
       return std::unexpected(std::move(drawable.error()));
     drawList.emplace_back(std::move(*drawable));
@@ -331,126 +333,126 @@ TileDrawer::QuadZLevel TileDrawer::modZLevel(std::uint32_t zLevel, ModId mod, Ma
 
 TileDrawer::QuadZLevel TileDrawer::damageZLevel() { return static_cast<std::uint64_t>(-1); }
 
-std::expected<bool, StarException> TileDrawer::determineMatchingPieces(MaterialPieceResultList& resultList, std::optional<std::reference_wrapper<bool>> occlude, std::shared_ptr<MaterialDatabase const> const& materialDb, MaterialRenderMatchList const& matchList,
-    WorldRenderData const& renderData, Vec2I const& basePos, TileLayer layer, bool isMod) {
-  RenderTile const& tile = getRenderTile(renderData, basePos);
+std::expected<bool, StarException> TileDrawer::determine_matching_pieces(MaterialPieceResultList& result_list, std::optional<std::reference_wrapper<bool>> occlude, MaterialDatabase const& material_database, MaterialRenderMatchList const& match_list,
+    WorldRenderData const& renderData, Vec2I const& base_pos, TileLayer layer, bool is_mod) {
+  RenderTile const& tile = getRenderTile(renderData, base_pos);
 
-  auto matchSetMatches = [&](std::shared_ptr<MaterialRenderMatch const> const& match) -> std::expected<bool, StarException> {
+  auto match_set_matches = [&](std::shared_ptr<MaterialRenderMatch const> const& match) -> std::expected<bool, StarException> {
     if (match->requiredLayer && *match->requiredLayer != layer)
       return false;
 
     if (match->matchPoints.empty())
       return true;
 
-    bool matchValid = match->matchJoin == MaterialJoinType::All;
-    for (auto const& matchPoint : match->matchPoints) {
-      auto const& neighborTile = getRenderTile(renderData, basePos + matchPoint.position);
+    bool match_valid = match->matchJoin == MaterialJoinType::All;
+    for (auto const& match_point : match->matchPoints) {
+      auto const& neighbor_tile = getRenderTile(renderData, base_pos + match_point.position);
 
-      bool neighborShadowing = false;
+      bool neighbor_shadowing = false;
       if (layer == TileLayer::Background) {
-        if (auto profile = materialDb->materialRenderProfile(neighborTile.foreground))
-          neighborShadowing = !profile->foregroundLightTransparent;
+        if (auto profile = material_database.material_render_profile(neighbor_tile.foreground))
+          neighbor_shadowing = !profile->get().foregroundLightTransparent;
       }
 
-      MaterialHue baseHue = layer == TileLayer::Foreground ? tile.foregroundHueShift : tile.backgroundHueShift;
-      MaterialHue neighborHue = layer == TileLayer::Foreground ? neighborTile.foregroundHueShift : neighborTile.backgroundHueShift;
-      MaterialHue baseModHue = layer == TileLayer::Foreground ? tile.foregroundModHueShift : tile.backgroundModHueShift;
-      MaterialHue neighborModHue = layer == TileLayer::Foreground ? neighborTile.foregroundModHueShift : neighborTile.backgroundModHueShift;
-      MaterialId baseMaterial = layer == TileLayer::Foreground ? tile.foreground : tile.background;
-      MaterialId neighborMaterial = layer == TileLayer::Foreground ? neighborTile.foreground : neighborTile.background;
-      ModId baseMod = layer == TileLayer::Foreground ? tile.foregroundMod : tile.backgroundMod;
-      ModId neighborMod = layer == TileLayer::Foreground ? neighborTile.foregroundMod : neighborTile.backgroundMod;
+      MaterialHue base_hue = layer == TileLayer::Foreground ? tile.foregroundHueShift : tile.backgroundHueShift;
+      MaterialHue neighbor_hue = layer == TileLayer::Foreground ? neighbor_tile.foregroundHueShift : neighbor_tile.backgroundHueShift;
+      MaterialHue base_mod_hue = layer == TileLayer::Foreground ? tile.foregroundModHueShift : tile.backgroundModHueShift;
+      MaterialHue neighbor_mod_hue = layer == TileLayer::Foreground ? neighbor_tile.foregroundModHueShift : neighbor_tile.backgroundModHueShift;
+      MaterialId base_material = layer == TileLayer::Foreground ? tile.foreground : tile.background;
+      MaterialId neighbor_material = layer == TileLayer::Foreground ? neighbor_tile.foreground : neighbor_tile.background;
+      ModId base_mod = layer == TileLayer::Foreground ? tile.foregroundMod : tile.backgroundMod;
+      ModId neighbor_mod = layer == TileLayer::Foreground ? neighbor_tile.foregroundMod : neighbor_tile.backgroundMod;
 
-      bool rulesValid = matchPoint.rule->join == MaterialJoinType::All;
-      for (auto const& ruleEntry : matchPoint.rule->entries) {
+      bool rules_valid = match_point.rule->join == MaterialJoinType::All;
+      for (auto const& rule_entry : match_point.rule->entries) {
         bool valid = true;
-        if (isMod) {
-          if (std::holds_alternative<MaterialRule::RuleEmpty>(ruleEntry.rule)) {
-            valid = neighborMod == NoModId;
-          } else if (std::holds_alternative<MaterialRule::RuleConnects>(ruleEntry.rule)) {
-            valid = isConnectableMaterial(neighborMaterial);
-          } else if (std::holds_alternative<MaterialRule::RuleShadows>(ruleEntry.rule)) {
-            valid = neighborShadowing;
-          } else if (ruleEntry.rule.index() == 4) {
-            valid = neighborMod == baseMod;
-            if (std::get<4>(ruleEntry.rule).matchHue)
-              valid = valid && baseModHue == neighborModHue;
-          } else if (std::holds_alternative<MaterialRule::RuleEqualsId>(ruleEntry.rule)) {
-            valid = neighborMod == std::get<MaterialRule::RuleEqualsId>(ruleEntry.rule).id;
-          } else if (std::holds_alternative<MaterialRule::RulePropertyEquals>(ruleEntry.rule)) {
-            auto const& propertyEquals = std::get<MaterialRule::RulePropertyEquals>(ruleEntry.rule);
-            if (auto profile = materialDb->modRenderProfile(neighborMod)) {
-              auto property = profile->ruleProperties.get(propertyEquals.propertyName, Json());
+        if (is_mod) {
+          if (std::holds_alternative<MaterialRule::RuleEmpty>(rule_entry.rule)) {
+            valid = neighbor_mod == NoModId;
+          } else if (std::holds_alternative<MaterialRule::RuleConnects>(rule_entry.rule)) {
+            valid = isConnectableMaterial(neighbor_material);
+          } else if (std::holds_alternative<MaterialRule::RuleShadows>(rule_entry.rule)) {
+            valid = neighbor_shadowing;
+          } else if (rule_entry.rule.index() == 4) {
+            valid = neighbor_mod == base_mod;
+            if (std::get<4>(rule_entry.rule).matchHue)
+              valid = valid && base_mod_hue == neighbor_mod_hue;
+          } else if (std::holds_alternative<MaterialRule::RuleEqualsId>(rule_entry.rule)) {
+            valid = neighbor_mod == std::get<MaterialRule::RuleEqualsId>(rule_entry.rule).id;
+          } else if (std::holds_alternative<MaterialRule::RulePropertyEquals>(rule_entry.rule)) {
+            auto const& property_equals = std::get<MaterialRule::RulePropertyEquals>(rule_entry.rule);
+            if (auto profile = material_database.mod_render_profile(neighbor_mod)) {
+              auto property = profile->get().ruleProperties.get(property_equals.propertyName, Json());
               if (!property)
                 return std::unexpected(std::move(property.error()));
-              valid = *property == propertyEquals.compare;
+              valid = *property == property_equals.compare;
             } else {
               valid = false;
             }
           }
         } else {
-          if (std::holds_alternative<MaterialRule::RuleEmpty>(ruleEntry.rule)) {
-            valid = neighborMaterial == EmptyMaterialId;
-          } else if (std::holds_alternative<MaterialRule::RuleConnects>(ruleEntry.rule)) {
-            valid = isConnectableMaterial(neighborMaterial);
-          } else if (std::holds_alternative<MaterialRule::RuleShadows>(ruleEntry.rule)) {
-            valid = neighborShadowing;
-          } else if (ruleEntry.rule.index() == 4) {
-            valid = neighborMaterial == baseMaterial;
-            if (std::get<4>(ruleEntry.rule).matchHue)
-              valid = valid && baseHue == neighborHue;
-          } else if (std::holds_alternative<MaterialRule::RuleEqualsId>(ruleEntry.rule)) {
-            valid = neighborMaterial == std::get<MaterialRule::RuleEqualsId>(ruleEntry.rule).id;
-          } else if (std::holds_alternative<MaterialRule::RulePropertyEquals>(ruleEntry.rule)) {
-            auto const& propertyEquals = std::get<MaterialRule::RulePropertyEquals>(ruleEntry.rule);
-            if (auto profile = materialDb->materialRenderProfile(neighborMaterial)) {
-              auto property = profile->ruleProperties.get(propertyEquals.propertyName);
+          if (std::holds_alternative<MaterialRule::RuleEmpty>(rule_entry.rule)) {
+            valid = neighbor_material == EmptyMaterialId;
+          } else if (std::holds_alternative<MaterialRule::RuleConnects>(rule_entry.rule)) {
+            valid = isConnectableMaterial(neighbor_material);
+          } else if (std::holds_alternative<MaterialRule::RuleShadows>(rule_entry.rule)) {
+            valid = neighbor_shadowing;
+          } else if (rule_entry.rule.index() == 4) {
+            valid = neighbor_material == base_material;
+            if (std::get<4>(rule_entry.rule).matchHue)
+              valid = valid && base_hue == neighbor_hue;
+          } else if (std::holds_alternative<MaterialRule::RuleEqualsId>(rule_entry.rule)) {
+            valid = neighbor_material == std::get<MaterialRule::RuleEqualsId>(rule_entry.rule).id;
+          } else if (std::holds_alternative<MaterialRule::RulePropertyEquals>(rule_entry.rule)) {
+            auto const& property_equals = std::get<MaterialRule::RulePropertyEquals>(rule_entry.rule);
+            if (auto profile = material_database.material_render_profile(neighbor_material)) {
+              auto property = profile->get().ruleProperties.get(property_equals.propertyName);
               if (!property)
                 return std::unexpected(std::move(property.error()));
-              valid = *property == propertyEquals.compare;
+              valid = *property == property_equals.compare;
             } else {
               valid = false;
             }
           }
         }
-        if (ruleEntry.inverse)
+        if (rule_entry.inverse)
           valid = !valid;
 
-        if (matchPoint.rule->join == MaterialJoinType::All) {
-          rulesValid = valid && rulesValid;
-          if (!rulesValid)
+        if (match_point.rule->join == MaterialJoinType::All) {
+          rules_valid = valid && rules_valid;
+          if (!rules_valid)
             break;
         } else {
-          rulesValid = valid || rulesValid;
+          rules_valid = valid || rules_valid;
         }
       }
 
       if (match->matchJoin == MaterialJoinType::All) {
-        matchValid = matchValid && rulesValid;
-        if (!matchValid)
-          return matchValid;
+        match_valid = match_valid && rules_valid;
+        if (!match_valid)
+          return match_valid;
       } else {
-        matchValid = matchValid || rulesValid;
+        match_valid = match_valid || rules_valid;
       }
     }
-    return matchValid;
+    return match_valid;
   };
 
-  bool subMatchResult = false;
-  for (auto const& match : matchList) {
-    auto matches = matchSetMatches(match);
+  bool sub_match_result = false;
+  for (auto const& match : match_list) {
+    auto matches = match_set_matches(match);
     if (!matches)
       return std::unexpected(std::move(matches.error()));
     if (*matches) {
       if (match->occlude && occlude)
         occlude->get() = *match->occlude;
 
-      subMatchResult = true;
+      sub_match_result = true;
 
-      for (auto const& piecePair : match->resultingPieces)
-        resultList.push_back({piecePair.first, piecePair.second});
+      for (auto const& piece_pair : match->resultingPieces)
+        result_list.emplace_back(std::cref(*piece_pair.first), piece_pair.second);
 
-      auto matched = determineMatchingPieces(resultList, occlude, materialDb, match->subMatches, renderData, basePos, layer, isMod);
+      auto matched = determine_matching_pieces(result_list, occlude, material_database, match->subMatches, renderData, base_pos, layer, is_mod);
       if (!matched)
         return std::unexpected(std::move(matched.error()));
       if (*matched && match->haltOnSubMatch)
@@ -461,7 +463,7 @@ std::expected<bool, StarException> TileDrawer::determineMatchingPieces(MaterialP
     }
   }
 
-  return subMatchResult;
+  return sub_match_result;
 }
 
 }

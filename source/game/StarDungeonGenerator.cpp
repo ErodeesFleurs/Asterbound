@@ -448,17 +448,17 @@ namespace Dungeon {
 
   std::expected<void, StarException> FrontBrush::paint(Vec2I position, Phase phase, DungeonGeneratorWriter& writer) const {
     if (phase != Phase::WallPhase) return {};
-    auto database = writer.root().materialDatabase();
+    auto database = writer.root().material_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    auto material = (*database)->materialId(m_material);
+    auto material = (*database)->material_id(m_material);
     if (!material) return std::unexpected(std::move(material.error()));
     ModId mod = NoModId;
     if (m_mod) {
-      auto id = (*database)->modId(*m_mod);
+      auto id = (*database)->mod_id(*m_mod);
       if (!id) return std::unexpected(std::move(id.error()));
       mod = *id;
     }
-    auto collision = (*database)->materialCollisionKind(*material);
+    auto collision = (*database)->material_collision_kind(*material);
     if (!collision) return std::unexpected(std::move(collision.error()));
     if (isSolidColliding(*collision)) writer.setLiquid(position, {});
     writer.setForegroundMaterial(position, *material, m_materialHue, m_materialColorVariant);
@@ -476,13 +476,13 @@ namespace Dungeon {
 
   std::expected<void, StarException> BackBrush::paint(Vec2I position, Phase phase, DungeonGeneratorWriter& writer) const {
     if (phase != Phase::WallPhase) return {};
-    auto database = writer.root().materialDatabase();
+    auto database = writer.root().material_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    auto material = (*database)->materialId(m_material);
+    auto material = (*database)->material_id(m_material);
     if (!material) return std::unexpected(std::move(material.error()));
     ModId mod = NoModId;
     if (m_mod) {
-      auto id = (*database)->modId(*m_mod);
+      auto id = (*database)->mod_id(*m_mod);
       if (!id) return std::unexpected(std::move(id.error()));
       mod = *id;
     }
@@ -605,9 +605,9 @@ namespace Dungeon {
     }
     if (phase == Phase::ModsPhase) {
       if (m_mod) {
-        auto database = writer.root().materialDatabase();
+        auto database = writer.root().material_database();
         if (!database) return std::unexpected(std::move(database.error()));
-        auto mod = (*database)->modId(*m_mod);
+        auto mod = (*database)->mod_id(*m_mod);
         if (!mod) return std::unexpected(std::move(mod.error()));
         writer.setForegroundMod(position, *mod, 0);
       } else if (writer.needsForegroundBiomeMod(position)) {
@@ -628,9 +628,9 @@ namespace Dungeon {
     }
     if (phase == Phase::ModsPhase) {
       if (m_mod) {
-        auto database = writer.root().materialDatabase();
+        auto database = writer.root().material_database();
         if (!database) return std::unexpected(std::move(database.error()));
-        auto mod = (*database)->modId(*m_mod);
+        auto mod = (*database)->mod_id(*m_mod);
         if (!mod) return std::unexpected(std::move(mod.error()));
         writer.setBackgroundMod(position, *mod, 0);
       } else if (writer.needsBackgroundBiomeMod(position)) {

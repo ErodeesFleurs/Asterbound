@@ -383,8 +383,8 @@ std::expected<void, StarException> Root::reload() {
     // Liquids database depends on the materials database
     std::lock_guard liquids_database_lock(m_liquids_database_mutex);
 
-    // Material database depends on particle database
-    std::lock_guard materialDatabaseLock(m_materialDatabaseMutex);
+    // Material database depends on particle and image metadata databases.
+    std::lock_guard material_database_lock(m_material_database_mutex);
 
     // Databases that depend on functions database.
     std::lock_guard damageDatabaseLock(m_damageDatabaseMutex);
@@ -435,7 +435,7 @@ std::expected<void, StarException> Root::reload() {
     m_tilesetDatabase.reset();
     m_statisticsDatabase.reset();
     m_liquids_database.reset();
-    m_materialDatabase.reset();
+    m_material_database.reset();
     m_damageDatabase.reset();
     m_effectSourceDatabase.reset();
     m_statusEffectDatabase.reset();
@@ -523,7 +523,7 @@ std::expected<void, StarException> Root::fullyLoad() {
   add(&Root::effectSourceDatabase);
   add(&Root::statusEffectDatabase);
   add(&Root::treasureDatabase);
-  add(&Root::materialDatabase);
+  add(&Root::material_database);
   add(&Root::objectDatabase);
   add(&Root::npcDatabase);
   add(&Root::plantDatabase);
@@ -778,16 +778,16 @@ std::expected<std::shared_ptr<ItemDatabase const>, StarException> Root::itemData
   return loadMember(m_itemDatabase, m_itemDatabaseMutex, "ItemDatabase", *this);
 }
 
-std::expected<std::shared_ptr<MaterialDatabase const>, StarException> Root::materialDatabase() {
-  return loadMemberFunction<MaterialDatabase>(m_materialDatabase, m_materialDatabaseMutex, "MaterialDatabase",
+std::expected<std::shared_ptr<MaterialDatabase const>, StarException> Root::material_database() {
+  return loadMemberFunction<MaterialDatabase>(m_material_database, m_material_database_mutex, "MaterialDatabase",
     [this]() -> std::expected<std::shared_ptr<MaterialDatabase>, StarException> {
-      auto a = assets();
-      if (!a) return std::unexpected(std::move(a.error()));
+      auto asset_database = assets();
+      if (!asset_database) return std::unexpected(std::move(asset_database.error()));
       auto particles = particleDatabase();
       if (!particles) return std::unexpected(std::move(particles.error()));
       auto metadata = image_metadata_database();
       if (!metadata) return std::unexpected(std::move(metadata.error()));
-      return MaterialDatabase::create(*a, *particles, **metadata, logger(), random());
+      return MaterialDatabase::create(**asset_database, **particles, **metadata, logger(), random());
     });
 }
 
@@ -806,7 +806,7 @@ std::expected<std::shared_ptr<LiquidsDatabase const>, StarException> Root::liqui
     [this]() -> std::expected<std::shared_ptr<LiquidsDatabase>, StarException> {
       auto asset_database = assets();
       if (!asset_database) return std::unexpected(std::move(asset_database.error()));
-      auto materials = materialDatabase();
+      auto materials = material_database();
       if (!materials) return std::unexpected(std::move(materials.error()));
       return LiquidsDatabase::create(**asset_database, **materials);
     });

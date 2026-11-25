@@ -737,9 +737,9 @@ const GameTestRegistration delayedExplosionOutlivesProjectile("ProjectileActions
   Vec2I tilePosition(1024, 1024);
   ASSERT_TRUE(world->generateRegion(RectI::with_size(tilePosition - Vec2I(4, 4), Vec2I(9, 9))));
   world->setTileProtectionEnabled(false);
-  auto materialDatabase = root.materialDatabase();
-  ASSERT_TRUE(materialDatabase) << materialDatabase.error().what();
-  auto dirt = (*materialDatabase)->materialId("dirt");
+  auto material_database = root.material_database();
+  ASSERT_TRUE(material_database) << material_database.error().what();
+  auto dirt = (*material_database)->material_id("dirt");
   ASSERT_TRUE(dirt) << dirt.error().what();
   auto modified = world->modifyServerTile(tilePosition, true);
   ASSERT_TRUE(modified) << modified.error().what();
@@ -792,9 +792,9 @@ const GameTestRegistration firstContactTriggersCollisionActionOnce("ProjectileAc
   world->setTileProtectionEnabled(false);
   Vec2I ground(1024, 1024);
   ASSERT_TRUE(world->generateRegion(RectI::with_size(ground - Vec2I(4, 4), Vec2I(9, 9))));
-  auto materials = root.materialDatabase();
+  auto materials = root.material_database();
   ASSERT_TRUE(materials) << materials.error().what();
-  auto dirt = (*materials)->materialId("dirt");
+  auto dirt = (*materials)->material_id("dirt");
   ASSERT_TRUE(dirt) << dirt.error().what();
   auto attachment = world->modifyServerTile(ground, true);
   ASSERT_TRUE(attachment) << attachment.error().what();

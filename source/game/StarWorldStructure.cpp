@@ -110,9 +110,9 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
   if (!autoblockPositionResult2) return std::unexpected(std::move(autoblockPositionResult2.error()));
   auto blockPosition = std::move((*autoblockPositionResult2));
   HashMap<Vec4B, BlockKey> blockKeys;
-  auto automatDbResult1 = root.materialDatabase();
-  if (!automatDbResult1) return std::unexpected(std::move(automatDbResult1.error()));
-  auto matDb = std::move((*automatDbResult1));
+  auto material_database_result = root.material_database();
+  if (!material_database_result) return std::unexpected(std::move(material_database_result.error()));
+  auto const& materials = **material_database_result;
   auto autoblockKeyJsonResult1 = settings.get("blockKey", JsonArray());
   if (!autoblockKeyJsonResult1) return std::unexpected(std::move(autoblockKeyJsonResult1.error()));
   auto autoblockKeyJsonResult2 = assets->fetch_json((*autoblockKeyJsonResult1), configPath);
@@ -129,9 +129,9 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     if (foregroundMat == "") {
       foregroundMatId = StructureMaterialId;
     } else {
-      auto foregroundMatIdResult1 = matDb->materialId(foregroundMat);
-      if (!foregroundMatIdResult1) return std::unexpected(std::move(foregroundMatIdResult1.error()));
-      foregroundMatId = std::move((*foregroundMatIdResult1));
+      auto id = materials.material_id(foregroundMat);
+      if (!id) return std::unexpected(std::move(id.error()));
+      foregroundMatId = *id;
     }
     auto autoforegroundModResult1 = blockKeyConfig.get_string("foregroundMod", "");
     if (!autoforegroundModResult1) return std::unexpected(std::move(autoforegroundModResult1.error()));
@@ -140,9 +140,9 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     if (foregroundMod == "") {
       foregroundModId = NoModId;
     } else {
-      auto foregroundModIdResult1 = matDb->modId(foregroundMod);
-      if (!foregroundModIdResult1) return std::unexpected(std::move(foregroundModIdResult1.error()));
-      foregroundModId = std::move((*foregroundModIdResult1));
+      auto id = materials.mod_id(foregroundMod);
+      if (!id) return std::unexpected(std::move(id.error()));
+      foregroundModId = *id;
     }
     auto autobackgroundMatResult1 = blockKeyConfig.get_string("backgroundMat", "");
     if (!autobackgroundMatResult1) return std::unexpected(std::move(autobackgroundMatResult1.error()));
@@ -151,9 +151,9 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     if (backgroundMat == "") {
       backgroundMatId = StructureMaterialId;
     } else {
-      auto backgroundMatIdResult1 = matDb->materialId(backgroundMat);
-      if (!backgroundMatIdResult1) return std::unexpected(std::move(backgroundMatIdResult1.error()));
-      backgroundMatId = std::move((*backgroundMatIdResult1));
+      auto id = materials.material_id(backgroundMat);
+      if (!id) return std::unexpected(std::move(id.error()));
+      backgroundMatId = *id;
     }
     auto autobackgroundModResult1 = blockKeyConfig.get_string("backgroundMod", "");
     if (!autobackgroundModResult1) return std::unexpected(std::move(autobackgroundModResult1.error()));
@@ -162,9 +162,9 @@ std::expected<WorldStructure, StarException> WorldStructure::create(Root& root, 
     if (backgroundMod == "") {
       backgroundModId = NoModId;
     } else {
-      auto backgroundModIdResult1 = matDb->modId(backgroundMod);
-      if (!backgroundModIdResult1) return std::unexpected(std::move(backgroundModIdResult1.error()));
-      backgroundModId = std::move((*backgroundModIdResult1));
+      auto id = materials.mod_id(backgroundMod);
+      if (!id) return std::unexpected(std::move(id.error()));
+      backgroundModId = *id;
     }
     auto autokeyField0Result1 = blockKeyConfig.get_bool("anchor", false);
     if (!autokeyField0Result1) return std::unexpected(std::move(autokeyField0Result1.error()));

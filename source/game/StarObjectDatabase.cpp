@@ -168,10 +168,10 @@ std::expected<bool, StarException> ObjectOrientation::placementValid(World const
 std::expected<bool, StarException> ObjectOrientation::anchorsValid(World const& world, Vec2I const& position) const {
   if (anchors.empty())
     return true;
-  auto materialDatabaseResult = world.root().materialDatabase();
-  if (!materialDatabaseResult)
-    return std::unexpected(std::move(materialDatabaseResult.error()));
-  auto materialDatabase = std::move(*materialDatabaseResult);
+  auto material_database_result = world.root().material_database();
+  if (!material_database_result)
+    return std::unexpected(std::move(material_database_result.error()));
+  auto material_database = std::move(*material_database_result);
   bool anyValid = false;
   for (auto const& anchor : anchors) {
     auto space = position + anchor.position;
@@ -183,18 +183,18 @@ std::expected<bool, StarException> ObjectOrientation::anchorsValid(World const& 
       if (!connectable)
         return false;
       if (anchor.tilled) {
-        auto tilledResult = materialDatabase->isTilledMod(world.mod(space, anchor.layer));
-        if (!tilledResult)
-          return std::unexpected(std::move(tilledResult.error()));
-        auto tilled = std::move(*tilledResult);
+        auto tilled_result = material_database->is_tilled_mod(world.mod(space, anchor.layer));
+        if (!tilled_result)
+          return std::unexpected(std::move(tilled_result.error()));
+        auto tilled = std::move(*tilled_result);
         if (!tilled)
           return false;
       }
       if (anchor.soil) {
-        auto soilResult = materialDatabase->isSoil(world.material(space, anchor.layer));
-        if (!soilResult)
-          return std::unexpected(std::move(soilResult.error()));
-        auto soil = std::move(*soilResult);
+        auto soil_result = material_database->is_soil(world.material(space, anchor.layer));
+        if (!soil_result)
+          return std::unexpected(std::move(soil_result.error()));
+        auto soil = std::move(*soil_result);
         if (!soil)
           return false;
       }
@@ -281,10 +281,10 @@ std::expected<StringMap<String>, StarException> orientation_image_keys(Json cons
 }
 
 std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDatabase::parseOrientations(Root& root, String const& path, Json const& configList, Json const& baseConfig) {
-  auto materialDatabaseResult = root.materialDatabase();
-  if (!materialDatabaseResult)
-    return std::unexpected(std::move(materialDatabaseResult.error()));
-  auto materialDatabase = std::move(*materialDatabaseResult);
+  auto material_database_result = root.material_database();
+  if (!material_database_result)
+    return std::unexpected(std::move(material_database_result.error()));
+  auto material_database = std::move(*material_database_result);
   auto image_metadata_result = root.image_metadata_database();
   if (!image_metadata_result)
     return std::unexpected(std::move(image_metadata_result.error()));
@@ -470,24 +470,24 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
       auto meta_bound_box = std::move(*meta_bound_box_result);
       orientation->meta_bound_box = std::move(meta_bound_box);
     }
-    auto tilledResult = orientationSettings.get_bool("requireTilledAnchors", false);
-    if (!tilledResult)
-      return std::unexpected(std::move(tilledResult.error()));
-    auto tilled = std::move(*tilledResult);
-    auto soilResult = orientationSettings.get_bool("requireSoilAnchors", false);
-    if (!soilResult)
-      return std::unexpected(std::move(soilResult.error()));
-    auto soil = std::move(*soilResult);
+    auto tilled_result = orientationSettings.get_bool("requireTilledAnchors", false);
+    if (!tilled_result)
+      return std::unexpected(std::move(tilled_result.error()));
+    auto tilled = std::move(*tilled_result);
+    auto soil_result = orientationSettings.get_bool("requireSoilAnchors", false);
+    if (!soil_result)
+      return std::unexpected(std::move(soil_result.error()));
+    auto soil = std::move(*soil_result);
     std::optional<MaterialId> anchorMaterial;
     auto anchorMaterialNameResult = orientationSettings.opt_string("anchorMaterial");
     if (!anchorMaterialNameResult)
       return std::unexpected(std::move(anchorMaterialNameResult.error()));
     auto anchorMaterialName = std::move(*anchorMaterialNameResult);
     if (anchorMaterialName) {
-      auto materialResult = materialDatabase->materialId(*anchorMaterialName);
-      if (!materialResult)
-        return std::unexpected(std::move(materialResult.error()));
-      auto material = std::move(*materialResult);
+      auto material_result = material_database->material_id(*anchorMaterialName);
+      if (!material_result)
+        return std::unexpected(std::move(material_result.error()));
+      auto material = std::move(*material_result);
       anchorMaterial = material;
     }
     auto anchorsResult = orientationSettings.get_array("anchors", JsonArray());
@@ -589,10 +589,10 @@ std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> ObjectDat
         if (!spacePositionResult)
           return std::unexpected(std::move(spacePositionResult.error()));
         auto spacePosition = std::move(*spacePositionResult);
-        auto materialResult = materialDatabase->materialId(materialName);
-        if (!materialResult)
-          return std::unexpected(std::move(materialResult.error()));
-        auto material = std::move(*materialResult);
+        auto material_result = material_database->material_id(materialName);
+        if (!material_result)
+          return std::unexpected(std::move(material_result.error()));
+        auto material = std::move(*material_result);
         orientation->materialSpaces.push_back({spacePosition, material});
       }
     } else if (collisionType == "solid" || collisionType == "platform") {

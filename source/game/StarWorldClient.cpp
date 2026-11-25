@@ -1541,10 +1541,10 @@ void WorldClient::setCollisionDebug(bool collisionDebug) {
 
 std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::shared_ptr<Packet>> const& packets) {
   auto& root = this->root();
-  auto result90 = root.materialDatabase();
+  auto result90 = root.material_database();
   if (!result90)
     return std::unexpected(std::move(result90.error()));
-  auto materialDatabase = (std::move(*result90));
+  auto material_database = (std::move(*result90));
   auto result91 = root.itemDatabase();
   if (!result91)
     return std::unexpected(std::move(result91.error()));
@@ -1755,7 +1755,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         
         if (!m_headless) {
           if (std::holds_alternative<PlaceMaterial>(modification.second)) {
-            auto result116 = materialDatabase->materialItemDrop(std::get<PlaceMaterial>(modification.second).material);
+            auto result116 = material_database->material_item_drop(std::get<PlaceMaterial>(modification.second).material);
             if (!result116)
               return std::unexpected(std::move(result116.error()));
             auto stack = (std::move(*result116));
@@ -1766,7 +1766,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
             if (!result118)
               return std::unexpected(std::move(result118.error()));
           } else if (std::holds_alternative<PlaceMod>(modification.second)) {
-            auto result119 = materialDatabase->modItemDrop(std::get<PlaceMod>(modification.second).mod);
+            auto result119 = material_database->mod_item_drop(std::get<PlaceMod>(modification.second).mod);
             if (!result119)
               return std::unexpected(std::move(result119.error()));
             auto stack = (std::move(*result119));
@@ -2993,10 +2993,10 @@ std::expected<void, StarException> WorldClient::sparkDamagedBlocks() {
     return {};
   }
   
-  auto result229 = this->root().materialDatabase();
+  auto result229 = this->root().material_database();
   if (!result229)
     return std::unexpected(std::move(result229.error()));
-  auto materialDatabase = (std::move(*result229));
+  auto material_database = (std::move(*result229));
   
   for (auto pos : m_damagedBlocks.values()) {
     if (auto tile = m_tileArray->modify_tile(pos)) {
@@ -3007,7 +3007,7 @@ std::expected<void, StarException> WorldClient::sparkDamagedBlocks() {
       if (isRealMaterial(tile->get().foreground) && tile->get().foregroundDamage.damage_effect_percentage() - this->root().random().uniform_float() > 0.0f
                 && (this->root().random().uniform_float() < m_blockDamageParticleProbability)) {
         auto particle = m_blockDamageParticle;
-        auto result230 = materialDatabase->materialParticleColor(tile->get().foreground, tile->get().foregroundHueShift);
+        auto result230 = material_database->material_particle_color(tile->get().foreground, tile->get().foregroundHueShift);
         if (!result230)
           return std::unexpected(std::move(result230.error()));
         particle.color = (std::move(*result230));
@@ -3025,7 +3025,7 @@ std::expected<void, StarException> WorldClient::sparkDamagedBlocks() {
       if (isRealMaterial(tile->get().background) && tile->get().backgroundDamage.damage_effect_percentage() - this->root().random().uniform_float() > 0.0f
                 && (this->root().random().uniform_float() < m_blockDamageParticleProbability)) {
         auto particle = m_blockDamageParticle;
-        auto result232 = materialDatabase->materialParticleColor(tile->get().background, tile->get().backgroundHueShift);
+        auto result232 = material_database->material_particle_color(tile->get().background, tile->get().backgroundHueShift);
         if (!result232)
           return std::unexpected(std::move(result232.error()));
         particle.color = (std::move(*result232));
@@ -3092,12 +3092,12 @@ std::expected<void, StarException> gatherClientLightingTiles(CellularLightingCal
       auto& tile = column[y];
       Vec3F light;
       if (tile.foreground != EmptyMaterialId || tile.foregroundMod != NoModId)
-        light += materials.radiantLight(tile.foreground, tile.foregroundMod);
+        light += materials.radiant_light(tile.foreground, tile.foregroundMod);
       if (tile.liquid.liquid != empty_liquid_id && tile.liquid.level != 0.0f)
         light += liquids.radiant_light(tile.liquid);
       if (tile.foregroundLightTransparent) {
         if (tile.background != EmptyMaterialId || tile.backgroundMod != NoModId)
-          light += materials.radiantLight(tile.background, tile.backgroundMod);
+          light += materials.radiant_light(tile.background, tile.backgroundMod);
         if (tile.backgroundLightTransparent && pos[1] + y > undergroundLevel)
           light += environmentLight;
       }
@@ -3149,15 +3149,15 @@ std::expected<void, StarException> WorldClient::lightingTileGather() {
   auto liquids_database = this->root().liquids_database();
   if (!liquids_database)
     return std::unexpected(std::move(liquids_database.error()));
-  auto result235 = this->root().materialDatabase();
+  auto result235 = this->root().material_database();
   if (!result235)
     return std::unexpected(std::move(result235.error()));
-  auto materialDatabase = (std::move(*result235));
+  auto material_database = (std::move(*result235));
 
   auto result236 = this->root().workers();
   if (!result236)
     return std::unexpected(std::move(result236.error()));
-  auto result237 = gatherClientLightingTiles(m_lighting_calculator, *m_tileArray, result236->get(), *materialDatabase,
+  auto result237 = gatherClientLightingTiles(m_lighting_calculator, *m_tileArray, result236->get(), *material_database,
                                              **liquids_database, environmentLight, undergroundLevel);
   if (!result237)
     return std::unexpected(std::move(result237.error()));
@@ -3756,15 +3756,15 @@ std::expected<bool, StarException> WorldClient::read_net_tile(Vec2I const& pos, 
   if (collision_changed)
     WorldImpl::invalidate_collision_cache(*m_tileArray, RectI::with_size(m_geometry.xwrap(pos), {1, 1}));
   
-  auto result298 = this->root().materialDatabase();
+  auto result298 = this->root().material_database();
   if (!result298)
     return std::unexpected(std::move(result298.error()));
-  auto materialDatabase = (std::move(*result298));
-  auto result299 = materialDatabase->backgroundLightTransparent(tile->get().background);
+  auto material_database = (std::move(*result298));
+  auto result299 = material_database->background_light_transparent(tile->get().background);
   if (!result299)
     return std::unexpected(std::move(result299.error()));
   tile->get().backgroundLightTransparent = (std::move(*result299));
-  auto result301 = materialDatabase->foregroundLightTransparent(tile->get().foreground);
+  auto result301 = material_database->foreground_light_transparent(tile->get().foreground);
   if (!result301)
     return std::unexpected(std::move(result301.error()));
   tile->get().foregroundLightTransparent =
@@ -4250,7 +4250,7 @@ std::expected<void, StarException> WorldClient::inform_tile_prediction(Vec2I con
   if (std::holds_alternative<PlaceMaterial>(modification)
       && std::get<PlaceMaterial>(modification).layer == TileLayer::Foreground) {
     auto const& placement = std::get<PlaceMaterial>(modification);
-    auto materials = root().materialDatabase();
+    auto materials = root().material_database();
     if (!materials)
       return std::unexpected(std::move(materials.error()));
     auto behavior = (*materials)->falling_behavior(placement.material);
@@ -4258,7 +4258,7 @@ std::expected<void, StarException> WorldClient::inform_tile_prediction(Vec2I con
       return std::unexpected(std::move(behavior.error()));
     CollisionKind collision;
     if (placement.collisionOverride == TileCollisionOverride::None) {
-      auto kind = (*materials)->materialCollisionKind(placement.material);
+      auto kind = (*materials)->material_collision_kind(placement.material);
       if (!kind)
         return std::unexpected(std::move(kind.error()));
       collision = *kind;

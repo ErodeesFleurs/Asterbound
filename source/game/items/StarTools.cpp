@@ -235,9 +235,9 @@ std::expected<void, StarException> MiningTool::fire(FireMode mode, bool shifting
   if (!ready())
     return {};
 
-  auto materialDatabase = root().materialDatabase();
-  if (!materialDatabase)
-    return std::unexpected(std::move(materialDatabase.error()));
+  auto material_database = root().material_database();
+  if (!material_database)
+    return std::unexpected(std::move(material_database.error()));
 
   if (initialized()) {
     auto itemOwner = owner();
@@ -265,7 +265,7 @@ std::expected<void, StarException> MiningTool::fire(FireMode mode, bool shifting
         return std::unexpected(std::move(aimPosition.error()));
       brushArea = tile_area_brush(radius, *aimPosition, true);
       for (auto pos : brushArea) {
-        auto sound = (*materialDatabase)->miningSound(itemWorld->get().material(pos, layer), itemWorld->get().mod(pos, layer));
+        auto sound = (*material_database)->mining_sound(itemWorld->get().material(pos, layer), itemWorld->get().mod(pos, layer));
         if (!sound)
           return std::unexpected(std::move(sound.error()));
         blockSound = std::move(*sound);
@@ -274,7 +274,7 @@ std::expected<void, StarException> MiningTool::fire(FireMode mode, bool shifting
       }
       if (blockSound.empty()) {
         for (auto pos : brushArea) {
-          auto sound = (*materialDatabase)->footstepSound(itemWorld->get().material(pos, layer), itemWorld->get().mod(pos, layer));
+          auto sound = (*material_database)->footstep_sound(itemWorld->get().material(pos, layer), itemWorld->get().mod(pos, layer));
           if (!sound)
             return std::unexpected(std::move(sound.error()));
           blockSound = std::move(*sound);
@@ -349,13 +349,13 @@ std::expected<void, StarException> MiningTool::fire(FireMode mode, bool shifting
         return std::unexpected(std::move(sound.error()));
       List<Particle> miningParticles;
       for (auto pos : brushArea) {
-        auto miningParticleConfig = (*materialDatabase)->miningParticle(itemWorld->get().material(pos, layer), itemWorld->get().mod(pos, layer));
-        if (!miningParticleConfig)
-          return std::unexpected(std::move(miningParticleConfig.error()));
-        if (*miningParticleConfig) {
-          auto miningParticle = (*miningParticleConfig)->instance();
-          miningParticle.position += Vec2F(pos);
-          miningParticles.push_back(miningParticle);
+        auto mining_particle_config = (*material_database)->mining_particle(itemWorld->get().material(pos, layer), itemWorld->get().mod(pos, layer));
+        if (!mining_particle_config)
+          return std::unexpected(std::move(mining_particle_config.error()));
+        if (*mining_particle_config) {
+          auto mining_particle = (*mining_particle_config)->instance();
+          mining_particle.position += Vec2F(pos);
+          miningParticles.push_back(std::move(mining_particle));
         }
       }
       auto particles = itemOwner->get().addParticles(miningParticles);
@@ -847,10 +847,10 @@ std::expected<void, StarException> BeamMiningTool::fire(FireMode mode, bool shif
   if (!ready())
     return {};
 
-  auto database = root().materialDatabase();
+  auto database = root().material_database();
   if (!database)
     return std::unexpected(std::move(database.error()));
-  auto materialDatabase = *database;
+  auto const& material_database = **database;
   auto worldResult = world();
   if (!worldResult)
     return std::unexpected(std::move(worldResult.error()));
@@ -884,7 +884,7 @@ std::expected<void, StarException> BeamMiningTool::fire(FireMode mode, bool shif
       auto aimPosition = Vec2I(*tileAimPosition);
 
       for (auto pos : brushArea) {
-        auto sound = materialDatabase->miningSound(worldp.material(pos, layer), worldp.mod(pos, layer));
+        auto sound = material_database.mining_sound(worldp.material(pos, layer), worldp.mod(pos, layer));
         if (!sound)
           return std::unexpected(std::move(sound.error()));
         blockSound = std::move(*sound);
@@ -893,7 +893,7 @@ std::expected<void, StarException> BeamMiningTool::fire(FireMode mode, bool shif
       }
       if (blockSound.empty()) {
         for (auto pos : brushArea) {
-          auto sound = materialDatabase->footstepSound(worldp.material(pos, layer), worldp.mod(pos, layer));
+          auto sound = material_database.footstep_sound(worldp.material(pos, layer), worldp.mod(pos, layer));
           if (!sound)
             return std::unexpected(std::move(sound.error()));
           blockSound = std::move(*sound);
@@ -979,13 +979,13 @@ std::expected<void, StarException> BeamMiningTool::fire(FireMode mode, bool shif
         return std::unexpected(std::move(sound.error()));
       List<Particle> miningParticles;
       for (auto pos : brushArea) {
-        auto miningParticleConfig = materialDatabase->miningParticle(worldp.material(pos, layer), worldp.mod(pos, layer));
-        if (!miningParticleConfig)
-          return std::unexpected(std::move(miningParticleConfig.error()));
-        if (*miningParticleConfig) {
-          auto miningParticle = (*miningParticleConfig)->instance();
-          miningParticle.position += Vec2F(pos);
-          miningParticles.push_back(miningParticle);
+        auto mining_particle_config = material_database.mining_particle(worldp.material(pos, layer), worldp.mod(pos, layer));
+        if (!mining_particle_config)
+          return std::unexpected(std::move(mining_particle_config.error()));
+        if (*mining_particle_config) {
+          auto mining_particle = (*mining_particle_config)->instance();
+          mining_particle.position += Vec2F(pos);
+          miningParticles.push_back(std::move(mining_particle));
         }
       }
       auto particles = ownerp.addParticles(miningParticles);

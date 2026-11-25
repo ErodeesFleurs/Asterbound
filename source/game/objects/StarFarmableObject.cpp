@@ -354,31 +354,28 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
       if (!assetsResult)
         return std::unexpected(std::move(assetsResult.error()));
       auto assets = std::move(*assetsResult);
-      auto materialsResult = root().materialDatabase();
-      if (!materialsResult)
-        return std::unexpected(std::move(materialsResult.error()));
-      auto materials = std::move(*materialsResult);
+      auto materials_result = root().material_database();
+      if (!materials_result)
+        return std::unexpected(std::move(materials_result.error()));
+      auto const& materials = **materials_result;
       auto wetToDryModsResult = assets->json("/farming.config:wetToDryMods");
       if (!wetToDryModsResult)
         return std::unexpected(std::move(wetToDryModsResult.error()));
       auto wetToDryMods = std::move(*wetToDryModsResult);
       for (auto const& anchor : orientation->anchors) {
         auto pos = tilePosition() + anchor.position;
-        auto modNameResult = materials->modName(currentWorld.get().mod(pos, anchor.layer));
-        if (!modNameResult)
-          return std::unexpected(std::move(modNameResult.error()));
-        auto modName = std::move(*modNameResult);
-        auto newModResult = wetToDryMods.opt_string(modName.get());
-        if (!newModResult)
-          return std::unexpected(std::move(newModResult.error()));
-        auto newMod = std::move(*newModResult);
-        if (newMod) {
-          auto modResult = materials->modId(*newMod);
-          if (!modResult)
-            return std::unexpected(std::move(modResult.error()));
-          auto mod = std::move(*modResult);
+        auto mod_name = materials.mod_name(currentWorld.get().mod(pos, anchor.layer));
+        if (!mod_name)
+          return std::unexpected(std::move(mod_name.error()));
+        auto new_mod = wetToDryMods.opt_string(mod_name->get());
+        if (!new_mod)
+          return std::unexpected(std::move(new_mod.error()));
+        if (*new_mod) {
+          auto mod = materials.mod_id(**new_mod);
+          if (!mod)
+            return std::unexpected(std::move(mod.error()));
           auto operation12 = currentWorld.get().modifyTile(
-            pos, PlaceMod{.layer = anchor.layer, .mod = mod, .modHueShift = MaterialHue()}, true);
+            pos, PlaceMod{.layer = anchor.layer, .mod = *mod, .modHueShift = MaterialHue()}, true);
           if (!operation12)
             return std::unexpected(std::move(operation12.error()));
         } else {

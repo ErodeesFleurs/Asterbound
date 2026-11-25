@@ -97,7 +97,7 @@ std::expected<BiomePlaceables, StarException> read_placeables(Root& root, Materi
     if (!choice) return std::unexpected(std::move(choice.error()));
     auto name = choice->get().string_ptr();
     if (!name) return std::unexpected(std::move(name.error()));
-    return materials.modId(**name);
+    return materials.mod_id(**name);
   };
   BiomePlaceables result;
   auto grass = pick_mod("grassMod");
@@ -262,7 +262,7 @@ std::expected<WeatherType, StarException> BiomeDatabase::weather_type(String con
 std::expected<std::shared_ptr<Biome>, StarException> BiomeDatabase::create_biome(String const& biome_name, std::uint64_t seed, float vertical_mid_point, float threat_level) const {
   auto config = m_biomes.find(biome_name);
   if (config == m_biomes.end()) return std::unexpected(BiomeException(Star::format("No such biome '{}'", biome_name)));
-  auto materials = m_root.materialDatabase();
+  auto materials = m_root.material_database();
   if (!materials) return std::unexpected(std::move(materials.error()));
   auto parse = [&]() -> std::expected<std::shared_ptr<Biome>, StarException> {
     RandomSource random(seed);
@@ -279,7 +279,7 @@ std::expected<std::shared_ptr<Biome>, StarException> BiomeDatabase::create_biome
     auto main = parameters.opt_string("mainBlock");
     if (!main) return std::unexpected(std::move(main.error()));
     if (*main) {
-      auto value = (*materials)->materialId(**main);
+      auto value = (*materials)->material_id(**main);
       if (!value) return std::unexpected(std::move(value.error()));
       biome->main_block = *value;
     }
@@ -290,14 +290,14 @@ std::expected<std::shared_ptr<Biome>, StarException> BiomeDatabase::create_biome
       for (auto const& entry : **sub_blocks) {
         auto name = entry.string_ptr();
         if (!name) return std::unexpected(std::move(name.error()));
-        auto id = (*materials)->materialId(**name);
+        auto id = (*materials)->material_id(**name);
         if (!id) return std::unexpected(std::move(id.error()));
         biome->sub_blocks.push_back(*id);
       }
     }
     auto ores = visit_ores(m_root, parameters, threat_level,
         [&](String const& name, float density) -> std::expected<void, StarException> {
-          auto id = (*materials)->modId(name);
+          auto id = (*materials)->mod_id(name);
           if (!id) return std::unexpected(std::move(id.error()));
           biome->ores.emplace_back(*id, density);
           return {};

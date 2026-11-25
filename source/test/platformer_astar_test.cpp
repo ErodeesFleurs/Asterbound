@@ -49,9 +49,9 @@ template <platform_world_callback Callback> void with_platform_world(GameTest& f
   ASSERT_TRUE(world->generateRegion(RectI::with_size(origin - Vec2I(20, 16), Vec2I(40, 40))));
   ASSERT_TRUE(world->setDungeonGravity(no_dungeon_id, 60.0f));
   ASSERT_TRUE(world->setDungeonGravity(construction_dungeon_id, 60.0f));
-  auto materials = root.materialDatabase();
+  auto materials = root.material_database();
   ASSERT_TRUE(materials) << materials.error().what();
-  auto dirt = (*materials)->materialId("dirt");
+  auto dirt = (*materials)->material_id("dirt");
   ASSERT_TRUE(dirt) << dirt.error().what();
   auto place = [&](Vec2I position) -> std::expected<void, StarException> {
     auto tile = world->modifyServerTile(position, true);
@@ -138,10 +138,10 @@ void expect_same_path(PlatformerAStar::Path const& actual, PlatformerAStar::Path
 
 std::expected<void, StarException> place_ledge(Root& root, WorldServer& world, Vec2F origin,
                                                TileCollisionOverride collision) {
-  auto materials = root.materialDatabase();
+  auto materials = root.material_database();
   if (!materials)
     return std::unexpected(std::move(materials.error()));
-  auto dirt = (*materials)->materialId("dirt");
+  auto dirt = (*materials)->material_id("dirt");
   if (!dirt)
     return std::unexpected(std::move(dirt.error()));
   for (int x = -8; x <= -6; ++x) {

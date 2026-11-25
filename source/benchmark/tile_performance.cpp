@@ -130,19 +130,19 @@ struct TileFixture {
 };
 
 std::expected<TileFixture, StarException> makeFixture(Root& root) {
-  auto materials = root.materialDatabase();
+  auto materials = root.material_database();
   if (!materials)
     return std::unexpected(std::move(materials.error()));
   auto liquids = root.liquids_database();
   if (!liquids)
     return std::unexpected(std::move(liquids.error()));
-  auto dirt = (*materials)->materialId("dirt");
+  auto dirt = (*materials)->material_id("dirt");
   if (!dirt)
     return std::unexpected(std::move(dirt.error()));
-  auto stone = (*materials)->materialId("cobblestone");
+  auto stone = (*materials)->material_id("cobblestone");
   if (!stone)
     return std::unexpected(std::move(stone.error()));
-  auto grass = (*materials)->modId("grass");
+  auto grass = (*materials)->mod_id("grass");
   if (!grass)
     return std::unexpected(std::move(grass.error()));
   auto water = (*liquids)->liquid_id("water");
@@ -268,7 +268,7 @@ std::expected<void, StarException> validateFixture(Root& root, std::shared_ptr<O
     return std::unexpected(StarException("Liquid-bottom fixture does not distinguish the two geometries"));
   if (!matches)
     return std::unexpected(StarException("Foreground edit left cached liquid geometry stale"));
-  auto materials = root.materialDatabase();
+  auto materials = root.material_database();
   if (!materials)
     return std::unexpected(std::move(materials.error()));
   for (bool damage : {true, false}) {
@@ -284,12 +284,12 @@ std::expected<void, StarException> validateFixture(Root& root, std::shared_ptr<O
       fixture->tile({480, 481}).backgroundDamageType = TileDamageType::Blockish;
     } else {
       std::optional<MaterialId> nonBlock;
-      for (auto const& name : (*materials)->materialNames()) {
-        auto id = (*materials)->materialId(name);
+      for (auto const& name : (*materials)->material_names()) {
+        auto id = (*materials)->material_id(name);
         if (!id) return std::unexpected(std::move(id.error()));
-        auto collision = (*materials)->materialCollisionKind(*id);
+        auto collision = (*materials)->material_collision_kind(*id);
         if (!collision) return std::unexpected(std::move(collision.error()));
-        if (!BlockCollisionSet.contains(*collision) && (*materials)->materialRenderProfile(*id)) {
+        if (!BlockCollisionSet.contains(*collision) && (*materials)->material_render_profile(*id)) {
           nonBlock = *id;
           break;
         }
@@ -319,7 +319,7 @@ std::expected<void, StarException> validateFixture(Root& root, std::shared_ptr<O
   auto pending = (*recovery)->setup(fixture->camera, fixture->data);
   if (!pending) return std::unexpected(std::move(pending.error()));
   MaterialId missing = FirstMetaMaterialId - 1;
-  while ((*materials)->materialCollisionKind(missing)) {
+  while ((*materials)->material_collision_kind(missing)) {
     if (missing == 0)
       return std::unexpected(StarException("Tile fixture found no absent real material"));
     --missing;

@@ -259,9 +259,9 @@ const GameTestRegistration falling_block_world_edges("FallingBlocksWorld", "Unlo
   ASSERT_TRUE(source_tile && *source_tile && target_tile && *target_tile);
   auto& source = (*source_tile)->get();
   auto& target = (*target_tile)->get();
-  auto materials = fixture.root().materialDatabase();
+  auto materials = fixture.root().material_database();
   ASSERT_TRUE(materials);
-  auto sand = (*materials)->materialId("sand");
+  auto sand = (*materials)->material_id("sand");
   ASSERT_TRUE(sand);
   source.foreground = *sand;
   source.foregroundHueShift = 29;
@@ -287,7 +287,7 @@ const GameTestRegistration falling_block_world_edges("FallingBlocksWorld", "Unlo
   EXPECT_EQ(*unavailable, BlockMoveResult::Unchanged);
   EXPECT_EQ(source.foreground, *sand);
   MaterialId missing = 0;
-  while (missing < FirstMetaMaterialId && (*materials)->isValidMaterialId(missing)) ++missing;
+  while (missing < FirstMetaMaterialId && (*materials)->is_valid_material_id(missing)) ++missing;
   ASSERT_LT(missing, FirstMetaMaterialId);
   source.foreground = missing;
   target.foregroundHueShift = 18;
@@ -333,11 +333,11 @@ const GameTestRegistration falling_block_protection("FallingBlocksWorld", "Prote
   target.foreground = EmptyMaterialId;
   world.setTileProtectionEnabled(true);
   ASSERT_TRUE(world.setTileProtection(17, true));
-  auto materials = fixture.root().materialDatabase();
+  auto materials = fixture.root().material_database();
   ASSERT_TRUE(materials);
-  auto sand = (*materials)->materialId("sand");
-  auto grass = (*materials)->modId("grass");
-  auto copper = (*materials)->modId("copper");
+  auto sand = (*materials)->material_id("sand");
+  auto grass = (*materials)->mod_id("grass");
+  auto copper = (*materials)->mod_id("copper");
   ASSERT_TRUE(sand && grass && copper);
   auto drops = [&]() {
     std::multiset<String> names;
@@ -443,10 +443,10 @@ const GameTestRegistration falling_block_partial_drop("FallingBlocksWorld", "Ret
   target.foreground = EmptyMaterialId;
   world.setTileProtectionEnabled(true);
   ASSERT_TRUE(world.setTileProtection(17, true));
-  auto materials = (*root)->materialDatabase();
+  auto materials = (*root)->material_database();
   ASSERT_TRUE(materials);
-  auto sand = (*materials)->materialId("sand");
-  auto copper = (*materials)->modId("copper");
+  auto sand = (*materials)->material_id("sand");
+  auto copper = (*materials)->mod_id("copper");
   ASSERT_TRUE(sand && copper);
   source.foreground = *sand;
   source.foregroundMod = *copper;

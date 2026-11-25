@@ -2096,10 +2096,10 @@ std::expected<LuaCallbacks, StarException> Object::makeObjectCallbacks() {
     return std::unexpected(std::move(operation36.error()));
   auto operation37 = callbacks.register_callback("setMaterialSpaces", [this](std::optional<JsonArray> const& newSpaces) -> std::expected<void, StarException> {
   List<MaterialSpace> spaces;
-  auto materialsResult = root().materialDatabase();
-  if (!materialsResult)
-    return std::unexpected(std::move(materialsResult.error()));
-  auto materials = std::move(*materialsResult);
+  auto materials_result = root().material_database();
+  if (!materials_result)
+    return std::unexpected(std::move(materials_result.error()));
+  auto materials = std::move(*materials_result);
   for (auto const& space : newSpaces.value_or(JsonArray{})) {
     auto positionConfigResult = space.get(0);
     if (!positionConfigResult)
@@ -2113,10 +2113,10 @@ std::expected<LuaCallbacks, StarException> Object::makeObjectCallbacks() {
     if (!nameResult)
       return std::unexpected(std::move(nameResult.error()));
     auto name = std::move(*nameResult);
-    auto materialResult = materials->materialId(name);
-    if (!materialResult)
-      return std::unexpected(std::move(materialResult.error()));
-    auto material = std::move(*materialResult);
+    auto material_result = materials->material_id(name);
+    if (!material_result)
+      return std::unexpected(std::move(material_result.error()));
+    auto material = std::move(*material_result);
     spaces.push_back({position, material});
   }
   m_materialSpaces.set(std::move(spaces));

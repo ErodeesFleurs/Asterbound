@@ -139,10 +139,10 @@ std::expected<Fixture, StarException> prepare_fixture(Root& root, std::shared_pt
   }
   MaterialId floor_material = EmptyMaterialId;
   if (!flying) {
-    auto materials = root.materialDatabase();
+    auto materials = root.material_database();
     if (!materials)
       return std::unexpected(std::move(materials.error()));
-    auto dirt = (*materials)->materialId("dirt");
+    auto dirt = (*materials)->material_id("dirt");
     if (!dirt)
       return std::unexpected(std::move(dirt.error()));
     floor_material = *dirt;

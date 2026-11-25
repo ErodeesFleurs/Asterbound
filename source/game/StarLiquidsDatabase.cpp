@@ -49,7 +49,7 @@ std::expected<void, StarException> load_interactions(
     if (!material_result)
       return std::unexpected(std::move(material_result.error()));
     if (*material_result) {
-      auto material = material_database.materialId(**material_result);
+      auto material = material_database.material_id(**material_result);
       if (!material)
         return std::unexpected(std::move(material.error()));
       settings.interactions.insert_or_assign(*other_id, make_left(*material));

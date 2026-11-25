@@ -160,7 +160,7 @@ private:
 
   [[nodiscard]] std::expected<bool, StarException> produceTerrainPrimitives(HashMap<QuadZLevel, List<RenderPrimitive>>& primitives,
       MaterialPieceResultList& pieces, TerrainLayer terrainLayer, Vec2I const& pos, WorldRenderData const& renderData,
-      std::shared_ptr<Assets const> const& assets, std::shared_ptr<MaterialDatabase const> const& materialDatabase);
+      std::shared_ptr<Assets const> const& assets, MaterialDatabase const& material_database);
   [[nodiscard]] std::expected<void, StarException> produceLiquidPrimitives(HashMap<LiquidId, List<RenderPrimitive>>& primitives, Vec2I const& pos, WorldRenderData const& renderData);
   [[nodiscard]] std::expected<TexturePtr, StarException> setupTexture(std::shared_ptr<Image const> const& image);
 

@@ -345,25 +345,25 @@ TilePainter::getTerrainChunk(WorldRenderData& renderData, Vec2I chunkIndex, Chun
       auto assets = m_root.assets();
       if (!assets)
         return std::unexpected(std::move(assets.error()));
-      auto materialDatabase = m_root.materialDatabase();
-      if (!materialDatabase)
-        return std::unexpected(std::move(materialDatabase.error()));
+      auto material_database = m_root.material_database();
+      if (!material_database)
+        return std::unexpected(std::move(material_database.error()));
       HashMap<TerrainLayer, HashMap<QuadZLevel, List<RenderPrimitive>>> terrainPrimitives;
       // Matching appends to this per-chunk scratch list. Reuse its capacity
-      // across tiles/layers without retaining piece owners beyond this miss.
+      // across tiles/layers; the material catalog owns every borrowed piece.
       MaterialPieceResultList pieces;
 
       RectI tileRange = RectI::with_size(chunkIndex * RenderChunkSize, Vec2I::filled(RenderChunkSize));
       for (int x = tileRange.x_min(); x < tileRange.x_max(); ++x) {
         for (int y = tileRange.y_min(); y < tileRange.y_max(); ++y) {
-          auto foreground = produceTerrainPrimitives(terrainPrimitives[TerrainLayer::Foreground], pieces, TerrainLayer::Foreground, {x, y}, renderData, *assets, *materialDatabase);
+          auto foreground = produceTerrainPrimitives(terrainPrimitives[TerrainLayer::Foreground], pieces, TerrainLayer::Foreground, {x, y}, renderData, *assets, **material_database);
           if (!foreground)
             return std::unexpected(std::move(foreground.error()));
-          auto midground = produceTerrainPrimitives(terrainPrimitives[TerrainLayer::Midground], pieces, TerrainLayer::Midground, {x, y}, renderData, *assets, *materialDatabase);
+          auto midground = produceTerrainPrimitives(terrainPrimitives[TerrainLayer::Midground], pieces, TerrainLayer::Midground, {x, y}, renderData, *assets, **material_database);
           if (!midground)
             return std::unexpected(std::move(midground.error()));
           if (!*foreground && !*midground) {
-            auto background = produceTerrainPrimitives(terrainPrimitives[TerrainLayer::Background], pieces, TerrainLayer::Background, {x, y}, renderData, *assets, *materialDatabase);
+            auto background = produceTerrainPrimitives(terrainPrimitives[TerrainLayer::Background], pieces, TerrainLayer::Background, {x, y}, renderData, *assets, **material_database);
             if (!background)
               return std::unexpected(std::move(background.error()));
           }
@@ -438,7 +438,7 @@ std::expected<TexturePtr, StarException> TilePainter::setupTexture(std::shared_p
 
 std::expected<bool, StarException> TilePainter::produceTerrainPrimitives(HashMap<QuadZLevel, List<RenderPrimitive>>& primitives,
     MaterialPieceResultList& pieces, TerrainLayer terrainLayer, Vec2I const& pos, WorldRenderData const& renderData,
-    std::shared_ptr<Assets const> const& assets, std::shared_ptr<MaterialDatabase const> const& materialDatabase) {
+    std::shared_ptr<Assets const> const& assets, MaterialDatabase const& material_database) {
 
   RenderTile const& tile = getRenderTile(renderData, pos);
 
@@ -474,16 +474,16 @@ std::expected<bool, StarException> TilePainter::produceTerrainPrimitives(HashMap
   }
 
   // render non-block colliding things in the midground
-  auto collisionKind = materialDatabase->materialCollisionKind(material);
-  if (!collisionKind)
-    return std::unexpected(std::move(collisionKind.error()));
-  bool isBlock = BlockCollisionSet.contains(*collisionKind);
+  auto collision_kind = material_database.material_collision_kind(material);
+  if (!collision_kind)
+    return std::unexpected(std::move(collision_kind.error()));
+  bool isBlock = BlockCollisionSet.contains(*collision_kind);
   if (terrainLayer == (isBlock ? TerrainLayer::Midground : TerrainLayer::Foreground))
     return false;
 
-  auto getPieceTexture = [this, &assets](MaterialId material, std::shared_ptr<MaterialRenderPiece const> const& piece, MaterialHue hue, std::optional<std::reference_wrapper<Directives const>> directives, bool mod) -> std::expected<TexturePtr, StarException> {
-    auto cached = m_textureCache.get(MaterialPieceTextureKey(material, piece->pieceId, hue, mod), [&](auto const&) -> std::expected<TexturePtr, StarException> {
-        AssetPath texture = (hue == 0) ? piece->texture : Star::format("{}?hueshift={}", piece->texture, materialHueToDegrees(hue));
+  auto get_piece_texture = [this, &assets](MaterialId material, MaterialRenderPiece const& piece, MaterialHue hue, std::optional<std::reference_wrapper<Directives const>> directives, bool mod) -> std::expected<TexturePtr, StarException> {
+    auto cached = m_textureCache.get(MaterialPieceTextureKey(material, piece.pieceId, hue, mod), [&](auto const&) -> std::expected<TexturePtr, StarException> {
+        AssetPath texture = (hue == 0) ? piece.texture : Star::format("{}?hueshift={}", piece.texture, materialHueToDegrees(hue));
 
         if (directives)
           texture.directives += directives->get();
@@ -498,40 +498,41 @@ std::expected<bool, StarException> TilePainter::produceTerrainPrimitives(HashMap
     return cached->get();
   };
 
-  auto materialRenderProfile = materialDatabase->materialRenderProfile(material);
-  auto modRenderProfile = materialDatabase->modRenderProfile(mod);
+  auto material_profile = material_database.material_render_profile(material);
+  auto mod_profile = material_database.mod_render_profile(mod);
 
-  if (materialRenderProfile) {
-    occlude = materialRenderProfile->occludesBehind;
-    auto materialColorVariant = materialRenderProfile->colorVariants > 0 ? colorVariant % materialRenderProfile->colorVariants : 0;
+  if (material_profile) {
+    auto const& profile = material_profile->get();
+    occlude = profile.occludesBehind;
+    auto material_color_variant = profile.colorVariants > 0 ? colorVariant % profile.colorVariants : 0;
     std::uint32_t variance = static_random_u32(renderData.geometry.xwrap(pos[0]), pos[1], (int)terrainLayer, "main");
-    auto& quadList = primitives[materialZLevel(materialRenderProfile->zLevel, material, materialHue, materialColorVariant)];
+    auto& quadList = primitives[materialZLevel(profile.zLevel, material, materialHue, material_color_variant)];
 
     pieces.clear();
-    auto matching = determineMatchingPieces(pieces, std::ref(occlude), materialDatabase, materialRenderProfile->mainMatchList, renderData, pos,
+    auto matching = determine_matching_pieces(pieces, std::ref(occlude), material_database, profile.mainMatchList, renderData, pos,
         terrainLayer == TerrainLayer::Background ? TileLayer::Background : TileLayer::Foreground, false);
     if (!matching)
       return std::unexpected(std::move(matching.error()));
     std::optional<std::reference_wrapper<Directives const>> directives;
-    if (!materialRenderProfile->colorDirectives.empty()) {
-      auto selected = materialRenderProfile->colorDirectives.wrap(materialColorVariant);
+    if (!profile.colorDirectives.empty()) {
+      auto selected = profile.colorDirectives.wrap(material_color_variant);
       if (!selected)
         return std::unexpected(std::move(selected.error()));
       directives = *selected;
     }
-    for (auto const& piecePair : pieces) {
-      auto texture = getPieceTexture(material, piecePair.first, materialHue, directives, false);
+    for (auto const& piece_pair : pieces) {
+      auto texture = get_piece_texture(material, piece_pair.first.get(), materialHue, directives, false);
       if (!texture)
         return std::unexpected(std::move(texture.error()));
-      auto variant = piecePair.first->variants.find_ref(materialColorVariant);
+      auto variant = piece_pair.first.get().variants.find_ref(material_color_variant);
       if (!variant)
-        variant = piecePair.first->variants.find_ref(0);
+        variant = piece_pair.first.get().variants.find_ref(0);
       if (!variant) continue;
       auto selectedCoords = variant->get().wrap(variance);
       if (!selectedCoords)
         return std::unexpected(std::move(selectedCoords.error()));
       RectF const& textureCoords = selectedCoords->get();
-      RectF worldCoords = RectF::with_size(piecePair.second / tile_pixels + Vec2F(pos), textureCoords.size() / tile_pixels);
+      RectF worldCoords = RectF::with_size(piece_pair.second / tile_pixels + Vec2F(pos), textureCoords.size() / tile_pixels);
       quadList.emplace_back(std::in_place_type_t<RenderQuad>(), std::move(*texture),
           worldCoords  .min(),
           textureCoords.min(),
@@ -545,36 +546,37 @@ std::expected<bool, StarException> TilePainter::produceTerrainPrimitives(HashMap
     }
   }
 
-  if (modRenderProfile) {
-    auto modColorVariant = modRenderProfile->colorVariants > 0 ? colorVariant % modRenderProfile->colorVariants : 0;
+  if (mod_profile) {
+    auto const& profile = mod_profile->get();
+    auto mod_color_variant = profile.colorVariants > 0 ? colorVariant % profile.colorVariants : 0;
     std::uint32_t variance = static_random_u32(renderData.geometry.xwrap(pos[0]), pos[1], (int)terrainLayer, "mod");
-    auto& quadList = primitives[modZLevel(modRenderProfile->zLevel, mod, modHue, modColorVariant)];
+    auto& quadList = primitives[modZLevel(profile.zLevel, mod, modHue, mod_color_variant)];
 
     pieces.clear();
-    auto matching = determineMatchingPieces(pieces, std::ref(occlude), materialDatabase, modRenderProfile->mainMatchList, renderData, pos,
+    auto matching = determine_matching_pieces(pieces, std::ref(occlude), material_database, profile.mainMatchList, renderData, pos,
         terrainLayer == TerrainLayer::Background ? TileLayer::Background : TileLayer::Foreground, true);
     if (!matching)
       return std::unexpected(std::move(matching.error()));
     std::optional<std::reference_wrapper<Directives const>> directives;
-    if (!modRenderProfile->colorDirectives.empty()) {
-      auto selected = modRenderProfile->colorDirectives.wrap(modColorVariant);
+    if (!profile.colorDirectives.empty()) {
+      auto selected = profile.colorDirectives.wrap(mod_color_variant);
       if (!selected)
         return std::unexpected(std::move(selected.error()));
       directives = *selected;
     }
-    for (auto const& piecePair : pieces) {
-      auto texture = getPieceTexture(mod, piecePair.first, modHue, directives, true);
+    for (auto const& piece_pair : pieces) {
+      auto texture = get_piece_texture(mod, piece_pair.first.get(), modHue, directives, true);
       if (!texture)
         return std::unexpected(std::move(texture.error()));
-      auto variant = piecePair.first->variants.find_ref(modColorVariant);
+      auto variant = piece_pair.first.get().variants.find_ref(mod_color_variant);
       if (!variant)
-        variant = piecePair.first->variants.find_ref(0);
+        variant = piece_pair.first.get().variants.find_ref(0);
       if (!variant) continue;
       auto selectedCoords = variant->get().wrap(variance);
       if (!selectedCoords)
         return std::unexpected(std::move(selectedCoords.error()));
       RectF const& textureCoords = selectedCoords->get();
-      RectF worldCoords = RectF::with_size(piecePair.second / tile_pixels + Vec2F(pos), textureCoords.size() / tile_pixels);
+      RectF worldCoords = RectF::with_size(piece_pair.second / tile_pixels + Vec2F(pos), textureCoords.size() / tile_pixels);
       quadList.emplace_back(std::in_place_type_t<RenderQuad>(), std::move(*texture),
           worldCoords.min(), textureCoords.min(),
           Vec2F(worldCoords.x_max(), worldCoords.y_min()), Vec2F(textureCoords.x_max(), textureCoords.y_min()),
@@ -584,15 +586,15 @@ std::expected<bool, StarException> TilePainter::produceTerrainPrimitives(HashMap
     }
   }
 
-  if (materialRenderProfile && damageLevel > 0 && isBlock) {
+  if (material_profile && damageLevel > 0 && isBlock) {
     auto& quadList = primitives[damageZLevel()];
-    auto crackingImage = materialRenderProfile->damageImage(damageLevel, damageType);
-    if (!crackingImage)
-      return std::unexpected(std::move(crackingImage.error()));
+    auto cracking_image = material_profile->get().damageImage(damageLevel, damageType);
+    if (!cracking_image)
+      return std::unexpected(std::move(cracking_image.error()));
 
-    auto cached = m_textureCache.get(AssetTextureKey(crackingImage->get().first),
+    auto cached = m_textureCache.get(AssetTextureKey(cracking_image->get().first),
         [&](auto const&) -> std::expected<TexturePtr, StarException> {
-          auto image = assets->image(crackingImage->get().first);
+          auto image = assets->image(cracking_image->get().first);
           if (!image)
             return std::unexpected(std::move(image.error()));
           return setupTexture(*image);
@@ -603,7 +605,7 @@ std::expected<bool, StarException> TilePainter::produceTerrainPrimitives(HashMap
 
     Vec2F textureSize(texture->size());
     RectF textureCoords = RectF::with_size(Vec2F(), textureSize);
-    RectF worldCoords = RectF::with_size(crackingImage->get().second / tile_pixels + Vec2F(pos), textureCoords.size() / tile_pixels);
+    RectF worldCoords = RectF::with_size(cracking_image->get().second / tile_pixels + Vec2F(pos), textureCoords.size() / tile_pixels);
 
     quadList.emplace_back(std::in_place_type_t<RenderQuad>(), std::move(texture),
         worldCoords.min(), textureCoords.min(),
