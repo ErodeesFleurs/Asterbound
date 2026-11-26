@@ -359,7 +359,7 @@ for (auto const& p : std::move(*result1080))
     {
 auto result1081 = p.second.to_string();
 if (!result1081) return std::unexpected(std::move(result1081.error()));
-m_networkedAnimator->setGlobalTag(p.first, std::move(*result1081));
+m_networkedAnimator->set_global_tag(p.first, std::move(*result1081));
 }
   auto result1082 = configValue("animationPartTags", JsonObject());
 if (!result1082) return std::unexpected(std::move(result1082.error()));
@@ -373,7 +373,7 @@ for (auto const& partPair : std::move(*result1083)) {
     auto result1085 = tagPair.second.to_string();
     if (!result1085)
       return std::unexpected(std::move(result1085.error()));
-    m_networkedAnimator->setPartTag(partPair.first, tagPair.first, std::move(*result1085));
+    m_networkedAnimator->set_part_tag(partPair.first, tagPair.first, std::move(*result1085));
   }
   }
 
@@ -552,7 +552,7 @@ if (!result1247) return std::unexpected(std::move(result1247.error()));
 if (!result1248) return std::unexpected(std::move(result1248.error()));
 auto result1249 = m_scriptComponent.add_callbacks("mcontroller", std::move(*result1248));
 if (!result1249) return std::unexpected(std::move(result1249.error()));
-    auto result1250 = LuaBindings::makeNetworkedAnimatorCallbacks(*m_networkedAnimator);
+    auto result1250 = LuaBindings::make_networked_animator_callbacks(*m_networkedAnimator);
 if (!result1250) return std::unexpected(std::move(result1250.error()));
 auto result1251 = m_scriptComponent.add_callbacks("animator", std::move(*result1250));
 if (!result1251) return std::unexpected(std::move(result1251.error()));
@@ -563,7 +563,7 @@ if (!result1252) return std::unexpected(std::move(result1252.error()));
   }
 
   if (world.isClient()) {
-    auto result1253 = LuaBindings::makeScriptedAnimatorCallbacks(*m_networkedAnimator,
+    auto result1253 = LuaBindings::make_scripted_animator_callbacks(*m_networkedAnimator,
       [this](String const& name, Json const& defaultValue) -> std::expected<Json, StarException> {
         return m_scriptedAnimationParameters.value(name, defaultValue);
       });
@@ -664,7 +664,7 @@ if (!result1200) return std::unexpected(std::move(result1200.error()));
 if (result1200->get().isClient()) {
     auto result1201 = m_networkedAnimator->update(dt, std::ref(m_networkedAnimatorDynamicTarget));
 if (!result1201) return std::unexpected(std::move(result1201.error()));
-    m_networkedAnimatorDynamicTarget.updatePosition(position());
+    m_networkedAnimatorDynamicTarget.update_position(position());
   } else {
     auto result1203 = m_networkedAnimator->update(dt, std::nullopt);
 if (!result1203) return std::unexpected(std::move(result1203.error()));
@@ -780,10 +780,10 @@ std::uint64_t Vehicle::presentation_epoch() const {
 }
 
 std::expected<void, StarException> Vehicle::collectRenderEvents(RenderCallback& renderer) {
-  auto&& result1190 = m_networkedAnimatorDynamicTarget.pullNewAudios();
+  auto&& result1190 = m_networkedAnimatorDynamicTarget.pull_new_audios();
 auto result1191 = renderer.add_audios(std::move(result1190));
 if (!result1191) return std::unexpected(std::move(result1191.error()));
-  auto&& result1192 = m_networkedAnimatorDynamicTarget.pullNewParticles();
+  auto&& result1192 = m_networkedAnimatorDynamicTarget.pull_new_particles();
 auto result1193 = renderer.add_particles(std::move(result1192));
 if (!result1193) return std::unexpected(std::move(result1193.error()));
   auto&& result1196 = m_scriptedAnimator.pull_new_audios();
@@ -797,7 +797,7 @@ if (!result1199) return std::unexpected(std::move(result1199.error()));
 
 std::expected<void, StarException> Vehicle::render(RenderCallback& renderer) {
   auto sample = m_networkedAnimator->sample(renderer.presentation().interpolation());
-  auto result1187 = sample.drawablesWithZLevel(position());
+  auto result1187 = sample.drawables_with_z_level(position());
 if (!result1187) return std::unexpected(std::move(result1187.error()));
 for (auto& drawable : std::move(*result1187)) {
     if (drawable.second < 0.0f)
@@ -845,10 +845,10 @@ std::expected<void, StarException> Vehicle::destroy(std::optional<std::reference
     auto result1177 = m_networkedAnimator->update(0.0, std::ref(m_networkedAnimatorDynamicTarget));
 if (!result1177) return std::unexpected(std::move(result1177.error()));
 
-    auto&& result1178 = m_networkedAnimatorDynamicTarget.pullNewAudios();
+    auto&& result1178 = m_networkedAnimatorDynamicTarget.pull_new_audios();
 auto result1179 = render_callback->get().add_audios(std::move(result1178));
 if (!result1179) return std::unexpected(std::move(result1179.error()));
-    auto&& result1180 = m_networkedAnimatorDynamicTarget.pullNewParticles();
+    auto&& result1180 = m_networkedAnimatorDynamicTarget.pull_new_particles();
 auto result1181 = render_callback->get().add_particles(std::move(result1180));
 if (!result1181) return std::unexpected(std::move(result1181.error()));
   }
@@ -979,7 +979,7 @@ std::expected<InteractAction, StarException> Vehicle::interact(InteractRequest c
     return interact_action_from_script(**result, entityId());
 
   auto distance_squared = [&](LoungePositionConfig const& lounge) -> std::expected<float, StarException> {
-    auto anchor = m_networkedAnimator->partPoint(lounge.part, lounge.partAnchor);
+    auto anchor = m_networkedAnimator->part_point(lounge.part, lounge.partAnchor);
     if (!anchor)
       return std::unexpected(std::move(anchor.error()));
     if (!*anchor)
@@ -1034,10 +1034,10 @@ std::expected<std::shared_ptr<LoungeAnchor const>, StarException> Vehicle::loung
   if (!positionConfig.enabled.get())
     return {};
 
-  auto result1131 = m_networkedAnimator->finalPartTransformation(positionConfig.part);
+  auto result1131 = m_networkedAnimator->final_part_transformation(positionConfig.part);
 if (!result1131) return std::unexpected(std::move(result1131.error()));
 Mat3F partTransformation = std::move(*result1131);
-  auto result1132 = m_networkedAnimator->partProperty(positionConfig.part, positionConfig.partAnchor);
+  auto result1132 = m_networkedAnimator->part_property(positionConfig.part, positionConfig.partAnchor);
 if (!result1132) return std::unexpected(std::move(result1132.error()));
 auto result1133 = json_to_vec2f(std::move(*result1132));
 if (!result1133) return std::unexpected(std::move(result1133.error()));
@@ -1096,7 +1096,7 @@ std::expected<List<PhysicsForceRegion>, StarException> Vehicle::force_regions() 
       continue;
     Vec2F translation = position();
     if (config.attach_to_part) {
-      auto transform = m_networkedAnimator->finalPartTransformation(*config.attach_to_part);
+      auto transform = m_networkedAnimator->final_part_transformation(*config.attach_to_part);
       if (!transform)
         return std::unexpected(std::move(transform.error()));
       translation += transform->transform_point(Vec2F{});
@@ -1114,7 +1114,7 @@ std::expected<List<DamageSource>, StarException> Vehicle::damage_sources() const
       DamageSource damageSource = p.second.damageSource;
 
       if (p.second.attachToPart) {
-        auto result1126 = m_networkedAnimator->finalPartTransformation(p.second.attachToPart.value());
+        auto result1126 = m_networkedAnimator->final_part_transformation(p.second.attachToPart.value());
 if (!result1126) return std::unexpected(std::move(result1126.error()));
 Mat3F partTransformation = std::move(*result1126);
         std::visit([partTransformation](auto& da) {
@@ -1147,7 +1147,7 @@ std::expected<std::optional<PhysicsMovingCollision>, StarException> Vehicle::mov
   PhysicsMovingCollision collision = collisionConfig.movingCollision;
 
   if (collisionConfig.attachToPart) {
-    auto result1125 = m_networkedAnimator->finalPartTransformation(*collisionConfig.attachToPart);
+    auto result1125 = m_networkedAnimator->final_part_transformation(*collisionConfig.attachToPart);
 if (!result1125) return std::unexpected(std::move(result1125.error()));
 Mat3F partTransformation = std::move(*result1125);
 

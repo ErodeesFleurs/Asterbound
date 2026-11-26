@@ -8,6 +8,7 @@ import star.algorithm;
 import star.armor_wearer;
 import star.armors;
 import star.asset_path;
+import star.byte_array;
 import star.assets;
 import star.casting;
 import star.client_context;
@@ -835,6 +836,37 @@ const GameTestRegistration semanticPartSampling(
     EXPECT_NEAR(sampled->get().frame_progress, .4f, 1e-5f);
   });
 
+const GameTestRegistration animator_include_chain(
+  "HumanoidRenderTest", "AnimatorAllowsSharedIncludesAndRejectsCycles", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    if (!fixture.check(bool(directory), "create private include fixture")) return;
+    auto cleanup = make_scope_exit([&] { fixture.check(bool(File::remove_all(*directory)), "remove include fixture"); });
+    auto overlay = File::relative_to(*directory, "assets");
+    if (!fixture.check(bool(File::create_directories(overlay)), "create include asset directory")) return;
+    auto asset = [&](String const& file, String const& contents) {
+      return fixture.check(bool(File::write_file(contents, File::relative_to(overlay, file))), "write animator include");
+    };
+    if (!asset("cycle-a.config", R"({"includes":["cycle-b.config"]})") ||
+        !asset("cycle-b.config", R"({"includes":["cycle-a.config"]})") ||
+        !asset("shared.config", R"({"transformationGroups":{"inherited":{}}})") ||
+        !asset("left.config", R"({"includes":["shared.config"]})") ||
+        !asset("right.config", R"({"includes":["shared.config"]})")) return;
+    auto settings = fixture.rootSettings();
+    settings.assetSources.push_back(overlay);
+    settings.storageDirectory = File::relative_to(*directory, "storage");
+    settings.runtimeConfigFile = {};
+    settings.logDirectory = {};
+    settings.logFile = {};
+    settings.includeUGC = false;
+    auto root = Root::create(std::move(settings));
+    if (!fixture.check(bool(root), "open private include root")) return;
+    auto cyclic = NetworkedAnimator::create(**root, JsonObject{{"version", 1}, {"includes", JsonArray{"cycle-a.config"}}});
+    if (!fixture.check(!cyclic && std::string_view(cyclic.error().what()).contains("/cycle-a.config -> /cycle-b.config -> /cycle-a.config"),
+                       "report the active include chain")) return;
+    auto shared = NetworkedAnimator::create(**root, JsonObject{{"version", 1}, {"includes", JsonArray{"left.config", "right.config"}}});
+    fixture.check(shared && (*shared)->has_transformation_group("inherited"), "shared includes contribute their groups");
+  });
+
 const GameTestRegistration animatorSemanticSampling(
   "HumanoidRenderTest", "AnimatorSampleDrivesGeometryLightsAndScopedOverrides", [](GameTest& fixture) {
     auto config = Json::parse(R"({
@@ -867,29 +899,29 @@ const GameTestRegistration animatorSemanticSampling(
     ASSERT_TRUE(made) << made.error().what();
     auto& animator = **made;
     auto line = Drawable::make_line(Line2F({0, 0}, {1, 0}), 1, Color::palette_white);
-    animator.setPartDrawables("body", {line});
+    animator.set_part_drawables("body", {line});
     NetworkedAnimator::DynamicTarget events;
     ASSERT_TRUE(animator.update(.1f, std::ref(events)));
-    ASSERT_TRUE(animator.translateTransformationGroup("moving", {2, 0}));
-    ASSERT_TRUE(animator.rotateGroup("aim", 1.f));
+    ASSERT_TRUE(animator.translate_transformation_group("moving", {2, 0}));
+    ASSERT_TRUE(animator.rotate_group("aim", 1.f));
     ASSERT_TRUE(animator.update(.25f, std::ref(events)));
-    auto logicalTimer = animator.stateTimer("movement");
+    auto logicalTimer = animator.state_timer("movement");
     ASSERT_TRUE(logicalTimer);
-    animator.setLocalTag("pose", "logical");
+    animator.set_local_tag("pose", "logical");
     for (int repeat = 0; repeat != 3; ++repeat) {
       auto sample = animator.sample(.5f);
       auto other = animator.sample(.1f);
-      auto otherPoint = other.partPoint("body", "testPoint");
+      auto otherPoint = other.part_point("body", "testPoint");
       ASSERT_TRUE(otherPoint);
       ASSERT_TRUE(*otherPoint);
       EXPECT_NEAR((**otherPoint)[0], 1.2f, 1e-5f);
-      auto timer = sample.stateTimer("movement");
+      auto timer = sample.state_timer("movement");
       ASSERT_TRUE(timer);
       EXPECT_NEAR(*timer, .225f, 1e-5f);
-      auto angle = sample.currentRotationAngle("aim");
+      auto angle = sample.current_rotation_angle("aim");
       ASSERT_TRUE(angle);
       EXPECT_NEAR(*angle, .25f, 1e-5f);
-      auto point = sample.partPoint("body", "testPoint");
+      auto point = sample.part_point("body", "testPoint");
       ASSERT_TRUE(point);
       ASSERT_TRUE(*point);
       EXPECT_NEAR((**point)[0], 2.8f, 1e-5f);
@@ -921,8 +953,8 @@ const GameTestRegistration animatorSemanticSampling(
       check_near((*lights)[2].position[1], -2.f + std::sin(.25f), "rim y uses the inherited pivot");
       check_near((*lights)[2].beam_angle, pi / 6 + .25f, "rim angle includes sampled rotation");
 
-      animator.setZoom(2);
-      animator.setFlipped(true, 1);
+      animator.set_zoom(2);
+      animator.set_flipped(true, 1);
       List<LightSource> appended{beam};
       if (!fixture.check(bool(sample.append_light_sources(appended, translation)), "append flipped sampled lights")
           || !fixture.check(appended.size() == 4u, "three lights were appended"))
@@ -946,21 +978,21 @@ const GameTestRegistration animatorSemanticSampling(
       fixture.check(!appended.empty() && appended[0].position == beam.position, "failed append preserves the original light");
       if (!fixture.check(bool(animator.set_light_active("zBroken", false)), "disable the invalid light"))
         return;
-      animator.setFlipped(false);
-      animator.setZoom(1);
-      ASSERT_TRUE(sample.setLocalState("movement", "stop"));
-      EXPECT_FALSE(sample.setLocalState("movement", "missing"));
-      sample.setLocalTag("pose", "sampled");
-      auto sampledTag = sample.applyPartTags("body", "<pose>");
-      auto otherTag = other.applyPartTags("body", "<pose>");
-      auto logicalTag = animator.applyPartTags("body", "<pose>");
+      animator.set_flipped(false);
+      animator.set_zoom(1);
+      ASSERT_TRUE(sample.set_local_state("movement", "stop"));
+      EXPECT_FALSE(sample.set_local_state("movement", "missing"));
+      sample.set_local_tag("pose", "sampled");
+      auto sampledTag = sample.apply_part_tags("body", "<pose>");
+      auto otherTag = other.apply_part_tags("body", "<pose>");
+      auto logicalTag = animator.apply_part_tags("body", "<pose>");
       ASSERT_TRUE(sampledTag);
       ASSERT_TRUE(otherTag);
       ASSERT_TRUE(logicalTag);
       EXPECT_EQ(*sampledTag, "sampled");
       EXPECT_EQ(*otherTag, "logical");
       EXPECT_EQ(*logicalTag, "logical");
-      ASSERT_TRUE(sample.translateLocalTransformationGroup("moving", {10, 0}));
+      ASSERT_TRUE(sample.translate_local_transformation_group("moving", {10, 0}));
       auto state = sample.state("movement");
       ASSERT_TRUE(state);
       EXPECT_EQ(*state, "stop");
@@ -971,12 +1003,12 @@ const GameTestRegistration animatorSemanticSampling(
         EXPECT_EQ(*inherited, "stop");
         EXPECT_FLOAT_EQ(nested.interpolation(), .5f);
       }
-      auto untouched = other.partPoint("body", "testPoint");
+      auto untouched = other.part_point("body", "testPoint");
       ASSERT_TRUE(untouched);
       ASSERT_TRUE(*untouched);
       EXPECT_NEAR((**untouched)[0], 1.2f, 1e-5f);
       auto logicalState = animator.state("movement");
-      auto logicalLocal = animator.getLocalTransformationGroup("moving");
+      auto logicalLocal = animator.get_local_transformation_group("moving");
       ASSERT_TRUE(logicalState);
       ASSERT_TRUE(logicalLocal);
       EXPECT_EQ(*logicalState, "walk");
@@ -989,20 +1021,20 @@ const GameTestRegistration animatorSemanticSampling(
       EXPECT_TRUE(hidden->empty());
       EXPECT_EQ(untouchedDrawables->size(), 1u);
     }
-    auto timer = animator.stateTimer("movement");
+    auto timer = animator.state_timer("movement");
     ASSERT_TRUE(timer);
     EXPECT_FLOAT_EQ(*timer, *logicalTimer);
     auto state = animator.state("movement");
     ASSERT_TRUE(state);
     EXPECT_EQ(*state, "walk");
-    auto local = animator.getLocalTransformationGroup("moving");
+    auto local = animator.get_local_transformation_group("moving");
     ASSERT_TRUE(local);
     EXPECT_FLOAT_EQ(local->transform_point(Vec2F{})[0], 0);
-    EXPECT_TRUE(events.pullNewAudios().empty());
-    EXPECT_TRUE(events.pullNewParticles().empty());
-    ASSERT_TRUE(animator.rotateGroup("aim", -2.f, true));
+    EXPECT_TRUE(events.pull_new_audios().empty());
+    EXPECT_TRUE(events.pull_new_particles().empty());
+    ASSERT_TRUE(animator.rotate_group("aim", -2.f, true));
     auto sample = animator.sample(0);
-    auto angle = sample.currentRotationAngle("aim");
+    auto angle = sample.current_rotation_angle("aim");
     ASSERT_TRUE(angle);
     EXPECT_FLOAT_EQ(*angle, -2.f);
   });
@@ -1046,7 +1078,7 @@ const GameTestRegistration sampledPartTransformOverrides(
     auto& animator = **made;
     ASSERT_TRUE(animator.update(0, {}));
     auto line = Drawable::make_line(Line2F({0, 0}, {1, 0}), 1, Color::palette_white);
-    animator.setPartDrawables("child", {line});
+    animator.set_part_drawables("child", {line});
     auto expectVec = [](Vec2F const& actual, Vec2F const& expected) {
       EXPECT_NEAR(actual[0], expected[0], 1e-5f);
       EXPECT_NEAR(actual[1], expected[1], 1e-5f);
@@ -1054,8 +1086,8 @@ const GameTestRegistration sampledPartTransformOverrides(
     auto expectPose = [&](NetworkedAnimator::Sample const& view, Mat3F const& parent, Mat3F const& global = Mat3F::identity()) {
       auto child = parent * Mat3F::translation({0, 3});
       // Query the child first so the parent's transformation is also reached recursively.
-      auto childTransform = view.partTransformation("child");
-      auto parentTransform = view.partTransformation("parent");
+      auto childTransform = view.part_transformation("child");
+      auto parentTransform = view.part_transformation("parent");
       ASSERT_TRUE(childTransform);
       ASSERT_TRUE(parentTransform);
       for (auto point : {Vec2F{}, Vec2F{1, 0}, Vec2F{0, 1}}) {
@@ -1063,8 +1095,8 @@ const GameTestRegistration sampledPartTransformOverrides(
         expectVec(parentTransform->transform_point(point), parent.transform_point(point));
       }
       auto final = global * child;
-      auto point = view.partPoint("child", "point");
-      auto poly = view.partPoly("child", "poly");
+      auto point = view.part_point("child", "point");
+      auto poly = view.part_poly("child", "poly");
       auto lights = view.light_sources();
       auto drawables = view.drawables();
       ASSERT_TRUE(point);
@@ -1096,51 +1128,133 @@ const GameTestRegistration sampledPartTransformOverrides(
       expectPose(independent, idle);
       {
         auto shared = sample;
-        ASSERT_TRUE(shared.translateLocalTransformationGroup("moving", {5, 2}));
+        ASSERT_TRUE(shared.translate_local_transformation_group("moving", {5, 2}));
         auto translated = Mat3F::translation({5, 2}) * idle;
         expectPose(sample, translated);
         expectPose(shared, translated);
-        ASSERT_TRUE(shared.rotateLocalTransformationGroup("moving", std::numbers::pi_v<float> / 2));
+        ASSERT_TRUE(shared.rotate_local_transformation_group("moving", std::numbers::pi_v<float> / 2));
         expectPose(sample, Mat3F::rotation(std::numbers::pi_v<float> / 2) * translated);
-        ASSERT_TRUE(shared.resetLocalTransformationGroup("moving"));
+        ASSERT_TRUE(shared.reset_local_transformation_group("moving"));
         expectPose(sample, idle);
-        ASSERT_TRUE(shared.setLocalState("pose", "shifted"));
+        ASSERT_TRUE(shared.set_local_state("pose", "shifted"));
         expectPose(sample, Mat3F::translation({7, 0}));
-        EXPECT_FALSE(shared.setLocalState("pose", "missing"));
-        EXPECT_FALSE(shared.translateLocalTransformationGroup("missing", {5, 2}));
-        EXPECT_FALSE(shared.rotateLocalTransformationGroup("missing", 1));
-        EXPECT_FALSE(shared.resetLocalTransformationGroup("missing"));
-        EXPECT_FALSE(shared.partTransformation("missing"));
+        EXPECT_FALSE(shared.set_local_state("pose", "missing"));
+        EXPECT_FALSE(shared.translate_local_transformation_group("missing", {5, 2}));
+        EXPECT_FALSE(shared.rotate_local_transformation_group("missing", 1));
+        EXPECT_FALSE(shared.reset_local_transformation_group("missing"));
+        EXPECT_FALSE(shared.part_transformation("missing"));
         expectPose(sample, Mat3F::translation({7, 0}));
-        ASSERT_TRUE(shared.setLocalState("pose", "badGroup"));
-        EXPECT_FALSE(sample.partTransformation("child"));
-        ASSERT_TRUE(shared.setLocalState("pose", "badAnchor"));
-        EXPECT_FALSE(sample.partTransformation("child"));
-        ASSERT_TRUE(shared.setLocalState("pose", "idle"));
+        ASSERT_TRUE(shared.set_local_state("pose", "badGroup"));
+        EXPECT_FALSE(sample.part_transformation("child"));
+        ASSERT_TRUE(shared.set_local_state("pose", "badAnchor"));
+        EXPECT_FALSE(sample.part_transformation("child"));
+        ASSERT_TRUE(shared.set_local_state("pose", "idle"));
         expectPose(sample, idle);
       }
       expectPose(independent, idle);
-      auto logical = animator.partTransformation("child");
+      auto logical = animator.part_transformation("child");
       auto logicalState = animator.state("pose");
-      auto logicalGroup = animator.getLocalTransformationGroup("moving");
+      auto logicalGroup = animator.get_local_transformation_group("moving");
       ASSERT_TRUE(logical);
       ASSERT_TRUE(logicalState);
       ASSERT_TRUE(logicalGroup);
       expectVec(logical->transform_point(Vec2F{0, 0}), {3, 3});
       EXPECT_EQ(*logicalState, "idle");
       EXPECT_EQ(*logicalGroup, Mat3F::identity());
-      animator.setZoom(2);
-      animator.setFlipped(true);
+      animator.set_zoom(2);
+      animator.set_flipped(true);
       auto global = Mat3F::scaling(Vec2F{-1, 1}) * Mat3F::scaling(2.f);
       expectPose(sample, idle, global);
       expectPose(independent, idle, global);
-      animator.setFlipped(false);
-      animator.setZoom(1);
+      animator.set_flipped(false);
+      animator.set_zoom(1);
       // Leave both state and local group overrides behind before the slot is reused.
-      ASSERT_TRUE(sample.setLocalState("pose", "shifted"));
-      ASSERT_TRUE(sample.translateLocalTransformationGroup("moving", {20, 0}));
+      ASSERT_TRUE(sample.set_local_state("pose", "shifted"));
+      ASSERT_TRUE(sample.translate_local_transformation_group("moving", {20, 0}));
       expectPose(sample, Mat3F::translation({27, 0}));
     }
+  });
+
+const GameTestRegistration animator_anchor_cycles(
+  "HumanoidRenderTest", "DynamicAnimatorAnchorsDetectOnlyActiveCyclesAndRetry", [](GameTest& fixture) {
+    auto config = Json::parse(R"({
+      "version":1,
+      "animatedParts":{
+        "stateTypes":{"pose":{"default":"idle","states":{
+          "idle":{"frames":1,"cycle":1},
+          "self":{"frames":1,"cycle":1},
+          "looping":{"frames":2,"cycle":1,"mode":"loop"}
+        }}},
+        "parts":{
+          "root":{"properties":{"offset":[3,0]}},
+          "pivot":{"properties":{"offset":[1,0],"anchorPart":"root"},"partStates":{"pose":{
+            "self":{"properties":{"anchorPart":"pivot"}},
+            "looping":{"frameProperties":{"anchorPart":["root","tail"]}}
+          }}},
+          "tail":{"properties":{"offset":[0,2],"anchorPart":"pivot","point":[0,0]}},
+          "sibling":{"properties":{"offset":[0,4],"anchorPart":"pivot"}}
+        }
+      },
+      "lights":{"glow":{"active":true,"position":[0,0],"color":[255,255,255],"anchorPart":"tail"}}
+    })");
+    if (!fixture.check(bool(config), "parse dynamic anchor animation"))
+      return;
+    auto made = NetworkedAnimator::create(fixture.root(), *config);
+    if (!fixture.check(bool(made), "create dynamic anchor animator"))
+      return;
+    auto& animator = **made;
+    auto check_position = [&](std::expected<Mat3F, StarException> const& transform, Vec2F expected, std::string_view context) {
+      if (fixture.check(bool(transform), context))
+        fixture.check(transform->transform_point(Vec2F{}) == expected, "correct anchored position");
+    };
+    {
+      std::optional<NetworkedAnimator::Sample> shared;
+      {
+        auto sample = animator.sample(1.f);
+        shared.emplace(sample);
+        check_position(sample.part_transformation("tail"), {4, 2}, "cache acyclic tail");
+        check_position(sample.part_transformation("sibling"), {4, 4}, "shared parent is not a cycle");
+        if (!fixture.check(shared->set_local_state("pose", "self") == true, "enter self anchor through sample copy"))
+          return;
+        auto failed = sample.part_transformation("tail");
+        fixture.check(!failed && std::string_view(failed.error().what()).contains("tail -> pivot -> pivot"),
+            "self cycle invalidates cached descendant and reports the full path");
+      }
+      auto independent = animator.sample(1.f);
+      check_position(independent.part_transformation("tail"), {4, 2}, "independent sample remains acyclic");
+      auto failed = shared->part_transformation("tail");
+      fixture.check(!failed && std::string_view(failed.error().what()).contains("tail -> pivot -> pivot"),
+          "copied sample keeps its slot after the original is destroyed");
+      if (!fixture.check(shared->set_local_state("pose", "idle") == true, "restore acyclic sampled pose"))
+        return;
+      check_position(shared->part_transformation("tail"), {4, 2}, "same sample retries self cycle successfully");
+    }
+    if (!fixture.check(animator.set_state("pose", "looping") == true, "start frame-driven anchor animation")
+        || !fixture.check(bool(animator.update(.6f, {})), "advance to cyclic frame"))
+      return;
+    auto logical_failed = animator.part_transformation("tail");
+    fixture.check(!logical_failed && std::string_view(logical_failed.error().what()).contains("tail -> pivot -> tail"),
+        "logical frame reports the mutual anchor cycle");
+    {
+      auto previous = animator.sample(.25f);
+      auto cyclic = animator.sample(1.f);
+      check_position(previous.part_transformation("tail"), {4, 2}, "earlier sampled frame is acyclic");
+      auto failed = cyclic.part_point("tail", "point");
+      fixture.check(!failed && std::string_view(failed.error().what()).contains("tail -> pivot -> tail"),
+          "sample point query reports its cyclic frame");
+      auto lights = cyclic.light_sources();
+      fixture.check(!lights && std::string_view(lights.error().what()).contains("tail -> pivot -> tail"),
+          "light query retries and reports the same path");
+      if (!fixture.check(cyclic.set_local_state("pose", "idle") == true, "restore acyclic sampled frame"))
+        return;
+      check_position(cyclic.part_transformation("sibling"), {4, 4}, "valid sibling after sampled cycle");
+      check_position(cyclic.part_transformation("tail"), {4, 2}, "valid descendant after sampled cycle");
+      fixture.check(!animator.part_transformation("tail"), "sample repair does not rewrite logical pose");
+    }
+    if (!fixture.check(animator.set_state("pose", "idle") == true, "restore acyclic logical pose"))
+      return;
+    check_position(animator.part_transformation("tail"), {4, 2}, "same animator retries cycle successfully");
+    check_position(animator.sample(1.f).part_transformation("tail"), {4, 2}, "reused sample slot remains valid");
   });
 
 const GameTestRegistration humanoidSemanticSampling(
@@ -1362,11 +1476,11 @@ const GameTestRegistration arm_rotation_group_order(
     auto& humanoid = **made;
     auto animator = humanoid.networked_animator();
     ASSERT_TRUE(animator);
-    ASSERT_TRUE(animator->get().translateTransformationGroup("before", {2, 3}));
-    ASSERT_TRUE(animator->get().scaleTransformationGroup("after", Vec2F(2, 3)));
+    ASSERT_TRUE(animator->get().translate_transformation_group("before", {2, 3}));
+    ASSERT_TRUE(animator->get().scale_transformation_group("after", Vec2F(2, 3)));
     // The supplied angle replaces each arm's stored transform rather than composing with it.
-    ASSERT_TRUE(animator->get().translateTransformationGroup("frontArmRotation", {100, 0}));
-    ASSERT_TRUE(animator->get().translateTransformationGroup("backArmRotation", {0, 100}));
+    ASSERT_TRUE(animator->get().translate_transformation_group("frontArmRotation", {100, 0}));
+    ASSERT_TRUE(animator->get().translate_transformation_group("backArmRotation", {0, 100}));
 
     constexpr float angle = std::numbers::pi_v<float> / 2;
     auto expect_position = [&](ToolHand hand, Direction facing, Vec2F expected) {
@@ -1392,7 +1506,7 @@ const GameTestRegistration arm_rotation_group_order(
     };
     expect_offset(ToolHand::Primary, Direction::Right, {-3, 5});
     expect_offset(ToolHand::Alt, Direction::Right, {4, 7});
-    ASSERT_TRUE(animator->get().setLocalState("frontArm", "plain"));
+    ASSERT_TRUE(animator->get().set_local_state("frontArm", "plain"));
     expect_offset(ToolHand::Alt, Direction::Right, {7, 7});
     humanoid.set_hand_parameters(ToolHand::Primary, true, 0, 0, true, false, false);
     expect_offset(ToolHand::Primary, Direction::Right, {7, 7});
@@ -1425,13 +1539,13 @@ const GameTestRegistration authoredAnimationGroupSampling(
     for (float alpha : {.25f, .75f, .25f}) {
       auto sample = animator.sample(alpha);
       auto opposite = animator.sample(1.f - alpha);
-      auto otherFrame = opposite.stateFrame("body");
+      auto otherFrame = opposite.state_frame("body");
       ASSERT_TRUE(otherFrame);
       EXPECT_EQ(*otherFrame, alpha < .5f ? 1 : 0);
-      auto frame = sample.stateFrame("body");
+      auto frame = sample.state_frame("body");
       ASSERT_TRUE(frame);
       EXPECT_EQ(*frame, alpha < .5f ? 0 : 1);
-      auto discrete = sample.partPoint("body", "point");
+      auto discrete = sample.part_point("body", "point");
       ASSERT_TRUE(discrete);
       ASSERT_TRUE(*discrete);
       EXPECT_FLOAT_EQ((**discrete)[0], alpha < .5f ? 0 : 8);
@@ -1442,9 +1556,76 @@ const GameTestRegistration authoredAnimationGroupSampling(
     auto logical = animator.group_transformation(std::array{String("discrete")});
     ASSERT_TRUE(logical);
     EXPECT_FLOAT_EQ(logical->transform_point(Vec2F{})[0], 8);
-    auto timer = animator.stateTimer("body");
+    auto timer = animator.state_timer("body");
     ASSERT_TRUE(timer);
     EXPECT_NEAR(*timer, .6f, 1e-5f);
+  });
+
+const GameTestRegistration animator_drawable_cache(
+  "HumanoidRenderTest", "AnimatorDrawableCacheRespectsCenterAndLiteralDirectivesInBothOrders", [](GameTest& fixture) {
+    auto config = Json::parse(R"({
+      "version":1,
+      "animatedParts":{
+        "stateTypes":{"pose":{"default":"center","states":{
+          "center":{"frames":1,"cycle":1},
+          "corner":{"frames":1,"cycle":1,"properties":{"processingDirectives":"?flipy"}},
+          "tagged":{"frames":1,"cycle":1,"properties":{"processingDirectives":"?<frame>"}}
+        }}},
+        "parts":{"sprite":{
+          "properties":{"image":"<sheet>","zLevel":3},
+          "partStates":{"pose":{
+            "center":{"properties":{"centered":true,"processingDirectives":"?flipx"}},
+            "corner":{"properties":{"centered":false}},
+            "tagged":{"properties":{"centered":false}}
+          }}
+        }}
+      }
+    })");
+    if (!GameTest::check(bool(config), "parse animator fixture")) return;
+    auto metadata = fixture.root().image_metadata_database();
+    if (!GameTest::check(bool(metadata), "load image metadata")) return;
+    String const path = "/humanoid/human/malehead.png";
+    auto size = (*metadata)->image_size(AssetPath(path));
+    if (!GameTest::check(bool(size) && (*size)[0] > 0 && (*size)[1] > 0, "load actual sprite dimensions")) return;
+    Vec2F const extent = Vec2F(*size) / static_cast<float>(tile_pixels);
+
+    for (bool center_first : {true, false}) {
+      auto made = NetworkedAnimator::create(fixture.root(), *config);
+      if (!GameTest::check(bool(made), "create animator")) return;
+      auto& animator = **made;
+      animator.set_global_tag("sheet", path);
+      animator.set_local_tag("frame", "flipx");
+      animator.set_part_tag("sprite", "frame", "flipy");
+      auto sample = animator.sample(1);
+      for (bool centered : {center_first, !center_first, center_first}) {
+        if (!GameTest::check(bool(sample.set_local_state("pose", centered ? "center" : "corner")), "switch sample state")) return;
+        auto tags = sample.apply_part_tags("sprite", "<frame>/<frameIndex>/<pose_state>");
+        GameTest::check(bool(tags) && *tags == (centered ? "1/0/center" : "1/0/corner"), "image frame tags use the active frame");
+
+        auto plain = sample.drawables();
+        if (!GameTest::check(bool(plain) && plain->size() == 1 && (*plain)[0].is_image(), "render one sprite")) return;
+        auto layered = sample.drawables_with_z_level();
+        if (!GameTest::check(bool(layered) && layered->size() == 1, "render one sprite with a Z level")) return;
+        auto const& sprite = (*plain)[0];
+        GameTest::check((*layered)[0].first == sprite && (*layered)[0].second == 3.f, "plain and Z output retain the same sprite");
+        auto const& image = sprite.image_part();
+        GameTest::check(AssetPath::join(image.image) == path + (centered ? "?flipx" : "?flipy"),
+            "part and state literal directives survive independently");
+        Vec2F const low = centered ? -extent / 2.f : Vec2F{};
+        GameTest::check(image.transformation.transform_point(Vec2F{}) + sprite.position == low
+            && image.transformation.transform_point(Vec2F(*size)) + sprite.position == low + extent,
+            "both image vertices use the active state's centering");
+      }
+      if (!GameTest::check(bool(sample.set_local_state("pose", "tagged")), "switch to a directive using the frame tag")) return;
+      for (bool remove_local : {false, true}) {
+        if (remove_local)
+          sample.set_local_tag("frame", std::nullopt);
+        auto rendered = sample.drawables();
+        if (!GameTest::check(bool(rendered) && rendered->size() == 1 && (*rendered)[0].is_image(), "render sprite with a tagged directive")) return;
+        GameTest::check(AssetPath::join((*rendered)[0].image_part().image) == path + (remove_local ? "?flipy" : "?flipx"),
+            "directive frame tags follow normal precedence, including sample removal");
+      }
+    }
   });
 
 static void exercise_movement_transitions(Root& root, Json const& config) {
@@ -1463,11 +1644,11 @@ static void exercise_movement_transitions(Root& root, Json const& config) {
     ASSERT_TRUE(model.set_state(Humanoid::Run));
     {
       auto& animator = model.networked_animator().value().get();
-      auto cycle = animator.stateCycle("body", {}).value();
+      auto cycle = animator.state_cycle("body", {}).value();
       ASSERT_TRUE(model.animate(cycle * .26f, {}));
       ASSERT_TRUE(model.animate(cycle * .28f, {}));
-      auto previous = animator.sample(0.f).stateTimer("body").value();
-      auto current = animator.stateTimer("body").value();
+      auto previous = animator.sample(0.f).state_timer("body").value();
+      auto current = animator.state_timer("body").value();
       auto previous_bob = model.bob_y_offset(0.f).value();
       auto current_bob = model.bob_y_offset(1.f).value();
       ASSERT_NE(previous, current);
@@ -1481,9 +1662,9 @@ static void exercise_movement_transitions(Root& root, Json const& config) {
           EXPECT_EQ(model.bob_y_offset(1.f).value(), current_bob);
           for (auto const& type : {String("body"), String("bodyHighPriority")}) {
             EXPECT_EQ(animator.state(type).value(), "run");
-            EXPECT_FALSE(animator.stateReverse(type).value());
-            EXPECT_EQ(animator.sample(0.f).stateTimer(type).value(), previous);
-            EXPECT_EQ(animator.stateTimer(type).value(), current);
+            EXPECT_FALSE(animator.state_reverse(type).value());
+            EXPECT_EQ(animator.sample(0.f).state_timer(type).value(), previous);
+            EXPECT_EQ(animator.state_timer(type).value(), current);
           }
         }
       }
@@ -1495,23 +1676,23 @@ static void exercise_movement_transitions(Root& root, Json const& config) {
                                                        {"stateAnimationsBackwards", JsonObject{{"run", repaired}}}}));
     ASSERT_TRUE(model.load_animation());
     auto& animator = model.networked_animator().value().get();
-    ASSERT_TRUE(animator.setLocalState("body", "run"));
-    ASSERT_TRUE(animator.setLocalState("bodyHighPriority", "run"));
+    ASSERT_TRUE(animator.set_local_state("body", "run"));
+    ASSERT_TRUE(animator.set_local_state("bodyHighPriority", "run"));
     ASSERT_TRUE(model.animate(.05f, {}));
-    auto timer = animator.stateTimer("body").value();
+    auto timer = animator.state_timer("body").value();
     ASSERT_GT(timer, 0.f);
     ASSERT_TRUE(model.set_moving_backwards(true));
-    EXPECT_EQ(animator.stateTimer("body").value(), timer);
-    EXPECT_EQ(animator.stateTimer("bodyHighPriority").value(), 0.f);
+    EXPECT_EQ(animator.state_timer("body").value(), timer);
+    EXPECT_EQ(animator.state_timer("bodyHighPriority").value(), 0.f);
     ASSERT_TRUE(model.animate(.04f, {}));
-    timer = animator.stateTimer("body").value();
-    auto high_timer = animator.stateTimer("bodyHighPriority").value();
+    timer = animator.state_timer("body").value();
+    auto high_timer = animator.state_timer("bodyHighPriority").value();
     ASSERT_GT(high_timer, 0.f);
     ASSERT_TRUE(model.set_moving_backwards(true)); // Same direction never restarts.
-    EXPECT_EQ(animator.stateTimer("bodyHighPriority").value(), high_timer);
+    EXPECT_EQ(animator.state_timer("bodyHighPriority").value(), high_timer);
     ASSERT_TRUE(model.set_state(Humanoid::Jump)); // No backwards group: use forward.
-    EXPECT_EQ(animator.stateTimer("body").value(), timer);
-    EXPECT_EQ(animator.stateTimer("bodyHighPriority").value(), 0.f);
+    EXPECT_EQ(animator.state_timer("body").value(), timer);
+    EXPECT_EQ(animator.state_timer("bodyHighPriority").value(), 0.f);
   }
 }
 
@@ -1571,14 +1752,14 @@ static void exercise_dummy_preview(Root& root, Json const& config) {
     String real_tags;
     String tags_query = "<backCosmetic1Frameset>|<headCosmetic4Frameset>|<helmetMaskDirectives>|<hairFrameset>|<previewProbe>";
     if (animated) {
-      animator->get().setLocalTag("previewProbe", String("real"));
-      real_tags = animator->get().applyPartTags("body", tags_query).value();
+      animator->get().set_local_tag("previewProbe", String("real"));
+      real_tags = animator->get().apply_part_tags("body", tags_query).value();
     }
     auto check_restored = [&] {
       EXPECT_EQ(model.state(), Humanoid::Walk);
       EXPECT_EQ(model.back_armor_frameset(), back->frameset(gender));
       if (animated) // Observe logical tags before a render could repair them.
-        EXPECT_EQ(animator->get().applyPartTags("body", tags_query).value(), real_tags);
+        EXPECT_EQ(animator->get().apply_part_tags("body", tags_query).value(), real_tags);
       EXPECT_EQ(model.render().value(), *real);
     };
     auto preview_a = [&] { return model.render_dummy(gender, std::cref(*head_a), {}, {}, std::cref(*back)); };
@@ -1638,9 +1819,9 @@ const GameTestRegistration emote_transaction(
       ASSERT_TRUE(handle);
       {
         auto& animator = handle->get();
-        auto before = animator.sample(0.f).stateTimer("emote");
-        auto after = animator.stateTimer("emote");
-        auto body = animator.stateTimer("body");
+        auto before = animator.sample(0.f).state_timer("emote");
+        auto after = animator.state_timer("emote");
+        auto body = animator.state_timer("body");
         ASSERT_TRUE(before && after && body);
         EXPECT_GT(*before, 0.f);
         EXPECT_GT(*after, *before);
@@ -1649,9 +1830,9 @@ const GameTestRegistration emote_transaction(
           EXPECT_EQ(model.emote_state(), HumanoidEmote::Laugh);
           EXPECT_EQ(animator.state("emote").value(), "laugh");
           EXPECT_EQ(animator.state("body").value(), "run");
-          EXPECT_EQ(animator.sample(0.f).stateTimer("emote").value(), *before);
-          EXPECT_EQ(animator.stateTimer("emote").value(), *after);
-          EXPECT_EQ(animator.stateTimer("body").value(), *body);
+          EXPECT_EQ(animator.sample(0.f).state_timer("emote").value(), *before);
+          EXPECT_EQ(animator.state_timer("emote").value(), *after);
+          EXPECT_EQ(animator.state_timer("body").value(), *body);
         }
         EXPECT_FALSE(model.set_emote_state(static_cast<HumanoidEmote>(-1)));
       }
@@ -1660,30 +1841,30 @@ const GameTestRegistration emote_transaction(
       ASSERT_TRUE(model.set_humanoid_parameters(JsonObject{{"emoteAnimations", JsonObject{{"happy", repaired}}}}));
       ASSERT_TRUE(model.load_animation());
       auto& animator = model.networked_animator().value().get();
-      ASSERT_TRUE(animator.setLocalState("emote", "laugh"));
+      ASSERT_TRUE(animator.set_local_state("emote", "laugh"));
       ASSERT_TRUE(model.animate(.05f, {}));
-      auto timer = animator.stateTimer("emote").value();
+      auto timer = animator.state_timer("emote").value();
       ASSERT_GT(timer, 0.f);
       ASSERT_TRUE(model.set_emote_state(HumanoidEmote::Happy));
       EXPECT_EQ(model.emote_state(), HumanoidEmote::Happy);
-      EXPECT_EQ(animator.stateTimer("emote").value(), timer); // Authored startNew=false.
+      EXPECT_EQ(animator.state_timer("emote").value(), timer); // Authored startNew=false.
 
       // A late pose error follows both state groups and local transform writes.
       // It must not finish or restart any logical cursor, or clear a transform.
-      ASSERT_TRUE(animator.translateLocalTransformationGroup("headRotation", {2, 3}));
-      auto transform = animator.getLocalTransformationGroup("headRotation").value();
+      ASSERT_TRUE(animator.translate_local_transformation_group("headRotation", {2, 3}));
+      auto transform = animator.get_local_transformation_group("headRotation").value();
       auto arm = animator.parts().get("frontArm");
       ASSERT_TRUE(arm);
       auto& properties = arm->get().part_properties;
       auto center = properties.get("rotationCenter").value().get();
       properties.set("rotationCenter", false);
       EXPECT_FALSE(model.reset_animation());
-      EXPECT_EQ(animator.stateTimer("emote").value(), timer);
-      EXPECT_EQ(animator.getLocalTransformationGroup("headRotation").value(), transform);
+      EXPECT_EQ(animator.state_timer("emote").value(), timer);
+      EXPECT_EQ(animator.get_local_transformation_group("headRotation").value(), transform);
       properties.set("rotationCenter", center);
       ASSERT_TRUE(model.reset_animation());
-      EXPECT_EQ(animator.sample(0.f).stateTimer("emote").value(), 0.f);
-      EXPECT_EQ(animator.stateTimer("emote").value(), 0.f); // Forced restart even for the same state.
+      EXPECT_EQ(animator.sample(0.f).state_timer("emote").value(), 0.f);
+      EXPECT_EQ(animator.state_timer("emote").value(), 0.f); // Forced restart even for the same state.
     }
   });
 
@@ -1736,8 +1917,8 @@ const GameTestRegistration humanoidTickOwnedPose(
     auto animatorRef = humanoid.networked_animator();
     ASSERT_TRUE(animatorRef);
     auto& animator = animatorRef->get();
-    auto logicalHead = animator.getLocalTransformationGroup("headRotation");
-    auto logicalArm = animator.getLocalTransformationGroup("frontArmRotation");
+    auto logicalHead = animator.get_local_transformation_group("headRotation");
+    auto logicalArm = animator.get_local_transformation_group("frontArmRotation");
     ASSERT_TRUE(logicalHead);
     ASSERT_TRUE(logicalArm);
     for (float alpha : {0.f, .5f, 1.f, .5f}) {
@@ -1764,8 +1945,8 @@ const GameTestRegistration humanoidTickOwnedPose(
       }
       auto preservedMouth = humanoid.mouth_offset();
       auto preservedArmor = humanoid.head_armor_offset();
-      auto preservedHead = animator.getLocalTransformationGroup("headRotation");
-      auto preservedArm = animator.getLocalTransformationGroup("frontArmRotation");
+      auto preservedHead = animator.get_local_transformation_group("headRotation");
+      auto preservedArm = animator.get_local_transformation_group("frontArmRotation");
       ASSERT_TRUE(preservedMouth);
       ASSERT_TRUE(preservedArmor);
       ASSERT_TRUE(preservedHead);
@@ -1943,7 +2124,7 @@ const GameTestRegistration humanoid_dance_playback(
         if (animated) {
           auto sample = animator->get().sample(alpha);
           ASSERT_TRUE(model.prepare_animator_pose(sample));
-          EXPECT_EQ(sample.applyPartTags("body", "<bodyDanceFrame>|<frontArmDanceFrame>|<backArmDanceFrame>"),
+          EXPECT_EQ(sample.apply_part_tags("body", "<bodyDanceFrame>|<frontArmDanceFrame>|<backArmDanceFrame>"),
                     first ? String("idle.2|idle.3|rotation?flipx") : String("default|default|default"));
           EXPECT_EQ(sample.state("bodyDance"), first ? String("idle.2") : String("idle"));
           EXPECT_EQ(sample.state("frontArmDance"), first ? String("idle.3") : String("idle"));
@@ -1999,4 +2180,244 @@ const GameTestRegistration humanoid_dance_playback(
       ASSERT_TRUE(stopped);
       check_pose(*stopped, "idle.1", true);
     }
+  });
+
+const GameTestRegistration animator_sound_retry(
+  "HumanoidRenderTest", "AnimatorSoundSwitchesAndSignalOrderSurviveFailedLoads", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    if (!GameTest::check(bool(directory), "create private sound fixture")) return;
+    auto cleanup = make_scope_exit([&] { GameTest::check(bool(File::remove_all(*directory)), "remove sound fixture"); });
+    auto overlay = File::relative_to(*directory, "assets");
+    auto sound_directory = File::relative_to(overlay, "eventprobe");
+    if (!GameTest::check(bool(File::create_directories(sound_directory)), "create sound overlay")) return;
+    auto write_wave = [&](String const& name, std::uint32_t frames) {
+      ByteArray bytes;
+      auto text = [&](std::string_view value) { bytes.append(std::span(value)); };
+      auto little_endian = [&](std::uint32_t value, unsigned width) {
+        for (unsigned i = 0; i < width; ++i)
+          bytes.push_back(static_cast<char>(value >> (8 * i)));
+      };
+      text("RIFF");
+      little_endian(36 + frames * 2, 4);
+      text("WAVEfmt ");
+      little_endian(16, 4);
+      little_endian(1, 2);
+      little_endian(1, 2);
+      little_endian(8000, 4);
+      little_endian(16000, 4);
+      little_endian(2, 2);
+      little_endian(16, 2);
+      text("data");
+      little_endian(frames * 2, 4);
+      for (std::uint32_t frame = 0; frame < frames; ++frame)
+        little_endian(12000, 2);
+      return File::write_file(bytes, File::relative_to(sound_directory, name));
+    };
+    if (!GameTest::check(write_wave("base.wav", 64) && write_wave("long.wav", 128), "write distinct PCM sounds")) return;
+    auto settings = fixture.rootSettings();
+    settings.assetSources.push_back(overlay);
+    settings.assetsSettings.missing_audio.reset();
+    settings.storageDirectory = File::relative_to(*directory, "storage");
+    settings.runtimeConfigFile = {};
+    settings.logDirectory = {};
+    settings.logFile = {};
+    settings.includeUGC = false;
+    auto root = Root::create(std::move(settings));
+    if (!GameTest::check(bool(root), "open private asset root")) return;
+    if (!GameTest::check(bool((*root)->assets()), "warm the asset source before seeding sound randomness")) return;
+
+    auto config = Json::parse(R"({
+      "animatedParts":{"stateTypes":{"motion":{"default":"old","states":{
+        "old":{"properties":{
+          "persistentSound":["base.wav","long.wav"],"immediateSound":["base.wav","long.wav"],
+          "persistentSoundRangeMultiplier":2,"immediateSoundRangeMultiplier":3}},
+        "replacement":{"properties":{
+          "persistentSound":"replacement.wav","immediateSound":"late.wav",
+          "persistentSoundRangeMultiplier":4,"immediateSoundRangeMultiplier":5}},
+        "invalid":{"properties":{"persistentSound":"base.wav","persistentSoundStopTime":"invalid"}}
+      }}}}
+    })");
+    if (!GameTest::check(bool(config), "parse state sound fixture")) return;
+    auto made = NetworkedAnimator::create(**root, *config, "/eventprobe/animator.animation");
+    if (!GameTest::check(bool(made), made ? "load state sound fixture" : made.error().what())) return;
+    auto& animator = **made;
+    NetworkedAnimator::DynamicTarget target;
+    auto tick = [&] { return animator.update(0, std::ref(target)); };
+    auto mix = [&](std::shared_ptr<AudioInstance> const& audio) {
+      Mixer mixer((*root)->logger(), 8000, 1);
+      std::array<std::int16_t, 8> output{};
+      return mixer.play(audio) && mixer.read(output, output.size());
+    };
+    auto& random = (*root)->random();
+    constexpr std::uint64_t seed = 0x534f554e44504f4f;
+    random.seed(seed);
+    RandomService expected(seed);
+    StringList pool{"base.wav", "long.wav"};
+    auto matches = [](std::shared_ptr<AudioInstance> const& audio, String const& selected) {
+      auto total = audio->total_time();
+      return total && std::abs(*total - (selected == "base.wav" ? 64.0 : 128.0) / 8000) < 1e-8;
+    };
+    auto persistent = expected.sample_value(pool);
+    auto immediate = expected.sample_value(pool);
+    if (!GameTest::check(persistent && immediate && tick(), "start both state sounds")) return;
+    auto first = target.pull_new_audios();
+    if (!GameTest::check(first.size() == 2 && first[0]->loops() == -1 && first[1]->loops() == 0 &&
+          first[0]->range_multiplier() == 2 && first[1]->range_multiplier() == 3 &&
+          matches(first[0], *persistent) && matches(first[1], *immediate),
+          "persistent then immediate publish the selected relative files")) return;
+    GameTest::check(random.next_u64() == expected.next_u64(), "initial sound selection uses the original RNG stream");
+    auto stable_persistent = expected.sample_value(pool);
+    auto stable_immediate = expected.sample_value(pool);
+    if (!GameTest::check(stable_persistent && stable_immediate && tick() && target.pull_new_audios().empty(),
+          "unchanged pools do not publish replacements")) return;
+    GameTest::check(random.next_u64() == expected.next_u64(), "stable sound pools still consume the legacy draws");
+
+    if (!GameTest::check(animator.set_state("motion", "replacement") && !tick() &&
+          target.pull_new_audios().empty() && mix(first[0]) && !first[0]->finished(),
+          "failed persistent load keeps the running voice and publishes nothing")) return;
+    if (!GameTest::check(write_wave("replacement.wav", 64) && (*root)->reload() && !tick(),
+          "same state retries persistent but still lacks immediate audio")) return;
+    auto replacement = target.pull_new_audios();
+    if (!GameTest::check(replacement.size() == 1 && replacement[0]->loops() == -1 &&
+          replacement[0]->range_multiplier() == 4 && mix(first[0]) && first[0]->finished(),
+          "committed replacement stops the original once")) return;
+    if (!GameTest::check(!tick() && target.pull_new_audios().empty() &&
+          write_wave("late.wav", 64) && (*root)->reload() && tick(),
+          "unchanged failed immediate sound retries without replaying persistent")) return;
+    auto late = target.pull_new_audios();
+    if (!GameTest::check(late.size() == 1 && late[0]->loops() == 0 && late[0]->range_multiplier() == 5 &&
+          tick() && target.pull_new_audios().empty(),
+          "same immediate identity publishes only after successful preparation")) return;
+    GameTest::check(animator.set_state("motion", "invalid") && !tick() &&
+          target.pull_new_audios().empty() && mix(replacement[0]) && !replacement[0]->finished() &&
+          animator.set_state("motion", "replacement") && tick() && target.pull_new_audios().empty(),
+          "invalid stop-time cannot publish or replace a prepared live voice");
+
+    auto independent = NetworkedAnimator::create(**root, JsonObject{
+      {"sounds", JsonObject{{"voice", JsonArray{"/eventprobe/base.wav"}}}}});
+    if (!GameTest::check(bool(independent), "create independent-only animator")) return;
+    auto& sounds = **independent;
+    NetworkedAnimator::DynamicTarget sound_target;
+    if (!GameTest::check(sounds.play_sound("voice", -1) && sounds.update(0, std::ref(sound_target)),
+          "start existing independent loop")) return;
+    auto existing = sound_target.pull_new_audios();
+    StringList interrupted_pool{"/eventprobe/base.wav", "/eventprobe/missing.wav"};
+    std::optional<std::uint64_t> interrupted_seed;
+    for (std::uint64_t candidate = 1; candidate <= 64; ++candidate) {
+      RandomService probe(candidate);
+      auto first_pick = probe.sample_value(interrupted_pool);
+      auto second_pick = probe.sample_value(interrupted_pool);
+      if (first_pick && second_pick && *first_pick == interrupted_pool.front() && *second_pick == interrupted_pool.back()) {
+        interrupted_seed = candidate;
+        break;
+      }
+    }
+    if (!GameTest::check(existing.size() == 1 && interrupted_seed && sounds.set_sound_pool("voice", interrupted_pool),
+          "choose a stream where the first play works and the next fails")) return;
+    random.seed(*interrupted_seed);
+    if (!GameTest::check(sounds.stop_all_sounds("voice") && sounds.play_sound("voice", -1) &&
+          sounds.play_sound("voice", -1) && sounds.stop_all_sounds("voice") &&
+          sounds.play_sound("voice", -1) && !sounds.update(0, std::ref(sound_target)) &&
+          mix(existing[0]) && existing[0]->finished(),
+          "deliver the stop and play prefix; hold the failed play and suffix")) return;
+    auto prefix = sound_target.pull_new_audios();
+    if (!GameTest::check(prefix.size() == 1 && mix(prefix[0]) && !prefix[0]->finished(),
+          "the successful prefix is published without applying the retained stop")) return;
+    if (!GameTest::check(sounds.set_sound_pool("voice", {"/eventprobe/base.wav"}) &&
+          sounds.play_sound("voice", -1) && sounds.update(0, std::ref(sound_target)),
+          "retry the undelivered signals before the new play")) return;
+    auto played = sound_target.pull_new_audios();
+    if (!GameTest::check(played.size() == 3 && mix(prefix[0]) && prefix[0]->finished() &&
+          mix(played[0]) && played[0]->finished() && mix(played[1]) && !played[1]->finished() &&
+          mix(played[2]) && !played[2]->finished(),
+          "only the voices before the retained stop are stopped, with no duplicate prefix")) return;
+    played[1]->stop();
+    if (!GameTest::check(mix(played[1]) && played[1]->finished(), "finish a still-tracked independent sound")) return;
+    std::weak_ptr<AudioInstance> finished = played[1];
+    played[1].reset();
+    if (!GameTest::check(sounds.set_sound_position("voice", {3, 5}) && sounds.update(0, std::ref(sound_target)),
+          "update the remaining independent voice")) return;
+    sound_target.update_position({7, 11});
+    if (!GameTest::check(finished.expired() && played[2]->position() == Vec2F(10, 16) && sound_target.pull_new_audios().empty(),
+          "position update releases finished voices and still tracks active ones")) return;
+    played[2]->stop();
+    if (!GameTest::check(mix(played[2]) && played[2]->finished(), "finish another independent voice")) return;
+    finished = played[2];
+    played[2].reset();
+    if (!GameTest::check(sounds.play_sound("voice", -1) && sounds.update(0, std::ref(sound_target)),
+          "queue another voice without a position update")) return;
+    GameTest::check(sound_target.pull_new_audios().size() == 1 && finished.expired(),
+        "event-only consumers release finished voices when publishing new audio");
+  });
+
+const GameTestRegistration animator_particle_bursts(
+  "HumanoidRenderTest", "AnimatorParticleBurstsPreserveShuffleOrderAndCheckCycleOverflow", [](GameTest& fixture) {
+    auto config = Json::parse(R"({
+      "particleEmitters":{
+        "picked":{"burstCount":2,"randomSelectCount":2,"particles":[
+          {"particle":{"type":"text","text":"a"}},
+          {"particle":{"type":"text","text":"b"},"count":2},
+          {"particle":{"type":"text","text":"c"}}
+        ]},
+        "silent":{"randomSelectCount":0,"particles":[
+          {"particle":{"type":"text","text":"d"}},
+          {"particle":{"type":"text","text":"e"}}
+        ]}
+      }
+    })");
+    if (!GameTest::check(bool(config), "parse particle burst fixture")) return;
+    auto made = NetworkedAnimator::create(fixture.root(), *config);
+    if (!GameTest::check(bool(made), made ? "load particle burst fixture" : made.error().what())) return;
+    auto& animator = **made;
+    NetworkedAnimator::DynamicTarget target;
+    constexpr std::uint64_t seed = 0x4255525354494458;
+    auto& random = fixture.root().random();
+    random.seed(seed);
+    RandomService expected(seed);
+    std::array<String, 3> ids{"a", "b", "c"};
+    for (unsigned bursts : {2u, 1u}) {
+      for (unsigned i = 0; i < bursts; ++i) {
+        if (!GameTest::check(bool(animator.burst_particle_emitter("picked")), "queue a particle burst")) return;
+      }
+      if (!GameTest::check(animator.burst_particle_emitter("silent") && animator.update(0, std::ref(target)),
+          "deliver accumulated bursts in emitter order")) return;
+      StringList expected_ids;
+      for (unsigned i = 0; i < 2 * bursts; ++i) {
+        auto order = ids;
+        expected.shuffle(order);
+        for (auto const& id : std::span(order).first(2)) {
+          for (unsigned copies = id == "b" ? 2 : 1; copies > 0; --copies) {
+            expected_ids.push_back(id);
+            std::array<float, 11> variance_draws;
+            expected.fill_uniform(variance_draws);
+          }
+        }
+      }
+      std::array<unsigned, 2> silent{0, 1};
+      expected.shuffle(silent);
+      StringList actual_ids;
+      for (auto const& emitted : target.pull_new_particles())
+        actual_ids.push_back(emitted.string);
+      GameTest::check(actual_ids == expected_ids, "each cycle shuffles a fresh authored order and preserves multiplicity");
+      GameTest::check(random.next_u64() == expected.next_u64(), "shuffle including zero picks and particle creation preserve RNG");
+    }
+
+    constexpr unsigned max_cycles = std::numeric_limits<unsigned>::max();
+    if (!GameTest::check(animator.set_particle_emitter_burst_count("picked", max_cycles / 2 + 1) &&
+          animator.burst_particle_emitter("picked") && animator.burst_particle_emitter("picked"),
+          "queue a burst product that would wrap to zero")) return;
+    auto overflow = animator.update(0, std::ref(target));
+    if (!GameTest::check(!overflow && overflow.error().is<NetworkedAnimatorException>() && target.pull_new_particles().empty(),
+          "reject burst product overflow without publishing particles")) return;
+    if (!GameTest::check(animator.set_particle_emitter_active("picked", true) &&
+          animator.set_particle_emitter_burst_count("picked", max_cycles) && animator.burst_particle_emitter("picked"),
+          "queue a burst whose addition to the first timer cycle would wrap")) return;
+    overflow = animator.update(0, std::ref(target));
+    if (!GameTest::check(!overflow && overflow.error().is<NetworkedAnimatorException>() && target.pull_new_particles().empty(),
+          "reject burst plus timer overflow")) return;
+    if (!GameTest::check(animator.set_particle_emitter_active("picked", false) &&
+          animator.set_particle_emitter_burst_count("picked", 1) && animator.burst_particle_emitter("picked") &&
+          animator.update(0, std::ref(target)), "schedule a valid burst after two errors")) return;
+    auto count = target.pull_new_particles().size();
+    GameTest::check(count == 2 || count == 3, "a later valid burst is not affected by a dropped overflow");
   });

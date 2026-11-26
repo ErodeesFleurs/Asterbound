@@ -405,7 +405,7 @@ std::expected<List<Drawable>, StarException> TechController::backDrawables(float
   for (auto const& animator : m_techAnimators.net_elements()) {
     if (animator->isVisible()) {
       auto sample = animator->animator->sample(interpolation);
-      auto pieces = sample.drawablesWithZLevel(m_movement_controller->get().position());
+      auto pieces = sample.drawables_with_z_level(m_movement_controller->get().position());
       if (!pieces)
         return std::unexpected(std::move(pieces.error()));
       for (auto& piece : *pieces) {
@@ -424,7 +424,7 @@ std::expected<List<Drawable>, StarException> TechController::frontDrawables(floa
   for (auto const& animator : m_techAnimators.net_elements()) {
     if (animator->isVisible()) {
       auto sample = animator->animator->sample(interpolation);
-      auto pieces = sample.drawablesWithZLevel(m_movement_controller->get().position());
+      auto pieces = sample.drawables_with_z_level(m_movement_controller->get().position());
       if (!pieces)
         return std::unexpected(std::move(pieces.error()));
       for (auto& piece : *pieces) {
@@ -456,9 +456,9 @@ List<std::shared_ptr<AudioInstance>> TechController::pullNewAudios() {
 
   for (auto const& animator : m_techAnimators.net_elements()) {
     if (animator->isVisible())
-      newAudios.append_range(animator->dynamicTarget.pullNewAudios());
+      newAudios.append_range(animator->dynamicTarget.pull_new_audios());
     else
-      animator->dynamicTarget.pullNewAudios();
+      animator->dynamicTarget.pull_new_audios();
   }
 
   return newAudios;
@@ -469,9 +469,9 @@ List<Particle> TechController::pullNewParticles() {
 
   for (auto const& animator : m_techAnimators.net_elements()) {
     if (animator->isVisible())
-      newParticles.append_range(animator->dynamicTarget.pullNewParticles());
+      newParticles.append_range(animator->dynamicTarget.pull_new_particles());
     else
-      animator->dynamicTarget.pullNewParticles();
+      animator->dynamicTarget.pull_new_particles();
   }
 
   return newParticles;
@@ -562,7 +562,7 @@ std::expected<void, StarException> TechController::TechAnimator::blank_net_delta
 void TechController::TechAnimator::setVisible(bool visible) {
   this->visible.set(visible);
   if (!visible)
-    dynamicTarget.stopAudio();
+    dynamicTarget.stop_audio();
 }
 
 bool TechController::TechAnimator::isVisible() const {
@@ -610,7 +610,7 @@ std::expected<void, StarException> TechController::setupTechModules(List<std::tu
       auto image = entry.second.to_string();
       if (!image)
         return std::unexpected(std::move(image.error()));
-      (*moduleAnimator)->animator->setPartTag(entry.first, "partImage", std::move(*image));
+      (*moduleAnimator)->animator->set_part_tag(entry.first, "partImage", std::move(*image));
     }
     auto& module = m_techModules.emplace_back(m_root);
     module.config = std::move(*config);
@@ -665,7 +665,7 @@ std::expected<void, StarException> TechController::initializeModules() {
       auto animator = m_techAnimators.get_net_element(module.animatorId);
       if (!animator)
         return std::unexpected(std::move(animator.error()));
-      if (auto result = add("animator", LuaBindings::makeNetworkedAnimatorCallbacks(*(*animator)->animator)); !result)
+      if (auto result = add("animator", LuaBindings::make_networked_animator_callbacks(*(*animator)->animator)); !result)
         return std::unexpected(std::move(result.error()));
       if (auto result = add("status", LuaBindings::makeStatusControllerCallbacks(m_statusController->get())); !result)
         return std::unexpected(std::move(result.error()));
@@ -724,7 +724,7 @@ std::expected<void, StarException> TechController::updateAnimators(float dt) {
     if (!updated)
       return std::unexpected(std::move(updated.error()));
     if (dynamicTarget)
-      dynamicTarget->get().updatePosition(m_movement_controller->get().position());
+      dynamicTarget->get().update_position(m_movement_controller->get().position());
   }
   return {};
 }

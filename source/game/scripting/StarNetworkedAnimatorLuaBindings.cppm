@@ -17,14 +17,14 @@ export namespace Star {
 }
 
 export namespace Star::LuaBindings {
-  [[nodiscard]] std::expected<LuaCallbacks, StarException> makeNetworkedAnimatorCallbacks(NetworkedAnimator& networkedAnimator);
+  [[nodiscard]] std::expected<LuaCallbacks, StarException> make_networked_animator_callbacks(NetworkedAnimator& networked_animator);
 
   namespace Detail {
     enum class AnimatorStateCallbackOrder { Networked, Scripted };
-    [[nodiscard]] std::expected<void, StarException> registerAnimatorStateCallbacks(LuaCallbacks& callbacks, NetworkedAnimator& networkedAnimator, AnimatorStateCallbackOrder order);
-    [[nodiscard]] std::expected<void, StarException> registerAnimatorLocalTransformationCallbacks(LuaCallbacks& callbacks, NetworkedAnimator& networkedAnimator);
-    [[nodiscard]] std::expected<void, StarException> registerAnimatorPartQueryCallbacks(LuaCallbacks& callbacks, NetworkedAnimator& networkedAnimator);
-    [[nodiscard]] std::expected<void, StarException> registerAnimatorPlaybackQueryCallbacks(LuaCallbacks& callbacks, NetworkedAnimator& networkedAnimator);
-    [[nodiscard]] std::expected<void, StarException> registerAnimatorDrawableCallbacks(LuaCallbacks& callbacks, NetworkedAnimator& networkedAnimator);
+    [[nodiscard]] std::expected<void, StarException> register_animator_state_callbacks(LuaCallbacks& callbacks, NetworkedAnimator& networked_animator, AnimatorStateCallbackOrder order);
+    [[nodiscard]] std::expected<void, StarException> register_animator_local_transformation_callbacks(LuaCallbacks& callbacks, NetworkedAnimator& networked_animator);
+    [[nodiscard]] std::expected<void, StarException> register_animator_part_query_callbacks(LuaCallbacks& callbacks, NetworkedAnimator& networked_animator);
+    [[nodiscard]] std::expected<void, StarException> register_animator_playback_query_callbacks(LuaCallbacks& callbacks, NetworkedAnimator& networked_animator);
+    [[nodiscard]] std::expected<void, StarException> register_animator_drawable_callbacks(LuaCallbacks& callbacks, NetworkedAnimator& networked_animator);
   }
 }

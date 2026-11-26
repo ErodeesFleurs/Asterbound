@@ -172,6 +172,8 @@ Each scheduler pass performs at most `maxFrameSkip + 1` due simulation ticks. Ba
 
 World presentation samples the previous and current fixed-tick states, normally adding one simulation tick of visual latency without extrapolating gameplay. Entity positions, supported native animation transforms, particles and the camera share the display sample. Pausing displays the current state. World/player replacement, reloads, native teleports and large corrections invalidate presentation history; authored small teleports can call [`mcontroller.resetPresentation()`](lua/movementcontroller.md). Continuous movement must not reset it each tick.
 
+Animator includes may share a common file across branches. A repeated file on the active include chain is a cycle, not a request to silently omit the file. Likewise, `anchorPart` is resolved for the active pose: a shared parent is valid, but a cyclic chain is an error. Image alignment follows the active part's `centered` property even when two states use the same sprite. A literal `processingDirectives` string does not require a tag to take effect.
+
 Presentation alpha is sampled after the synchronous main-thread ImGui backend
 handshake and renderer frame setup, immediately before application draw
 preparation. Waiting for that setup does not freeze the sample at the earlier

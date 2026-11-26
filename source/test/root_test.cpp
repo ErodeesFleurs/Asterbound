@@ -1334,17 +1334,17 @@ const GameTestRegistration signed_broadcast_lifecycle("RootTest", "SignedBroadca
     auto published = player->getSecretPropertyRef(property);
     ASSERT_TRUE(published);
     EXPECT_EQ(published->get(), expected_property);
-    auto legacy = player->effectsAnimator()->globalTag(legacy_tag);
+    auto legacy = player->effectsAnimator()->global_tag(legacy_tag);
     ASSERT_TRUE(legacy);
     EXPECT_EQ(legacy->get(), expected_key);
   };
   ASSERT_NO_FATAL_FAILURE(expect_published());
   ASSERT_TRUE(player->setSecretProperty(property, Json()));
-  player->effectsAnimator()->removeGlobalTag(legacy_tag);
+  player->effectsAnimator()->remove_global_tag(legacy_tag);
   ASSERT_TRUE(world->update(1.0f / 60.0f));
   ASSERT_NO_FATAL_FAILURE(expect_published());
   ASSERT_TRUE(player->setSecretProperty(property, 17));
-  player->effectsAnimator()->setGlobalTag(legacy_tag, "replaced");
+  player->effectsAnimator()->set_global_tag(legacy_tag, "replaced");
   ASSERT_TRUE(world->update(1.0f / 60.0f));
   ASSERT_NO_FATAL_FAILURE(expect_published());
 
@@ -1396,7 +1396,7 @@ const GameTestRegistration signed_broadcast_lifecycle("RootTest", "SignedBroadca
     SCOPED_TRACE(legacy ? "StarExtensions" : "secret broadcast");
     auto publish = [&](String const& public_key) -> std::expected<void, StarException> {
       if (legacy) {
-        player->effectsAnimator()->setGlobalTag(legacy_tag, public_key);
+        player->effectsAnimator()->set_global_tag(legacy_tag, public_key);
         return {};
       }
       return player->setSecretProperty(property, public_key);
@@ -1414,7 +1414,7 @@ const GameTestRegistration signed_broadcast_lifecycle("RootTest", "SignedBroadca
       EXPECT_EQ(received.size(), before + 1);
     }
     if (legacy) {
-      player->effectsAnimator()->removeGlobalTag(legacy_tag);
+      player->effectsAnimator()->remove_global_tag(legacy_tag);
     } else {
       ASSERT_TRUE(player->setSecretProperty(property, Json()));
     }
@@ -3790,9 +3790,9 @@ const GameTestRegistration animatorPartDrawableFirstAdd("AnimatorTest", "PartDra
       ASSERT_TRUE(created) << created.error().what();
       auto animator = std::move(*created);
       auto callbacks = scripted
-          ? LuaBindings::makeScriptedAnimatorCallbacks(*animator,
+          ? LuaBindings::make_scripted_animator_callbacks(*animator,
               [](String const&, Json const& fallback) -> std::expected<Json, StarException> { return fallback; })
-          : LuaBindings::makeNetworkedAnimatorCallbacks(*animator);
+          : LuaBindings::make_networked_animator_callbacks(*animator);
       ASSERT_TRUE(callbacks) << callbacks.error().what();
       auto engine = LuaEngine::create();
       ASSERT_TRUE(engine) << engine.error().what();

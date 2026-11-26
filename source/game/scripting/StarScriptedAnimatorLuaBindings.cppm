@@ -18,5 +18,5 @@ export namespace Star {
 }
 
 export namespace Star::LuaBindings {
-  [[nodiscard]] std::expected<LuaCallbacks, StarException> makeScriptedAnimatorCallbacks(NetworkedAnimator& animator, std::function<std::expected<Json, StarException>(String const&, Json const&)> getParameter);
+  [[nodiscard]] std::expected<LuaCallbacks, StarException> make_scripted_animator_callbacks(NetworkedAnimator& animator, std::function<std::expected<Json, StarException>(String const&, Json const&)> get_parameter);
 }

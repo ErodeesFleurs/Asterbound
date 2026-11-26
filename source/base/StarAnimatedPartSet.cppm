@@ -150,7 +150,7 @@ public:
     };
     struct PartCache {
       ActivePartInformation part;
-      bool dirty = true;
+      std::uint64_t generation = 0;
       // Keys describe discrete sources only; timing and affine interpolation
       // are refreshed whenever this sample is prepared.
       TransformEndpoints transforms;
@@ -163,6 +163,7 @@ public:
     bool logical_reset = false;
     std::vector<StateCache> states;
     std::vector<PartCache> parts;
+    std::uint64_t part_generation = 0;
     std::shared_ptr<JsonObject const> configuration;
     std::uint8_t animator_version = 0;
     std::uint64_t owner_id = 0;
@@ -282,6 +283,7 @@ private:
   };
   SampleIdentity m_sample_identity;
   bool sample_prepared(Sample const& sample) const;
+  static void invalidate_sample_parts(Sample& sample);
   [[nodiscard]] std::expected<std::reference_wrapper<ActiveStateInformation const>, StarException> resolve_state(StateType const& entry, std::optional<std::reference_wrapper<Sample>> sample) const;
   [[nodiscard]] std::expected<std::reference_wrapper<ActivePartInformation const>, StarException> resolve_part(Part const& entry, std::optional<std::reference_wrapper<Sample>> sample) const;
 

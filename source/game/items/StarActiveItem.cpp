@@ -155,7 +155,7 @@ std::expected<std::shared_ptr<ActiveItem>, StarException> ActiveItem::create(Roo
     auto part = pair.second.to_string();
     if (!part)
       return std::unexpected(std::move(part.error()));
-    item->m_itemAnimator->setPartTag(pair.first, "partImage", *part);
+    item->m_itemAnimator->set_part_tag(pair.first, "partImage", *part);
   }
   auto animationParameters = config.get_object("scriptedAnimationParameters", {});
   if (!animationParameters)
@@ -225,7 +225,7 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
       }).and_then([&](LuaCallbacks callbacks) { return m_script.add_callbacks("config", std::move(callbacks)); });
     if (!configCallbacks)
       return std::unexpected(std::move(configCallbacks.error()));
-    auto animatorCallbacks = LuaBindings::makeNetworkedAnimatorCallbacks(*m_itemAnimator).and_then([&](LuaCallbacks callbacks) { return m_script.add_callbacks("animator", std::move(callbacks)); });
+    auto animatorCallbacks = LuaBindings::make_networked_animator_callbacks(*m_itemAnimator).and_then([&](LuaCallbacks callbacks) { return m_script.add_callbacks("animator", std::move(callbacks)); });
     if (!animatorCallbacks)
       return std::unexpected(std::move(animatorCallbacks.error()));
     auto statusCallbacks = LuaBindings::makeStatusControllerCallbacks(owner.statusController()).and_then([&](LuaCallbacks callbacks) { return m_script.add_callbacks("status", std::move(callbacks)); });
@@ -269,7 +269,7 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
       if (!delta)
         return std::unexpected(std::move(delta.error()));
       m_scriptedAnimator.set_update_delta(*delta);
-      auto animationCallbacks = LuaBindings::makeScriptedAnimatorCallbacks(*m_itemAnimator,
+      auto animationCallbacks = LuaBindings::make_scripted_animator_callbacks(*m_itemAnimator,
           [this](String const& name, Json const& defaultValue) -> Json { return m_scriptedAnimationParameters.value(name, defaultValue); })
           .and_then([&](LuaCallbacks callbacks) { return m_scriptedAnimator.add_callbacks("animationConfig", std::move(callbacks)); });
       if (!animationCallbacks)
@@ -328,7 +328,7 @@ std::expected<void, StarException> ActiveItem::uninit() {
         remember(m_scriptedAnimator.remove_callbacks(name));
     }
   }
-  m_itemAnimatorDynamicTarget.stopAudio();
+  m_itemAnimatorDynamicTarget.stop_audio();
   remember(ToolUserItem::uninit());
   m_activeAudio.clear();
   if (error)
@@ -566,7 +566,7 @@ std::optional<Direction> ActiveItem::facingDirection() const {
 
 std::expected<List<Drawable>, StarException> ActiveItem::handDrawables(float interpolation) const {
   auto sample = m_itemAnimator->sample(interpolation);
-  if (m_itemAnimator->constParts().empty()) {
+  if (m_itemAnimator->const_parts().empty()) {
     auto drawables = Item::icon_drawables();
     if (!drawables)
       return std::unexpected(std::move(drawables.error()));
@@ -620,7 +620,7 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> ActiveItem::p
   // say, the shoulder and un-rotated, but it gets a bit weird with Humanoid
   // modifications.
   List<std::shared_ptr<AudioInstance>> result;
-  for (auto& audio : m_itemAnimatorDynamicTarget.pullNewAudios()) {
+  for (auto& audio : m_itemAnimatorDynamicTarget.pull_new_audios()) {
     m_activeAudio[audio] = *audio->position();
     auto itemOwner = owner();
     if (!itemOwner)
@@ -638,7 +638,7 @@ std::expected<List<std::shared_ptr<AudioInstance>>, StarException> ActiveItem::p
 std::expected<List<Particle>, StarException> ActiveItem::pullNewParticles() {
   // Same as pullNewAudios, we translate, rotate, and flip ourselves
   List<Particle> result;
-  for (auto& particle : m_itemAnimatorDynamicTarget.pullNewParticles()) {
+  for (auto& particle : m_itemAnimatorDynamicTarget.pull_new_particles()) {
     auto itemOwner = owner();
     if (!itemOwner)
       return std::unexpected(std::move(itemOwner.error()));

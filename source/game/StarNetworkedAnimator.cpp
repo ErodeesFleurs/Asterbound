@@ -31,6 +31,7 @@ import star.format;
 import star.lexical_cast;
 import star.data_stream_extra;
 import star.game_types;
+import star.net_element_containers;
 
 import star.animated_part_set;
 import star.drawable;
@@ -53,7 +54,7 @@ import star.algorithm;
 namespace Star {
 
 namespace {
-Mat3F sampleAffine(float alpha, Mat3F const& previous, Mat3F const& current) {
+Mat3F sample_affine(float alpha, Mat3F const& previous, Mat3F const& current) {
   if (alpha <= 0)
     return previous;
   if (alpha >= 1)
@@ -65,7 +66,7 @@ Mat3F sampleAffine(float alpha, Mat3F const& previous, Mat3F const& current) {
   return Mat3F(xs * std::cos(xa), xs * std::sin(xa), lerp(alpha, previous[0][2], current[0][2]),
       ys * std::sin(ya), ys * std::cos(ya), lerp(alpha, previous[1][2], current[1][2]), 0, 0, 1);
 }
-auto processTransforms = [](Mat3F mat, Json const& transforms,
+auto process_transforms = [](Mat3F mat, Json const& transforms,
                             JsonObject const& properties) -> std::expected<Mat3F, StarException> {
   auto entries = transforms.iterate_array();
   if (!entries)
@@ -77,10 +78,10 @@ auto processTransforms = [](Mat3F mat, Json const& transforms,
     if (*action == "reset") {
       mat = Mat3F::identity();
     } else if (*action == "translate") {
-      auto offsetJson = v.get_array(1);
-      if (!offsetJson)
-        return std::unexpected(std::move(offsetJson.error()));
-      auto offset = json_to_vec2f(*offsetJson);
+      auto offset_json = v.get_array(1);
+      if (!offset_json)
+        return std::unexpected(std::move(offset_json.error()));
+      auto offset = json_to_vec2f(*offset_json);
       if (!offset)
         return std::unexpected(std::move(offset.error()));
       mat.translate(*offset);
@@ -88,34 +89,34 @@ auto processTransforms = [](Mat3F mat, Json const& transforms,
       auto angle = v.get_float(1);
       if (!angle)
         return std::unexpected(std::move(angle.error()));
-      auto configuredCenter = properties.maybe("rotationCenter");
-      auto defaultCenter =
-        configuredCenter ? configuredCenter->to_array() : std::expected<JsonArray, StarException>(JsonArray{0, 0});
-      if (!defaultCenter)
-        return std::unexpected(std::move(defaultCenter.error()));
-      auto centerJson = v.get_array(2, *defaultCenter);
-      if (!centerJson)
-        return std::unexpected(std::move(centerJson.error()));
-      auto center = json_to_vec2f(*centerJson);
+      auto configured_center = properties.maybe("rotationCenter");
+      auto default_center =
+        configured_center ? configured_center->to_array() : std::expected<JsonArray, StarException>(JsonArray{0, 0});
+      if (!default_center)
+        return std::unexpected(std::move(default_center.error()));
+      auto center_json = v.get_array(2, *default_center);
+      if (!center_json)
+        return std::unexpected(std::move(center_json.error()));
+      auto center = json_to_vec2f(*center_json);
       if (!center)
         return std::unexpected(std::move(center.error()));
       mat.rotate(*action == "rotate" ? *angle : *angle * std::numbers::pi / 180, *center);
     } else if (*action == "scale") {
-      auto scaleJson = v.get_array(1);
-      if (!scaleJson)
-        return std::unexpected(std::move(scaleJson.error()));
-      auto scale = json_to_vec2f(*scaleJson);
+      auto scale_json = v.get_array(1);
+      if (!scale_json)
+        return std::unexpected(std::move(scale_json.error()));
+      auto scale = json_to_vec2f(*scale_json);
       if (!scale)
         return std::unexpected(std::move(scale.error()));
-      auto configuredCenter = properties.maybe("scalingCenter");
-      auto defaultCenter =
-        configuredCenter ? configuredCenter->to_array() : std::expected<JsonArray, StarException>(JsonArray{0, 0});
-      if (!defaultCenter)
-        return std::unexpected(std::move(defaultCenter.error()));
-      auto centerJson = v.get_array(2, *defaultCenter);
-      if (!centerJson)
-        return std::unexpected(std::move(centerJson.error()));
-      auto center = json_to_vec2f(*centerJson);
+      auto configured_center = properties.maybe("scalingCenter");
+      auto default_center =
+        configured_center ? configured_center->to_array() : std::expected<JsonArray, StarException>(JsonArray{0, 0});
+      if (!default_center)
+        return std::unexpected(std::move(default_center.error()));
+      auto center_json = v.get_array(2, *default_center);
+      if (!center_json)
+        return std::unexpected(std::move(center_json.error()));
+      auto center = json_to_vec2f(*center_json);
       if (!center)
         return std::unexpected(std::move(center.error()));
       mat.scale(*scale, *center);
@@ -145,38 +146,48 @@ auto processTransforms = [](Mat3F mat, Json const& transforms,
 };
 }
 
+void NetworkedAnimator::Presentation::invalidate_part_transforms() {
+  // Group and state overrides can change any anchored descendant.
+  if (++pose_generation == 0) {
+    for (auto& part : part_transforms)
+      part.pose_generation = 0;
+    ++pose_generation;
+  }
+}
+
+void NetworkedAnimator::Presentation::invalidate_state() {
+  invalidate_part_transforms();
+  if (++state_generation == 0) {
+    for (auto& group : groups)
+      group.state_generation = 0;
+    ++state_generation;
+  }
+}
+
+NetworkedAnimator::Presentation& NetworkedAnimator::acquire_presentation() const {
+  for (auto& slot : m_presentations) {
+    if (!slot.users)
+      return slot;
+  }
+  return m_presentations.emplace_back();
+}
+
 NetworkedAnimator::Sample::Sample(NetworkedAnimator const& animator, float interpolation)
-  : m_presentation(nullptr), m_animator(animator), m_interpolation(std::clamp(interpolation, 0.f, 1.f)) {
-  for (auto const& slot : animator.m_presentations) {
-    if (!slot->users) {
-      m_presentation = slot.get();
-      break;
-    }
-  }
-  if (!m_presentation) {
-    animator.m_presentations.push_back(std::make_unique<Presentation>());
-    m_presentation = animator.m_presentations.back().get();
-  }
-  auto& presentation = *m_presentation;
-  animator.m_animatedParts.prepare_sample(presentation.parts, m_interpolation);
-  presentation.partTransforms.resize(presentation.parts.parts.size());
-  presentation.invalidatePartTransforms();
-  presentation.groups.resize(animator.m_transformationGroups.size());
-  for (auto&& tag : presentation.tags)
-    tag.second.active = false;
-  for (auto&& drawables : presentation.drawables)
-    drawables.second.active = false;
-  std::size_t index = 0;
-  for (auto const& pair : animator.m_transformationGroups) {
-    auto const& group = pair.second;
-    group.presentationIndex = index;
-    auto& cache = presentation.groups[index++];
-    cache.localTransform = group.localTransform;
-    cache.transform = group.affineTransform();
-    cache.animationDirty = true;
-    if (group.presentationHistory) {
-      cache.transform = sampleAffine(m_interpolation, group.previousTransform, cache.transform);
-      cache.localTransform = sampleAffine(m_interpolation, group.previousLocalTransform, group.localTransform);
+  : m_presentation(animator.acquire_presentation()), m_animator(animator), m_interpolation(std::clamp(interpolation, 0.f, 1.f)) {
+  auto& presentation = m_presentation.get();
+  animator.m_animated_parts.prepare_sample(presentation.parts, m_interpolation);
+  presentation.part_transforms.resize(presentation.parts.parts.size());
+  presentation.groups.resize(animator.m_transformation_groups.size());
+  presentation.invalidate_state();
+  for (auto&& [name, tag] : presentation.tags)
+    tag.active = false;
+  for (auto const& [name, group] : animator.m_transformation_groups) {
+    auto& cache = presentation.groups[group.presentation_index];
+    cache.local_transform = group.local_transform;
+    cache.transform = group.affine_transform();
+    if (group.presentation_history) {
+      cache.transform = sample_affine(m_interpolation, group.previous_transform, cache.transform);
+      cache.local_transform = sample_affine(m_interpolation, group.previous_local_transform, group.local_transform);
     }
   }
   presentation.users = 1;
@@ -184,111 +195,115 @@ NetworkedAnimator::Sample::Sample(NetworkedAnimator const& animator, float inter
 
 NetworkedAnimator::Sample::Sample(Sample const& sample)
   : m_presentation(sample.m_presentation), m_animator(sample.m_animator), m_interpolation(sample.m_interpolation) {
-  ++m_presentation->users;
+  ++m_presentation.get().users;
 }
 
 NetworkedAnimator::Sample::~Sample() {
-  --m_presentation->users;
+  auto& presentation = m_presentation.get();
+  if (--presentation.users == 0) {
+    for (auto&& [name, attachment] : presentation.drawables)
+      attachment = {};
+  }
 }
 
 NetworkedAnimator::Sample NetworkedAnimator::sample(float interpolation) const {
   return Sample(*this, interpolation);
 }
 
-std::expected<String, StarException> NetworkedAnimator::state(String const& stateType) const {
-  return queryState(stateType, nullptr);
+std::expected<String, StarException> NetworkedAnimator::state(String const& state_type) const {
+  return query_state(state_type, std::nullopt);
 }
 
-std::expected<String, StarException> NetworkedAnimator::Sample::state(String const& stateType) const {
-  return m_animator.queryState(stateType, this);
+std::expected<String, StarException> NetworkedAnimator::Sample::state(String const& state_type) const {
+  return m_animator.query_state(state_type, std::cref(*this));
 }
 
-std::expected<int, StarException> NetworkedAnimator::stateFrame(String const& stateType) const {
-  return queryStateFrame(stateType, nullptr);
+std::expected<int, StarException> NetworkedAnimator::state_frame(String const& state_type) const {
+  return query_state_frame(state_type, std::nullopt);
 }
 
-std::expected<int, StarException> NetworkedAnimator::Sample::stateFrame(String const& stateType) const {
-  return m_animator.queryStateFrame(stateType, this);
+std::expected<int, StarException> NetworkedAnimator::Sample::state_frame(String const& state_type) const {
+  return m_animator.query_state_frame(state_type, std::cref(*this));
 }
 
-std::expected<int, StarException> NetworkedAnimator::stateNextFrame(String const& stateType) const {
-  return queryStateNextFrame(stateType, nullptr);
+std::expected<int, StarException> NetworkedAnimator::state_next_frame(String const& state_type) const {
+  return query_state_next_frame(state_type, std::nullopt);
 }
 
-std::expected<int, StarException> NetworkedAnimator::Sample::stateNextFrame(String const& stateType) const {
-  return m_animator.queryStateNextFrame(stateType, this);
+std::expected<int, StarException> NetworkedAnimator::Sample::state_next_frame(String const& state_type) const {
+  return m_animator.query_state_next_frame(state_type, std::cref(*this));
 }
 
-std::expected<float, StarException> NetworkedAnimator::stateFrameProgress(String const& stateType) const {
-  return queryStateFrameProgress(stateType, nullptr);
+std::expected<float, StarException> NetworkedAnimator::state_frame_progress(String const& state_type) const {
+  return query_state_frame_progress(state_type, std::nullopt);
 }
 
-std::expected<float, StarException> NetworkedAnimator::Sample::stateFrameProgress(String const& stateType) const {
-  return m_animator.queryStateFrameProgress(stateType, this);
+std::expected<float, StarException> NetworkedAnimator::Sample::state_frame_progress(String const& state_type) const {
+  return m_animator.query_state_frame_progress(state_type, std::cref(*this));
 }
 
-std::expected<float, StarException> NetworkedAnimator::stateTimer(String const& stateType) const {
-  return queryStateTimer(stateType, nullptr);
+std::expected<float, StarException> NetworkedAnimator::state_timer(String const& state_type) const {
+  return query_state_timer(state_type, std::nullopt);
 }
 
-std::expected<float, StarException> NetworkedAnimator::Sample::stateTimer(String const& stateType) const {
-  return m_animator.queryStateTimer(stateType, this);
+std::expected<float, StarException> NetworkedAnimator::Sample::state_timer(String const& state_type) const {
+  return m_animator.query_state_timer(state_type, std::cref(*this));
 }
 
-std::expected<bool, StarException> NetworkedAnimator::stateReverse(String const& stateType) const {
-  return queryStateReverse(stateType, nullptr);
+std::expected<bool, StarException> NetworkedAnimator::state_reverse(String const& state_type) const {
+  return query_state_reverse(state_type, std::nullopt);
 }
 
-std::expected<bool, StarException> NetworkedAnimator::Sample::stateReverse(String const& stateType) const {
-  return m_animator.queryStateReverse(stateType, this);
+std::expected<bool, StarException> NetworkedAnimator::Sample::state_reverse(String const& state_type) const {
+  return m_animator.query_state_reverse(state_type, std::cref(*this));
 }
 
-std::expected<float, StarException> NetworkedAnimator::stateCycle(String const& stateType, std::optional<String> state) const {
-  return queryStateCycle(stateType, std::move(state), nullptr);
+std::expected<float, StarException> NetworkedAnimator::state_cycle(String const& state_type, std::optional<String> state) const {
+  return query_state_cycle(state_type, std::move(state), std::nullopt);
 }
 
-std::expected<float, StarException> NetworkedAnimator::Sample::stateCycle(String const& stateType, std::optional<String> state) const {
-  return m_animator.queryStateCycle(stateType, std::move(state), this);
+std::expected<float, StarException> NetworkedAnimator::Sample::state_cycle(String const& state_type, std::optional<String> state) const {
+  return m_animator.query_state_cycle(state_type, std::move(state), std::cref(*this));
 }
 
-std::expected<int, StarException> NetworkedAnimator::stateFrames(String const& stateType, std::optional<String> state) const {
-  return queryStateFrames(stateType, std::move(state), nullptr);
+std::expected<int, StarException> NetworkedAnimator::state_frames(String const& state_type, std::optional<String> state) const {
+  return query_state_frames(state_type, std::move(state), std::nullopt);
 }
 
-std::expected<int, StarException> NetworkedAnimator::Sample::stateFrames(String const& stateType, std::optional<String> state) const {
-  return m_animator.queryStateFrames(stateType, std::move(state), this);
+std::expected<int, StarException> NetworkedAnimator::Sample::state_frames(String const& state_type, std::optional<String> state) const {
+  return m_animator.query_state_frames(state_type, std::move(state), std::cref(*this));
 }
 
-std::expected<Json, StarException> NetworkedAnimator::stateProperty(String const& stateType, String const& propertyName, std::optional<String> state, std::optional<int> frame) const {
-  return queryStateProperty(stateType, propertyName, std::move(state), std::move(frame), nullptr);
+std::expected<Json, StarException> NetworkedAnimator::state_property(String const& state_type, String const& property_name, std::optional<String> state, std::optional<int> frame) const {
+  return query_state_property(state_type, property_name, std::move(state), std::move(frame), std::nullopt);
 }
 
-std::expected<Json, StarException> NetworkedAnimator::Sample::stateProperty(String const& stateType, String const& propertyName, std::optional<String> state, std::optional<int> frame) const {
-  return m_animator.queryStateProperty(stateType, propertyName, std::move(state), std::move(frame), this);
+std::expected<Json, StarException> NetworkedAnimator::Sample::state_property(String const& state_type, String const& property_name, std::optional<String> state, std::optional<int> frame) const {
+  return m_animator.query_state_property(state_type, property_name, std::move(state), std::move(frame), std::cref(*this));
 }
 
-std::expected<Json, StarException> NetworkedAnimator::stateNextProperty(String const& stateType, String const& propertyName) const {
-  return queryStateNextProperty(stateType, propertyName, nullptr);
+std::expected<Json, StarException> NetworkedAnimator::state_next_property(String const& state_type, String const& property_name) const {
+  return query_state_next_property(state_type, property_name, std::nullopt);
 }
 
-std::expected<Json, StarException> NetworkedAnimator::Sample::stateNextProperty(String const& stateType, String const& propertyName) const {
-  return m_animator.queryStateNextProperty(stateType, propertyName, this);
+std::expected<Json, StarException> NetworkedAnimator::Sample::state_next_property(String const& state_type, String const& property_name) const {
+  return m_animator.query_state_next_property(state_type, property_name, std::cref(*this));
 }
 
-std::expected<Json, StarException> NetworkedAnimator::partProperty(String const& partName, String const& propertyName, std::optional<String> stateType, std::optional<String> state, std::optional<int> frame) const {
-  return queryPartProperty(partName, propertyName, std::move(stateType), std::move(state), std::move(frame), nullptr);
+std::expected<Json, StarException> NetworkedAnimator::part_property(String const& part_name, String const& property_name, std::optional<String> state_type, std::optional<String> state, std::optional<int> frame) const {
+  return query_part_property(part_name, property_name, std::move(state_type), std::move(state), std::move(frame), std::nullopt);
 }
 
-std::expected<Json, StarException> NetworkedAnimator::Sample::partProperty(String const& partName, String const& propertyName, std::optional<String> stateType, std::optional<String> state, std::optional<int> frame) const {
-  return m_animator.queryPartProperty(partName, propertyName, std::move(stateType), std::move(state), std::move(frame), this);
+std::expected<Json, StarException> NetworkedAnimator::Sample::part_property(String const& part_name, String const& property_name, std::optional<String> state_type, std::optional<String> state, std::optional<int> frame) const {
+  return m_animator.query_part_property(part_name, property_name, std::move(state_type), std::move(state), std::move(frame), std::cref(*this));
 }
 
-std::expected<Json, StarException> NetworkedAnimator::partNextProperty(String const & partName, String const & propertyName) const {
-  return queryPartNextProperty(partName, propertyName, nullptr);
+std::expected<Json, StarException> NetworkedAnimator::part_next_property(String const& part_name, String const& property_name) const {
+  return query_part_next_property(part_name, property_name, std::nullopt);
 }
 
-std::expected<Json, StarException> NetworkedAnimator::Sample::partNextProperty(String const & partName, String const & propertyName) const {
-  return m_animator.queryPartNextProperty(partName, propertyName, this);
+std::expected<Json, StarException> NetworkedAnimator::Sample::part_next_property(String const& part_name, String const& property_name) const {
+  return m_animator.query_part_next_property(part_name, property_name, std::cref(*this));
 }
 
 std::expected<Mat3F, StarException> NetworkedAnimator::group_transformation(std::span<String const> groups) const {
@@ -299,68 +314,68 @@ std::expected<Mat3F, StarException> NetworkedAnimator::Sample::group_transformat
   return m_animator.query_group_transformation(groups, std::cref(*this));
 }
 
-std::expected<Mat3F, StarException> NetworkedAnimator::partTransformation(String const& partName) const {
-  return queryPartTransformation(partName, nullptr);
+std::expected<Mat3F, StarException> NetworkedAnimator::part_transformation(String const& part_name) const {
+  return query_part_transformation(part_name, std::nullopt, std::nullopt);
 }
 
-std::expected<Mat3F, StarException> NetworkedAnimator::Sample::partTransformation(String const& partName) const {
-  return m_animator.queryPartTransformation(partName, this);
+std::expected<Mat3F, StarException> NetworkedAnimator::Sample::part_transformation(String const& part_name) const {
+  return m_animator.query_part_transformation(part_name, std::cref(*this), std::nullopt);
 }
 
-std::expected<Mat3F, StarException> NetworkedAnimator::finalPartTransformation(String const& partName) const {
-  return queryFinalPartTransformation(partName, nullptr);
+std::expected<Mat3F, StarException> NetworkedAnimator::final_part_transformation(String const& part_name) const {
+  return query_final_part_transformation(part_name, std::nullopt);
 }
 
-std::expected<Mat3F, StarException> NetworkedAnimator::Sample::finalPartTransformation(String const& partName) const {
-  return m_animator.queryFinalPartTransformation(partName, this);
+std::expected<Mat3F, StarException> NetworkedAnimator::Sample::final_part_transformation(String const& part_name) const {
+  return m_animator.query_final_part_transformation(part_name, std::cref(*this));
 }
 
-std::expected<std::optional<Vec2F>, StarException> NetworkedAnimator::partPoint(String const& partName, String const& propertyName) const {
-  return queryPartPoint(partName, propertyName, nullptr);
+std::expected<std::optional<Vec2F>, StarException> NetworkedAnimator::part_point(String const& part_name, String const& property_name) const {
+  return query_part_point(part_name, property_name, std::nullopt);
 }
 
-std::expected<std::optional<Vec2F>, StarException> NetworkedAnimator::Sample::partPoint(String const& partName, String const& propertyName) const {
-  return m_animator.queryPartPoint(partName, propertyName, this);
+std::expected<std::optional<Vec2F>, StarException> NetworkedAnimator::Sample::part_point(String const& part_name, String const& property_name) const {
+  return m_animator.query_part_point(part_name, property_name, std::cref(*this));
 }
 
-std::expected<std::optional<PolyF>, StarException> NetworkedAnimator::partPoly(String const& partName, String const& propertyName) const {
-  return queryPartPoly(partName, propertyName, nullptr);
+std::expected<std::optional<PolyF>, StarException> NetworkedAnimator::part_poly(String const& part_name, String const& property_name) const {
+  return query_part_poly(part_name, property_name, std::nullopt);
 }
 
-std::expected<std::optional<PolyF>, StarException> NetworkedAnimator::Sample::partPoly(String const& partName, String const& propertyName) const {
-  return m_animator.queryPartPoly(partName, propertyName, this);
+std::expected<std::optional<PolyF>, StarException> NetworkedAnimator::Sample::part_poly(String const& part_name, String const& property_name) const {
+  return m_animator.query_part_poly(part_name, property_name, std::cref(*this));
 }
 
-std::expected<String, StarException> NetworkedAnimator::applyPartTags(String const& partName, String apply) const {
-  return queryApplyPartTags(partName, std::move(apply), nullptr);
+std::expected<String, StarException> NetworkedAnimator::apply_part_tags(String const& part_name, String apply) const {
+  return query_apply_part_tags(part_name, std::move(apply), std::nullopt);
 }
 
-std::expected<String, StarException> NetworkedAnimator::Sample::applyPartTags(String const& partName, String apply) const {
-  return m_animator.queryApplyPartTags(partName, std::move(apply), this);
+std::expected<String, StarException> NetworkedAnimator::Sample::apply_part_tags(String const& part_name, String apply) const {
+  return m_animator.query_apply_part_tags(part_name, std::move(apply), std::cref(*this));
 }
 
-std::expected<float, StarException> NetworkedAnimator::currentRotationAngle(String const& rotationGroup) const {
-  return queryCurrentRotationAngle(rotationGroup, nullptr);
+std::expected<float, StarException> NetworkedAnimator::current_rotation_angle(String const& rotation_group) const {
+  return query_current_rotation_angle(rotation_group, std::nullopt);
 }
 
-std::expected<float, StarException> NetworkedAnimator::Sample::currentRotationAngle(String const& rotationGroup) const {
-  return m_animator.queryCurrentRotationAngle(rotationGroup, this);
+std::expected<float, StarException> NetworkedAnimator::Sample::current_rotation_angle(String const& rotation_group) const {
+  return m_animator.query_current_rotation_angle(rotation_group, std::cref(*this));
 }
 
 std::expected<List<Drawable>, StarException> NetworkedAnimator::drawables(Vec2F const& translate) const {
-  return queryDrawables(translate, nullptr);
+  return query_drawables(translate, std::nullopt);
 }
 
 std::expected<List<Drawable>, StarException> NetworkedAnimator::Sample::drawables(Vec2F const& translate) const {
-  return m_animator.queryDrawables(translate, this);
+  return m_animator.query_drawables(translate, std::cref(*this));
 }
 
-std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator::drawablesWithZLevel(Vec2F const& translate) const {
-  return queryDrawablesWithZLevel(translate, nullptr);
+std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator::drawables_with_z_level(Vec2F const& translate) const {
+  return query_drawables_with_z_level(translate, std::nullopt);
 }
 
-std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator::Sample::drawablesWithZLevel(Vec2F const& translate) const {
-  return m_animator.queryDrawablesWithZLevel(translate, this);
+std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator::Sample::drawables_with_z_level(Vec2F const& translate) const {
+  return m_animator.query_drawables_with_z_level(translate, std::cref(*this));
 }
 
 std::expected<List<LightSource>, StarException> NetworkedAnimator::light_sources(Vec2F const& translate) const {
@@ -385,283 +400,285 @@ std::expected<void, StarException> NetworkedAnimator::Sample::append_light_sourc
   return m_animator.append_light_sources(lights, translate, std::cref(*this));
 }
 
-std::expected<bool, StarException> NetworkedAnimator::Sample::hasState(String const& type, std::optional<String> const& state) const {
-  return m_animator.hasState(type, state);
+std::expected<bool, StarException> NetworkedAnimator::Sample::has_state(String const& type, std::optional<String> const& state) const {
+  return m_animator.has_state(type, state);
 }
 
-std::expected<bool, StarException> NetworkedAnimator::Sample::setLocalState(String const& type, String const& state, bool startNew, bool reverse) {
-  auto changed = m_animator.m_animatedParts.set_presentation_state(type, state, startNew, reverse, m_presentation->parts);
-  if (changed && *changed) {
-    m_presentation->invalidatePartTransforms();
-    for (auto& group : m_presentation->groups)
-      group.animationDirty = true;
-  }
+std::expected<bool, StarException> NetworkedAnimator::Sample::set_local_state(String const& type, String const& state, bool start_new, bool reverse) {
+  auto& presentation = m_presentation.get();
+  auto changed = m_animator.m_animated_parts.set_presentation_state(type, state, start_new, reverse, presentation.parts);
+  if (changed && *changed)
+    presentation.invalidate_state();
   return changed;
 }
 
-void NetworkedAnimator::Sample::setLocalTag(String name, std::optional<String> value) {
-  m_presentation->tags.set(std::move(name), {true, std::move(value)});
+void NetworkedAnimator::Sample::set_local_tag(String name, std::optional<String> value) {
+  m_presentation.get().tags.set(std::move(name), {true, std::move(value)});
 }
 
 void NetworkedAnimator::Sample::set_part_drawables(String const& name, std::optional<std::reference_wrapper<List<Drawable> const>> drawables) {
-  m_presentation->drawables.set(name, {true, drawables});
+  m_presentation.get().drawables.set(name, {true, drawables});
 }
 
-std::expected<void, StarException> NetworkedAnimator::Sample::resetLocalTransformationGroup(String const& name) {
-  auto group = m_animator.m_transformationGroups.get(name);
+std::expected<void, StarException> NetworkedAnimator::Sample::reset_local_transformation_group(String const& name) {
+  auto group = m_animator.m_transformation_groups.get(name);
   if (!group) return std::unexpected(std::move(group.error()));
-  m_presentation->groups[group->get().presentationIndex].localTransform = Mat3F::identity();
-  m_presentation->invalidatePartTransforms();
+  m_presentation.get().groups[group->get().presentation_index].local_transform = Mat3F::identity();
+  m_presentation.get().invalidate_part_transforms();
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::Sample::rotateLocalTransformationGroup(String const& name, float rotation, Vec2F const& center) {
-  auto group = m_animator.m_transformationGroups.get(name);
+std::expected<void, StarException> NetworkedAnimator::Sample::rotate_local_transformation_group(String const& name, float rotation, Vec2F const& center) {
+  auto group = m_animator.m_transformation_groups.get(name);
   if (!group) return std::unexpected(std::move(group.error()));
-  auto& matrix = m_presentation->groups[group->get().presentationIndex].localTransform;
+  auto& matrix = m_presentation.get().groups[group->get().presentation_index].local_transform;
   matrix = Mat3F::rotation(rotation, center) * matrix;
-  m_presentation->invalidatePartTransforms();
+  m_presentation.get().invalidate_part_transforms();
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::Sample::translateLocalTransformationGroup(String const& name, Vec2F const& translation) {
-  auto group = m_animator.m_transformationGroups.get(name);
+std::expected<void, StarException> NetworkedAnimator::Sample::translate_local_transformation_group(String const& name, Vec2F const& translation) {
+  auto group = m_animator.m_transformation_groups.get(name);
   if (!group) return std::unexpected(std::move(group.error()));
-  auto& matrix = m_presentation->groups[group->get().presentationIndex].localTransform;
+  auto& matrix = m_presentation.get().groups[group->get().presentation_index].local_transform;
   matrix = Mat3F::translation(translation) * matrix;
-  m_presentation->invalidatePartTransforms();
+  m_presentation.get().invalidate_part_transforms();
   return {};
 }
 
-std::expected<Mat3F, StarException> NetworkedAnimator::Sample::getLocalTransformationGroup(String const& name) const {
-  auto group = m_animator.m_transformationGroups.get(name);
+std::expected<Mat3F, StarException> NetworkedAnimator::Sample::get_local_transformation_group(String const& name) const {
+  auto group = m_animator.m_transformation_groups.get(name);
   if (!group) return std::unexpected(std::move(group.error()));
-  return m_presentation->groups[group->get().presentationIndex].localTransform;
+  return m_presentation.get().groups[group->get().presentation_index].local_transform;
 }
 
 NetworkedAnimator::DynamicTarget::~DynamicTarget() {
-  stopAudio();
+  stop_audio();
 }
 
-List<std::shared_ptr<AudioInstance>> NetworkedAnimator::DynamicTarget::pullNewAudios() {
-  pendingAudios.exec([this](std::shared_ptr<AudioInstance> const& ptr) {
-    Vec2F audioBasePosition = ptr->position().value_or(Vec2F{});
-    currentAudioBasePositions[ptr] = audioBasePosition;
-    ptr->set_position(position + audioBasePosition);
-  });
-  return std::exchange(pendingAudios, {});
+List<std::shared_ptr<AudioInstance>> NetworkedAnimator::DynamicTarget::pull_new_audios() {
+  // Position updates normally prune the registries. Event-only consumers can
+  // skip them, so also prune when publishing audio without a position update.
+  if (!std::exchange(positioned_since_audio_pull, false) && !pending_audios.empty() && !current_audio_base_positions.empty())
+    clear_finished_audio();
+  for (auto const& audio : pending_audios) {
+    Vec2F base_position = audio->position().value_or(Vec2F{});
+    current_audio_base_positions[audio] = base_position;
+    audio->set_position(position + base_position);
+  }
+  return std::exchange(pending_audios, {});
 }
 
-List<Particle> NetworkedAnimator::DynamicTarget::pullNewParticles() {
-  pendingParticles.exec([this](Particle& particle) {
+List<Particle> NetworkedAnimator::DynamicTarget::pull_new_particles() {
+  for (auto& particle : pending_particles)
     particle.position += position;
-    return particle;
-  });
-  return std::exchange(pendingParticles, {});
+  return std::exchange(pending_particles, {});
 }
 
-void NetworkedAnimator::DynamicTarget::stopAudio() {
-  for (auto const& pair : currentAudioBasePositions) {
-    if (pair.first->loops() != 0)
-      pair.first->stop();
+void NetworkedAnimator::DynamicTarget::stop_audio() {
+  for (auto const& [audio, base_position] : current_audio_base_positions) {
+    if (audio->loops() != 0)
+      audio->stop();
   }
 }
 
-void NetworkedAnimator::DynamicTarget::updatePosition(Vec2F const& p) {
-  clearFinishedAudio();
+void NetworkedAnimator::DynamicTarget::update_position(Vec2F const& p) {
+  clear_finished_audio();
+  positioned_since_audio_pull = true;
   position = p;
-  for (auto&& audioPair : currentAudioBasePositions)
-    audioPair.first->set_position(audioPair.second + p);
+  for (auto const& [audio, base_position] : current_audio_base_positions)
+    audio->set_position(base_position + p);
 }
 
-void NetworkedAnimator::DynamicTarget::clearFinishedAudio() {
-  for (auto&& p : statePersistentSounds) {
-    if (p.second.audio && p.second.audio->finished())
-      p.second.audio.reset();
+void NetworkedAnimator::DynamicTarget::clear_finished_audio() {
+  for (auto&& [name, sound] : state_persistent_sounds) {
+    if (sound.audio && sound.audio->finished())
+      sound.audio.reset();
   }
 
-  for (auto&& p : stateImmediateSounds) {
-    if (p.second.audio && p.second.audio->finished())
-      p.second.audio.reset();
-  }
-
-  for (auto&& p : independentSounds)
-    p.second.filter([](std::shared_ptr<AudioInstance> const& audio) { return !audio->finished(); });
-
-  Star::erase_if(currentAudioBasePositions, [](std::pair<std::shared_ptr<AudioInstance>, Vec2F> const& pair) {
-      return pair.first->finished();
-    });
+  auto finished = [](std::shared_ptr<AudioInstance> const& audio) { return audio->finished(); };
+  Star::erase_if(independent_sounds, [&](std::ranges::range_reference_t<decltype(independent_sounds)> pair) {
+    auto& sounds = pair.second;
+    sounds.erase(std::remove_if(sounds.begin(), sounds.end(), finished), sounds.end());
+    return sounds.empty();
+  });
+  Star::erase_if(current_audio_base_positions, [&](std::ranges::range_reference_t<decltype(current_audio_base_positions)> pair) {
+    return finished(pair.first);
+  });
 }
 
-NetworkedAnimator::NetworkedAnimator(Root& root) : m_root(root) {
+NetworkedAnimator::NetworkedAnimator(ConstructionKey, Root& root) : m_root(root) {
   m_zoom.set(1.0f);
   m_flipped.set(false);
-  m_flippedRelativeCenterLine.set(0.0f);
-  m_animationRate.set(1.0f);
-  m_animatorVersion = 0;
+  m_flipped_relative_center_line.set(0.0f);
+  m_animation_rate.set(1.0f);
+  m_animator_version = 0;
 }
 
-std::expected<std::shared_ptr<NetworkedAnimator>, StarException> NetworkedAnimator::create(Root& root, Json config, String relativePath) {
-  auto animator = std::shared_ptr<NetworkedAnimator>(new NetworkedAnimator(root));
-  auto loaded = animator->loadConfig(std::move(config), std::move(relativePath));
+std::expected<std::shared_ptr<NetworkedAnimator>, StarException> NetworkedAnimator::create(Root& root, Json config, String relative_path) {
+  auto animator = std::make_shared<NetworkedAnimator>(ConstructionKey{}, root);
+  auto loaded = animator->load_config(std::move(config), std::move(relative_path));
   if (!loaded) return std::unexpected(std::move(loaded.error()));
   return animator;
 }
 
-std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, String relativePath) {
+std::expected<void, StarException> NetworkedAnimator::load_config(Json config, String relative_path) {
   auto& root = m_root.get();
-  if (config.is_null()) return setupNetStates();
+  if (config.is_null()) return setup_net_states();
   if (config.type() == Json::Type::String) {
     auto path = config.to_string();
     if (!path) return std::unexpected(std::move(path.error()));
-    if (relativePath.empty()) relativePath = *path;
+    if (relative_path.empty()) relative_path = *path;
     auto assets = root.assets();
     if (!assets) return std::unexpected(std::move(assets.error()));
-    auto loaded = (*assets)->json(AssetPath::relative_to(relativePath, *path));
+    auto loaded = (*assets)->json(AssetPath::relative_to(relative_path, *path));
     if (!loaded) return std::unexpected(std::move(loaded.error()));
     config = std::move(*loaded);
-  } else if (relativePath.empty()) {
-    relativePath = "/";
+  } else if (relative_path.empty()) {
+    relative_path = "/";
   }
-  auto versionValue = config.get_uint("version", 0);
-  if (!versionValue) return std::unexpected(std::move(versionValue.error()));
-  m_animatorVersion = *versionValue;
+  auto version_value = config.get_uint("version", 0);
+  if (!version_value) return std::unexpected(std::move(version_value.error()));
+  m_animator_version = *version_value;
   if (version() > 0) {
-    auto hasIncludes = config.contains("includes");
-    if (!hasIncludes) return std::unexpected(std::move(hasIncludes.error()));
-    if (*hasIncludes) {
+    auto has_includes = config.contains("includes");
+    if (!has_includes) return std::unexpected(std::move(has_includes.error()));
+    if (*has_includes) {
       auto includes = config.get("includes");
       if (!includes) return std::unexpected(std::move(includes.error()));
-      auto merged = mergeIncludes(root, config, *includes, relativePath);
+      StringList include_chain;
+      auto merged = merge_includes(root, config, *includes, relative_path, include_chain);
       if (!merged) return std::unexpected(std::move(merged.error()));
       config = std::move(*merged);
     }
   }
-  auto partsConfig = config.get("animatedParts", JsonObject());
-  if (!partsConfig) return std::unexpected(std::move(partsConfig.error()));
-  auto parts = AnimatedPartSet::create(*partsConfig, version());
+  auto parts_config = config.get("animatedParts", JsonObject());
+  if (!parts_config) return std::unexpected(std::move(parts_config.error()));
+  auto parts = AnimatedPartSet::create(*parts_config, version());
   if (!parts) return std::unexpected(std::move(parts.error()));
-  m_animatedParts = std::move(*parts);
-  m_animationStateTypes = m_animatedParts.state_types();
-  m_relativePath = AssetPath::directory(relativePath);
-  auto globalTagDefaultsConfig = config.get("globalTagDefaults", JsonObject());
-  if (!globalTagDefaultsConfig) return std::unexpected(std::move(globalTagDefaultsConfig.error()));
-  auto globalTagDefaultsEntries = globalTagDefaultsConfig->iterate_object();
-  if (!globalTagDefaultsEntries) return std::unexpected(std::move(globalTagDefaultsEntries.error()));
-  for (auto const& pair : *globalTagDefaultsEntries) {
+  m_animated_parts = std::move(*parts);
+  m_animation_state_types = m_animated_parts.state_types();
+  m_relative_path = AssetPath::directory(relative_path);
+  auto global_tag_defaults_config = config.get("globalTagDefaults", JsonObject());
+  if (!global_tag_defaults_config) return std::unexpected(std::move(global_tag_defaults_config.error()));
+  auto global_tag_defaults_entries = global_tag_defaults_config->iterate_object();
+  if (!global_tag_defaults_entries) return std::unexpected(std::move(global_tag_defaults_entries.error()));
+  for (auto const& pair : *global_tag_defaults_entries) {
     auto value = pair.second.to_string();
     if (!value) return std::unexpected(std::move(value.error()));
-    setGlobalTag(pair.first, *value);
+    set_global_tag(pair.first, *value);
   }
-  auto partTagDefaultsConfig = config.get("partTagDefaults", JsonObject());
-  if (!partTagDefaultsConfig) return std::unexpected(std::move(partTagDefaultsConfig.error()));
-  auto partTagDefaultsEntries = partTagDefaultsConfig->iterate_object();
-  if (!partTagDefaultsEntries) return std::unexpected(std::move(partTagDefaultsEntries.error()));
-  for (auto const& pair : *partTagDefaultsEntries) {
+  auto part_tag_defaults_config = config.get("partTagDefaults", JsonObject());
+  if (!part_tag_defaults_config) return std::unexpected(std::move(part_tag_defaults_config.error()));
+  auto part_tag_defaults_entries = part_tag_defaults_config->iterate_object();
+  if (!part_tag_defaults_entries) return std::unexpected(std::move(part_tag_defaults_entries.error()));
+  for (auto const& pair : *part_tag_defaults_entries) {
     auto tags = pair.second.iterate_object();
     if (!tags) return std::unexpected(std::move(tags.error()));
     for (auto const& tag : *tags) {
       auto value = tag.second.to_string();
       if (!value) return std::unexpected(std::move(value.error()));
-      setPartTag(pair.first, tag.first, *value);
+      set_part_tag(pair.first, tag.first, *value);
     }
   }
-  auto transformationGroupsConfig = config.get("transformationGroups", JsonObject());
-  if (!transformationGroupsConfig) return std::unexpected(std::move(transformationGroupsConfig.error()));
-  auto transformationGroupsEntries = transformationGroupsConfig->iterate_object();
-  if (!transformationGroupsEntries) return std::unexpected(std::move(transformationGroupsEntries.error()));
-  for (auto const& pair : *transformationGroupsEntries) {
-    auto& tg = m_transformationGroups[pair.first];
+  auto transformation_groups_config = config.get("transformationGroups", JsonObject());
+  if (!transformation_groups_config) return std::unexpected(std::move(transformation_groups_config.error()));
+  auto transformation_groups_entries = transformation_groups_config->iterate_object();
+  if (!transformation_groups_entries) return std::unexpected(std::move(transformation_groups_entries.error()));
+  std::size_t group_index = 0;
+  for (auto const& pair : *transformation_groups_entries) {
+    auto& tg = m_transformation_groups[pair.first];
+    tg.presentation_index = group_index++;
     auto interpolated = pair.second.get_bool("interpolated", false);
     if (!interpolated) return std::unexpected(std::move(interpolated.error()));
     tg.interpolated = *interpolated;
-    tg.setAffineTransform(Mat3F::identity());
-    tg.setAnimationAffineTransform(Mat3F::identity());
-    tg.setLocalAffineTransform(Mat3F::identity());
+    tg.set_affine_transform(Mat3F::identity());
+    tg.set_animation_affine_transform(Mat3F::identity());
+    tg.set_local_affine_transform(Mat3F::identity());
   }
-  auto rotationGroupsConfig = config.get("rotationGroups", JsonObject());
-  if (!rotationGroupsConfig) return std::unexpected(std::move(rotationGroupsConfig.error()));
-  auto rotationGroupsEntries = rotationGroupsConfig->iterate_object();
-  if (!rotationGroupsEntries) return std::unexpected(std::move(rotationGroupsEntries.error()));
-  for (auto const& pair : *rotationGroupsEntries) {
-    auto& rotationGroup = m_rotationGroups[pair.first];
+  auto rotation_groups_config = config.get("rotationGroups", JsonObject());
+  if (!rotation_groups_config) return std::unexpected(std::move(rotation_groups_config.error()));
+  auto rotation_groups_entries = rotation_groups_config->iterate_object();
+  if (!rotation_groups_entries) return std::unexpected(std::move(rotation_groups_entries.error()));
+  for (auto const& pair : *rotation_groups_entries) {
+    auto& rotation_group = m_rotation_groups[pair.first];
     auto velocity = pair.second.get_float("angularVelocity", 0.0f);
     if (!velocity) return std::unexpected(std::move(velocity.error()));
-    rotationGroup.angularVelocity = std::move(*velocity);
-    auto centerJson = pair.second.get("rotationCenter", JsonArray{0, 0});
-    if (!centerJson) return std::unexpected(std::move(centerJson.error()));
-    auto center = json_to_vec2f(*centerJson);
+    rotation_group.angular_velocity = std::move(*velocity);
+    auto center_json = pair.second.get("rotationCenter", JsonArray{0, 0});
+    if (!center_json) return std::unexpected(std::move(center_json.error()));
+    auto center = json_to_vec2f(*center_json);
     if (!center) return std::unexpected(std::move(center.error()));
-    rotationGroup.rotationCenter = std::move(*center);
+    rotation_group.rotation_center = std::move(*center);
   }
-  auto particleEmittersConfig = config.get("particleEmitters", JsonObject());
-  if (!particleEmittersConfig) return std::unexpected(std::move(particleEmittersConfig.error()));
-  auto particleEmittersEntries = particleEmittersConfig->iterate_object();
-  if (!particleEmittersEntries) return std::unexpected(std::move(particleEmittersEntries.error()));
-  for (auto const& pair : *particleEmittersEntries) {
-    auto& emitter = m_particleEmitters[pair.first];
-    auto const& particleEmitterConfig = pair.second;
-    auto rate = particleEmitterConfig.get_float("emissionRate", 1.0f);
+  auto particle_emitters_config = config.get("particleEmitters", JsonObject());
+  if (!particle_emitters_config) return std::unexpected(std::move(particle_emitters_config.error()));
+  auto particle_emitters_entries = particle_emitters_config->iterate_object();
+  if (!particle_emitters_entries) return std::unexpected(std::move(particle_emitters_entries.error()));
+  for (auto const& pair : *particle_emitters_entries) {
+    auto& emitter = m_particle_emitters[pair.first];
+    auto const& particle_emitter_config = pair.second;
+    auto rate = particle_emitter_config.get_float("emissionRate", 1.0f);
     if (!rate) return std::unexpected(std::move(rate.error()));
-    emitter.emissionRate.set(*rate);
-    auto variance = particleEmitterConfig.get_float("emissionRateVariance", 0.0f);
+    emitter.emission_rate.set(*rate);
+    auto variance = particle_emitter_config.get_float("emissionRateVariance", 0.0f);
     if (!variance) return std::unexpected(std::move(variance.error()));
-    emitter.emissionRateVariance = std::move(*variance);
-    RectF offsetRegion = RectF::null();
-    auto region = particleEmitterConfig.opt("offsetRegion");
+    emitter.emission_rate_variance = std::move(*variance);
+    RectF offset_region = RectF::null();
+    auto region = particle_emitter_config.opt("offsetRegion");
     if (!region) return std::unexpected(std::move(region.error()));
     if (*region) {
-      auto regionValue = json_to_rectf(**region);
-      if (!regionValue) return std::unexpected(std::move(regionValue.error()));
-      offsetRegion = *regionValue;
+      auto region_value = json_to_rectf(**region);
+      if (!region_value) return std::unexpected(std::move(region_value.error()));
+      offset_region = *region_value;
     }
-    emitter.offsetRegion.set(offsetRegion);
-    auto anchor = particleEmitterConfig.opt_string("anchorPart");
+    emitter.offset_region.set(offset_region);
+    auto anchor = particle_emitter_config.opt_string("anchorPart");
     if (!anchor) return std::unexpected(std::move(anchor.error()));
-    emitter.anchorPart = std::move(*anchor);
-    auto groupsJson = particleEmitterConfig.get("transformationGroups", JsonArray());
-    if (!groupsJson) return std::unexpected(std::move(groupsJson.error()));
-    auto groups = json_to_string_list(*groupsJson);
+    emitter.anchor_part = std::move(*anchor);
+    auto groups_json = particle_emitter_config.get("transformationGroups", JsonArray());
+    if (!groups_json) return std::unexpected(std::move(groups_json.error()));
+    auto groups = json_to_string_list(*groups_json);
     if (!groups) return std::unexpected(std::move(groups.error()));
-    emitter.transformationGroups = std::move(*groups);
-    auto rotation = particleEmitterConfig.opt_string("rotationGroup");
+    emitter.transformation_groups = std::move(*groups);
+    auto rotation = particle_emitter_config.opt_string("rotationGroup");
     if (!rotation) return std::unexpected(std::move(rotation.error()));
-    emitter.rotationGroup = std::move(*rotation);
-    auto center = particleEmitterConfig.opt("rotationCenter");
+    emitter.rotation_group = std::move(*rotation);
+    auto center = particle_emitter_config.opt("rotationCenter");
     if (!center) return std::unexpected(std::move(center.error()));
     if (*center) {
-      auto centerValue = json_to_vec2f(**center);
-      if (!centerValue) return std::unexpected(std::move(centerValue.error()));
-      emitter.rotationCenter = *centerValue;
+      auto center_value = json_to_vec2f(**center);
+      if (!center_value) return std::unexpected(std::move(center_value.error()));
+      emitter.rotation_center = *center_value;
     }
-    auto particlesJson = particleEmitterConfig.get("particles");
-    if (!particlesJson) return std::unexpected(std::move(particlesJson.error()));
-    auto particles = particlesJson->iterate_array();
+    auto particles_json = particle_emitter_config.get("particles");
+    if (!particles_json) return std::unexpected(std::move(particles_json.error()));
+    auto particles = particles_json->iterate_array();
     if (!particles) return std::unexpected(std::move(particles.error()));
-    for (auto const& particleConfig : *particles) {
+    for (auto const& particle_config : *particles) {
       auto database = root.particleDatabase();
       if (!database) return std::unexpected(std::move(database.error()));
-      auto particle = particleConfig.get("particle");
+      auto particle = particle_config.get("particle");
       if (!particle) return std::unexpected(std::move(particle.error()));
-      auto creator = (*database)->particleCreator(*particle, relativePath);
+      auto creator = (*database)->particleCreator(*particle, relative_path);
       if (!creator) return std::unexpected(std::move(creator.error()));
-      auto count = particleConfig.get_uint("count", 1);
+      auto count = particle_config.get_uint("count", 1);
       if (!count) return std::unexpected(std::move(count.error()));
-      auto offsetJson = particleConfig.get("offset", JsonArray{0, 0});
-      if (!offsetJson) return std::unexpected(std::move(offsetJson.error()));
-      auto offset = json_to_vec2f(*offsetJson);
+      auto offset_json = particle_config.get("offset", JsonArray{0, 0});
+      if (!offset_json) return std::unexpected(std::move(offset_json.error()));
+      auto offset = json_to_vec2f(*offset_json);
       if (!offset) return std::unexpected(std::move(offset.error()));
-      auto flip = particleConfig.get_bool("flip", false);
+      auto flip = particle_config.get_bool("flip", false);
       if (!flip) return std::unexpected(std::move(flip.error()));
-      emitter.particleList.push_back({*creator, static_cast<unsigned>(*count), *offset, *flip});
+      emitter.particle_list.push_back({*creator, static_cast<unsigned>(*count), *offset, *flip});
     }
-    auto burstCount = particleEmitterConfig.get_uint("burstCount", 1);
-    if (!burstCount) return std::unexpected(std::move(burstCount.error()));
-    emitter.burstCount.set(*burstCount);
-    auto randomCount = particleEmitterConfig.get_uint("randomSelectCount", emitter.particleList.size());
-    if (!randomCount) return std::unexpected(std::move(randomCount.error()));
-    emitter.randomSelectCount.set(*randomCount);
-    auto active = particleEmitterConfig.get_bool("active", false);
+    auto burst_count = particle_emitter_config.get_uint("burstCount", 1);
+    if (!burst_count) return std::unexpected(std::move(burst_count.error()));
+    emitter.burst_count.set(*burst_count);
+    auto random_count = particle_emitter_config.get_uint("randomSelectCount", emitter.particle_list.size());
+    if (!random_count) return std::unexpected(std::move(random_count.error()));
+    emitter.random_select_count.set(*random_count);
+    auto active = particle_emitter_config.get_bool("active", false);
     if (!active) return std::unexpected(std::move(active.error()));
     emitter.active.set(*active);
   }
@@ -744,62 +761,62 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
     if (!ambience) return std::unexpected(std::move(ambience.error()));
     light.beam_ambience = std::move(*ambience);
   }
-  auto soundsConfig = config.get("sounds", JsonObject());
-  if (!soundsConfig) return std::unexpected(std::move(soundsConfig.error()));
-  auto soundsEntries = soundsConfig->iterate_object();
-  if (!soundsEntries) return std::unexpected(std::move(soundsEntries.error()));
-  for (auto const& pair : *soundsEntries) {
+  auto sounds_config = config.get("sounds", JsonObject());
+  if (!sounds_config) return std::unexpected(std::move(sounds_config.error()));
+  auto sounds_entries = sounds_config->iterate_object();
+  if (!sounds_entries) return std::unexpected(std::move(sounds_entries.error()));
+  for (auto const& pair : *sounds_entries) {
     auto& sound = m_sounds[pair.first];
-    auto const& soundConfig = pair.second;
-    if (soundConfig.is_type(Json::Type::Array)) {
-      sound.rangeMultiplier = 1.0f;
-      auto pool = json_to_string_list(soundConfig);
+    auto const& sound_config = pair.second;
+    if (sound_config.is_type(Json::Type::Array)) {
+      sound.range_multiplier = 1.0f;
+      auto pool = json_to_string_list(sound_config);
       if (!pool) return std::unexpected(std::move(pool.error()));
-      sound.soundPool.set(pool->transformed(
-        [relativePath = m_relativePath](String const& path) { return AssetPath::relative_to(relativePath, path); }));
-      sound.volumeTarget.set(1.0f);
-      sound.volumeRampTime.set(0.0f);
-      sound.pitchMultiplierTarget.set(1.0f);
-      sound.pitchMultiplierRampTime.set(0.0f);
+      sound.sound_pool.set(pool->transformed(
+        [relative_path = m_relative_path](String const& path) { return AssetPath::relative_to(relative_path, path); }));
+      sound.volume_target.set(1.0f);
+      sound.volume_ramp_time.set(0.0f);
+      sound.pitch_multiplier_target.set(1.0f);
+      sound.pitch_multiplier_ramp_time.set(0.0f);
     } else {
-      auto range = soundConfig.get_float("rangeMultiplier", 1.0f);
+      auto range = sound_config.get_float("rangeMultiplier", 1.0f);
       if (!range) return std::unexpected(std::move(range.error()));
-      sound.rangeMultiplier = std::move(*range);
-      Vec2F soundPosition{};
-      auto position = soundConfig.opt("position");
+      sound.range_multiplier = std::move(*range);
+      Vec2F sound_position{};
+      auto position = sound_config.opt("position");
       if (!position) return std::unexpected(std::move(position.error()));
       if (*position) {
-        auto positionValue = json_to_vec2f(**position);
-        if (!positionValue) return std::unexpected(std::move(positionValue.error()));
-        soundPosition = *positionValue;
+        auto position_value = json_to_vec2f(**position);
+        if (!position_value) return std::unexpected(std::move(position_value.error()));
+        sound_position = *position_value;
       }
-      sound.xPosition.set(soundPosition[0]);
-      sound.yPosition.set(soundPosition[1]);
-      auto volume = soundConfig.get_float("volume", 1.0f);
+      sound.x_position.set(sound_position[0]);
+      sound.y_position.set(sound_position[1]);
+      auto volume = sound_config.get_float("volume", 1.0f);
       if (!volume) return std::unexpected(std::move(volume.error()));
-      sound.volumeTarget.set(*volume);
-      auto volumeRamp = soundConfig.get_float("volumeRampTime", 0.0f);
-      if (!volumeRamp) return std::unexpected(std::move(volumeRamp.error()));
-      sound.volumeRampTime.set(*volumeRamp);
-      auto pitch = soundConfig.get_float("pitchMultiplier", 1.0f);
+      sound.volume_target.set(*volume);
+      auto volume_ramp = sound_config.get_float("volumeRampTime", 0.0f);
+      if (!volume_ramp) return std::unexpected(std::move(volume_ramp.error()));
+      sound.volume_ramp_time.set(*volume_ramp);
+      auto pitch = sound_config.get_float("pitchMultiplier", 1.0f);
       if (!pitch) return std::unexpected(std::move(pitch.error()));
-      sound.pitchMultiplierTarget.set(*pitch);
-      auto pitchRamp = soundConfig.get_float("pitchMultiplierRampTime", 0.0f);
-      if (!pitchRamp) return std::unexpected(std::move(pitchRamp.error()));
-      sound.pitchMultiplierRampTime.set(*pitchRamp);
-      auto poolJson = soundConfig.get("pool", JsonArray());
-      if (!poolJson) return std::unexpected(std::move(poolJson.error()));
-      auto pool = json_to_string_list(*poolJson);
+      sound.pitch_multiplier_target.set(*pitch);
+      auto pitch_ramp = sound_config.get_float("pitchMultiplierRampTime", 0.0f);
+      if (!pitch_ramp) return std::unexpected(std::move(pitch_ramp.error()));
+      sound.pitch_multiplier_ramp_time.set(*pitch_ramp);
+      auto pool_json = sound_config.get("pool", JsonArray());
+      if (!pool_json) return std::unexpected(std::move(pool_json.error()));
+      auto pool = json_to_string_list(*pool_json);
       if (!pool) return std::unexpected(std::move(pool.error()));
-      sound.soundPool.set(pool->transformed(
-        [relativePath = m_relativePath](String const& path) { return AssetPath::relative_to(relativePath, path); }));
+      sound.sound_pool.set(pool->transformed(
+        [relative_path = m_relative_path](String const& path) { return AssetPath::relative_to(relative_path, path); }));
     }
   }
-  auto effectsConfig = config.get("effects", JsonObject());
-  if (!effectsConfig) return std::unexpected(std::move(effectsConfig.error()));
-  auto effectsEntries = effectsConfig->iterate_object();
-  if (!effectsEntries) return std::unexpected(std::move(effectsEntries.error()));
-  for (auto const& pair : *effectsEntries) {
+  auto effects_config = config.get("effects", JsonObject());
+  if (!effects_config) return std::unexpected(std::move(effects_config.error()));
+  auto effects_entries = effects_config->iterate_object();
+  if (!effects_entries) return std::unexpected(std::move(effects_entries.error()));
+  for (auto const& pair : *effects_entries) {
     auto& effect = m_effects[pair.first];
     auto type = pair.second.get_string("type");
     if (!type) return std::unexpected(std::move(type.error()));
@@ -811,203 +828,203 @@ std::expected<void, StarException> NetworkedAnimator::loadConfig(Json config, St
     if (!directives) return std::unexpected(std::move(directives.error()));
     effect.directives = *directives;
   }
-  m_transformationGroups.sort_by_key();
-  m_rotationGroups.sort_by_key();
-  m_particleEmitters.sort_by_key();
+  m_transformation_groups.sort_by_key();
+  m_rotation_groups.sort_by_key();
+  m_particle_emitters.sort_by_key();
   m_lights.sort_by_key();
   m_sounds.sort_by_key();
   m_effects.sort_by_key();
-  for (auto const& stateType : m_animatedParts.state_types())
-    m_stateInfo[stateType].wasUpdated = true;
-  m_stateInfo.sort_by_key();
-  return setupNetStates();
+  for (auto const& state_type : m_animated_parts.state_types())
+    m_state_info[state_type].was_updated = true;
+  m_state_info.sort_by_key();
+  return setup_net_states();
 }
 
 std::expected<std::shared_ptr<NetworkedAnimator>, StarException> NetworkedAnimator::create(Root& root) {
-  auto result = std::shared_ptr<NetworkedAnimator>(new NetworkedAnimator(root));
-  auto registered = result->setupNetStates();
+  auto result = std::make_shared<NetworkedAnimator>(ConstructionKey{}, root);
+  auto registered = result->setup_net_states();
   if (!registered) return std::unexpected(std::move(registered.error()));
   return result;
 }
 
 std::expected<std::shared_ptr<NetworkedAnimator>, StarException> NetworkedAnimator::create(NetworkedAnimator const& animator) {
-  auto result = std::shared_ptr<NetworkedAnimator>(new NetworkedAnimator(animator.m_root.get()));
-  result->m_relativePath = animator.m_relativePath;
-  result->m_animatedParts = animator.m_animatedParts;
-  result->m_animationStateTypes = animator.m_animationStateTypes;
-  result->m_stateInfo = animator.m_stateInfo;
-  result->m_transformationGroups = animator.m_transformationGroups;
-  result->m_rotationGroups = animator.m_rotationGroups;
-  result->m_particleEmitters = animator.m_particleEmitters;
+  auto result = std::make_shared<NetworkedAnimator>(ConstructionKey{}, animator.m_root.get());
+  result->m_relative_path = animator.m_relative_path;
+  result->m_animated_parts = animator.m_animated_parts;
+  result->m_animation_state_types = animator.m_animation_state_types;
+  result->m_state_info = animator.m_state_info;
+  result->m_transformation_groups = animator.m_transformation_groups;
+  result->m_rotation_groups = animator.m_rotation_groups;
+  result->m_particle_emitters = animator.m_particle_emitters;
   result->m_lights = animator.m_lights;
   result->m_sounds = animator.m_sounds;
   result->m_effects = animator.m_effects;
-  result->m_processingDirectives = animator.m_processingDirectives;
+  result->m_processing_directives = animator.m_processing_directives;
   result->m_zoom = animator.m_zoom;
   result->m_flipped = animator.m_flipped;
-  result->m_flippedRelativeCenterLine = animator.m_flippedRelativeCenterLine;
-  result->m_animationRate = animator.m_animationRate;
-  result->m_globalTags = animator.m_globalTags;
-  result->m_partTags = animator.m_partTags;
-  result->m_cachedPartDrawables = animator.m_cachedPartDrawables;
-  result->m_partDrawables = animator.m_partDrawables;
-  result->m_localTags = animator.m_localTags;
-  result->m_animatorVersion = animator.m_animatorVersion;
-  auto registered = result->setupNetStates();
+  result->m_flipped_relative_center_line = animator.m_flipped_relative_center_line;
+  result->m_animation_rate = animator.m_animation_rate;
+  result->m_global_tags = animator.m_global_tags;
+  result->m_part_tags = animator.m_part_tags;
+  result->m_cached_part_drawables = animator.m_cached_part_drawables;
+  result->m_part_drawables = animator.m_part_drawables;
+  result->m_local_tags = animator.m_local_tags;
+  result->m_animator_version = animator.m_animator_version;
+  auto registered = result->setup_net_states();
   if (!registered) return std::unexpected(std::move(registered.error()));
 
   return result;
 }
 
-StringList NetworkedAnimator::stateTypes() const {
-  return m_animatedParts.state_types();
+StringList NetworkedAnimator::state_types() const {
+  return m_animated_parts.state_types();
 }
 
-std::expected<StringList, StarException> NetworkedAnimator::states(String const& stateType) const {
-  return m_animatedParts.states(stateType);
+std::expected<StringList, StarException> NetworkedAnimator::states(String const& state_type) const {
+  return m_animated_parts.states(state_type);
 }
 
-std::expected<bool, StarException> NetworkedAnimator::setState(String const& stateType, String const& state, bool startNew, bool reverse) {
-  auto changed = m_animatedParts.set_active_state(stateType, state, startNew, reverse);
+std::expected<bool, StarException> NetworkedAnimator::set_state(String const& state_type, String const& state, bool start_new, bool reverse) {
+  auto changed = m_animated_parts.set_active_state(state_type, state, start_new, reverse);
   if (!changed) return std::unexpected(std::move(changed.error()));
   if (*changed) {
-    m_stateInfo[stateType].wasUpdated = true;
-    m_stateInfo[stateType].startedEvent.trigger();
+    m_state_info[state_type].was_updated = true;
+    m_state_info[state_type].started_event.trigger();
     return true;
   }
   return false;
 }
 
-std::expected<bool, StarException> NetworkedAnimator::setLocalState(String const& stateType, String const& state, bool startNew, bool reverse) {
-  return m_animatedParts.set_active_state(stateType, state, startNew, reverse);
+std::expected<bool, StarException> NetworkedAnimator::set_local_state(String const& state_type, String const& state, bool start_new, bool reverse) {
+  return m_animated_parts.set_active_state(state_type, state, start_new, reverse);
 }
 
 std::expected<void, StarException> NetworkedAnimator::validate_local_state(String const& type, String const& state) const {
-  auto target = m_animatedParts.get_state(type, state);
+  auto target = m_animated_parts.get_state(type, state);
   if (!target) return std::unexpected(std::move(target.error()));
   return {};
 }
 
-std::expected<String, StarException> NetworkedAnimator::queryState(String const& stateType, Sample const* sample) const {
-  auto state = sample ? m_animatedParts.active_state(stateType, sample->m_presentation->parts) : m_animatedParts.active_state(stateType);
+std::expected<String, StarException> NetworkedAnimator::query_state(String const& state_type, SampleView sample) const {
+  auto state = sample ? m_animated_parts.active_state(state_type, sample->get().m_presentation.get().parts) : m_animated_parts.active_state(state_type);
   if (!state) return std::unexpected(std::move(state.error()));
   return state->get().state_name;
 }
-std::expected<int, StarException> NetworkedAnimator::queryStateFrame(String const& stateType, Sample const* sample) const {
-  auto state = sample ? m_animatedParts.active_state(stateType, sample->m_presentation->parts) : m_animatedParts.active_state(stateType);
+std::expected<int, StarException> NetworkedAnimator::query_state_frame(String const& state_type, SampleView sample) const {
+  auto state = sample ? m_animated_parts.active_state(state_type, sample->get().m_presentation.get().parts) : m_animated_parts.active_state(state_type);
   if (!state) return std::unexpected(std::move(state.error()));
   return state->get().frame;
 }
-std::expected<int, StarException> NetworkedAnimator::queryStateNextFrame(String const& stateType, Sample const* sample) const {
-  auto state = sample ? m_animatedParts.active_state(stateType, sample->m_presentation->parts) : m_animatedParts.active_state(stateType);
+std::expected<int, StarException> NetworkedAnimator::query_state_next_frame(String const& state_type, SampleView sample) const {
+  auto state = sample ? m_animated_parts.active_state(state_type, sample->get().m_presentation.get().parts) : m_animated_parts.active_state(state_type);
   if (!state) return std::unexpected(std::move(state.error()));
   return state->get().next_frame;
 }
-std::expected<float, StarException> NetworkedAnimator::queryStateFrameProgress(String const& stateType, Sample const* sample) const {
-  auto state = sample ? m_animatedParts.active_state(stateType, sample->m_presentation->parts) : m_animatedParts.active_state(stateType);
+std::expected<float, StarException> NetworkedAnimator::query_state_frame_progress(String const& state_type, SampleView sample) const {
+  auto state = sample ? m_animated_parts.active_state(state_type, sample->get().m_presentation.get().parts) : m_animated_parts.active_state(state_type);
   if (!state) return std::unexpected(std::move(state.error()));
   return state->get().frame_progress;
 }
-std::expected<float, StarException> NetworkedAnimator::queryStateTimer(String const& stateType, Sample const* sample) const {
-  auto state = sample ? m_animatedParts.active_state(stateType, sample->m_presentation->parts) : m_animatedParts.active_state(stateType);
+std::expected<float, StarException> NetworkedAnimator::query_state_timer(String const& state_type, SampleView sample) const {
+  auto state = sample ? m_animated_parts.active_state(state_type, sample->get().m_presentation.get().parts) : m_animated_parts.active_state(state_type);
   if (!state) return std::unexpected(std::move(state.error()));
   return state->get().timer;
 }
-std::expected<bool, StarException> NetworkedAnimator::queryStateReverse(String const& stateType, Sample const* sample) const {
-  auto state = sample ? m_animatedParts.active_state(stateType, sample->m_presentation->parts) : m_animatedParts.active_state(stateType);
+std::expected<bool, StarException> NetworkedAnimator::query_state_reverse(String const& state_type, SampleView sample) const {
+  auto state = sample ? m_animated_parts.active_state(state_type, sample->get().m_presentation.get().parts) : m_animated_parts.active_state(state_type);
   if (!state) return std::unexpected(std::move(state.error()));
   return state->get().reverse;
 }
 
-std::expected<float, StarException> NetworkedAnimator::queryStateCycle(String const& stateType, std::optional<String> state, Sample const* sample) const {
-  auto active = sample ? m_animatedParts.active_state(stateType, sample->m_presentation->parts) : m_animatedParts.active_state(stateType);
+std::expected<float, StarException> NetworkedAnimator::query_state_cycle(String const& state_type, std::optional<String> state, SampleView sample) const {
+  auto active = sample ? m_animated_parts.active_state(state_type, sample->get().m_presentation.get().parts) : m_animated_parts.active_state(state_type);
   if (!active) return std::unexpected(std::move(active.error()));
-  auto selected = m_animatedParts.get_state(stateType, state.value_or(active->get().state_name));
+  auto selected = m_animated_parts.get_state(state_type, state ? *state : active->get().state_name);
   if (!selected) return std::unexpected(std::move(selected.error()));
   return selected->get().cycle;
 }
-std::expected<int, StarException> NetworkedAnimator::queryStateFrames(String const& stateType, std::optional<String> state, Sample const* sample) const {
-  auto active = sample ? m_animatedParts.active_state(stateType, sample->m_presentation->parts) : m_animatedParts.active_state(stateType);
+std::expected<int, StarException> NetworkedAnimator::query_state_frames(String const& state_type, std::optional<String> state, SampleView sample) const {
+  auto active = sample ? m_animated_parts.active_state(state_type, sample->get().m_presentation.get().parts) : m_animated_parts.active_state(state_type);
   if (!active) return std::unexpected(std::move(active.error()));
-  auto selected = m_animatedParts.get_state(stateType, state.value_or(active->get().state_name));
+  auto selected = m_animated_parts.get_state(state_type, state ? *state : active->get().state_name);
   if (!selected) return std::unexpected(std::move(selected.error()));
   return selected->get().frames;
 }
 
-std::expected<bool, StarException> NetworkedAnimator::hasState(String const& stateType, std::optional<String> const& state) const {
-  auto contains = m_animatedParts.state_types().contains(stateType);
+std::expected<bool, StarException> NetworkedAnimator::has_state(String const& state_type, std::optional<String> const& state) const {
+  auto contains = m_animated_parts.state_types().contains(state_type);
   if (!contains) return std::unexpected(std::move(contains.error()));
   if (!*contains) return false;
   if (state) {
-    auto states = m_animatedParts.states(stateType);
+    auto states = m_animated_parts.states(state_type);
     if (!states) return std::unexpected(std::move(states.error()));
     return states->contains(*state);
   }
   return true;
 }
 
-StringMap<AnimatedPartSet::Part> const& NetworkedAnimator::constParts() const {
-  return m_animatedParts.const_parts();
+StringMap<AnimatedPartSet::Part> const& NetworkedAnimator::const_parts() const {
+  return m_animated_parts.const_parts();
 }
 
 StringMap<AnimatedPartSet::Part>& NetworkedAnimator::parts() {
-  return m_animatedParts.parts();
+  return m_animated_parts.parts();
 }
 
-StringList NetworkedAnimator::partNames() const {
-  return m_animatedParts.part_names();
+StringList NetworkedAnimator::part_names() const {
+  return m_animated_parts.part_names();
 }
 
-std::expected<Json, StarException> NetworkedAnimator::queryStateProperty(String const& stateType, String const& propertyName, std::optional<String> state, std::optional<int> frame, Sample const* sample) const {
+std::expected<Json, StarException> NetworkedAnimator::query_state_property(String const& state_type, String const& property_name, std::optional<String> state, std::optional<int> frame, SampleView sample) const {
   if (state) {
     if (!frame) return std::unexpected(NetworkedAnimatorException("State property requires a frame"));
-    return m_animatedParts.get_state_frame_property(stateType, propertyName, *state, *frame);
+    return m_animated_parts.get_state_frame_property(state_type, property_name, *state, *frame);
   }
-  auto active = sample ? m_animatedParts.active_state(stateType, sample->m_presentation->parts) : m_animatedParts.active_state(stateType);
+  auto active = sample ? m_animated_parts.active_state(state_type, sample->get().m_presentation.get().parts) : m_animated_parts.active_state(state_type);
   if (!active) return std::unexpected(std::move(active.error()));
-  return active->get().properties.value(propertyName);
+  return active->get().properties.value(property_name);
 }
-std::expected<Json, StarException> NetworkedAnimator::queryStateNextProperty(String const& stateType, String const& propertyName, Sample const* sample) const {
-  auto active = sample ? m_animatedParts.active_state(stateType, sample->m_presentation->parts) : m_animatedParts.active_state(stateType);
+std::expected<Json, StarException> NetworkedAnimator::query_state_next_property(String const& state_type, String const& property_name, SampleView sample) const {
+  auto active = sample ? m_animated_parts.active_state(state_type, sample->get().m_presentation.get().parts) : m_animated_parts.active_state(state_type);
   if (!active) return std::unexpected(std::move(active.error()));
-  return active->get().next_properties.value(propertyName);
+  return active->get().next_properties.value(property_name);
 }
 
-std::expected<Json, StarException> NetworkedAnimator::queryPartProperty(String const& partName, String const& propertyName, std::optional<String> stateType, std::optional<String> state, std::optional<int> frame, Sample const* sample) const {
-  if (stateType) {
+std::expected<Json, StarException> NetworkedAnimator::query_part_property(String const& part_name, String const& property_name, std::optional<String> state_type, std::optional<String> state, std::optional<int> frame, SampleView sample) const {
+  if (state_type) {
     if (!state || !frame) return std::unexpected(NetworkedAnimatorException("Part state property requires a state and frame"));
-    return m_animatedParts.get_part_state_frame_property(partName, propertyName, *stateType, *state, *frame);
+    return m_animated_parts.get_part_state_frame_property(part_name, property_name, *state_type, *state, *frame);
   }
-  auto active = sample ? m_animatedParts.active_part(partName, sample->m_presentation->parts) : m_animatedParts.active_part(partName);
+  auto active = sample ? m_animated_parts.active_part(part_name, sample->get().m_presentation.get().parts) : m_animated_parts.active_part(part_name);
   if (!active) return std::unexpected(std::move(active.error()));
-  return active->get().properties.value(propertyName);
+  return active->get().properties.value(property_name);
 }
-std::expected<Json, StarException> NetworkedAnimator::queryPartNextProperty(String const& partName, String const& propertyName, Sample const* sample) const {
-  auto active = sample ? m_animatedParts.active_part(partName, sample->m_presentation->parts) : m_animatedParts.active_part(partName);
+std::expected<Json, StarException> NetworkedAnimator::query_part_next_property(String const& part_name, String const& property_name, SampleView sample) const {
+  auto active = sample ? m_animated_parts.active_part(part_name, sample->get().m_presentation.get().parts) : m_animated_parts.active_part(part_name);
   if (!active) return std::unexpected(std::move(active.error()));
-  return active->get().next_properties.value(propertyName);
+  return active->get().next_properties.value(property_name);
 }
 
-Mat3F NetworkedAnimator::globalTransformation() const {
+Mat3F NetworkedAnimator::global_transformation() const {
   Mat3F transformation = Mat3F::scaling(m_zoom.get());
   if (m_flipped.get())
-    transformation = Mat3F::scaling(Vec2F(-1, 1), Vec2F(m_flippedRelativeCenterLine.get(), 0)) * transformation;
+    transformation = Mat3F::scaling(Vec2F(-1, 1), Vec2F(m_flipped_relative_center_line.get(), 0)) * transformation;
   return transformation;
 }
 
-std::expected<Mat3F, StarException> NetworkedAnimator::animationGroupTransformation(String const& name, TransformationGroup const& group, Mat3F const& base, Sample const* sample) const {
-  for (auto const& stateType : m_animationStateTypes) {
-    auto state = sample ? m_animatedParts.active_state(stateType, sample->m_presentation->parts) : m_animatedParts.active_state(stateType);
+std::expected<Mat3F, StarException> NetworkedAnimator::animation_group_transformation(String const& name, TransformationGroup const& group, Mat3F const& base, SampleView sample) const {
+  for (auto const& state_type : m_animation_state_types) {
+    auto state = sample ? m_animated_parts.active_state(state_type, sample->get().m_presentation.get().parts) : m_animated_parts.active_state(state_type);
     if (!state) return std::unexpected(std::move(state.error()));
     auto const& active = state->get();
     if (auto transforms = active.properties.find_ref(name)) {
-      auto matrix = processTransforms(base, transforms->get(), active.properties);
+      auto matrix = process_transforms(base, transforms->get(), active.properties);
       if (!matrix) return std::unexpected(std::move(matrix.error()));
       if (group.interpolated) {
         if (auto next = active.next_properties.find_ref(name)) {
-          auto nextMatrix = processTransforms(base, next->get(), active.next_properties);
-          if (!nextMatrix) return std::unexpected(std::move(nextMatrix.error()));
-          return sampleAffine(active.frame_progress, *matrix, *nextMatrix);
+          auto next_matrix = process_transforms(base, next->get(), active.next_properties);
+          if (!next_matrix) return std::unexpected(std::move(next_matrix.error()));
+          return sample_affine(active.frame_progress, *matrix, *next_matrix);
         }
       }
       return matrix;
@@ -1016,239 +1033,273 @@ std::expected<Mat3F, StarException> NetworkedAnimator::animationGroupTransformat
   return base;
 }
 
-std::expected<Mat3F, StarException> NetworkedAnimator::query_group_transformation(std::span<String const> groups, std::optional<std::reference_wrapper<Sample const>> sample) const {
+std::expected<Mat3F, StarException> NetworkedAnimator::query_group_transformation(std::span<String const> groups, SampleView sample) const {
   auto mat = Mat3F::identity();
   for (auto const& name : groups) {
-    auto group = m_transformationGroups.get(name);
+    auto group = m_transformation_groups.get(name);
     if (!group) return std::unexpected(std::move(group.error()));
     auto const& value = group->get();
-    auto cache = sample ? &sample->get().m_presentation->groups[value.presentationIndex] : nullptr;
-    bool sampled_animation = sample && !sample->get().m_presentation->parts.logical_reset;
-    if (sampled_animation && cache->animationDirty) {
-      auto sampled = animationGroupTransformation(name, value, value.animationBaseTransform, &sample->get());
-      if (!sampled) return std::unexpected(std::move(sampled.error()));
-      cache->animationTransform = *sampled;
-      cache->animationDirty = false;
+    if (sample) {
+      auto& presentation = sample->get().m_presentation.get();
+      auto& cache = presentation.groups[value.presentation_index];
+      if (presentation.parts.logical_reset) {
+        mat = cache.transform * cache.local_transform * value.animation_affine_transform() * mat;
+      } else {
+        if (cache.state_generation != presentation.state_generation) {
+          auto sampled = animation_group_transformation(name, value, value.animation_base_transform, sample);
+          if (!sampled) return std::unexpected(std::move(sampled.error()));
+          cache.animation_transform = *sampled;
+          cache.state_generation = presentation.state_generation;
+        }
+        mat = cache.transform * cache.local_transform * cache.animation_transform * mat;
+      }
+    } else {
+      mat = value.affine_transform() * value.local_affine_transform() * value.animation_affine_transform() * mat;
     }
-    auto base = sample ? cache->transform : value.affineTransform();
-    auto animation = sampled_animation ? cache->animationTransform : value.animationAffineTransform();
-    mat = base * (sample ? cache->localTransform : value.localAffineTransform()) * animation * mat;
   }
   return mat;
 }
 
-std::expected<Mat3F, StarException> NetworkedAnimator::queryPartTransformation(String const& partName, Sample const* sample) const {
-  auto definition = m_animatedParts.const_parts().get(partName);
+std::expected<Mat3F, StarException> NetworkedAnimator::query_part_transformation(String const& part_name, SampleView sample,
+    std::optional<std::reference_wrapper<AnchorPath const>> path) const {
+  auto definition = m_animated_parts.const_parts().get(part_name);
   if (!definition) return std::unexpected(std::move(definition.error()));
-  Presentation::PartTransform* cache = nullptr;
+  auto const& entry = definition->get();
+  std::optional<std::reference_wrapper<Presentation::PartTransform>> cache;
   if (sample) {
-    auto index = definition->get().presentation_index;
-    if (index >= sample->m_presentation->partTransforms.size())
+    auto& presentation = sample->get().m_presentation.get();
+    if (entry.presentation_index >= presentation.part_transforms.size())
       return std::unexpected(AnimatedPartSetException("Invalid animation part index"));
-    cache = &sample->m_presentation->partTransforms[index];
-    if (cache->valid)
-      return cache->transform;
+    auto& cached = presentation.part_transforms[entry.presentation_index];
+    if (cached.pose_generation == presentation.pose_generation)
+      return cached.transform;
+    cache = std::ref(cached);
   }
-  auto active = sample ? m_animatedParts.active_part(definition->get(), sample->m_presentation->parts) : m_animatedParts.active_part(definition->get());
+  for (auto ancestor = path; ancestor; ancestor = ancestor->get().parent) {
+    if (ancestor->get().name == part_name) {
+      StringList names;
+      for (; path; path = path->get().parent)
+        names.push_back(path->get().name);
+      std::reverse(names.begin(), names.end());
+      return std::unexpected(NetworkedAnimatorException::format("Animation anchorPart cycle: {} -> {}", names.join(" -> "), part_name));
+    }
+  }
+
+  auto active = sample ? m_animated_parts.active_part(entry, sample->get().m_presentation.get().parts) : m_animated_parts.active_part(entry);
   if (!active) return std::unexpected(std::move(active.error()));
   auto const& part = active->get();
   Mat3F transformation = Mat3F::identity();
-  if (auto offsetJson = part.properties.value("offset").opt()) {
-    auto offset = json_to_vec2f(*offsetJson);
+  if (auto offset_json = part.properties.find_ref("offset"); offset_json && !offset_json->get().is_null()) {
+    auto offset = json_to_vec2f(offset_json->get());
     if (!offset) return std::unexpected(std::move(offset.error()));
     transformation = Mat3F::translation(*offset) * transformation;
   }
   transformation = part.animation_affine_transform() * transformation;
-  auto groups = json_to_string_list(part.properties.value("transformationGroups", JsonArray()));
-  if (!groups) return std::unexpected(std::move(groups.error()));
-  auto group = sample ? sample->group_transformation(*groups) : group_transformation(*groups);
-  if (!group) return std::unexpected(std::move(group.error()));
-  transformation = *group * transformation;
-  auto rotationName = part.properties.value("rotationGroup").opt_string();
-  if (!rotationName) return std::unexpected(std::move(rotationName.error()));
-  if (*rotationName) {
-    auto rotation = m_rotationGroups.get(**rotationName);
+  auto group_transform = Mat3F::identity();
+  if (auto groups_json = part.properties.find_ref("transformationGroups")) {
+    auto groups = json_to_string_list(groups_json->get());
+    if (!groups) return std::unexpected(std::move(groups.error()));
+    auto group = query_group_transformation(*groups, sample);
+    if (!group) return std::unexpected(std::move(group.error()));
+    group_transform = *group;
+  }
+  transformation = group_transform * transformation;
+  if (auto rotation_json = part.properties.find_ref("rotationGroup"); rotation_json && !rotation_json->get().is_null()) {
+    auto rotation_name = rotation_json->get().to_string();
+    if (!rotation_name) return std::unexpected(std::move(rotation_name.error()));
+    auto rotation = m_rotation_groups.get(*rotation_name);
     if (!rotation) return std::unexpected(std::move(rotation.error()));
-    Vec2F center = rotation->get().rotationCenter;
-    if (auto centerJson = part.properties.value("rotationCenter").opt()) {
-      auto configuredCenter = json_to_vec2f(*centerJson);
-      if (!configuredCenter) return std::unexpected(std::move(configuredCenter.error()));
-      center = *configuredCenter;
-    }
     auto const& value = rotation->get();
-    float angle =
-      sample ? angle_lerp(sample->interpolation(), value.previousAngle, value.currentAngle) : value.currentAngle;
+    auto center = value.rotation_center;
+    if (auto center_json = part.properties.find_ref("rotationCenter"); center_json && !center_json->get().is_null()) {
+      auto configured_center = json_to_vec2f(center_json->get());
+      if (!configured_center) return std::unexpected(std::move(configured_center.error()));
+      center = *configured_center;
+    }
+    float angle = sample ? angle_lerp(sample->get().interpolation(), value.previous_angle, value.current_angle) : value.current_angle;
     transformation = Mat3F::rotation(angle, center) * transformation;
   }
-  if (auto anchorJson = part.properties.find_ref("anchorPart")) {
-    auto anchorName = anchorJson->get().to_string();
-    if (!anchorName) return std::unexpected(std::move(anchorName.error()));
-    auto anchor = queryPartTransformation(*anchorName, sample);
+  if (auto anchor_json = part.properties.find_ref("anchorPart")) {
+    auto anchor_name = anchor_json->get().to_string();
+    if (!anchor_name) return std::unexpected(std::move(anchor_name.error()));
+    // A stack-local link is unwound automatically on both success and failure.
+    AnchorPath current{part_name, path};
+    auto anchor = query_part_transformation(*anchor_name, sample, std::cref(current));
     if (!anchor) return std::unexpected(std::move(anchor.error()));
     transformation = *anchor * transformation;
   }
   if (cache) {
-    cache->transform = transformation;
-    cache->valid = true;
+    cache->get().transform = transformation;
+    cache->get().pose_generation = sample->get().m_presentation.get().pose_generation;
   }
   return transformation;
 }
 
-std::expected<Mat3F, StarException> NetworkedAnimator::queryFinalPartTransformation(String const& partName, Sample const* sample) const {
-  auto part = queryPartTransformation(partName, sample);
+std::expected<Mat3F, StarException> NetworkedAnimator::query_final_part_transformation(String const& part_name, SampleView sample) const {
+  auto part = query_part_transformation(part_name, sample, std::nullopt);
   if (!part) return std::unexpected(std::move(part.error()));
-  return globalTransformation() * *part;
+  return global_transformation() * *part;
 }
 
-std::expected<std::optional<Vec2F>, StarException> NetworkedAnimator::queryPartPoint(String const& partName, String const& propertyName, Sample const* sample) const {
-  auto active = sample ? m_animatedParts.active_part(partName, sample->m_presentation->parts) : m_animatedParts.active_part(partName);
+std::expected<std::optional<Vec2F>, StarException> NetworkedAnimator::query_part_point(String const& part_name, String const& property_name, SampleView sample) const {
+  auto active = sample ? m_animated_parts.active_part(part_name, sample->get().m_presentation.get().parts) : m_animated_parts.active_part(part_name);
   if (!active) return std::unexpected(std::move(active.error()));
-  auto property = active->get().properties.value(propertyName);
+  auto property = active->get().properties.value(property_name);
   if (!property) return std::optional<Vec2F>{};
   auto value = json_to_vec2f(property);
   if (!value) return std::unexpected(std::move(value.error()));
-  auto transform = queryFinalPartTransformation(partName, sample);
+  auto transform = query_final_part_transformation(part_name, sample);
   if (!transform) return std::unexpected(std::move(transform.error()));
   return std::optional<Vec2F>(transform->transform_point(*value));
 }
 
-std::expected<std::optional<PolyF>, StarException> NetworkedAnimator::queryPartPoly(String const& partName, String const& propertyName, Sample const* sample) const {
-  auto active = sample ? m_animatedParts.active_part(partName, sample->m_presentation->parts) : m_animatedParts.active_part(partName);
+std::expected<std::optional<PolyF>, StarException> NetworkedAnimator::query_part_poly(String const& part_name, String const& property_name, SampleView sample) const {
+  auto active = sample ? m_animated_parts.active_part(part_name, sample->get().m_presentation.get().parts) : m_animated_parts.active_part(part_name);
   if (!active) return std::unexpected(std::move(active.error()));
-  auto property = active->get().properties.value(propertyName);
+  auto property = active->get().properties.value(property_name);
   if (!property) return std::optional<PolyF>{};
   auto value = json_to_polyf(property);
   if (!value) return std::unexpected(std::move(value.error()));
-  auto transform = queryFinalPartTransformation(partName, sample);
+  auto transform = query_final_part_transformation(part_name, sample);
   if (!transform) return std::unexpected(std::move(transform.error()));
   value->transform(*transform);
   return std::optional<PolyF>(std::move(*value));
 }
 
-void NetworkedAnimator::setGlobalTag(String tagName, std::optional<String> tagValue) {
-  if (tagValue)
-    m_globalTags.set(std::move(tagName), std::move(*tagValue));
+void NetworkedAnimator::set_global_tag(String tag_name, std::optional<String> tag_value) {
+  if (tag_value)
+    m_global_tags.set(std::move(tag_name), std::move(*tag_value));
   else
-    m_globalTags.remove(tagName);
+    m_global_tags.remove(tag_name);
 }
 
-void NetworkedAnimator::removeGlobalTag(String const& tagName) {
-  m_globalTags.remove(tagName);
+void NetworkedAnimator::remove_global_tag(String const& tag_name) {
+  m_global_tags.remove(tag_name);
 }
 
-std::optional<std::reference_wrapper<String const>> NetworkedAnimator::globalTag(String const& tagName) const {
-  return m_globalTags.find_ref(tagName);
+std::optional<std::reference_wrapper<String const>> NetworkedAnimator::global_tag(String const& tag_name) const {
+  return m_global_tags.find_ref(tag_name);
 }
 
 
-void NetworkedAnimator::setPartTag(String const& partType, String tagName, std::optional<String> tagValue) {
-  if (tagValue)
-    m_partTags[partType].set(std::move(tagName), std::move(*tagValue));
+void NetworkedAnimator::set_part_tag(String const& part_type, String tag_name, std::optional<String> tag_value) {
+  if (tag_value)
+    m_part_tags[part_type].set(std::move(tag_name), std::move(*tag_value));
   else
-    m_partTags[partType].remove(tagName);
+    m_part_tags[part_type].remove(tag_name);
 }
 
-void NetworkedAnimator::setLocalTag(String tagName, std::optional<String> tagValue) {
-  if (tagValue)
-    m_localTags.set(tagName, *tagValue);
+void NetworkedAnimator::set_local_tag(String tag_name, std::optional<String> tag_value) {
+  if (tag_value)
+    m_local_tags.set(tag_name, *tag_value);
   else
-    m_localTags.remove(tagName);
+    m_local_tags.remove(tag_name);
 }
 
-void NetworkedAnimator::setPartDrawables(String const& partName, List<Drawable> drawables) {
-  m_partDrawables.set(partName, std::move(drawables));
+void NetworkedAnimator::set_part_drawables(String const& part_name, List<Drawable> drawables) {
+  m_part_drawables.set(part_name, std::move(drawables));
 }
-void NetworkedAnimator::addPartDrawables(String const& partName, List<Drawable> drawables) {
-  m_partDrawables[partName].append_range(drawables);
+void NetworkedAnimator::add_part_drawables(String const& part_name, List<Drawable> drawables) {
+  m_part_drawables[part_name].append_range(drawables);
 }
-std::expected<String, StarException> NetworkedAnimator::queryApplyPartTags(String const& partName, String apply, Sample const* sample) const {
-  HashMap<String, String> animationTags = m_localTags;
+std::expected<HashMap<String, String>, StarException> NetworkedAnimator::animation_tags(SampleView sample) const {
+  auto tags = m_local_tags;
   if (sample) {
-    for (auto const& tag : sample->m_presentation->tags) {
-      if (!tag.second.active)
+    for (auto const& [name, tag] : sample->get().m_presentation.get().tags) {
+      if (!tag.active)
         continue;
-      if (tag.second.value)
-        animationTags.set(tag.first, *tag.second.value);
+      if (tag.value)
+        tags.set(name, *tag.value);
       else
-        animationTags.remove(tag.first);
+        tags.remove(name);
     }
   }
-  std::optional<unsigned> frame;
-  String frameStr;
-  String frameIndexStr;
-  auto activePartResult = sample ? m_animatedParts.active_part(partName, sample->m_presentation->parts) : m_animatedParts.active_part(partName);
-  if (!activePartResult) return std::unexpected(std::move(activePartResult.error()));
-  auto const& activePart = activePartResult->get();
-  auto partTagsResult = m_partTags.get(partName);
-  if (!partTagsResult) return std::unexpected(std::move(partTagsResult.error()));
-  auto const& partTags = partTagsResult->get();
-  if (activePart.active_state) {
-    unsigned stateFrame = activePart.active_state->frame;
-    frame = stateFrame;
-    frameStr = static_cast<String>(Star::to_string(stateFrame + 1));
-    frameIndexStr = static_cast<String>(Star::to_string(stateFrame));
-  }
   if (version() > 0) {
-    animationTags.set("relativePath", m_relativePath);
-    for (auto& stateTypeName : m_animatedParts.state_types()) {
-      auto activeStateResult = sample ? m_animatedParts.active_state(stateTypeName, sample->m_presentation->parts) : m_animatedParts.active_state(stateTypeName);
-      if (!activeStateResult) return std::unexpected(std::move(activeStateResult.error()));
-      auto const& activeState = activeStateResult->get();
-      unsigned stateFrame = activeState.frame;
-      std::optional<unsigned> frame;
-      String frameStr;
-      String frameIndexStr;
-
-      frame = stateFrame;
-      frameStr = static_cast<String>(Star::to_string(stateFrame + 1));
-      frameIndexStr = static_cast<String>(Star::to_string(stateFrame));
-      if (frame) {
-        animationTags.set(stateTypeName + "_frame", frameStr);
-        animationTags.set(stateTypeName + "_frameIndex", frameIndexStr);
-      }
-      animationTags.set(stateTypeName + "_state", activeState.state_name);
-
-      if (auto p = activeState.properties.find_ref("animationTags")) {
-        auto tags = p->get().iterate_object();
-        if (!tags) return std::unexpected(std::move(tags.error()));
-        for (auto const& tag : *tags) {
-          if (!animationTags.contains(tag.first)) {
-            auto value = tag.second.to_string();
+    tags.set("relativePath", m_relative_path);
+    for (auto const& name : m_animation_state_types) {
+      auto active = sample ? m_animated_parts.active_state(name, sample->get().m_presentation.get().parts)
+                           : m_animated_parts.active_state(name);
+      if (!active) return std::unexpected(std::move(active.error()));
+      auto const& state = active->get();
+      tags.set(name + "_frame", static_cast<String>(Star::to_string(state.frame + 1)));
+      tags.set(name + "_frameIndex", static_cast<String>(Star::to_string(state.frame)));
+      tags.set(name + "_state", state.state_name);
+      if (auto property = state.properties.find_ref("animationTags")) {
+        auto authored = property->get().iterate_object();
+        if (!authored) return std::unexpected(std::move(authored.error()));
+        for (auto const& [tag, entry] : *authored) {
+          if (!tags.contains(tag)) {
+            auto value = entry.to_string();
             if (!value) return std::unexpected(std::move(value.error()));
-            animationTags.set(tag.first, *value);
+            tags.set(tag, std::move(*value));
           }
         }
       }
     }
   }
+  return tags;
+}
 
+namespace {
+class PartTagContext {
+public:
+  PartTagContext(HashMap<String, String> const& animation, NetElementHashMap<String, String> const& part,
+      NetElementHashMap<String, String> const& global, std::optional<unsigned> frame)
+    : m_animation(animation), m_part(part), m_global(global), m_frame(frame) {}
 
-  auto applied = apply.maybe_lookup_tags_view([&](StringView tag) -> StringView {
-    if (tag == "frame") {
-      if (frame)
-        return frameStr;
-    } else if (tag == "frameIndex") {
-      if (frame)
-        return frameIndexStr;
-    } else if (auto p = animationTags.find_ref(tag)) {
-      return StringView(p->get());
-    } else if (auto p = partTags.find_ref(tag)) {
-      return StringView(p->get());
-    } else if (auto p = m_globalTags.find_ref(tag)) {
-      return StringView(p->get());
-    }
-
+  StringView lookup(StringView tag) const {
+    if (auto value = m_animation.get().find_ref(tag)) return StringView(value->get());
+    if (auto value = m_part.get().find_ref(tag)) return StringView(value->get());
+    if (auto value = m_global.get().find_ref(tag)) return StringView(value->get());
     return StringView("default");
-  });
-  return applied ? *applied : apply;
+  }
+
+  StringView lookup_image(StringView tag) {
+    if (tag == "frame")
+      return frame_tag(m_frame_text, 1);
+    if (tag == "frameIndex")
+      return frame_tag(m_frame_index_text, 0);
+    return lookup(tag);
+  }
+
+private:
+  StringView frame_tag(std::optional<String>& text, unsigned offset) const {
+    if (!m_frame)
+      return StringView("default");
+    if (!text)
+      text.emplace(static_cast<String>(Star::to_string(*m_frame + offset)));
+    return StringView(*text);
+  }
+
+  std::reference_wrapper<HashMap<String, String> const> m_animation;
+  std::reference_wrapper<NetElementHashMap<String, String> const> m_part;
+  std::reference_wrapper<NetElementHashMap<String, String> const> m_global;
+  std::optional<unsigned> m_frame;
+  std::optional<String> m_frame_text;
+  std::optional<String> m_frame_index_text;
+};
+}
+
+std::expected<String, StarException> NetworkedAnimator::query_apply_part_tags(String const& part_name, String apply, SampleView sample) const {
+  auto active = sample ? m_animated_parts.active_part(part_name, sample->get().m_presentation.get().parts)
+                       : m_animated_parts.active_part(part_name);
+  if (!active) return std::unexpected(std::move(active.error()));
+  auto part_tags = m_part_tags.get(part_name);
+  if (!part_tags) return std::unexpected(std::move(part_tags.error()));
+  auto tags = animation_tags(sample);
+  if (!tags) return std::unexpected(std::move(tags.error()));
+  auto const& state = active->get().active_state;
+  PartTagContext context(*tags, part_tags->get(), m_global_tags, state ? std::optional<unsigned>{state->frame} : std::nullopt);
+  auto applied = apply.maybe_lookup_tags_view([&](StringView tag) { return context.lookup_image(tag); });
+  return applied ? std::move(*applied) : std::move(apply);
 }
 
 
-void NetworkedAnimator::setProcessingDirectives(Directives const& directives) {
-  m_processingDirectives.set(directives);
+void NetworkedAnimator::set_processing_directives(Directives const& directives) {
+  m_processing_directives.set(directives);
 }
 
-void NetworkedAnimator::setZoom(float zoom) {
+void NetworkedAnimator::set_zoom(float zoom) {
   m_zoom.set(zoom);
 }
 
@@ -1256,217 +1307,217 @@ bool NetworkedAnimator::flipped() const {
   return m_flipped.get();
 }
 
-float NetworkedAnimator::flippedRelativeCenterLine() const {
-  return m_flippedRelativeCenterLine.get();
+float NetworkedAnimator::flipped_relative_center_line() const {
+  return m_flipped_relative_center_line.get();
 }
 
-void NetworkedAnimator::setFlipped(bool flipped, float relativeCenterLine) {
+void NetworkedAnimator::set_flipped(bool flipped, float relative_center_line) {
   m_flipped.set(flipped);
-  m_flippedRelativeCenterLine.set(relativeCenterLine);
+  m_flipped_relative_center_line.set(relative_center_line);
 }
 
-void NetworkedAnimator::setAnimationRate(float rate) {
-  m_animationRate.set(rate);
+void NetworkedAnimator::set_animation_rate(float rate) {
+  m_animation_rate.set(rate);
 }
 
-float NetworkedAnimator::animationRate() {
-  return m_animationRate.get();
+float NetworkedAnimator::animation_rate() {
+  return m_animation_rate.get();
 }
 
-bool NetworkedAnimator::hasRotationGroup(String const& rotationGroup) const {
-  return m_rotationGroups.contains(rotationGroup);
+bool NetworkedAnimator::has_rotation_group(String const& rotation_group) const {
+  return m_rotation_groups.contains(rotation_group);
 }
 
-std::expected<void, StarException> NetworkedAnimator::rotateGroup(String const& rotationGroup, float targetAngle, bool immediate) {
-  auto groupResult = m_rotationGroups.get(rotationGroup);
-  if (!groupResult) return std::unexpected(std::move(groupResult.error()));
-  auto& group = groupResult->get();
-  group.targetAngle.set(targetAngle);
+std::expected<void, StarException> NetworkedAnimator::rotate_group(String const& rotation_group, float target_angle, bool immediate) {
+  auto group_result = m_rotation_groups.get(rotation_group);
+  if (!group_result) return std::unexpected(std::move(group_result.error()));
+  auto& group = group_result->get();
+  group.target_angle.set(target_angle);
 
   if (immediate) {
-    group.currentAngle = targetAngle;
-    group.previousAngle = targetAngle;
-    group.netImmediateEvent.trigger();
+    group.current_angle = target_angle;
+    group.previous_angle = target_angle;
+    group.net_immediate_event.trigger();
   }
   return {};
 }
 
-std::expected<float, StarException> NetworkedAnimator::queryCurrentRotationAngle(String const& rotationGroup, Sample const* sample) const {
-  auto entry = m_rotationGroups.get(rotationGroup);
+std::expected<float, StarException> NetworkedAnimator::query_current_rotation_angle(String const& rotation_group, SampleView sample) const {
+  auto entry = m_rotation_groups.get(rotation_group);
   if (!entry) return std::unexpected(std::move(entry.error()));
   auto const& group = entry->get();
-  return sample ? angle_lerp(sample->interpolation(), group.previousAngle, group.currentAngle) : group.currentAngle;
+  return sample ? angle_lerp(sample->get().interpolation(), group.previous_angle, group.current_angle) : group.current_angle;
 }
 
-bool NetworkedAnimator::hasTransformationGroup(String const& transformationGroup) const {
-  return m_transformationGroups.contains(transformationGroup);
+bool NetworkedAnimator::has_transformation_group(String const& transformation_group) const {
+  return m_transformation_groups.contains(transformation_group);
 }
 
-std::expected<void, StarException> NetworkedAnimator::translateTransformationGroup(String const& transformationGroup, Vec2F const& translation) {
-  auto groupResult = m_transformationGroups.get(transformationGroup);
-  if (!groupResult) return std::unexpected(std::move(groupResult.error()));
-  auto& group = groupResult->get();
-  group.setAffineTransform(Mat3F::translation(translation) * group.affineTransform());
+std::expected<void, StarException> NetworkedAnimator::translate_transformation_group(String const& transformation_group, Vec2F const& translation) {
+  auto group_result = m_transformation_groups.get(transformation_group);
+  if (!group_result) return std::unexpected(std::move(group_result.error()));
+  auto& group = group_result->get();
+  group.set_affine_transform(Mat3F::translation(translation) * group.affine_transform());
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::rotateTransformationGroup(
-    String const& transformationGroup, float rotation, Vec2F const& rotationCenter) {
-  auto groupResult = m_transformationGroups.get(transformationGroup);
-  if (!groupResult) return std::unexpected(std::move(groupResult.error()));
-  auto& group = groupResult->get();
-  group.setAffineTransform(Mat3F::rotation(rotation, rotationCenter) * group.affineTransform());
+std::expected<void, StarException> NetworkedAnimator::rotate_transformation_group(
+    String const& transformation_group, float rotation, Vec2F const& rotation_center) {
+  auto group_result = m_transformation_groups.get(transformation_group);
+  if (!group_result) return std::unexpected(std::move(group_result.error()));
+  auto& group = group_result->get();
+  group.set_affine_transform(Mat3F::rotation(rotation, rotation_center) * group.affine_transform());
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::scaleTransformationGroup(
-    String const& transformationGroup, float scale, Vec2F const& scaleCenter) {
-  auto groupResult = m_transformationGroups.get(transformationGroup);
-  if (!groupResult) return std::unexpected(std::move(groupResult.error()));
-  auto& group = groupResult->get();
-  group.setAffineTransform(Mat3F::scaling(scale, scaleCenter) * group.affineTransform());
+std::expected<void, StarException> NetworkedAnimator::scale_transformation_group(
+    String const& transformation_group, float scale, Vec2F const& scale_center) {
+  auto group_result = m_transformation_groups.get(transformation_group);
+  if (!group_result) return std::unexpected(std::move(group_result.error()));
+  auto& group = group_result->get();
+  group.set_affine_transform(Mat3F::scaling(scale, scale_center) * group.affine_transform());
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::scaleTransformationGroup(
-    String const& transformationGroup, Vec2F const& scale, Vec2F const& scaleCenter) {
-  auto groupResult = m_transformationGroups.get(transformationGroup);
-  if (!groupResult) return std::unexpected(std::move(groupResult.error()));
-  auto& group = groupResult->get();
-  group.setAffineTransform(Mat3F::scaling(scale, scaleCenter) * group.affineTransform());
+std::expected<void, StarException> NetworkedAnimator::scale_transformation_group(
+    String const& transformation_group, Vec2F const& scale, Vec2F const& scale_center) {
+  auto group_result = m_transformation_groups.get(transformation_group);
+  if (!group_result) return std::unexpected(std::move(group_result.error()));
+  auto& group = group_result->get();
+  group.set_affine_transform(Mat3F::scaling(scale, scale_center) * group.affine_transform());
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::transformTransformationGroup(
-    String const& transformationGroup, float a, float b, float c, float d, float tx, float ty) {
-  auto groupResult = m_transformationGroups.get(transformationGroup);
-  if (!groupResult) return std::unexpected(std::move(groupResult.error()));
-  auto& group = groupResult->get();
+std::expected<void, StarException> NetworkedAnimator::transform_transformation_group(
+    String const& transformation_group, float a, float b, float c, float d, float tx, float ty) {
+  auto group_result = m_transformation_groups.get(transformation_group);
+  if (!group_result) return std::unexpected(std::move(group_result.error()));
+  auto& group = group_result->get();
   Mat3F transform = Mat3F(a, b, tx, c, d, ty, 0, 0, 1);
-  group.setAffineTransform(transform * group.affineTransform());
+  group.set_affine_transform(transform * group.affine_transform());
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::resetTransformationGroup(String const& transformationGroup) {
-  auto entry = m_transformationGroups.get(transformationGroup);
+std::expected<void, StarException> NetworkedAnimator::reset_transformation_group(String const& transformation_group) {
+  auto entry = m_transformation_groups.get(transformation_group);
   if (!entry) return std::unexpected(std::move(entry.error()));
-  entry->get().setAffineTransform(Mat3F::identity());
+  entry->get().set_affine_transform(Mat3F::identity());
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::setTransformationGroup(String const& transformationGroup, Mat3F transform) {
-  auto entry = m_transformationGroups.get(transformationGroup);
+std::expected<void, StarException> NetworkedAnimator::set_transformation_group(String const& transformation_group, Mat3F transform) {
+  auto entry = m_transformation_groups.get(transformation_group);
   if (!entry) return std::unexpected(std::move(entry.error()));
-  entry->get().setAffineTransform(transform);
+  entry->get().set_affine_transform(transform);
   return {};
 }
 
-std::expected<Mat3F, StarException> NetworkedAnimator::getTransformationGroup(String const& transformationGroup) {
-  auto entry = m_transformationGroups.get(transformationGroup);
+std::expected<Mat3F, StarException> NetworkedAnimator::get_transformation_group(String const& transformation_group) {
+  auto entry = m_transformation_groups.get(transformation_group);
   if (!entry) return std::unexpected(std::move(entry.error()));
-  return entry->get().affineTransform();
+  return entry->get().affine_transform();
 }
-std::expected<void, StarException> NetworkedAnimator::translateLocalTransformationGroup(String const& transformationGroup, Vec2F const& translation) {
-  auto groupResult = m_transformationGroups.get(transformationGroup);
-  if (!groupResult) return std::unexpected(std::move(groupResult.error()));
-  auto& group = groupResult->get();
-  group.setLocalAffineTransform(Mat3F::translation(translation) * group.localAffineTransform());
+std::expected<void, StarException> NetworkedAnimator::translate_local_transformation_group(String const& transformation_group, Vec2F const& translation) {
+  auto group_result = m_transformation_groups.get(transformation_group);
+  if (!group_result) return std::unexpected(std::move(group_result.error()));
+  auto& group = group_result->get();
+  group.set_local_affine_transform(Mat3F::translation(translation) * group.local_affine_transform());
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::rotateLocalTransformationGroup(
-    String const& transformationGroup, float rotation, Vec2F const& rotationCenter) {
-  auto groupResult = m_transformationGroups.get(transformationGroup);
-  if (!groupResult) return std::unexpected(std::move(groupResult.error()));
-  auto& group = groupResult->get();
-  group.setLocalAffineTransform(Mat3F::rotation(rotation, rotationCenter) * group.localAffineTransform());
+std::expected<void, StarException> NetworkedAnimator::rotate_local_transformation_group(
+    String const& transformation_group, float rotation, Vec2F const& rotation_center) {
+  auto group_result = m_transformation_groups.get(transformation_group);
+  if (!group_result) return std::unexpected(std::move(group_result.error()));
+  auto& group = group_result->get();
+  group.set_local_affine_transform(Mat3F::rotation(rotation, rotation_center) * group.local_affine_transform());
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::scaleLocalTransformationGroup(
-    String const& transformationGroup, float scale, Vec2F const& scaleCenter) {
-  auto groupResult = m_transformationGroups.get(transformationGroup);
-  if (!groupResult) return std::unexpected(std::move(groupResult.error()));
-  auto& group = groupResult->get();
-  group.setLocalAffineTransform(Mat3F::scaling(scale, scaleCenter) * group.localAffineTransform());
+std::expected<void, StarException> NetworkedAnimator::scale_local_transformation_group(
+    String const& transformation_group, float scale, Vec2F const& scale_center) {
+  auto group_result = m_transformation_groups.get(transformation_group);
+  if (!group_result) return std::unexpected(std::move(group_result.error()));
+  auto& group = group_result->get();
+  group.set_local_affine_transform(Mat3F::scaling(scale, scale_center) * group.local_affine_transform());
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::scaleLocalTransformationGroup(
-    String const& transformationGroup, Vec2F const& scale, Vec2F const& scaleCenter) {
-  auto groupResult = m_transformationGroups.get(transformationGroup);
-  if (!groupResult) return std::unexpected(std::move(groupResult.error()));
-  auto& group = groupResult->get();
-  group.setLocalAffineTransform(Mat3F::scaling(scale, scaleCenter) * group.localAffineTransform());
+std::expected<void, StarException> NetworkedAnimator::scale_local_transformation_group(
+    String const& transformation_group, Vec2F const& scale, Vec2F const& scale_center) {
+  auto group_result = m_transformation_groups.get(transformation_group);
+  if (!group_result) return std::unexpected(std::move(group_result.error()));
+  auto& group = group_result->get();
+  group.set_local_affine_transform(Mat3F::scaling(scale, scale_center) * group.local_affine_transform());
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::transformLocalTransformationGroup(
-    String const& transformationGroup, float a, float b, float c, float d, float tx, float ty) {
-  auto groupResult = m_transformationGroups.get(transformationGroup);
-  if (!groupResult) return std::unexpected(std::move(groupResult.error()));
-  auto& group = groupResult->get();
+std::expected<void, StarException> NetworkedAnimator::transform_local_transformation_group(
+    String const& transformation_group, float a, float b, float c, float d, float tx, float ty) {
+  auto group_result = m_transformation_groups.get(transformation_group);
+  if (!group_result) return std::unexpected(std::move(group_result.error()));
+  auto& group = group_result->get();
   Mat3F transform = Mat3F(a, b, tx, c, d, ty, 0, 0, 1);
-  group.setLocalAffineTransform(transform * group.localAffineTransform());
+  group.set_local_affine_transform(transform * group.local_affine_transform());
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::resetLocalTransformationGroup(String const& transformationGroup) {
-  auto entry = m_transformationGroups.get(transformationGroup);
+std::expected<void, StarException> NetworkedAnimator::reset_local_transformation_group(String const& transformation_group) {
+  auto entry = m_transformation_groups.get(transformation_group);
   if (!entry) return std::unexpected(std::move(entry.error()));
-  entry->get().setLocalAffineTransform(Mat3F::identity());
+  entry->get().set_local_affine_transform(Mat3F::identity());
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::setLocalTransformationGroup(String const& transformationGroup, Mat3F transform) {
-  auto entry = m_transformationGroups.get(transformationGroup);
+std::expected<void, StarException> NetworkedAnimator::set_local_transformation_group(String const& transformation_group, Mat3F transform) {
+  auto entry = m_transformation_groups.get(transformation_group);
   if (!entry) return std::unexpected(std::move(entry.error()));
-  entry->get().setLocalAffineTransform(transform);
+  entry->get().set_local_affine_transform(transform);
   return {};
 }
 
-std::expected<Mat3F, StarException> NetworkedAnimator::getLocalTransformationGroup(String const& transformationGroup) {
-  auto entry = m_transformationGroups.get(transformationGroup);
+std::expected<Mat3F, StarException> NetworkedAnimator::get_local_transformation_group(String const& transformation_group) {
+  auto entry = m_transformation_groups.get(transformation_group);
   if (!entry) return std::unexpected(std::move(entry.error()));
-  return entry->get().localAffineTransform();
+  return entry->get().local_affine_transform();
 }
 
-bool NetworkedAnimator::hasParticleEmitter(String const& emitterName) const {
-  return m_particleEmitters.contains(emitterName);
+bool NetworkedAnimator::has_particle_emitter(String const& emitter_name) const {
+  return m_particle_emitters.contains(emitter_name);
 }
 
-std::expected<void, StarException> NetworkedAnimator::setParticleEmitterActive(String const& emitterName, bool active) {
-  auto entry = m_particleEmitters.get(emitterName);
+std::expected<void, StarException> NetworkedAnimator::set_particle_emitter_active(String const& emitter_name, bool active) {
+  auto entry = m_particle_emitters.get(emitter_name);
   if (!entry) return std::unexpected(std::move(entry.error()));
   entry->get().active.set(active);
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::setParticleEmitterEmissionRate(String const& emitterName, float emissionRate) {
-  auto entry = m_particleEmitters.get(emitterName);
+std::expected<void, StarException> NetworkedAnimator::set_particle_emitter_emission_rate(String const& emitter_name, float emission_rate) {
+  auto entry = m_particle_emitters.get(emitter_name);
   if (!entry) return std::unexpected(std::move(entry.error()));
-  entry->get().emissionRate.set(emissionRate);
+  entry->get().emission_rate.set(emission_rate);
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::setParticleEmitterOffsetRegion(String const& emitterName, RectF const& offsetRegion) {
-  auto entry = m_particleEmitters.get(emitterName);
+std::expected<void, StarException> NetworkedAnimator::set_particle_emitter_offset_region(String const& emitter_name, RectF const& offset_region) {
+  auto entry = m_particle_emitters.get(emitter_name);
   if (!entry) return std::unexpected(std::move(entry.error()));
-  entry->get().offsetRegion.set(offsetRegion);
+  entry->get().offset_region.set(offset_region);
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::setParticleEmitterBurstCount(String const& emitterName, unsigned burstCount) {
-  auto entry = m_particleEmitters.get(emitterName);
+std::expected<void, StarException> NetworkedAnimator::set_particle_emitter_burst_count(String const& emitter_name, unsigned burst_count) {
+  auto entry = m_particle_emitters.get(emitter_name);
   if (!entry) return std::unexpected(std::move(entry.error()));
-  entry->get().burstCount.set(burstCount);
+  entry->get().burst_count.set(burst_count);
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::burstParticleEmitter(String const& emitterName) {
-  auto entry = m_particleEmitters.get(emitterName);
+std::expected<void, StarException> NetworkedAnimator::burst_particle_emitter(String const& emitter_name) {
+  auto entry = m_particle_emitters.get(emitter_name);
   if (!entry) return std::unexpected(std::move(entry.error()));
-  entry->get().burstEvent.trigger();
+  entry->get().burst_event.trigger();
   return {};
 }
 
@@ -1504,344 +1555,267 @@ std::expected<void, StarException> NetworkedAnimator::set_light_point_angle(Stri
   return {};
 }
 
-bool NetworkedAnimator::hasSound(String const& soundName) const {
-  return m_sounds.contains(soundName);
+bool NetworkedAnimator::has_sound(String const& sound_name) const {
+  return m_sounds.contains(sound_name);
 }
 
-std::expected<void, StarException> NetworkedAnimator::setSoundPool(String const& soundName, StringList soundPool) {
-  auto entry = m_sounds.get(soundName);
+std::expected<void, StarException> NetworkedAnimator::set_sound_pool(String const& sound_name, StringList sound_pool) {
+  auto entry = m_sounds.get(sound_name);
   if (!entry) return std::unexpected(std::move(entry.error()));
-  entry->get().soundPool.set(std::move(soundPool));
+  entry->get().sound_pool.set(std::move(sound_pool));
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::setSoundPosition(String const& soundName, Vec2F const& position) {
-  auto soundResult = m_sounds.get(soundName);
-  if (!soundResult) return std::unexpected(std::move(soundResult.error()));
-  auto& sound = soundResult->get();
-  sound.xPosition.set(position[0]);
-  sound.yPosition.set(position[1]);
+std::expected<void, StarException> NetworkedAnimator::set_sound_position(String const& sound_name, Vec2F const& position) {
+  auto sound_result = m_sounds.get(sound_name);
+  if (!sound_result) return std::unexpected(std::move(sound_result.error()));
+  auto& sound = sound_result->get();
+  sound.x_position.set(position[0]);
+  sound.y_position.set(position[1]);
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::setSoundVolume(String const& soundName, float volume, float rampTime) {
-  auto soundResult = m_sounds.get(soundName);
-  if (!soundResult) return std::unexpected(std::move(soundResult.error()));
-  auto& sound = soundResult->get();
-  sound.volumeTarget.set(volume);
-  sound.volumeRampTime.set(rampTime);
+std::expected<void, StarException> NetworkedAnimator::set_sound_volume(String const& sound_name, float volume, float ramp_time) {
+  auto sound_result = m_sounds.get(sound_name);
+  if (!sound_result) return std::unexpected(std::move(sound_result.error()));
+  auto& sound = sound_result->get();
+  sound.volume_target.set(volume);
+  sound.volume_ramp_time.set(ramp_time);
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::setSoundPitchMultiplier(String const& soundName, float pitchMultiplier, float rampTime) {
-  auto soundResult = m_sounds.get(soundName);
-  if (!soundResult) return std::unexpected(std::move(soundResult.error()));
-  auto& sound = soundResult->get();
-  sound.pitchMultiplierTarget.set(pitchMultiplier);
-  sound.pitchMultiplierRampTime.set(rampTime);
+std::expected<void, StarException> NetworkedAnimator::set_sound_pitch_multiplier(String const& sound_name, float pitch_multiplier, float ramp_time) {
+  auto sound_result = m_sounds.get(sound_name);
+  if (!sound_result) return std::unexpected(std::move(sound_result.error()));
+  auto& sound = sound_result->get();
+  sound.pitch_multiplier_target.set(pitch_multiplier);
+  sound.pitch_multiplier_ramp_time.set(ramp_time);
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::playSound(String const& soundName, int loops) {
-  auto soundResult = m_sounds.get(soundName);
-  if (!soundResult) return std::unexpected(std::move(soundResult.error()));
-  auto& sound = soundResult->get();
+std::expected<void, StarException> NetworkedAnimator::play_sound(String const& sound_name, int loops) {
+  auto sound_result = m_sounds.get(sound_name);
+  if (!sound_result) return std::unexpected(std::move(sound_result.error()));
+  auto& sound = sound_result->get();
   sound.loops.set(loops);
   sound.signals.send(SoundSignal::Play);
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::stopAllSounds(String const& soundName, float rampTime) {
-  auto soundResult = m_sounds.get(soundName);
-  if (!soundResult) return std::unexpected(std::move(soundResult.error()));
-  auto& sound = soundResult->get();
-  sound.volumeRampTime.set(rampTime);
+std::expected<void, StarException> NetworkedAnimator::stop_all_sounds(String const& sound_name, float ramp_time) {
+  auto sound_result = m_sounds.get(sound_name);
+  if (!sound_result) return std::unexpected(std::move(sound_result.error()));
+  auto& sound = sound_result->get();
+  sound.volume_ramp_time.set(ramp_time);
   sound.signals.send(SoundSignal::StopAll);
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::setEffectEnabled(String const& effect, bool enabled) {
+std::expected<void, StarException> NetworkedAnimator::set_effect_enabled(String const& effect, bool enabled) {
   auto entry = m_effects.get(effect);
   if (!entry) return std::unexpected(std::move(entry.error()));
   entry->get().enabled.set(enabled);
   return {};
 }
 
-std::expected<List<Drawable>, StarException> NetworkedAnimator::queryDrawables(Vec2F const& position, Sample const* sample) const {
-  List<Drawable> drawables;
-  auto rendered = queryDrawablesWithZLevel(position, sample);
-  if (!rendered) return std::unexpected(std::move(rendered.error()));
-  for (auto& p : *rendered)
-    drawables.push_back(std::move(p.first));
-  return drawables;
+std::expected<List<Drawable>, StarException> NetworkedAnimator::query_drawables(Vec2F const& position, SampleView sample) const {
+  return collect_drawables<Drawable>(position, sample);
 }
 
-std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator::queryDrawablesWithZLevel(Vec2F const& position, Sample const* sample) const {
-  std::size_t partCount = m_animatedParts.const_parts().size();
-  if (!partCount)
-    return List<std::pair<Drawable, float>>{};
+std::expected<List<std::pair<Drawable, float>>, StarException> NetworkedAnimator::query_drawables_with_z_level(Vec2F const& position, SampleView sample) const {
+  return collect_drawables<std::pair<Drawable, float>>(position, sample);
+}
 
-  auto part_drawables = [&](String const& name) -> std::optional<std::reference_wrapper<List<Drawable> const>> {
-    if (sample) {
-      auto override = sample->m_presentation->drawables.find_ref(name);
-      if (override && override->get().active)
-        return override->get().drawables;
-    }
-    return m_partDrawables.find_ref(name);
-  };
+template <typename Output>
+  requires (std::same_as<Output, Drawable> || std::same_as<Output, std::pair<Drawable, float>>)
+std::expected<List<Output>, StarException> NetworkedAnimator::collect_drawables(Vec2F const& position, SampleView sample) const {
+  List<Output> drawables;
+  std::size_t const part_count = m_animated_parts.const_parts().size();
+  if (!part_count)
+    return drawables;
 
-  List<Directives> baseProcessingDirectives = { m_processingDirectives.get() };
-  for (auto& pair : m_effects) {
-    auto const& effectState = pair.second;
-
-    if (effectState.enabled.get()) {
-      auto const& effect = pair.second;
-      if (effect.type == "flash") {
-        if (effectState.timer > effect.time / 2) {
-          baseProcessingDirectives.push_back(effect.directives);
-        }
-      } else if (effect.type == "directive") {
-        baseProcessingDirectives.push_back(effect.directives);
-      } else {
-        return std::unexpected(NetworkedAnimatorException(Star::format("No such NetworkedAnimator effect type '{}'", effect.type)));
-      }
-    }
-  }
-  HashMap<String, String> animationTags = m_localTags;
-  if (sample) {
-    for (auto const& tag : sample->m_presentation->tags) {
-      if (!tag.second.active)
+  List<std::reference_wrapper<Directives const>> effect_directives;
+  for (auto const& [name, effect] : m_effects) {
+    if (!effect.enabled.get())
+      continue;
+    if (effect.type == "flash") {
+      if (!(effect.timer > effect.time / 2))
         continue;
-      if (tag.second.value)
-        animationTags.set(tag.first, *tag.second.value);
-      else
-        animationTags.remove(tag.first);
+    } else if (effect.type != "directive") {
+      return std::unexpected(NetworkedAnimatorException(Star::format("No such NetworkedAnimator effect type '{}'", effect.type)));
     }
+    if (!effect.directives.empty())
+      effect_directives.push_back(std::cref(effect.directives));
   }
-  if (version() > 0) {
-    animationTags.set("relativePath", m_relativePath);
-    for (auto& stateTypeName : m_animatedParts.state_types()) {
-      auto activeStateResult = sample ? m_animatedParts.active_state(stateTypeName, sample->m_presentation->parts) : m_animatedParts.active_state(stateTypeName);
-      if (!activeStateResult) return std::unexpected(std::move(activeStateResult.error()));
-      auto const& activeState = activeStateResult->get();
-      unsigned stateFrame = activeState.frame;
-      std::optional<unsigned> frame;
-      String frameStr;
-      String frameIndexStr;
+  auto tags = animation_tags(sample);
+  if (!tags) return std::unexpected(std::move(tags.error()));
 
-      frame = stateFrame;
-      frameStr = static_cast<String>(Star::to_string(stateFrame + 1));
-      frameIndexStr = static_cast<String>(Star::to_string(stateFrame));
-      if (frame) {
-        animationTags.set(stateTypeName + "_frame", frameStr);
-        animationTags.set(stateTypeName + "_frameIndex", frameIndexStr);
-      }
-      animationTags.set(stateTypeName + "_state", activeState.state_name);
-
-      if (auto p = activeState.properties.find_ref("animationTags")) {
-        auto tags = p->get().iterate_object();
-        if (!tags) return std::unexpected(std::move(tags.error()));
-        for (auto const& tag : *tags) {
-          if (!animationTags.contains(tag.first)) {
-            auto value = tag.second.to_string();
-            if (!value) return std::unexpected(std::move(value.error()));
-            animationTags.set(tag.first, *value);
-          }
-        }
+  struct Part {
+    std::reference_wrapper<AnimatedPartSet::ActivePartInformation const> active;
+    std::reference_wrapper<String const> name;
+    std::span<Drawable const> attachments;
+    float z;
+  };
+  List<Part> parts;
+  parts.reserve(part_count);
+  std::size_t drawable_count = part_count;
+  bool const flipped = m_flipped.get();
+  bool const has_animation_tags = version() > 0;
+  auto attachments_for = [&](String const& name) -> std::span<Drawable const> {
+    if (sample) {
+      auto override = sample->get().m_presentation.get().drawables.find_ref(name);
+      if (override && override->get().active) {
+        auto const& drawables = override->get().drawables;
+        return drawables ? std::span<Drawable const>(drawables->get()) : std::span<Drawable const>{};
       }
     }
-  }
-
-  List<std::tuple<std::reference_wrapper<AnimatedPartSet::ActivePartInformation const>, std::reference_wrapper<String const>, float>> parts;
-  parts.reserve(partCount);
-  int drawableCount = 0;
-  auto collect_part = [&](String const& partName, AnimatedPartSet::ActivePartInformation const& activePart) -> std::expected<void, StarException> {
-    std::optional<float> maybeZLevel;
-    if (m_flipped.get()) {
-      auto maybeFlipped = activePart.properties.value("flippedZLevel").opt_float();
-      if (!maybeFlipped) return std::unexpected(std::move(maybeFlipped.error()));
-      if (*maybeFlipped) maybeZLevel = **maybeFlipped;
-    }
-    if (!maybeZLevel) {
-      auto z = activePart.properties.value("zLevel").opt_float();
-      if (!z) return std::unexpected(std::move(z.error()));
-      maybeZLevel = *z;
-    }
-
-    if (auto drawables = part_drawables(partName))
-      drawableCount += drawables->get().size();
-    parts.push_back(std::make_tuple(std::cref(activePart), std::cref(partName), maybeZLevel.value_or(0.0f)));
+    if (auto attached = m_part_drawables.find_ref(name))
+      return attached->get();
     return {};
   };
-  auto collected = sample ? m_animatedParts.for_each_active_part(collect_part, sample->m_presentation->parts)
-                          : m_animatedParts.for_each_active_part(collect_part);
+  auto collect_part = [&](String const& name, AnimatedPartSet::ActivePartInformation const& active) -> std::expected<void, StarException> {
+    std::optional<float> z;
+    if (flipped) {
+      auto flipped_z = active.properties.value("flippedZLevel").opt_float();
+      if (!flipped_z) return std::unexpected(std::move(flipped_z.error()));
+      z = *flipped_z;
+    }
+    if (!z) {
+      auto normal_z = active.properties.value("zLevel").opt_float();
+      if (!normal_z) return std::unexpected(std::move(normal_z.error()));
+      z = *normal_z;
+    }
+    auto attachments = attachments_for(name);
+    drawable_count += attachments.size();
+    parts.push_back({std::cref(active), std::cref(name), attachments, z.value_or(0.0f)});
+    return {};
+  };
+  auto collected = sample ? m_animated_parts.for_each_active_part(collect_part, sample->get().m_presentation.get().parts)
+                          : m_animated_parts.for_each_active_part(collect_part);
   if (!collected) return std::unexpected(std::move(collected.error()));
+  std::sort(parts.begin(), parts.end(), [](Part const& a, Part const& b) { return a.z < b.z; });
 
-  std::sort(parts.begin(), parts.end(), [](auto const& a, auto const& b) { return std::get<2>(a) < std::get<2>(b); });
-
-  List<std::pair<Drawable, float>> drawables;
-  drawables.reserve(partCount + drawableCount);
-  for (auto& entry : parts) {
-    auto& activePart = std::get<0>(entry).get();
-    auto& partName = std::get<1>(entry).get();
-    // Make sure we don't copy the original image
-    String fallback = "";
-    Json jImage = activePart.properties.value("image", {});
-    if (version() > 0 && m_flipped.get()) {
-      auto maybeFlipped = activePart.properties.value("flippedImage").opt_string();
-      if (!maybeFlipped) return std::unexpected(std::move(maybeFlipped.error()));
-      if (*maybeFlipped) jImage = **maybeFlipped;
+  drawables.reserve(drawable_count);
+  auto emit = [&](Drawable drawable, Mat3F const& transform, float z) {
+    drawable.transform(transform);
+    if constexpr (std::same_as<Output, Drawable>)
+      drawables.push_back(std::move(drawable));
+    else
+      drawables.emplace_back(std::move(drawable), z);
+  };
+  std::shared_ptr<ImageMetadataDatabase const> metadata;
+  auto ensure_metadata = [&]() -> std::expected<void, StarException> {
+    if (!metadata) {
+      auto loaded = m_root.get().image_metadata_database();
+      if (!loaded) return std::unexpected(std::move(loaded.error()));
+      metadata = std::move(*loaded);
     }
-
-    std::shared_ptr<String const> imageString;
-    if (jImage.is_type(Json::Type::String)) {
-      auto checkedImage = jImage.string_ptr();
-      if (!checkedImage)
-        return std::unexpected(std::move(checkedImage.error()));
-      imageString = std::move(*checkedImage);
+    return {};
+  };
+  Mat3F const global_transform = global_transformation();
+  for (auto const& entry : parts) {
+    auto const& active = entry.active.get();
+    auto const& name = entry.name.get();
+    auto flipped_image = has_animation_tags && flipped ? active.properties.find_ref("flippedImage") : std::nullopt;
+    bool const use_flipped_image = flipped_image && !flipped_image->get().is_null();
+    auto image_property = use_flipped_image ? flipped_image : active.properties.find_ref("image");
+    std::shared_ptr<String const> image;
+    if (image_property && (use_flipped_image || image_property->get().is_type(Json::Type::String))) {
+      auto checked = image_property->get().string_ptr();
+      if (!checked) return std::unexpected(std::move(checked.error()));
+      image = std::move(*checked);
     }
-    String const& image = imageString ? *imageString : fallback;
+    auto centered_value = active.properties.value("centered").opt_bool();
+    if (!centered_value) return std::unexpected(std::move(centered_value.error()));
+    auto fullbright = active.properties.value("fullbright").opt_bool();
+    if (!fullbright) return std::unexpected(std::move(fullbright.error()));
+    bool const centered = centered_value->value_or(true);
 
-    auto centeredValue = activePart.properties.value("centered").opt_bool();
-    if (!centeredValue) return std::unexpected(std::move(centeredValue.error()));
-    auto fullbrightValue = activePart.properties.value("fullbright").opt_bool();
-    if (!fullbrightValue) return std::unexpected(std::move(fullbrightValue.error()));
-    bool centered = centeredValue->value_or(true);
-    bool fullbright = fullbrightValue->value_or(false);
+    auto part_tags = m_part_tags.get(name);
+    if (!part_tags) return std::unexpected(std::move(part_tags.error()));
+    auto const& state = active.active_state;
+    PartTagContext context(*tags, part_tags->get(), m_global_tags, state ? std::optional<unsigned>{state->frame} : std::nullopt);
+    auto processing = [&](JsonObject const& properties) -> std::expected<Directives, StarException> {
+      auto property = properties.find_ref("processingDirectives");
+      if (!property || property->get().is_null()) return Directives{};
+      auto text = property->get().string_ptr();
+      if (!text) return std::unexpected(std::move(text.error()));
+      if ((**text).empty()) return Directives{};
+      if (has_animation_tags) {
+        auto applied = (**text).maybe_lookup_tags_view([&](StringView tag) { return context.lookup(tag); });
+        if (applied) return Directives(std::move(*applied));
+      }
+      return Directives(**text);
+    };
+    auto part_directives = processing(active.properties);
+    if (!part_directives) return std::unexpected(std::move(part_directives.error()));
+    auto state_directives = state ? processing(state->properties) : std::expected<Directives, StarException>{};
+    if (!state_directives) return std::unexpected(std::move(state_directives.error()));
 
-    std::size_t originalDirectivesSize = baseProcessingDirectives.size();
+    auto part_transform = query_part_transformation(name, sample, std::nullopt);
+    if (!part_transform) return std::unexpected(std::move(part_transform.error()));
+    auto transform = global_transform * *part_transform;
+    transform.translate(position);
 
-    auto partTagsResult = m_partTags.get(partName);
-    if (!partTagsResult) return std::unexpected(std::move(partTagsResult.error()));
-    auto const& partTags = partTagsResult->get();
-
-    auto partDirectives = activePart.properties.value("processingDirectives").opt_string();
-    if (!partDirectives) return std::unexpected(std::move(partDirectives.error()));
-    if (auto directives = *partDirectives) {
-      if (version() > 0){
-        directives = directives->maybe_lookup_tags_view([&](StringView tag) -> StringView {
-          if (auto p = animationTags.find_ref(tag)) {
-            return StringView(p->get());
-          } else if (auto p = partTags.find_ref(tag)) {
-            return StringView(p->get());
-          } else if (auto p = m_globalTags.find_ref(tag)) {
-            return StringView(p->get());
+    if (image) {
+      auto processed = image->maybe_lookup_tags_view([&](StringView tag) { return context.lookup_image(tag); });
+      String const& used_image = processed ? *processed : *image;
+      if (!used_image.empty()) {
+        auto initial = used_image.at(0);
+        if (!initial) return std::unexpected(std::move(initial.error()));
+        if (*initial != ':' && *initial != '?') {
+          auto cached = m_cached_part_drawables.find(name);
+          if (cached == m_cached_part_drawables.end() || cached->second.path != used_image || cached->second.centered != centered) {
+            auto loaded = ensure_metadata();
+            if (!loaded) return std::unexpected(std::move(loaded.error()));
+            String resolved;
+            if (*initial != '/')
+              resolved = AssetPath::relative_to(m_relative_path, used_image);
+            auto created = Drawable::make_image(*metadata, *initial == '/' ? used_image : resolved, 1.0f / tile_pixels, centered, Vec2F());
+            if (!created) return std::unexpected(std::move(created.error()));
+            CachedPartDrawable next{processed ? std::move(*processed) : String(used_image), centered, std::move(*created)};
+            if (cached == m_cached_part_drawables.end())
+              cached = m_cached_part_drawables.emplace(name, std::move(next)).first;
+            else
+              cached->second = std::move(next);
           }
-          return StringView("default");
-        });
-      }
-      if (!directives) return std::unexpected(NetworkedAnimatorException("Processing directives tag lookup produced no value"));
-      baseProcessingDirectives.push_back(*directives);
-    }
 
-    std::optional<unsigned> frame;
-    String frameStr;
-    String frameIndexStr;
-    if (activePart.active_state) {
-      unsigned stateFrame = activePart.active_state->frame;
-      frame = stateFrame;
-      frameStr = static_cast<String>(Star::to_string(stateFrame + 1));
-      frameIndexStr = static_cast<String>(Star::to_string(stateFrame));
-
-      auto stateDirectives = activePart.active_state->properties.value("processingDirectives").opt_string();
-      if (!stateDirectives) return std::unexpected(std::move(stateDirectives.error()));
-      if (auto directives = *stateDirectives) {
-        if (version() > 0){
-          directives = directives->maybe_lookup_tags_view([&](StringView tag) -> StringView {
-            if (auto p = animationTags.find_ref(tag)) {
-              return StringView(p->get());
-            } else if (auto p = partTags.find_ref(tag)) {
-              return StringView(p->get());
-            } else if (auto p = m_globalTags.find_ref(tag)) {
-              return StringView(p->get());
+          Drawable drawable = cached->second.drawable;
+          auto& image_part = drawable.image_part();
+          auto append = [&](Directives const& directives) -> std::expected<void, StarException> {
+            if (directives.empty()) return {};
+            if (!centered) {
+              image_part.image.directives += directives;
+              return {};
             }
-            return StringView("default");
-          });
-        }
-        if (!directives) return std::unexpected(NetworkedAnimatorException("Processing directives tag lookup produced no value"));
-        baseProcessingDirectives.push_back(*directives);
-      }
-    }
-
-    std::optional<String> processedImage = image.maybe_lookup_tags_view([&](StringView tag) -> StringView {
-      if (tag == "frame") {
-        if (frame)
-          return frameStr;
-      } else if (tag == "frameIndex") {
-        if (frame)
-          return frameIndexStr;
-      } else if (auto p = animationTags.find_ref(tag)) {
-        return StringView(p->get());
-      } else if (auto p = partTags.find_ref(tag)) {
-        return StringView(p->get());
-      } else if (auto p = m_globalTags.find_ref(tag)) {
-        return StringView(p->get());
-      }
-
-      return StringView("default");
-    });
-    String const& usedImage = processedImage ? *processedImage : image;
-
-    auto partTransform = queryPartTransformation(partName, sample);
-    if (!partTransform) return std::unexpected(std::move(partTransform.error()));
-    auto transformation = globalTransformation() * *partTransform;
-    transformation.translate(position);
-
-    std::optional<String::Char> initial;
-    if (!usedImage.empty()) {
-      auto character = usedImage.at(0);
-      if (!character) return std::unexpected(std::move(character.error()));
-      initial = *character;
-    }
-    if (initial && *initial != ':' && *initial != '?') {
-      std::size_t hash = hash_of(usedImage);
-      auto find = m_cachedPartDrawables.find(partName);
-      if (find == m_cachedPartDrawables.end() || find->second.first != hash) {
-        String relativeImage;
-        if (*initial != '/')
-          relativeImage = AssetPath::relative_to(m_relativePath, usedImage);
-
-        auto metadata = m_root.get().image_metadata_database();
-        if (!metadata) return std::unexpected(std::move(metadata.error()));
-        auto created = Drawable::make_image(**metadata, !relativeImage.empty() ? relativeImage : usedImage, 1.0f / tile_pixels, centered, Vec2F());
-        if (!created) return std::unexpected(std::move(created.error()));
-        Drawable drawable = std::move(*created);
-        if (find == m_cachedPartDrawables.end())
-          find = m_cachedPartDrawables.emplace(partName, std::pair{ hash, std::move(drawable) }).first;
-        else {
-          find->second.first = hash;
-          find->second.second = std::move(drawable);
+            auto loaded = ensure_metadata();
+            if (!loaded) return std::unexpected(std::move(loaded.error()));
+            auto added = image_part.add_directives(*metadata, directives, true);
+            if (!added) return std::unexpected(std::move(added.error()));
+            return {};
+          };
+          auto added_base = append(m_processing_directives.get());
+          if (!added_base) return std::unexpected(std::move(added_base.error()));
+          for (Directives const& directives : effect_directives) {
+            auto added = append(directives);
+            if (!added) return std::unexpected(std::move(added.error()));
+          }
+          auto added_part = append(*part_directives);
+          if (!added_part) return std::unexpected(std::move(added_part.error()));
+          auto added_state = append(*state_directives);
+          if (!added_state) return std::unexpected(std::move(added_state.error()));
+          drawable.fullbright = fullbright->value_or(false);
+          emit(std::move(drawable), transform, entry.z);
         }
       }
-
-      Drawable drawable = find->second.second;
-      auto& imagePart = drawable.image_part();
-      for (Directives const& directives : baseProcessingDirectives) {
-        auto metadata = m_root.get().image_metadata_database();
-        if (!metadata) return std::unexpected(std::move(metadata.error()));
-        auto added = imagePart.add_directives(**metadata, directives, centered);
-        if (!added) return std::unexpected(std::move(added.error()));
-      }
-      drawable.fullbright = fullbright;
-      drawable.transform(transformation);
-      drawables.push_back({std::move(drawable), std::get<2>(entry)});
     }
-
-    if (auto attached = part_drawables(partName)) {
-      for (auto const& attachedDrawable : attached->get()) {
-        Drawable drawable = attachedDrawable;
-        drawable.transform(transformation);
-        drawables.push_back({std::move(drawable), std::get<2>(entry)});
-      }
-    }
-
-    baseProcessingDirectives.resize(originalDirectivesSize);
+    for (auto const& attached : entry.attachments)
+      emit(attached, transform, entry.z);
   }
-
   return drawables;
 }
 
-std::expected<void, StarException> NetworkedAnimator::append_light_sources(List<LightSource>& lights, Vec2F const& translate, std::optional<std::reference_wrapper<Sample const>> sample) const {
+std::expected<void, StarException> NetworkedAnimator::append_light_sources(List<LightSource>& lights, Vec2F const& translate, SampleView sample) const {
   auto initial_size = lights.size();
   auto rollback = [&](StarException&& error) {
     lights.resize(initial_size);
@@ -1857,7 +1831,7 @@ std::expected<void, StarException> NetworkedAnimator::append_light_sources(List<
     float point_angle = normalize_angle(light.point_angle.get());
     Mat3F transformation = Mat3F::identity();
     if (light.anchor_part) {
-      auto anchor = sample ? sample->get().partTransformation(*light.anchor_part) : partTransformation(*light.anchor_part);
+      auto anchor = query_part_transformation(*light.anchor_part, sample, std::nullopt);
       if (!anchor) return rollback(std::move(anchor.error()));
       transformation = *anchor;
     }
@@ -1867,16 +1841,16 @@ std::expected<void, StarException> NetworkedAnimator::append_light_sources(List<
     position = transformation.transform_point(position);
     point_angle = transformation.transform_angle(point_angle);
     if (light.rotation_group) {
-      auto rotation = m_rotationGroups.get(*light.rotation_group);
+      auto rotation = m_rotation_groups.get(*light.rotation_group);
       if (!rotation) return rollback(std::move(rotation.error()));
       auto const& rg = rotation->get();
-      float angle = sample ? angle_lerp(sample->get().interpolation(), rg.previousAngle, rg.currentAngle) : rg.currentAngle;
-      Vec2F center = light.rotation_center.value_or(rg.rotationCenter);
+      float angle = sample ? angle_lerp(sample->get().interpolation(), rg.previous_angle, rg.current_angle) : rg.current_angle;
+      Vec2F center = light.rotation_center.value_or(rg.rotation_center);
       position = (position - center).rotate(angle) + center;
       point_angle += angle;
     }
     if (!global)
-      global.emplace(globalTransformation());
+      global.emplace(global_transformation());
     position = global->transform_point(position);
     if (flipped) {
       if (point_angle > 0)
@@ -1896,126 +1870,183 @@ std::expected<void, StarException> NetworkedAnimator::append_light_sources(List<
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::update(float dt, std::optional<std::reference_wrapper<DynamicTarget>> dynamicTarget) {
-  dt *= m_animationRate.get();
+std::expected<std::shared_ptr<AudioInstance>, StarException> NetworkedAnimator::load_sound(String const& path) const {
+  auto assets = m_root.get().assets();
+  if (!assets) return std::unexpected(std::move(assets.error()));
+  auto audio = (*assets)->audio(path);
+  if (!audio) return std::unexpected(std::move(audio.error()));
+  return AudioInstance::create(**audio);
+}
 
-  auto animated = m_animatedParts.update(dt);
-  if (!animated) return std::unexpected(std::move(animated.error()));
+std::expected<void, StarException> NetworkedAnimator::update_state_sounds(DynamicTarget& target, String const& name,
+    AnimatedPartSet::ActiveStateInformation const& state) const {
+  using SoundFile = std::shared_ptr<String const>;
+  auto select_file = [this](Json const& sound) -> std::expected<SoundFile, StarException> {
+    if (sound.is_type(Json::Type::String))
+      return sound.string_ptr();
+    if (sound.is_type(Json::Type::Array)) {
+      auto pool = sound.array_ptr();
+      if (!pool) return std::unexpected(std::move(pool.error()));
+      if (!(**pool).empty()) {
+        auto selected = m_root.get().random().sample_ref(**pool);
+        if (!selected) return std::unexpected(std::move(selected.error()));
+        return selected->get().string_ptr();
+      }
+    }
+    return SoundFile{};
+  };
 
-  auto statesUpdated = m_animatedParts.for_each_active_state([&](String const& stateTypeName, AnimatedPartSet::ActiveStateInformation const& activeState) -> std::expected<void, StarException> {
-      if (dynamicTarget) {
-        dynamicTarget->get().clearFinishedAudio();
+  // Selection precedes the identity check, even for an unchanged pool.
+  auto persistent = state.properties.find_ref("persistentSound");
+  auto persistent_file = persistent ? select_file(persistent->get()) : std::expected<SoundFile, StarException>{};
+  if (!persistent_file) return std::unexpected(std::move(persistent_file.error()));
+  auto active = target.state_persistent_sounds.find_ref(name);
+  if (active && active->get().audio && active->get().audio->finished())
+    active->get().audio.reset();
+  if (!active || !persistent || active->get().sound != persistent->get() || !active->get().audio) {
+    if (*persistent_file && !(*persistent_file)->empty()) {
+      auto range = state.properties.value("persistentSoundRangeMultiplier", 1.f).to_float();
+      if (!range) return std::unexpected(std::move(range.error()));
+      auto stop_time = state.properties.value("persistentSoundStopTime", 0.f).to_float();
+      if (!stop_time) return std::unexpected(std::move(stop_time.error()));
+      auto next = load_sound(AssetPath::relative_to(m_relative_path, **persistent_file));
+      if (!next) return std::unexpected(std::move(next.error()));
+      (*next)->set_range_multiplier(*range);
+      (*next)->set_loops(-1);
+      (*next)->set_position(global_transformation().transform_point(Vec2F{}));
 
-        Json persistentSound = activeState.properties.value("persistentSound", "");
-        String persistentSoundFile;
+      if (active && active->get().audio)
+        active->get().audio->stop(active->get().stop_ramp_time);
+      target.pending_audios.push_back(*next);
+      target.state_persistent_sounds[name] = {persistent->get(), std::move(*next), *stop_time};
+    } else if (active) {
+      if (active->get().audio)
+        active->get().audio->stop(active->get().stop_ramp_time);
+      target.state_persistent_sounds.remove(name);
+    }
+  }
 
-        if (persistentSound.is_type(Json::Type::String)) {
-          auto file = persistentSound.to_string();
-          if (!file) return std::unexpected(std::move(file.error()));
-          persistentSoundFile = *file;
-        } else if (persistentSound.is_type(Json::Type::Array)) {
-          auto sound_pool = persistentSound.array_ptr();
-          if (!sound_pool)
-            return std::unexpected(std::move(sound_pool.error()));
-          auto file = m_root.get().random().sample_value(**sound_pool, "").and_then([](Json const& value) {
-            return value.to_string();
-          });
-          if (!file) return std::unexpected(std::move(file.error()));
-          persistentSoundFile = *file;
-        }
+  auto immediate = state.properties.find_ref("immediateSound");
+  if (!immediate) {
+    target.state_immediate_sounds.remove(name);
+    return {};
+  }
+  auto immediate_file = select_file(immediate->get());
+  if (!immediate_file) return std::unexpected(std::move(immediate_file.error()));
+  if (auto last = target.state_immediate_sounds.find_ref(name); !last || last->get() != immediate->get()) {
+    if (*immediate_file && !(*immediate_file)->empty()) {
+      auto range = state.properties.value("immediateSoundRangeMultiplier", 1.f).to_float();
+      if (!range) return std::unexpected(std::move(range.error()));
+      auto next = load_sound(AssetPath::relative_to(m_relative_path, **immediate_file));
+      if (!next) return std::unexpected(std::move(next.error()));
+      (*next)->set_range_multiplier(*range);
+      (*next)->set_position(global_transformation().transform_point(Vec2F{}));
+      target.pending_audios.push_back(std::move(*next));
+    }
+    target.state_immediate_sounds[name] = immediate->get();
+  }
+  return {};
+}
 
-        if (!persistentSoundFile.empty())
-          persistentSoundFile = AssetPath::relative_to(m_relativePath, persistentSoundFile);
-
-        auto& activePersistentSound = dynamicTarget->get().statePersistentSounds[stateTypeName];
-
-        bool changedPersistentSound = persistentSound != activePersistentSound.sound;
-        if (changedPersistentSound || !activePersistentSound.audio) {
-          activePersistentSound.sound = std::move(persistentSound);
-          if (activePersistentSound.audio)
-            activePersistentSound.audio->stop(activePersistentSound.stopRampTime);
-
-          if (!persistentSoundFile.empty()) {
-            auto assets = m_root.get().assets();
-            if (!assets) return std::unexpected(std::move(assets.error()));
-            auto audio = (*assets)->audio(persistentSoundFile);
-            if (!audio) return std::unexpected(std::move(audio.error()));
-            auto instance = AudioInstance::create(**audio);
-            if (!instance) return std::unexpected(std::move(instance.error()));
-            activePersistentSound.audio = std::move(*instance);
-            auto range = activeState.properties.value("persistentSoundRangeMultiplier", 1.0f).to_float();
-            if (!range) return std::unexpected(std::move(range.error()));
-            activePersistentSound.audio->set_range_multiplier(*range);
-            activePersistentSound.audio->set_loops(-1);
-            activePersistentSound.audio->set_position(globalTransformation().transform_point(Vec2F()));
-            auto stopTime = activeState.properties.value("persistentSoundStopTime", 0.0f).to_float();
-            if (!stopTime) return std::unexpected(std::move(stopTime.error()));
-            activePersistentSound.stopRampTime = *stopTime;
-            dynamicTarget->get().pendingAudios.push_back(activePersistentSound.audio);
-          } else {
-            dynamicTarget->get().statePersistentSounds.remove(stateTypeName);
+std::expected<void, StarException> NetworkedAnimator::update_independent_sounds(DynamicTarget& target) {
+  for (auto& [name, entry] : m_sounds) {
+    auto& active_sounds = target.independent_sounds;
+    std::optional<Vec2F> position;
+    auto base_position = [&]() -> Vec2F const& {
+      if (!position)
+        position = global_transformation().transform_point(Vec2F(entry.x_position.get(), entry.y_position.get()));
+      return *position;
+    };
+    auto update_levels = [&](AudioInstance& audio) {
+      audio.set_volume(entry.volume_target.get(), entry.volume_ramp_time.get());
+      audio.set_pitch_multiplier(entry.pitch_multiplier_target.get(), entry.pitch_multiplier_ramp_time.get());
+    };
+    auto deliver = [&](List<SoundSignal> const& signals, std::size_t& next_signal) -> std::expected<void, StarException> {
+      for (; next_signal < signals.size(); ++next_signal) {
+        if (signals[next_signal] == SoundSignal::StopAll) {
+          if (auto active = active_sounds.find_ref(name)) {
+            for (auto const& audio : active->get())
+              audio->stop(entry.volume_ramp_time.get());
+            active_sounds.remove(name);
           }
+          continue;
         }
-
-        Json immediateSound = activeState.properties.value("immediateSound", "");
-        String immediateSoundFile = "";
-
-        if (immediateSound.is_type(Json::Type::String)) {
-          auto file = immediateSound.to_string();
-          if (!file) return std::unexpected(std::move(file.error()));
-          immediateSoundFile = *file;
-        } else if (immediateSound.is_type(Json::Type::Array)) {
-          auto sound_pool = immediateSound.array_ptr();
-          if (!sound_pool)
-            return std::unexpected(std::move(sound_pool.error()));
-          auto file = m_root.get().random().sample_value(**sound_pool, "").and_then([](Json const& value) {
-            return value.to_string();
-          });
-          if (!file) return std::unexpected(std::move(file.error()));
-          immediateSoundFile = *file;
-        }
-
-        if (!immediateSoundFile.empty())
-          immediateSoundFile = AssetPath::relative_to(m_relativePath, immediateSoundFile);
-
-        auto& activeImmediateSound = dynamicTarget->get().stateImmediateSounds[stateTypeName];
-
-        bool changedImmediateSound = immediateSound != activeImmediateSound.sound;
-        if (changedImmediateSound) {
-          activeImmediateSound.sound = std::move(immediateSound);
-          if (!immediateSoundFile.empty()) {
-            auto assets = m_root.get().assets();
-            if (!assets) return std::unexpected(std::move(assets.error()));
-            auto audio = (*assets)->audio(immediateSoundFile);
-            if (!audio) return std::unexpected(std::move(audio.error()));
-            auto instance = AudioInstance::create(**audio);
-            if (!instance) return std::unexpected(std::move(instance.error()));
-            activeImmediateSound.audio = std::move(*instance);
-            auto range = activeState.properties.value("immediateSoundRangeMultiplier", 1.0f).to_float();
-            if (!range) return std::unexpected(std::move(range.error()));
-            activeImmediateSound.audio->set_range_multiplier(*range);
-            activeImmediateSound.audio->set_position(globalTransformation().transform_point(Vec2F()));
-            dynamicTarget->get().pendingAudios.push_back(activeImmediateSound.audio);
-          }
+        if (signals[next_signal] != SoundSignal::Play)
+          continue;
+        auto const& pool = entry.sound_pool.get();
+        if (pool.empty())
+          continue;
+        auto selected = m_root.get().random().sample_ref(pool);
+        if (!selected) return std::unexpected(std::move(selected.error()));
+        if (!selected->get().empty()) {
+          auto audio = load_sound(selected->get());
+          if (!audio) return std::unexpected(std::move(audio.error()));
+          (*audio)->set_range_multiplier(entry.range_multiplier);
+          (*audio)->set_loops(entry.loops.get());
+          (*audio)->set_position(base_position());
+          update_levels(**audio);
+          active_sounds[name].push_back(*audio);
+          target.pending_audios.push_back(std::move(*audio));
         }
       }
+      return {};
+    };
 
-      if (auto lights_on = activeState.properties.find_ref("lightsOn")) {
+    // receive() acknowledges the whole batch. Retain its uncommitted suffix
+    // across a failed asset load and deliver it before reading newer signals.
+    if (!entry.retry_signals.empty()) {
+      auto delivered = deliver(entry.retry_signals, entry.next_retry_signal);
+      if (!delivered) return delivered;
+      entry.retry_signals = {};
+    }
+    auto signals = entry.signals.receive();
+    std::size_t next_signal = 0;
+    if (auto delivered = deliver(signals, next_signal); !delivered) {
+      entry.retry_signals = std::move(signals);
+      entry.next_retry_signal = next_signal;
+      return delivered;
+    }
+
+    if (auto active = active_sounds.find_ref(name)) {
+      for (auto const& audio : active->get()) {
+        if (auto base = target.current_audio_base_positions.find_ref(audio))
+          base->get() = base_position();
+        update_levels(*audio);
+      }
+    }
+  }
+  return {};
+}
+
+std::expected<void, StarException> NetworkedAnimator::update(float dt, std::optional<std::reference_wrapper<DynamicTarget>> dynamic_target) {
+  dt *= m_animation_rate.get();
+
+  auto animated = m_animated_parts.update(dt);
+  if (!animated) return std::unexpected(std::move(animated.error()));
+
+  auto states_updated = m_animated_parts.for_each_active_state([&](String const& state_type,
+      AnimatedPartSet::ActiveStateInformation const& active_state) -> std::expected<void, StarException> {
+      if (dynamic_target) {
+        if (auto sounds = update_state_sounds(dynamic_target->get(), state_type, active_state); !sounds)
+          return sounds;
+      }
+
+      if (auto lights_on = active_state.properties.find_ref("lightsOn")) {
         auto entries = lights_on->get().iterate_array();
         if (!entries) return std::unexpected(std::move(entries.error()));
-        for (auto const& nameJson : *entries) {
-          auto name = nameJson.to_string();
+        for (auto const& name_json : *entries) {
+          auto name = name_json.to_string();
           if (!name) return std::unexpected(std::move(name.error()));
           auto entry = m_lights.get(*name);
           if (!entry) return std::unexpected(std::move(entry.error()));
           entry->get().active.set(true);
         }
       }
-      if (auto lights_off = activeState.properties.find_ref("lightsOff")) {
+      if (auto lights_off = active_state.properties.find_ref("lightsOff")) {
         auto entries = lights_off->get().iterate_array();
         if (!entries) return std::unexpected(std::move(entries.error()));
-        for (auto const& nameJson : *entries) {
-          auto name = nameJson.to_string();
+        for (auto const& name_json : *entries) {
+          auto name = name_json.to_string();
           if (!name) return std::unexpected(std::move(name.error()));
           auto entry = m_lights.get(*name);
           if (!entry) return std::unexpected(std::move(entry.error()));
@@ -2023,24 +2054,24 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         }
       }
 
-      if (auto particleEmittersOn = activeState.properties.find_ref("particleEmittersOn")) {
-        auto entries = particleEmittersOn->get().iterate_array();
+      if (auto emitters_on = active_state.properties.find_ref("particleEmittersOn")) {
+        auto entries = emitters_on->get().iterate_array();
         if (!entries) return std::unexpected(std::move(entries.error()));
-        for (auto const& nameJson : *entries) {
-          auto name = nameJson.to_string();
+        for (auto const& name_json : *entries) {
+          auto name = name_json.to_string();
           if (!name) return std::unexpected(std::move(name.error()));
-          auto entry = m_particleEmitters.get(*name);
+          auto entry = m_particle_emitters.get(*name);
           if (!entry) return std::unexpected(std::move(entry.error()));
           entry->get().active.set(true);
         }
       }
-      if (auto particleEmittersOff = activeState.properties.find_ref("particleEmittersOff")) {
-        auto entries = particleEmittersOff->get().iterate_array();
+      if (auto emitters_off = active_state.properties.find_ref("particleEmittersOff")) {
+        auto entries = emitters_off->get().iterate_array();
         if (!entries) return std::unexpected(std::move(entries.error()));
-        for (auto const& nameJson : *entries) {
-          auto name = nameJson.to_string();
+        for (auto const& name_json : *entries) {
+          auto name = name_json.to_string();
           if (!name) return std::unexpected(std::move(name.error()));
-          auto entry = m_particleEmitters.get(*name);
+          auto entry = m_particle_emitters.get(*name);
           if (!entry) return std::unexpected(std::move(entry.error()));
           entry->get().active.set(false);
         }
@@ -2048,158 +2079,116 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
 
       return {};
     });
-  if (!statesUpdated) return std::unexpected(std::move(statesUpdated.error()));
+  if (!states_updated) return states_updated;
   if (version() > 0) {
-    for (auto& pair : m_transformationGroups) {
-      auto& group = pair.second;
-      group.animationBaseTransform = group.animationAffineTransform();
-      auto transform = animationGroupTransformation(pair.first, group, group.animationBaseTransform, nullptr);
+    for (auto& [name, group] : m_transformation_groups) {
+      group.animation_base_transform = group.animation_affine_transform();
+      auto transform = animation_group_transformation(name, group, group.animation_base_transform, std::nullopt);
       if (!transform) return std::unexpected(std::move(transform.error()));
-      group.setAnimationAffineTransform(*transform);
+      group.set_animation_affine_transform(*transform);
     }
   }
 
-  for (auto& pair : m_rotationGroups) {
-    auto& rotationGroup = pair.second;
-    rotationGroup.previousAngle = rotationGroup.currentAngle;
-    if (rotationGroup.angularVelocity == 0.0f)
-      rotationGroup.currentAngle = rotationGroup.targetAngle.get();
+  for (auto& [name, rotation] : m_rotation_groups) {
+    rotation.previous_angle = rotation.current_angle;
+    if (rotation.angular_velocity == 0.0f)
+      rotation.current_angle = rotation.target_angle.get();
     else
-      rotationGroup.currentAngle = approach_angle(rotationGroup.targetAngle.get(), rotationGroup.currentAngle, rotationGroup.angularVelocity * dt);
+      rotation.current_angle = approach_angle(rotation.target_angle.get(), rotation.current_angle, rotation.angular_velocity * dt);
   }
 
-  if (dynamicTarget) {
-    auto addParticles = [this, dynamicTarget](ParticleEmitter::ParticleConfig const& config, RectF const& offsetRegion, Mat3F const& transformation) {
-      for (unsigned i = 0; i < config.count; ++i) {
-        Particle particle = config.creator();
-        particle.position += config.offset;
-
-        if (!offsetRegion.is_null()) {
-          particle.position[0] += m_root.get().random().uniform_float() * offsetRegion.width() + offsetRegion.x_min();
-          particle.position[1] += m_root.get().random().uniform_float() * offsetRegion.height() + offsetRegion.y_min();
-        }
-
-        float speed = particle.velocity.magnitude();
-        particle.velocity = Vec2F::with_angle(transformation.transform_angle(particle.velocity.angle())) * speed;
-        particle.position = transformation.transform_point(particle.position);
-        particle.rotation = transformation.transform_angle(particle.rotation);
-
-        particle.size *= m_zoom.get();
-        if (config.flip)
-          particle.flip = !particle.flip;
-
-        if (transformation.determinant() < 0) {
-          particle.flip = !particle.flip;
-          particle.rotation += std::numbers::pi;
-        }
-
-        dynamicTarget->get().pendingParticles.push_back(std::move(particle));
-      }
-    };
-
-    for (auto& pair : m_particleEmitters) {
+  if (dynamic_target) {
+    auto& target = dynamic_target->get();
+    auto& random = m_root.get().random();
+    for (auto& [name, emitter] : m_particle_emitters) {
       Mat3F transformation = Mat3F::identity();
-      if (pair.second.anchorPart) {
-        auto anchor = partTransformation(*pair.second.anchorPart);
+      if (emitter.anchor_part) {
+        auto anchor = part_transformation(*emitter.anchor_part);
         if (!anchor) return std::unexpected(std::move(anchor.error()));
         transformation = *anchor;
       }
-      auto group = group_transformation(pair.second.transformationGroups);
+      auto group = group_transformation(emitter.transformation_groups);
       if (!group) return std::unexpected(std::move(group.error()));
       transformation = *group * transformation;
 
-      if (pair.second.rotationGroup) {
-        auto rotation = m_rotationGroups.get(*pair.second.rotationGroup);
+      if (emitter.rotation_group) {
+        auto rotation = m_rotation_groups.get(*emitter.rotation_group);
         if (!rotation) return std::unexpected(std::move(rotation.error()));
         auto const& rg = rotation->get();
-        Vec2F rotationCenter = pair.second.rotationCenter.value_or(rg.rotationCenter);
-        transformation = Mat3F::rotation(rg.currentAngle, rotationCenter) * transformation;
+        Vec2F rotation_center = emitter.rotation_center.value_or(rg.rotation_center);
+        transformation = Mat3F::rotation(rg.current_angle, rotation_center) * transformation;
       }
 
-      transformation = globalTransformation() * transformation;
-
-      // assume we emit no particles
-      unsigned numEmissionCycles = 0;
-
-      if (pair.second.active.get()) {
-        pair.second.timer = std::min(pair.second.timer, 1.0f / (pair.second.emissionRate.get() + pair.second.emissionRateVariance));
-        if (pair.second.timer <= 0.0f) {
-          // timer causes us to emit one set
-          ++numEmissionCycles;
-          auto variance = m_root.get().random().uniform_float(-pair.second.emissionRateVariance, pair.second.emissionRateVariance);
+      unsigned emission_cycles = 0;
+      if (emitter.active.get()) {
+        auto rate = emitter.emission_rate.get();
+        emitter.timer = std::min(emitter.timer, 1.0f / (rate + emitter.emission_rate_variance));
+        if (emitter.timer <= 0.0f) {
+          ++emission_cycles;
+          auto variance = random.uniform_float(-emitter.emission_rate_variance, emitter.emission_rate_variance);
           if (!variance) return std::unexpected(std::move(variance.error()));
-          pair.second.timer = 1.0f / (pair.second.emissionRate.get() + *variance);
+          emitter.timer = 1.0f / (rate + *variance);
         } else {
-          pair.second.timer -= dt;
+          emitter.timer -= dt;
         }
       }
 
-      auto bursts = pair.second.burstEvent.pull_occurrences();
-      for (std::uint64_t i = 0; i < bursts; ++i)
-        numEmissionCycles += pair.second.burstCount.get();
+      auto bursts = emitter.burst_event.pull_occurrences();
+      auto count = emitter.burst_count.get();
+      if (count != 0 && bursts > (std::numeric_limits<unsigned>::max() - emission_cycles) / count)
+        return std::unexpected(NetworkedAnimatorException(Star::format("Particle emitter '{}' burst cycle count overflow", name)));
+      emission_cycles += static_cast<unsigned>(bursts * count);
+      if (emission_cycles == 0 || emitter.particle_list.empty())
+        continue;
 
-      if (numEmissionCycles > 0) {
-        RectF rect = pair.second.offsetRegion.get();
-        unsigned numToSelect = pair.second.randomSelectCount.get();
-
-        for (unsigned i = 0; i < numEmissionCycles; ++i) {
-          if (numToSelect >= pair.second.particleList.size()) {
-            for (auto const& particleConfig : pair.second.particleList)
-              addParticles(particleConfig, rect, transformation);
-          } else {
-            List<ParticleEmitter::ParticleConfig> shuffledList = pair.second.particleList;
-            m_root.get().random().shuffle(shuffledList);
-
-            for (unsigned i = 0; i < numToSelect; ++i)
-              addParticles(shuffledList[i], rect, transformation);
+      transformation = global_transformation() * transformation;
+      auto const& offset_region = emitter.offset_region.get();
+      bool has_offset = !offset_region.is_null();
+      bool flipped = transformation.determinant() < 0;
+      auto zoom = m_zoom.get();
+      auto emit = [&](ParticleEmitter::ParticleConfig const& config) {
+        for (unsigned i = 0; i < config.count; ++i) {
+          Particle particle = config.creator();
+          particle.position += config.offset;
+          if (has_offset) {
+            particle.position[0] += random.uniform_float() * offset_region.width() + offset_region.x_min();
+            particle.position[1] += random.uniform_float() * offset_region.height() + offset_region.y_min();
           }
+
+          float speed = particle.velocity.magnitude();
+          particle.velocity = Vec2F::with_angle(transformation.transform_angle(particle.velocity.angle())) * speed;
+          particle.position = transformation.transform_point(particle.position);
+          particle.rotation = transformation.transform_angle(particle.rotation);
+          particle.size *= zoom;
+          if (config.flip != flipped)
+            particle.flip = !particle.flip;
+          if (flipped)
+            particle.rotation += std::numbers::pi;
+          target.pending_particles.push_back(std::move(particle));
+        }
+      };
+
+      auto selected_count = static_cast<unsigned>(emitter.random_select_count.get());
+      if (selected_count >= emitter.particle_list.size()) {
+        for (unsigned cycle = 0; cycle < emission_cycles; ++cycle) {
+          for (auto const& config : emitter.particle_list)
+            emit(config);
+        }
+      } else {
+        m_particle_selection.resize(emitter.particle_list.size());
+        for (unsigned cycle = 0; cycle < emission_cycles; ++cycle) {
+          // A fresh authored order per cycle matches the old shuffled copy,
+          // including RNG consumption when selected_count is zero.
+          std::iota(m_particle_selection.begin(), m_particle_selection.end(), std::size_t{0});
+          random.shuffle(m_particle_selection);
+          for (std::size_t i = 0; i < selected_count; ++i)
+            emit(emitter.particle_list[m_particle_selection[i]]);
         }
       }
     }
 
-    for (auto& pair : m_sounds) {
-      auto const& soundName = pair.first;
-      auto& soundEntry = pair.second;
-
-      for (auto signal : soundEntry.signals.receive()) {
-        if (signal == SoundSignal::StopAll) {
-          for (auto& sound : std::exchange(dynamicTarget->get().independentSounds[soundName], {}))
-            sound->stop(soundEntry.volumeRampTime.get());
-        } else if (signal == SoundSignal::Play) {
-          auto selectedFile = m_root.get().random().sample_value(soundEntry.soundPool.get());
-          if (!selectedFile)
-            return std::unexpected(std::move(selectedFile.error()));
-          String soundFile = std::move(*selectedFile);
-          if (!soundFile.empty()) {
-            auto assets = m_root.get().assets();
-            if (!assets) return std::unexpected(std::move(assets.error()));
-            auto audio = (*assets)->audio(soundFile);
-            if (!audio) return std::unexpected(std::move(audio.error()));
-            auto instance = AudioInstance::create(**audio);
-            if (!instance) return std::unexpected(std::move(instance.error()));
-            auto sound = std::move(*instance);
-            sound->set_range_multiplier(soundEntry.rangeMultiplier);
-            sound->set_loops(soundEntry.loops.get());
-            sound->set_position(
-              globalTransformation().transform_point(Vec2F(soundEntry.xPosition.get(), soundEntry.yPosition.get())));
-            sound->set_volume(soundEntry.volumeTarget.get(), soundEntry.volumeRampTime.get());
-            sound->set_pitch_multiplier(soundEntry.pitchMultiplierTarget.get(),
-                                        soundEntry.pitchMultiplierRampTime.get());
-            dynamicTarget->get().independentSounds[soundName].push_back(sound);
-            dynamicTarget->get().pendingAudios.push_back(std::move(sound));
-          }
-        }
-      }
-
-      // Update all still active independent sounds position, volume, and speed
-      for (auto const& activeIndependentSound : dynamicTarget->get().independentSounds.value(soundName)) {
-        if (auto basePosition = dynamicTarget->get().currentAudioBasePositions.find_ref(activeIndependentSound))
-          basePosition->get() = globalTransformation().transform_point(Vec2F(soundEntry.xPosition.get(), soundEntry.yPosition.get()));
-        activeIndependentSound->set_volume(soundEntry.volumeTarget.get(), soundEntry.volumeRampTime.get());
-        activeIndependentSound->set_pitch_multiplier(soundEntry.pitchMultiplierTarget.get(),
-                                                     soundEntry.pitchMultiplierRampTime.get());
-      }
-    }
+    if (auto sounds = update_independent_sounds(target); !sounds)
+      return sounds;
   }
 
   for (auto& pair : m_lights) {
@@ -2216,131 +2205,130 @@ std::expected<void, StarException> NetworkedAnimator::update(float dt, std::opti
         effect.timer -= dt;
     }
   }
-  for (auto& pair : m_transformationGroups) {
-    auto& group = pair.second;
-    auto transform = group.affineTransform();
-    group.previousTransform = group.presentationHistory ? group.currentTransform : transform;
-    group.previousLocalTransform = group.presentationHistory ? group.currentLocalTransform : group.localTransform;
-    group.currentLocalTransform = group.localTransform;
-    group.currentTransform = transform;
-    group.presentationHistory = true;
+  for (auto& [name, group] : m_transformation_groups) {
+    auto transform = group.affine_transform();
+    group.previous_transform = group.presentation_history ? group.current_transform : transform;
+    group.previous_local_transform = group.presentation_history ? group.current_local_transform : group.local_transform;
+    group.current_local_transform = group.local_transform;
+    group.current_transform = transform;
+    group.presentation_history = true;
   }
   return {};
 }
 
-std::expected<void, StarException> NetworkedAnimator::finishAnimations() {
-  return m_animatedParts.finish_animations();
+std::expected<void, StarException> NetworkedAnimator::finish_animations() {
+  return m_animated_parts.finish_animations();
 }
 
 void NetworkedAnimator::commit_local_reset(Sample const& staged) {
-  auto const& presentation = *staged.m_presentation;
-  m_animatedParts.commit_finished_states(presentation.parts);
-  for (auto& [name, group] : m_transformationGroups)
-    group.setLocalAffineTransform(presentation.groups[group.presentationIndex].localTransform);
+  auto const& presentation = staged.m_presentation.get();
+  m_animated_parts.commit_finished_states(presentation.parts);
+  for (auto& [name, group] : m_transformation_groups)
+    group.set_local_affine_transform(presentation.groups[group.presentation_index].local_transform);
   for (auto const& [name, tag] : presentation.tags)
     if (tag.active)
-      setLocalTag(name, tag.value);
+      set_local_tag(name, tag.value);
 }
 
-Mat3F NetworkedAnimator::TransformationGroup::affineTransform() const {
+Mat3F NetworkedAnimator::TransformationGroup::affine_transform() const {
   return Mat3F(
-      xScale.get() * std::cos(xShear.get()), xScale.get() * std::sin(xShear.get()), xTranslation.get(),
-      yScale.get() * std::sin(yShear.get()), yScale.get() * std::cos(yShear.get()), yTranslation.get(),
+      x_scale.get() * std::cos(x_shear.get()), x_scale.get() * std::sin(x_shear.get()), x_translation.get(),
+      y_scale.get() * std::sin(y_shear.get()), y_scale.get() * std::cos(y_shear.get()), y_translation.get(),
       0, 0, 1
     );
 }
 
-void NetworkedAnimator::TransformationGroup::setAffineTransform(Mat3F const& matrix) {
-  xTranslation.set(matrix[0][2]);
-  yTranslation.set(matrix[1][2]);
-  xScale.set(std::sqrt(square(matrix[0][0]) + square(matrix[0][1])));
-  yScale.set(std::sqrt(square(matrix[1][0]) + square(matrix[1][1])));
-  xShear.set(std::atan2(matrix[0][1], matrix[0][0]));
-  yShear.set(std::atan2(matrix[1][0], matrix[1][1]));
+void NetworkedAnimator::TransformationGroup::set_affine_transform(Mat3F const& matrix) {
+  x_translation.set(matrix[0][2]);
+  y_translation.set(matrix[1][2]);
+  x_scale.set(std::sqrt(square(matrix[0][0]) + square(matrix[0][1])));
+  y_scale.set(std::sqrt(square(matrix[1][0]) + square(matrix[1][1])));
+  x_shear.set(std::atan2(matrix[0][1], matrix[0][0]));
+  y_shear.set(std::atan2(matrix[1][0], matrix[1][1]));
 }
 
-void NetworkedAnimator::TransformationGroup::setLocalAffineTransform(Mat3F const& matrix) {
-  localTransform = matrix;
+void NetworkedAnimator::TransformationGroup::set_local_affine_transform(Mat3F const& matrix) {
+  local_transform = matrix;
 }
 
-Mat3F NetworkedAnimator::TransformationGroup::localAffineTransform() const {
-  return localTransform;
+Mat3F NetworkedAnimator::TransformationGroup::local_affine_transform() const {
+  return local_transform;
 }
 
-void NetworkedAnimator::TransformationGroup::setAnimationAffineTransform(Mat3F const& matrix) {
-  xTranslationAnimation = matrix[0][2];
-  yTranslationAnimation = matrix[1][2];
-  xScaleAnimation = std::sqrt(square(matrix[0][0]) + square(matrix[0][1]));
-  yScaleAnimation = std::sqrt(square(matrix[1][0]) + square(matrix[1][1]));
-  xShearAnimation = std::atan2(matrix[0][1], matrix[0][0]);
-  yShearAnimation = std::atan2(matrix[1][0], matrix[1][1]);
+void NetworkedAnimator::TransformationGroup::set_animation_affine_transform(Mat3F const& matrix) {
+  x_translation_animation = matrix[0][2];
+  y_translation_animation = matrix[1][2];
+  x_scale_animation = std::sqrt(square(matrix[0][0]) + square(matrix[0][1]));
+  y_scale_animation = std::sqrt(square(matrix[1][0]) + square(matrix[1][1]));
+  x_shear_animation = std::atan2(matrix[0][1], matrix[0][0]);
+  y_shear_animation = std::atan2(matrix[1][0], matrix[1][1]);
 }
 
-Mat3F NetworkedAnimator::TransformationGroup::animationAffineTransform() const {
+Mat3F NetworkedAnimator::TransformationGroup::animation_affine_transform() const {
   return Mat3F(
-      xScaleAnimation * std::cos(xShearAnimation), xScaleAnimation * std::sin(xShearAnimation), xTranslationAnimation,
-      yScaleAnimation * std::sin(yShearAnimation), yScaleAnimation * std::cos(yShearAnimation), yTranslationAnimation,
+      x_scale_animation * std::cos(x_shear_animation), x_scale_animation * std::sin(x_shear_animation), x_translation_animation,
+      y_scale_animation * std::sin(y_shear_animation), y_scale_animation * std::cos(y_shear_animation), y_translation_animation,
       0, 0, 1
     );
 }
 
-std::expected<void, StarException> NetworkedAnimator::setupNetStates() {
+std::expected<void, StarException> NetworkedAnimator::setup_net_states() {
   clear_net_elements();
 
-  if (auto registered = add_net_element(m_processingDirectives); !registered) return std::unexpected(std::move(registered.error()));
+  if (auto registered = add_net_element(m_processing_directives); !registered) return std::unexpected(std::move(registered.error()));
   if (auto registered = add_net_element(m_zoom); !registered) return std::unexpected(std::move(registered.error()));
   if (auto registered = add_net_element(m_flipped); !registered) return std::unexpected(std::move(registered.error()));
-  if (auto registered = add_net_element(m_flippedRelativeCenterLine); !registered) return std::unexpected(std::move(registered.error()));
+  if (auto registered = add_net_element(m_flipped_relative_center_line); !registered) return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = add_net_element(m_animationRate); !registered) return std::unexpected(std::move(registered.error()));
-  m_animationRate.set_interpolator(lerp<float, float>);
+  if (auto registered = add_net_element(m_animation_rate); !registered) return std::unexpected(std::move(registered.error()));
+  m_animation_rate.set_interpolator(lerp<float, float>);
 
-  if (auto registered = add_net_element(m_globalTags); !registered) return std::unexpected(std::move(registered.error()));
+  if (auto registered = add_net_element(m_global_tags); !registered) return std::unexpected(std::move(registered.error()));
 
-  auto partNames = m_animatedParts.part_names();
-  partNames.sort();
-  for (auto const& part : partNames)
-    if (auto registered = add_net_element(m_partTags[part]); !registered) return std::unexpected(std::move(registered.error()));
+  auto part_names = m_animated_parts.part_names();
+  part_names.sort();
+  for (auto const& part : part_names)
+    if (auto registered = add_net_element(m_part_tags[part]); !registered) return std::unexpected(std::move(registered.error()));
 
-  for (auto& pair : m_stateInfo) {
+  for (auto& pair : m_state_info) {
     pair.second.reverse.set_compatibility_version(10);
     if (auto registered = add_net_element(pair.second.reverse); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.stateIndex); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.startedEvent); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.state_index); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.started_event); !registered) return std::unexpected(std::move(registered.error()));
   }
 
-  for (auto& pair : m_transformationGroups) {
-    if (auto registered = add_net_element(pair.second.xTranslation); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.yTranslation); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.xScale); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.yScale); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.xShear); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.yShear); !registered) return std::unexpected(std::move(registered.error()));
+  for (auto& pair : m_transformation_groups) {
+    if (auto registered = add_net_element(pair.second.x_translation); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.y_translation); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.x_scale); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.y_scale); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.x_shear); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.y_shear); !registered) return std::unexpected(std::move(registered.error()));
 
     if (pair.second.interpolated) {
-      pair.second.xTranslation.set_interpolator(lerp<float, float>);
-      pair.second.yTranslation.set_interpolator(lerp<float, float>);
-      pair.second.xScale.set_interpolator(lerp<float, float>);
-      pair.second.yScale.set_interpolator(lerp<float, float>);
-      pair.second.xShear.set_interpolator(angle_lerp<float, float>);
-      pair.second.yShear.set_interpolator(angle_lerp<float, float>);
+      pair.second.x_translation.set_interpolator(lerp<float, float>);
+      pair.second.y_translation.set_interpolator(lerp<float, float>);
+      pair.second.x_scale.set_interpolator(lerp<float, float>);
+      pair.second.y_scale.set_interpolator(lerp<float, float>);
+      pair.second.x_shear.set_interpolator(angle_lerp<float, float>);
+      pair.second.y_shear.set_interpolator(angle_lerp<float, float>);
     }
   }
 
-  for (auto& pair : m_rotationGroups) {
-    if (auto registered = add_net_element(pair.second.targetAngle); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.netImmediateEvent); !registered) return std::unexpected(std::move(registered.error()));
+  for (auto& pair : m_rotation_groups) {
+    if (auto registered = add_net_element(pair.second.target_angle); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.net_immediate_event); !registered) return std::unexpected(std::move(registered.error()));
   }
 
-  for (auto& pair : m_particleEmitters) {
-    if (auto registered = add_net_element(pair.second.emissionRate); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.burstCount); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.randomSelectCount); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.offsetRegion); !registered) return std::unexpected(std::move(registered.error()));
+  for (auto& pair : m_particle_emitters) {
+    if (auto registered = add_net_element(pair.second.emission_rate); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.burst_count); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.random_select_count); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.offset_region); !registered) return std::unexpected(std::move(registered.error()));
     if (auto registered = add_net_element(pair.second.active); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.burstEvent); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.burst_event); !registered) return std::unexpected(std::move(registered.error()));
 
-    pair.second.burstEvent.set_ignore_occurrences_on_net_load(true);
+    pair.second.burst_event.set_ignore_occurrences_on_net_load(true);
   }
 
   for (auto& pair : m_lights) {
@@ -2360,21 +2348,23 @@ std::expected<void, StarException> NetworkedAnimator::setupNetStates() {
   }
 
   for (auto& pair : m_sounds) {
-    if (auto registered = add_net_element(pair.second.soundPool); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.xPosition); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.yPosition); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.volumeTarget); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.volumeRampTime); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.pitchMultiplierTarget); !registered) return std::unexpected(std::move(registered.error()));
-    if (auto registered = add_net_element(pair.second.pitchMultiplierRampTime); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.sound_pool); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.x_position); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.y_position); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.volume_target); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.volume_ramp_time); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.pitch_multiplier_target); !registered) return std::unexpected(std::move(registered.error()));
+    if (auto registered = add_net_element(pair.second.pitch_multiplier_ramp_time); !registered) return std::unexpected(std::move(registered.error()));
     if (auto registered = add_net_element(pair.second.loops); !registered) return std::unexpected(std::move(registered.error()));
     if (auto registered = add_net_element(pair.second.signals); !registered) return std::unexpected(std::move(registered.error()));
+    pair.second.retry_signals = {};
+    pair.second.next_retry_signal = 0;
 
-    pair.second.xPosition.set_fixed_point_base(0.0125f);
-    pair.second.yPosition.set_fixed_point_base(0.0125f);
+    pair.second.x_position.set_fixed_point_base(0.0125f);
+    pair.second.y_position.set_fixed_point_base(0.0125f);
 
-    pair.second.xPosition.set_interpolator(lerp<float, float>);
-    pair.second.yPosition.set_interpolator(lerp<float, float>);
+    pair.second.x_position.set_interpolator(lerp<float, float>);
+    pair.second.y_position.set_interpolator(lerp<float, float>);
   }
 
   for (auto& pair : m_effects)
@@ -2384,30 +2374,30 @@ std::expected<void, StarException> NetworkedAnimator::setupNetStates() {
 }
 
 std::expected<void, StarException> NetworkedAnimator::net_elements_need_load(bool initial) {
-  for (auto& pair : m_stateInfo) {
-    if (pair.second.startedEvent.pull_occurred() || initial) {
-      auto changed = m_animatedParts.set_active_state_index(pair.first, pair.second.stateIndex.get(), true, pair.second.reverse.get());
+  for (auto& pair : m_state_info) {
+    if (pair.second.started_event.pull_occurred() || initial) {
+      auto changed = m_animated_parts.set_active_state_index(pair.first, pair.second.state_index.get(), true, pair.second.reverse.get());
       if (!changed) return std::unexpected(std::move(changed.error()));
     }
   }
 
-  for (auto& pair : m_rotationGroups) {
-    if (pair.second.netImmediateEvent.pull_occurred() || initial) {
-      pair.second.currentAngle = pair.second.targetAngle.get();
-      pair.second.previousAngle = pair.second.currentAngle;
+  for (auto& pair : m_rotation_groups) {
+    if (pair.second.net_immediate_event.pull_occurred() || initial) {
+      pair.second.current_angle = pair.second.target_angle.get();
+      pair.second.previous_angle = pair.second.current_angle;
     }
   }
   return {};
 }
 
 std::expected<void, StarException> NetworkedAnimator::net_elements_need_store() {
-  for (auto& pair : m_stateInfo) {
-    if (pair.second.wasUpdated || (version() < 1)) {
-      pair.second.wasUpdated = false;
-      auto index = m_animatedParts.active_state_index(pair.first);
+  for (auto& pair : m_state_info) {
+    if (pair.second.was_updated || (version() < 1)) {
+      pair.second.was_updated = false;
+      auto index = m_animated_parts.active_state_index(pair.first);
       if (!index) return std::unexpected(std::move(index.error()));
-      pair.second.stateIndex.set(*index);
-      auto reverse = m_animatedParts.active_state_reverse(pair.first);
+      pair.second.state_index.set(*index);
+      auto reverse = m_animated_parts.active_state_reverse(pair.first);
       if (!reverse) return std::unexpected(std::move(reverse.error()));
       pair.second.reverse.set(*reverse);
     }
@@ -2416,11 +2406,12 @@ std::expected<void, StarException> NetworkedAnimator::net_elements_need_store() 
 }
 
 std::uint8_t NetworkedAnimator::version() const {
-  return m_animatorVersion;
+  return m_animator_version;
 }
 
-std::expected<Json, StarException> NetworkedAnimator::mergeIncludes(Root& root, Json config, Json includes, String relativePath) {
-  Json includedConfigs;
+std::expected<Json, StarException> NetworkedAnimator::merge_includes(Root& root, Json const& config, Json const& includes,
+    String const& relative_path, StringList& include_chain) {
+  Json included_configs;
   auto paths = includes.iterate_array();
   if (!paths) return std::unexpected(std::move(paths.error()));
   for (auto const& path : *paths) {
@@ -2428,21 +2419,23 @@ std::expected<Json, StarException> NetworkedAnimator::mergeIncludes(Root& root, 
     if (!name) return std::unexpected(std::move(name.error()));
     auto assets = root.assets();
     if (!assets) return std::unexpected(std::move(assets.error()));
-    auto loaded = (*assets)->json(AssetPath::relative_to(relativePath, *name));
+    auto resolved = AssetPath::relative_to(relative_path, *name);
+    if (std::ranges::find(include_chain, resolved) != include_chain.end())
+      return std::unexpected(NetworkedAnimatorException::format("Animation include cycle: {} -> {}", include_chain.join(" -> "), resolved));
+    auto loaded = (*assets)->json(resolved);
     if (!loaded) return std::unexpected(std::move(loaded.error()));
-    Json includeConfig = std::move(*loaded);
-    auto hasIncludes = includeConfig.contains("includes");
-    if (!hasIncludes) return std::unexpected(std::move(hasIncludes.error()));
-    if (*hasIncludes) {
-      auto nested = includeConfig.get("includes");
-      if (!nested) return std::unexpected(std::move(nested.error()));
-      auto merged = mergeIncludes(root, includeConfig, *nested, relativePath);
+    auto nested = loaded->find("includes");
+    if (!nested) return std::unexpected(std::move(nested.error()));
+    if (*nested) {
+      include_chain.push_back(std::move(resolved));
+      auto merged = merge_includes(root, *loaded, (*nested)->get(), relative_path, include_chain);
+      include_chain.pop_back();
       if (!merged) return std::unexpected(std::move(merged.error()));
-      includeConfig = std::move(*merged);
+      *loaded = std::move(*merged);
     }
-    includedConfigs = json_merge(includedConfigs, includeConfig);
+    included_configs = json_merge(included_configs, *loaded);
   }
-  return json_merge(includedConfigs, config);
+  return json_merge(included_configs, config);
 }
 
 }

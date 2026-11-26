@@ -538,8 +538,8 @@ std::expected<List<Drawable>, StarException> MonsterDatabase::monster_portrait(M
 std::expected<void, StarException> MonsterDatabase::apply_appearance(
     MonsterVariant const& variant, NetworkedAnimator& animator) const {
   for (auto const& [part, image] : variant.animator_part_tags)
-    animator.setPartTag(part, "partImage", image);
-  animator.setZoom(variant.scale);
+    animator.set_part_tag(part, "partImage", image);
+  animator.set_zoom(variant.scale);
 
   auto colors = variant.parameters.get_string("colors", "default");
   if (!colors)
@@ -550,7 +550,7 @@ std::expected<void, StarException> MonsterDatabase::apply_appearance(
     return std::unexpected(std::move(palette.error()));
   auto const& swaps = variant.color_swap ? *variant.color_swap : palette->get();
   if (!swaps.empty())
-    animator.setProcessingDirectives(color_replace_operation_to_string(swaps));
+    animator.set_processing_directives(color_replace_operation_to_string(swaps));
   return {};
 }
 

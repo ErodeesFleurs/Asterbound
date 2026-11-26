@@ -571,7 +571,7 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
       auto operation7 = m_scriptComponent.add_callbacks("entity", std::move(entityCallbacks));
       if (!operation7)
         return std::unexpected(std::move(operation7.error()));
-      auto animatorCallbacksResult = LuaBindings::makeNetworkedAnimatorCallbacks(*m_networkedAnimator);
+      auto animatorCallbacksResult = LuaBindings::make_networked_animator_callbacks(*m_networkedAnimator);
       if (!animatorCallbacksResult)
         return std::unexpected(std::move(animatorCallbacksResult.error()));
       auto animatorCallbacks = std::move(*animatorCallbacksResult);
@@ -586,7 +586,7 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
       auto operation10 = m_scriptedAnimator.set_scripts(m_config->animationScripts);
       if (!operation10)
         return std::unexpected(std::move(operation10.error()));
-      auto animationCallbacksResult = LuaBindings::makeScriptedAnimatorCallbacks(*m_networkedAnimator, [this](String const& name, Json const& def) -> std::expected<Json, StarException> { return m_scriptedAnimationParameters.value(name, def); });
+      auto animationCallbacksResult = LuaBindings::make_scripted_animator_callbacks(*m_networkedAnimator, [this](String const& name, Json const& def) -> std::expected<Json, StarException> { return m_scriptedAnimationParameters.value(name, def); });
       if (!animationCallbacksResult)
         return std::unexpected(std::move(animationCallbacksResult.error()));
       auto animationCallbacks = std::move(*animationCallbacksResult);
@@ -633,7 +633,7 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
       if (!imageResult)
         return std::unexpected(std::move(imageResult.error()));
       auto image = std::move(*imageResult);
-      m_networkedAnimator->setPartTag(pair.first, "partImage", image);
+      m_networkedAnimator->set_part_tag(pair.first, "partImage", image);
     }
     auto animationPositionConfigResult = configValue("animationPosition", JsonArray{0, 0});
     if (!animationPositionConfigResult)
@@ -644,7 +644,7 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
       return std::unexpected(std::move(animationPositionResult.error()));
     auto animationPosition = std::move(*animationPositionResult);
     m_animationPosition = animationPosition / tile_pixels;
-    m_networkedAnimator->setFlipped(false);
+    m_networkedAnimator->set_flipped(false);
     auto image_metadata_result = root().image_metadata_database();
     if (!image_metadata_result)
       return std::unexpected(std::move(image_metadata_result.error()));
@@ -666,14 +666,14 @@ std::expected<void, StarException> Object::init(World& world, EntityId entityId,
       return std::unexpected(std::move(centerResult.error()));
     auto center = std::move(*centerResult);
     m_animationCenterLine = center;
-    m_networkedAnimator->setFlipped(direction() == Direction::Left, m_animationCenterLine);
+    m_networkedAnimator->set_flipped(direction() == Direction::Left, m_animationCenterLine);
     // Do not animate initial state transitions unless explicitly requested.
     auto finishResult = configValue("forceFinishAnimationsInInit", true);
     if (!finishResult)
       return std::unexpected(std::move(finishResult.error()));
     auto finish = std::move(*finishResult);
     if (finish != false) {
-      auto operation16 = m_networkedAnimator->finishAnimations();
+      auto operation16 = m_networkedAnimator->finish_animations();
       if (!operation16)
         return std::unexpected(std::move(operation16.error()));
     }
@@ -862,7 +862,7 @@ std::expected<void, StarException> Object::update(float dt, std::uint64_t) {
     auto operation2 = m_networkedAnimator->update(dt, std::nullopt);
     if (!operation2)
       return std::unexpected(std::move(operation2.error()));
-    m_networkedAnimator->setFlipped(direction() == Direction::Left, m_animationCenterLine);
+    m_networkedAnimator->set_flipped(direction() == Direction::Left, m_animationCenterLine);
     auto operation3 = recover_lua_script_error(m_scriptComponent.update(m_scriptComponent.update_dt(dt)));
     if (!operation3)
       return std::unexpected(std::move(operation3.error()));
@@ -870,7 +870,7 @@ std::expected<void, StarException> Object::update(float dt, std::uint64_t) {
     auto operation4 = m_networkedAnimator->update(dt, std::ref(m_networkedAnimatorDynamicTarget));
     if (!operation4)
       return std::unexpected(std::move(operation4.error()));
-    m_networkedAnimatorDynamicTarget.updatePosition(position() + m_animationPosition);
+    m_networkedAnimatorDynamicTarget.update_position(position() + m_animationPosition);
   }
   if (m_lightFlickering)
     m_lightFlickering->update(dt);
@@ -886,7 +886,7 @@ std::expected<void, StarException> Object::update(float dt, std::uint64_t) {
 
 std::expected<void, StarException> Object::collectRenderEvents(RenderCallback& render_callback) {
   for (auto const& pair : m_imageKeys)
-    m_networkedAnimator->setGlobalTag(pair.first, pair.second);
+    m_networkedAnimator->set_global_tag(pair.first, pair.second);
   auto shake = computeDamageShake();
   if (!shake)
     return std::unexpected(std::move(shake.error()));
@@ -897,10 +897,10 @@ std::expected<void, StarException> Object::collectRenderEvents(RenderCallback& r
   auto operation2 = collectSounds(render_callback);
   if (!operation2)
     return std::unexpected(std::move(operation2.error()));
-  auto operation3 = render_callback.add_audios(m_networkedAnimatorDynamicTarget.pullNewAudios());
+  auto operation3 = render_callback.add_audios(m_networkedAnimatorDynamicTarget.pull_new_audios());
   if (!operation3)
     return std::unexpected(std::move(operation3.error()));
-  auto operation4 = render_callback.add_particles(m_networkedAnimatorDynamicTarget.pullNewParticles());
+  auto operation4 = render_callback.add_particles(m_networkedAnimatorDynamicTarget.pull_new_particles());
   if (!operation4)
     return std::unexpected(std::move(operation4.error()));
   auto operation8 = render_callback.add_particles(m_scriptedAnimator.pull_new_particles());
@@ -914,7 +914,7 @@ std::expected<void, StarException> Object::collectRenderEvents(RenderCallback& r
 
 std::expected<void, StarException> Object::render(RenderCallback& render_callback) {
   auto sample = m_networkedAnimator->sample(render_callback.presentation().interpolation());
-  if (!m_networkedAnimator->constParts().empty()) {
+  if (!m_networkedAnimator->const_parts().empty()) {
     auto shakeResult = damageShake();
     if (!shakeResult)
       return std::unexpected(std::move(shakeResult.error()));
@@ -1876,7 +1876,7 @@ std::expected<LuaCallbacks, StarException> Object::makeObjectCallbacks() {
   if (!operation12)
     return std::unexpected(std::move(operation12.error()));
   auto operation13 = callbacks.register_callback("setProcessingDirectives", [this](String const& directives) {
-  m_networkedAnimator->setProcessingDirectives(directives);
+  m_networkedAnimator->set_processing_directives(directives);
 });
   if (!operation13)
     return std::unexpected(std::move(operation13.error()));

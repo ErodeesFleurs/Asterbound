@@ -238,7 +238,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("effectsAnimator", [&player]() -> std::expected<LuaCallbacks, StarException> {
-    return LuaBindings::makeNetworkedAnimatorCallbacks(*player.effectsAnimator());
+    return LuaBindings::make_networked_animator_callbacks(*player.effectsAnimator());
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 

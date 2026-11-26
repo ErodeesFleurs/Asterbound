@@ -225,11 +225,20 @@ bool AnimatedPartSet::sample_prepared(Sample const& sample) const {
       && sample.parts.size() == m_parts.size();
 }
 
+void AnimatedPartSet::invalidate_sample_parts(Sample& sample) {
+  if (++sample.part_generation == 0) {
+    for (auto& part : sample.parts)
+      part.generation = 0;
+    ++sample.part_generation;
+  }
+}
+
 void AnimatedPartSet::prepare_sample(Sample& sample, float interpolation) const {
   sample.owner_id = m_sample_identity.value;
   sample.interpolation = std::clamp(interpolation, 0.f, 1.f);
   sample.states.resize(m_state_types.size());
   sample.parts.resize(m_parts.size());
+  invalidate_sample_parts(sample);
   bool same_configuration = !sample.logical_reset && sample.configuration == m_sample_configuration && sample.animator_version == m_animator_version;
   sample.logical_reset = false;
   sample.configuration = m_sample_configuration;
@@ -250,7 +259,6 @@ void AnimatedPartSet::prepare_sample(Sample& sample, float interpolation) const 
       cache.properties_valid = false;
       cache.part.part_name = entry.first;
     }
-    cache.dirty = true;
   }
 }
 
@@ -273,8 +281,7 @@ std::expected<bool, StarException> AnimatedPartSet::set_presentation_state(Strin
   active.reverse = reverse;
   sample.states[state_type.presentation_index].override_state = state->get();
   sample.states[state_type.presentation_index].dirty = true;
-  for (auto& cache : sample.parts)
-    cache.dirty = true;
+  invalidate_sample_parts(sample);
   return true;
 }
 
@@ -452,6 +459,7 @@ static std::expected<void, StarException> finish_cursor(AnimatedPartSet::StateTy
 
 std::expected<void, StarException> AnimatedPartSet::stage_finished_states(Sample& sample) const {
   sample.logical_reset = true;
+  invalidate_sample_parts(sample);
   for (auto& part : sample.parts)
     part.properties_valid = false;
   for (auto const& [name, type] : m_state_types) {
@@ -706,8 +714,7 @@ std::expected<void, StarException> AnimatedPartSet::freshen_active_part(Part con
   auto cache = sample.transform([&](std::reference_wrapper<Sample> view) {
     return std::ref(view.get().parts[part.presentation_index]);
   });
-  auto& dirty = cache ? cache->get().dirty : part.active_part_dirty;
-  if (!dirty)
+  if (cache ? cache->get().generation == sample->get().part_generation : !part.active_part_dirty)
     return {};
   auto& active = cache ? cache->get().part : part.active_part;
   if (!cache)
@@ -786,7 +793,10 @@ std::expected<void, StarException> AnimatedPartSet::freshen_active_part(Part con
       entry.properties_valid = true;
     }
   }
-  dirty = false;
+  if (cache)
+    cache->get().generation = sample->get().part_generation;
+  else
+    part.active_part_dirty = false;
   return {};
 }
 

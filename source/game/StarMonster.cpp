@@ -392,7 +392,7 @@ if (!result55) return std::unexpected(std::move(result55.error()));
 auto result56 = m_script_component.add_callbacks("entity", std::move(*result55));
 if (!result56) return std::unexpected(std::move(result56.error()));
 
-    auto result57 = LuaBindings::makeNetworkedAnimatorCallbacks(*m_networked_animator);
+    auto result57 = LuaBindings::make_networked_animator_callbacks(*m_networked_animator);
 if (!result57) return std::unexpected(std::move(result57.error()));
 auto result58 = m_script_component.add_callbacks("animator", std::move(*result57));
 if (!result58) return std::unexpected(std::move(result58.error()));
@@ -420,7 +420,7 @@ if (!result64) return std::unexpected(std::move(result64.error()));
 if (!result65) return std::unexpected(std::move(result65.error()));
 
 
-    auto result66 = LuaBindings::makeScriptedAnimatorCallbacks(*m_networked_animator,
+    auto result66 = LuaBindings::make_scripted_animator_callbacks(*m_networked_animator,
       [this](String const& name, Json const& defaultValue) -> Json {
         return m_scripted_animation_parameters.value(name, defaultValue);
       });
@@ -688,7 +688,7 @@ std::expected<List<DamageSource>, StarException> Monster::damage_sources() const
     auto found = std::ranges::find_if(transforms, [&](AnchorTransform const& entry) { return entry.first.get() == anchor; });
     if (found != transforms.end())
       return std::cref(found->second);
-    auto transform = m_networked_animator->partTransformation(anchor);
+    auto transform = m_networked_animator->part_transformation(anchor);
     if (!transform)
       return std::unexpected(std::move(transform.error()));
     transforms.emplace_back(std::cref(anchor), std::move(*transform));
@@ -696,7 +696,7 @@ std::expected<List<DamageSource>, StarException> Monster::damage_sources() const
   };
 
   bool flipped = m_networked_animator->flipped();
-  float flip_center = flipped ? m_networked_animator->flippedRelativeCenterLine() : 0.0f;
+  float flip_center = flipped ? m_networked_animator->flipped_relative_center_line() : 0.0f;
   auto const& part_configs = m_monster_variant.animation_damage_parts;
   std::size_t next_index = 0;
   for (auto const& [name, config] : part_configs) {
@@ -845,7 +845,7 @@ if (!result114) return std::unexpected(std::move(result114.error()));
 String knockoutEffect = std::move(*result114);
   if (!knockoutEffect.empty())
     {
-  auto result115 = m_networked_animator->setEffectEnabled(knockoutEffect, true);
+  auto result115 = m_networked_animator->set_effect_enabled(knockoutEffect, true);
   if (!result115) return std::unexpected(std::move(result115.error()));
 
 }
@@ -856,7 +856,7 @@ auto knockoutAnimationStates = std::move(*result116);
 for (auto const& pair : knockoutAnimationStates) {
   auto result117 = pair.second.to_string();
   if (!result117) return std::unexpected(std::move(result117.error()));
-  auto result118 = m_networked_animator->setState(pair.first, std::move(*result117));
+  auto result118 = m_networked_animator->set_state(pair.first, std::move(*result117));
   if (!result118) return std::unexpected(std::move(result118.error()));
 }
   return {};
@@ -938,14 +938,14 @@ treasurePool = std::move(*result121);
   if (render_callback) {
     if (!m_death_particle_burst.empty())
       {
-  auto result131 = m_networked_animator->burstParticleEmitter(m_death_particle_burst);
+  auto result131 = m_networked_animator->burst_particle_emitter(m_death_particle_burst);
   if (!result131) return std::unexpected(std::move(result131.error()));
 
 }
 
     if (!m_death_sound.empty())
       {
-  auto result132 = m_networked_animator->playSound(m_death_sound);
+  auto result132 = m_networked_animator->play_sound(m_death_sound);
   if (!result132) return std::unexpected(std::move(result132.error()));
 
 }
@@ -954,9 +954,9 @@ treasurePool = std::move(*result121);
 if (!result133) return std::unexpected(std::move(result133.error()));
 
 
-    auto result134 = render_callback->get().add_audios(m_networked_animator_dynamic_target.pullNewAudios());
+    auto result134 = render_callback->get().add_audios(m_networked_animator_dynamic_target.pull_new_audios());
 if (!result134) return std::unexpected(std::move(result134.error()));
-    auto result135 = render_callback->get().add_particles(m_networked_animator_dynamic_target.pullNewParticles());
+    auto result135 = render_callback->get().add_particles(m_networked_animator_dynamic_target.pull_new_particles());
 if (!result135) return std::unexpected(std::move(result135.error()));
     auto result136 = render_callback->get().add_particles(m_status_controller->pullNewParticles());
 if (!result136) return std::unexpected(std::move(result136.error()));
@@ -1001,7 +1001,7 @@ std::expected<void, StarException> Monster::update(float dt, std::uint64_t) {
   m_movement_controller->set_timestep(dt);
 
   if (isMaster()) {
-    m_networked_animator->setFlipped((m_movement_controller->facing_direction() == Direction::Left) != m_monster_variant.reversed);
+    m_networked_animator->set_flipped((m_movement_controller->facing_direction() == Direction::Left) != m_monster_variant.reversed);
 
     if (m_knocked_out) {
       m_knockout_timer -= dt;
@@ -1033,7 +1033,7 @@ std::expected<void, StarException> Monster::update(float dt, std::uint64_t) {
     return m_networked_animator->update(dt, std::nullopt);
 
   if (auto result = m_networked_animator->update(dt, std::ref(m_networked_animator_dynamic_target)); !result) return result;
-  m_networked_animator_dynamic_target.updatePosition(position());
+  m_networked_animator_dynamic_target.update_position(position());
   auto animation = recover_lua_script_error(m_scripted_animator.update());
   if (!animation) return std::unexpected(std::move(animation.error()));
   auto& spatial_log = root().spatialLogger();
@@ -1047,9 +1047,9 @@ std::uint64_t Monster::presentation_epoch() const {
 }
 
 std::expected<void, StarException> Monster::collectRenderEvents(RenderCallback& render_callback) {
-  auto result158 = render_callback.add_audios(m_networked_animator_dynamic_target.pullNewAudios());
+  auto result158 = render_callback.add_audios(m_networked_animator_dynamic_target.pull_new_audios());
 if (!result158) return std::unexpected(std::move(result158.error()));
-  auto result159 = render_callback.add_particles(m_networked_animator_dynamic_target.pullNewParticles());
+  auto result159 = render_callback.add_particles(m_networked_animator_dynamic_target.pull_new_particles());
 if (!result159) return std::unexpected(std::move(result159.error()));
   auto result162 = render_callback.add_particles(m_status_controller->pullNewParticles());
 if (!result162) return std::unexpected(std::move(result162.error()));
@@ -1520,7 +1520,7 @@ return List<Drawable>{std::move(*result242)};
     auto result243 = NetworkedAnimator::create(*m_networked_animator);
 if (!result243) return std::unexpected(std::move(result243.error()));
 auto animator = std::move(*result243);
-    animator->setFlipped(!m_monster_variant.reversed);
+    animator->set_flipped(!m_monster_variant.reversed);
     auto result244 = animator->drawables();
 if (!result244) return std::unexpected(std::move(result244.error()));
 auto drawables = std::move(*result244);

@@ -541,7 +541,7 @@ if (!result99) return std::unexpected(std::move(result99.error()));
     auto result100 = humanoid();
 if (!result100) return std::unexpected(std::move(result100.error()));
 auto animator = (*result100)->networked_animator();
-auto result101 = LuaBindings::makeNetworkedAnimatorCallbacks(animator->get());
+auto result101 = LuaBindings::make_networked_animator_callbacks(animator->get());
 if (!result101) return std::unexpected(std::move(result101.error()));
 auto result102 = m_scriptComponent.add_callbacks("animator", std::move(*result101));
 if (!result102) return std::unexpected(std::move(result102.error()));
@@ -562,7 +562,7 @@ if (!result106) return std::unexpected(std::move(result106.error()));
     auto result107 = humanoid();
 if (!result107) return std::unexpected(std::move(result107.error()));
 auto animator = (*result107)->networked_animator();
-auto result108 = LuaBindings::makeScriptedAnimatorCallbacks(animator->get(),
+auto result108 = LuaBindings::make_scripted_animator_callbacks(animator->get(),
       [this](String const& name, Json const& defaultValue) -> Json {
         return m_scriptedAnimationParameters.value(name, defaultValue);
       });
@@ -1151,9 +1151,9 @@ std::uint64_t Npc::presentation_epoch() const {
 }
 
 std::expected<void, StarException> Npc::collectRenderEvents(RenderCallback& render_callback) {
-  auto result246 = render_callback.add_particles(m_humanoidDynamicTarget.pullNewParticles());
+  auto result246 = render_callback.add_particles(m_humanoidDynamicTarget.pull_new_particles());
 if (!result246) return std::unexpected(std::move(result246.error()));
-  auto result247 = render_callback.add_audios(m_humanoidDynamicTarget.pullNewAudios());
+  auto result247 = render_callback.add_audios(m_humanoidDynamicTarget.pull_new_audios());
 if (!result247) return std::unexpected(std::move(result247.error()));
   auto result250 = render_callback.add_particles(m_statusController->pullNewParticles());
 if (!result250) return std::unexpected(std::move(result250.error()));
@@ -1435,7 +1435,7 @@ if (!result284) return std::unexpected(std::move(result284.error()));
   auto result290 = std::move(*result289)->animate(dt, std::ref(m_humanoidDynamicTarget));
   if (!result290) return std::unexpected(std::move(result290.error()));
 
-      m_humanoidDynamicTarget.updatePosition(position());
+      m_humanoidDynamicTarget.update_position(position());
     } else {
       auto result291 = humanoid();
   if (!result291) return std::unexpected(std::move(result291.error()));
@@ -2851,7 +2851,7 @@ if (!result563) return std::unexpected(std::move(result563.error()));
         auto result564 = humanoid();
 if (!result564) return std::unexpected(std::move(result564.error()));
 auto animator = (*result564)->networked_animator();
-auto result565 = LuaBindings::makeNetworkedAnimatorCallbacks(animator->get());
+auto result565 = LuaBindings::make_networked_animator_callbacks(animator->get());
 if (!result565) return std::unexpected(std::move(result565.error()));
 auto result566 = m_scriptComponent.add_callbacks("animator", std::move(*result565));
 if (!result566) return std::unexpected(std::move(result566.error()));
@@ -2886,7 +2886,7 @@ if (!result567) return std::unexpected(std::move(result567.error()));
         auto result575 = humanoid();
   if (!result575) return std::unexpected(std::move(result575.error()));
   auto animator = (*result575)->networked_animator();
-  auto result576 = LuaBindings::makeScriptedAnimatorCallbacks(animator->get(),
+  auto result576 = LuaBindings::make_scripted_animator_callbacks(animator->get(),
           [this](String const& name, Json const& default_value) -> Json {
             return m_scriptedAnimationParameters.value(name, default_value);
           });

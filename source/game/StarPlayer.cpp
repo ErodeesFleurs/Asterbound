@@ -913,7 +913,7 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
   auto movement_parameters = std::move(*movementParametersResult);
   if (auto result = m_movement_controller->reset_base_parameters(movement_parameters); !result)
     return std::unexpected(std::move(result.error()));
-  m_effectsAnimator->setGlobalTag("effectDirectives", speciesDef->effectDirectives());
+  m_effectsAnimator->set_global_tag("effectDirectives", speciesDef->effectDirectives());
   m_deathParticleBurst.set(humanoid()->default_death_particles());
   auto propertiesResult = diskStore.get_object("genericProperties");
   if (!propertiesResult)
@@ -1069,7 +1069,7 @@ std::expected<void, StarException> Player::init(World& world, EntityId entityId,
       auto songbookCallbacks = std::move(*songbookCallbacksResult);
       if (auto result = p.second->add_callbacks("songbook", std::move(songbookCallbacks)); !result)
         return std::unexpected(std::move(result.error()));
-      auto animatorCallbacksResult = LuaBindings::makeNetworkedAnimatorCallbacks(humanoid()->networked_animator()->get());
+      auto animatorCallbacksResult = LuaBindings::make_networked_animator_callbacks(humanoid()->networked_animator()->get());
       if (!animatorCallbacksResult)
         return std::unexpected(std::move(animatorCallbacksResult.error()));
       auto animatorCallbacks = std::move(*animatorCallbacksResult);
@@ -1100,7 +1100,7 @@ std::expected<void, StarException> Player::init(World& world, EntityId entityId,
   if (world.isClient()) {
     if (auto result = m_scriptedAnimator.set_scripts(humanoid()->animation_scripts()); !result)
       return std::unexpected(std::move(result.error()));
-    auto animationCallbacksResult = LuaBindings::makeScriptedAnimatorCallbacks(humanoid()->networked_animator()->get(),
+    auto animationCallbacksResult = LuaBindings::make_scripted_animator_callbacks(humanoid()->networked_animator()->get(),
       [&parameters = m_scriptedAnimationParameters](String const& name, Json const& defaultValue) -> std::expected<Json, StarException> {
         return parameters.value(name, defaultValue);
       });
@@ -1263,7 +1263,7 @@ std::expected<List<Particle>, StarException> Player::particles() {
     return std::unexpected(std::move(generated.error()));
   auto particles = std::move(*generated);
   particles.append_range(std::exchange(m_callbackParticles, {}));
-  particles.append_range(m_humanoidDynamicTarget.pullNewParticles());
+  particles.append_range(m_humanoidDynamicTarget.pull_new_particles());
   particles.append_range(m_techController->pullNewParticles());
   particles.append_range(m_statusController->pullNewParticles());
   return particles;
@@ -1973,7 +1973,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
       if (m_teleportTimer <= 0 && m_state == State::TeleportIn) {
         m_state = State::Idle;
         {
-          if (auto result = m_effectsAnimator->burstParticleEmitter(m_teleportAnimationType + "Burst"); !result)
+          if (auto result = m_effectsAnimator->burst_particle_emitter(m_teleportAnimationType + "Burst"); !result)
             return std::unexpected(std::move(result.error()));
         }
       }
@@ -2306,7 +2306,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
 
   auto scale = Mat3F::scaling(Vec2F(facingDirection == Direction::Right ? 1.f : -1.f, 1.f));
   {
-    if (auto result = m_effectsAnimator->setTransformationGroup("flip", scale); !result)
+    if (auto result = m_effectsAnimator->set_transformation_group("flip", scale); !result)
       return std::unexpected(std::move(result.error()));
   }
 
@@ -2322,7 +2322,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
       if (auto result = m_effectsAnimator->update(dt, std::ref(m_effectsAnimatorDynamicTarget)); !result)
         return std::unexpected(std::move(result.error()));
     }
-    m_effectsAnimatorDynamicTarget.updatePosition(position() + m_techController->parentOffset());
+    m_effectsAnimatorDynamicTarget.update_position(position() + m_techController->parentOffset());
   } else {
     {
       if (auto result = m_effectsAnimator->update(dt, std::nullopt); !result)
@@ -2568,15 +2568,15 @@ std::expected<void, StarException> Player::collectRenderEvents(RenderCallback& c
   }
   m_footstepPending = false;
   m_landingNoisePending = false;
-  if (auto result = render_callback.add_audios(m_effectsAnimatorDynamicTarget.pullNewAudios()); !result)
+  if (auto result = render_callback.add_audios(m_effectsAnimatorDynamicTarget.pull_new_audios()); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = render_callback.add_particles(m_effectsAnimatorDynamicTarget.pullNewParticles()); !result)
+  if (auto result = render_callback.add_particles(m_effectsAnimatorDynamicTarget.pull_new_particles()); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = render_callback.add_audios(m_techController->pullNewAudios()); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = render_callback.add_audios(m_statusController->pullNewAudios()); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = render_callback.add_audios(m_humanoidDynamicTarget.pullNewAudios()); !result)
+  if (auto result = render_callback.add_audios(m_humanoidDynamicTarget.pull_new_audios()); !result)
     return std::unexpected(std::move(result.error()));
   for (auto const& pending : std::exchange(m_callbackSounds, {})) {
     auto assetsResult = root().assets();
@@ -2699,17 +2699,17 @@ std::expected<std::shared_ptr<Item>, StarException> Player::pickupItems(std::sha
       return std::unexpected(std::move(soundResult.error()));
     auto sound = std::move(*soundResult);
     if (!sound.empty()) {
-      if (auto result = m_effectsAnimator->setSoundPool("pickup", {sound}); !result)
+      if (auto result = m_effectsAnimator->set_sound_pool("pickup", {sound}); !result)
         return std::unexpected(std::move(result.error()));
       float pitch = 1.f - (static_cast<float>(items->count()) / static_cast<float>(items->max_stack())) * 0.5f;
       auto varianceResult = root().random().uniform_float(0.8f, 1.2f);
       if (!varianceResult)
         return std::unexpected(std::move(varianceResult.error()));
       auto variance = std::move(*varianceResult);
-      if (auto result = m_effectsAnimator->setSoundPitchMultiplier("pickup", std::clamp(pitch * variance, 0.f, 2.f));
+      if (auto result = m_effectsAnimator->set_sound_pitch_multiplier("pickup", std::clamp(pitch * variance, 0.f, 2.f));
           !result)
         return std::unexpected(std::move(result.error()));
-      if (auto result = m_effectsAnimator->playSound("pickup"); !result)
+      if (auto result = m_effectsAnimator->play_sound("pickup"); !result)
         return std::unexpected(std::move(result.error()));
     }
     auto databaseResult = root().itemDatabase();
@@ -3670,7 +3670,7 @@ std::expected<void, StarException> Player::processStateChanges(float dt) {
 
     if (m_state == State::Jump && (oldState == State::Idle || oldState == State::Run || oldState == State::Walk || oldState == State::Crouch))
       {
-        if (auto result = m_effectsAnimator->burstParticleEmitter("jump"); !result)
+        if (auto result = m_effectsAnimator->burst_particle_emitter("jump"); !result)
           return std::unexpected(std::move(result.error()));
       }
 
@@ -3678,7 +3678,7 @@ std::expected<void, StarException> Player::processStateChanges(float dt) {
       if (oldState == State::Fall && oldState != m_state && m_state != State::Swim && m_state != State::SwimIdle
           && m_state != State::Jump) {
         {
-          if (auto result = m_effectsAnimator->burstParticleEmitter("landing"); !result)
+          if (auto result = m_effectsAnimator->burst_particle_emitter("landing"); !result)
             return std::unexpected(std::move(result.error()));
         }
         m_landedNetState.trigger();
@@ -3693,7 +3693,7 @@ std::expected<void, StarException> Player::processStateChanges(float dt) {
       if (auto result = humanoid()->animate(dt, std::ref(m_humanoidDynamicTarget)); !result)
         return std::unexpected(std::move(result.error()));
     }
-    m_humanoidDynamicTarget.updatePosition(position() + (m_techController->parentOffset()));
+    m_humanoidDynamicTarget.update_position(position() + (m_techController->parentOffset()));
   } else {
     {
       if (auto result = humanoid()->animate(dt, {}); !result)
@@ -4103,7 +4103,7 @@ std::expected<void, StarException> Player::setBusyState(PlayerBusyState busyStat
   if (!nameResult)
     return std::unexpected(std::move(nameResult.error()));
   auto const& name = nameResult->get();
-  if (auto result = m_effectsAnimator->setState("busy", name); !result)
+  if (auto result = m_effectsAnimator->set_state("busy", name); !result)
     return std::unexpected(std::move(result.error()));
   return {};
 }
@@ -4113,7 +4113,7 @@ std::expected<void, StarException> Player::teleportOut(String const& animationTy
   m_state = State::TeleportOut;
   m_teleportAnimationType = animationType;
   {
-    if (auto result = m_effectsAnimator->setState("teleport", m_teleportAnimationType + "Out"); !result)
+    if (auto result = m_effectsAnimator->set_state("teleport", m_teleportAnimationType + "Out"); !result)
       return std::unexpected(std::move(result.error()));
   }
   m_deployment->setDeploying(deploy);
@@ -4128,7 +4128,7 @@ std::expected<void, StarException> Player::teleportOut(String const& animationTy
 std::expected<void, StarException> Player::teleportIn() {
   resetPresentation();
   m_state = State::TeleportIn;
-  if (auto result = m_effectsAnimator->setState("teleport", m_teleportAnimationType + "In"); !result)
+  if (auto result = m_effectsAnimator->set_state("teleport", m_teleportAnimationType + "In"); !result)
     return std::unexpected(std::move(result.error()));
   m_teleportTimer = m_deployment->isDeployed() ? m_config->deployInTime : m_config->teleportInTime;
   auto assetsResult = root().assets();
@@ -4158,7 +4158,7 @@ std::expected<void, StarException> Player::teleportAbort() {
   resetPresentation();
   m_state = State::TeleportIn;
   {
-    if (auto result = m_effectsAnimator->setState("teleport", "abort"); !result)
+    if (auto result = m_effectsAnimator->set_state("teleport", "abort"); !result)
       return std::unexpected(std::move(result.error()));
   }
   m_deployment->setDeploying(m_deployment->isDeployed());
@@ -5041,7 +5041,7 @@ std::shared_ptr<NetworkedAnimator> Player::effectsAnimator() {
 const String secretProprefix = std::string("\0JsonProperty\0", sizeof("\0JsonProperty\0") - 1);
 
 std::optional<StringView> Player::getSecretPropertyView(String const& name) const {
-  if (auto tag = m_effectsAnimator->globalTag(secretProprefix + name)) {
+  if (auto tag = m_effectsAnimator->global_tag(secretProprefix + name)) {
     auto const& view = tag->get().utf8();
     DataStreamReader buffer{std::span<char const>(view)};
     auto type = buffer.read<std::uint8_t>();
@@ -5060,11 +5060,11 @@ std::optional<StringView> Player::getSecretPropertyView(String const& name) cons
 }
 
 std::optional<std::reference_wrapper<String const>> Player::getSecretPropertyRef(String const& name) const {
-  return m_effectsAnimator->globalTag(secretProprefix + name);
+  return m_effectsAnimator->global_tag(secretProprefix + name);
 }
 
 std::expected<Json, StarException> Player::getSecretProperty(String const& name, Json defaultValue) const {
-  if (auto tag = m_effectsAnimator->globalTag(secretProprefix + name)) {
+  if (auto tag = m_effectsAnimator->global_tag(secretProprefix + name)) {
     DataStreamReader buffer{std::span<char const>(tag->get().utf8())};
     auto value = buffer.read<Json>();
     if (value)
@@ -5083,9 +5083,9 @@ std::expected<void, StarException> Player::setSecretProperty(String const& name,
     if (auto result = ds.write(value); !result)
       return std::unexpected(std::move(result.error()));
     auto const& data = ds.data();
-    m_effectsAnimator->setGlobalTag(secretProprefix + name, String(std::string_view(data.span().data(), data.size())));
+    m_effectsAnimator->set_global_tag(secretProprefix + name, String(std::string_view(data.span().data(), data.size())));
   } else {
-    m_effectsAnimator->removeGlobalTag(secretProprefix + name);
+    m_effectsAnimator->remove_global_tag(secretProprefix + name);
   }
   return {};
 }
@@ -5103,7 +5103,7 @@ std::expected<void, StarException> Player::refresh_humanoid_parameters() {
     m_refreshed_humanoid_parameters.trigger();
     if (auto result = install_humanoid(); !result)
       return std::unexpected(std::move(result.error()));
-    m_effectsAnimator->setGlobalTag("effectDirectives", definition->effectDirectives());
+    m_effectsAnimator->set_global_tag("effectDirectives", definition->effectDirectives());
     m_deathParticleBurst.set(humanoid()->default_death_particles());
     m_statusController->setStatusProperty("ouchNoise", definition->ouchNoise(m_identity.gender));
     m_scriptedAnimationParameters.clear();
@@ -5131,7 +5131,7 @@ std::expected<void, StarException> Player::refresh_humanoid_parameters() {
         if (script.second->initialized()) {
           if (auto result = script.second->remove_callbacks("animator"); !result)
             return std::unexpected(std::move(result.error()));
-          auto callbacks_result = LuaBindings::makeNetworkedAnimatorCallbacks(humanoid()->networked_animator()->get());
+          auto callbacks_result = LuaBindings::make_networked_animator_callbacks(humanoid()->networked_animator()->get());
           if (!callbacks_result)
             return std::unexpected(std::move(callbacks_result.error()));
           auto callbacks = std::move(*callbacks_result);
@@ -5155,7 +5155,7 @@ std::expected<void, StarException> Player::refresh_humanoid_parameters() {
         return std::unexpected(std::move(result.error()));
       if (auto result = m_scriptedAnimator.set_scripts(humanoid()->animation_scripts()); !result)
         return std::unexpected(std::move(result.error()));
-      auto animation_callbacks_result = LuaBindings::makeScriptedAnimatorCallbacks(humanoid()->networked_animator()->get(),
+      auto animation_callbacks_result = LuaBindings::make_scripted_animator_callbacks(humanoid()->networked_animator()->get(),
         [&parameters = m_scriptedAnimationParameters](String const& name, Json const& default_value) -> std::expected<Json, StarException> {
           return parameters.value(name, default_value);
         });

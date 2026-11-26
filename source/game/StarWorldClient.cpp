@@ -1849,7 +1849,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       } else if (view.size() > legacy_full_size && view.starts_with(legacy_voice_prefix)) {
         // Preserve StarExtensions' signed voice framing on vanilla servers.
         if (auto player = m_entityMap->get<Player>(damage->remote_damage_notification.source_entity_id)) {
-          auto public_key = player->effectsAnimator()->globalTag(legacy_voice_public_key);
+          auto public_key = player->effectsAnimator()->global_tag(legacy_voice_public_key);
           auto signature = view.substr(legacy_voice_prefix.size(), Curve25519::signature_size);
           auto raw = view.substr(legacy_full_size);
           if (verify_broadcast_signature(player, true,
@@ -2079,9 +2079,9 @@ std::expected<void, StarException> WorldClient::update(float dt) {
       if (!published)
         return std::unexpected(std::move(published.error()));
     }
-    auto legacy_key = m_mainPlayer->effectsAnimator()->globalTag(legacy_voice_public_key);
+    auto legacy_key = m_mainPlayer->effectsAnimator()->global_tag(legacy_voice_public_key);
     if (!legacy_key || legacy_key->get() != m_broadcast_public_key)
-      m_mainPlayer->effectsAnimator()->setGlobalTag(legacy_voice_public_key, m_broadcast_public_key);
+      m_mainPlayer->effectsAnimator()->set_global_tag(legacy_voice_public_key, m_broadcast_public_key);
   }
   
   ++m_currentStep;

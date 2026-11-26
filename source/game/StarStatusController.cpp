@@ -809,14 +809,14 @@ bool StatusController::toolUsageSuppressed() const {
 List<std::shared_ptr<AudioInstance>> StatusController::pullNewAudios() {
   List<std::shared_ptr<AudioInstance>> newAudios;
   for (auto const& animator : m_effectAnimators.net_elements())
-    newAudios.append_range(animator->dynamicTarget.pullNewAudios());
+    newAudios.append_range(animator->dynamicTarget.pull_new_audios());
   return newAudios;
 }
 
 List<Particle> StatusController::pullNewParticles() {
   List<Particle> newParticles;
   for (auto const& animator : m_effectAnimators.net_elements())
-    newParticles.append_range(animator->dynamicTarget.pullNewParticles());
+    newParticles.append_range(animator->dynamicTarget.pull_new_particles());
   return newParticles;
 }
 
@@ -939,7 +939,7 @@ std::expected<void, StarException> StatusController::updateAnimators(float dt) {
       if (auto result = animator->animator->update(dt, std::nullopt); !result) return std::unexpected(std::move(result.error()));
     } else {
       if (auto result = animator->animator->update(dt, std::ref(animator->dynamicTarget)); !result) return std::unexpected(std::move(result.error()));
-      animator->dynamicTarget.updatePosition(m_movement_controller->get().position());
+      animator->dynamicTarget.update_position(m_movement_controller->get().position());
     }
   }
   return {};
@@ -1090,7 +1090,7 @@ std::expected<void, StarException> StatusController::initPrimaryScript() {
   if (m_primaryAnimatorId != EffectAnimatorGroup::null_element_id) {
     auto animator = m_effectAnimators.get_net_element(m_primaryAnimatorId);
     if (!animator) return std::unexpected(std::move(animator.error()));
-    auto callbacks = LuaBindings::makeNetworkedAnimatorCallbacks(*(*animator)->animator);
+    auto callbacks = LuaBindings::make_networked_animator_callbacks(*(*animator)->animator);
     if (!callbacks) return std::unexpected(std::move(callbacks.error()));
     if (auto result = m_primaryScript.add_callbacks("animator", std::move(*callbacks)); !result) return std::unexpected(std::move(result.error()));
   }
@@ -1130,7 +1130,7 @@ std::expected<void, StarException> StatusController::initUniqueEffectScript(Uniq
   if (!entityCallbacks) return std::unexpected(std::move(entityCallbacks.error()));
   if (auto result = uniqueEffect.script.add_callbacks("entity", std::move(*entityCallbacks)); !result) return std::unexpected(std::move(result.error()));
   if (uniqueEffect.animator) {
-    auto callbacks = LuaBindings::makeNetworkedAnimatorCallbacks(*uniqueEffect.animator->animator);
+    auto callbacks = LuaBindings::make_networked_animator_callbacks(*uniqueEffect.animator->animator);
     if (!callbacks) return std::unexpected(std::move(callbacks.error()));
     if (auto result = uniqueEffect.script.add_callbacks("animator", std::move(*callbacks)); !result) return std::unexpected(std::move(result.error()));
   }

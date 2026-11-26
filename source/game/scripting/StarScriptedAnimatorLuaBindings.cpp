@@ -42,23 +42,23 @@ import star.networked_animator_lua_bindings;
 
 namespace Star {
 
-std::expected<LuaCallbacks, StarException> LuaBindings::makeScriptedAnimatorCallbacks(NetworkedAnimator& networkedAnimator, std::function<std::expected<Json, StarException>(String const&, Json const&)> getParameter) {
+std::expected<LuaCallbacks, StarException> LuaBindings::make_scripted_animator_callbacks(NetworkedAnimator& networked_animator, std::function<std::expected<Json, StarException>(String const&, Json const&)> get_parameter) {
   LuaCallbacks callbacks;
 
-  if (auto result = callbacks.register_callback("animationParameter", std::move(getParameter)); !result)
+  if (auto result = callbacks.register_callback("animationParameter", std::move(get_parameter)); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = Detail::registerAnimatorPartQueryCallbacks(callbacks, networkedAnimator); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = Detail::register_animator_part_query_callbacks(callbacks, networked_animator); !result) return std::unexpected(std::move(result.error()));
 
-  if (auto result = Detail::registerAnimatorStateCallbacks(callbacks, networkedAnimator, Detail::AnimatorStateCallbackOrder::Scripted); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = Detail::register_animator_state_callbacks(callbacks, networked_animator, Detail::AnimatorStateCallbackOrder::Scripted); !result) return std::unexpected(std::move(result.error()));
 
   if (auto result = callbacks.register_callback_with_signature<bool, String>(
-      "hasTransformationGroup", std::bind_front(&NetworkedAnimator::hasTransformationGroup, std::ref(networkedAnimator))); !result) return std::unexpected(std::move(result.error()));
+      "hasTransformationGroup", std::bind_front(&NetworkedAnimator::has_transformation_group, std::ref(networked_animator))); !result) return std::unexpected(std::move(result.error()));
 
-  if (auto result = Detail::registerAnimatorLocalTransformationCallbacks(callbacks, networkedAnimator); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = Detail::register_animator_local_transformation_callbacks(callbacks, networked_animator); !result) return std::unexpected(std::move(result.error()));
 
-  if (auto result = Detail::registerAnimatorDrawableCallbacks(callbacks, networkedAnimator); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = Detail::register_animator_drawable_callbacks(callbacks, networked_animator); !result) return std::unexpected(std::move(result.error()));
 
-  if (auto result = Detail::registerAnimatorPlaybackQueryCallbacks(callbacks, networkedAnimator); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = Detail::register_animator_playback_query_callbacks(callbacks, networked_animator); !result) return std::unexpected(std::move(result.error()));
 
 
   return callbacks;
