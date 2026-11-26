@@ -12,7 +12,7 @@ local COLD_COLOR = {25, 255, 255, 225}
 local HOT_COLOR = {255, 96, 96, 225}
 local MINIMUM_DB = -80
 local VOICE_MAX, INPUT_MAX = 1.75, 1.0
-local MID = 7.5
+local MID = 6.5
 
 local localization = {}
 local function str(a, b)
@@ -117,7 +117,7 @@ end
 local voiceCanvas, inputCanvas = nil, nil
 local function updateVolumeCanvas(canvas, volume, multiplier)
 	canvas:clear()
-	local lineEnd = 1 + volume * 166
+	local lineEnd = 1 + volume * 165
 	local lineColor = {95, 110, 255, 225}
 	local multiplied = volume * multiplier
 	if multiplied > 1 then
@@ -141,17 +141,17 @@ local thresholdCanvas = nil
 local function updateThresholdCanvas(canvas, dB)
 	canvas:clear()
   local scale = pane.scale()
-	local lineEnd = 1 + (1 - (dB / MINIMUM_DB)) * 166
+	local lineEnd = 1 + (1 - (dB / MINIMUM_DB)) * 165
 	local lineColor = {255, 255, 0, 127}
 	canvas:drawLine({1,  2}, {lineEnd,  2}, lineColor, scale)
-	canvas:drawLine({1, 13}, {lineEnd, 13}, lineColor, scale)
+	canvas:drawLine({1, 11}, {lineEnd, 11}, lineColor, scale)
 	lineColor[4] = 64
-	canvas:drawLine({lineEnd,  2}, {167,  2}, lineColor, scale)
-	canvas:drawLine({lineEnd, 13}, {167, 13}, lineColor, scale)
+	canvas:drawLine({lineEnd,  2}, {166,  2}, lineColor, scale)
+	canvas:drawLine({lineEnd, 11}, {166, 11}, lineColor, scale)
 	canvas:drawLine({lineEnd - 0.5, MID}, {lineEnd + 0.5, MID}, {255, 255, 255, 200}, 60)
 
 	local loudness = 1 - (voice.speaker().smoothDecibels / MINIMUM_DB)
-	local loudnessEnd = math.min(1 + loudness * 166, 167)
+	local loudnessEnd = math.min(1 + loudness * 165, 166)
 	if loudnessEnd > 0 then
 		lineColor[4] = 200
 		canvas:drawLine({1, MID}, {loudnessEnd, MID}, lineColor, 4 * scale)
@@ -214,8 +214,8 @@ local function sliderToValue(x)
 end
 
 local function mouseInSlider(mouse)
-	return mouse[1] > 0 and mouse[1] < 168
-	   and mouse[2] > 0 and mouse[2] < 16
+	return mouse[1] >= 0 and mouse[1] < 167
+	   and mouse[2] >= 0 and mouse[2] < 13
 end
 
 local function handleVolume(canvas, mouse, multiplier, setter)
