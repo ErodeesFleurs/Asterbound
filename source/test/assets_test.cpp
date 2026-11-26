@@ -300,6 +300,7 @@ std::expected<std::unique_ptr<Root>, StarException> effect_test_root(GameTest& f
   settings.runtimeConfigFile = {};
   settings.logFile = {};
   settings.includeUGC = false;
+  settings.mix_random_entropy = false;
   settings.assetsSettings.missing_audio = {};
   return Root::create(std::move(settings));
 }

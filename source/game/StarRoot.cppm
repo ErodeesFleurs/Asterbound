@@ -116,6 +116,9 @@ public:
     // If given, will write changed configuration to the given file within the
     // storage directory.
     std::optional<String> runtimeConfigFile;
+
+    // Disable only for isolated consumers that explicitly seed the simulation RNG.
+    bool mix_random_entropy = true;
   };
 
   // Initializes the starbound root object and does the initial load.  All of

@@ -289,9 +289,11 @@ std::expected<void, StarException> Root::initialize() {
           }
         }
 
-        auto entropy = m_random.mix_seed();
-        if (!entropy)
-          return std::unexpected(std::move(entropy.error()));
+        if (m_settings.mix_random_entropy) {
+          auto entropy = m_random.mix_seed();
+          if (!entropy)
+            return std::unexpected(std::move(entropy.error()));
+        }
 
         {
           std::lock_guard locker(m_configurationMutex);
