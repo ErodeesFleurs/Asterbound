@@ -450,9 +450,9 @@ void ClientWeather::setup(WorldGeometry worldGeometry, WeatherEffectsActiveQuery
   m_currentTime = 0.0;
 }
 
-std::expected<void, StarException> ClientWeather::readUpdate(ByteArray data, NetCompatibilityRules rules) {
+std::expected<void, StarException> ClientWeather::readUpdate(ByteArray const& data, NetCompatibilityRules rules) {
   if (!data.empty()) {
-    auto read = m_netGroup.read_net_state(std::move(data), 0.0f, rules);
+    auto read = m_netGroup.read_net_state(data, 0.0f, rules);
     if (!read) return std::unexpected(std::move(read.error()));
     return getNetStates();
   }

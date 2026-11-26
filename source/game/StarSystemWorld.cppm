@@ -191,7 +191,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> serverUpdate(SystemWorldServer& system, float dt);
 
   [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules = {});
-  [[nodiscard]] std::expected<void, StarException> read_net_state(ByteArray data, float interpolationTime, NetCompatibilityRules rules = {});
+  [[nodiscard]] std::expected<void, StarException> read_net_state(ByteArray const& data, float interpolation_time = 0.0f, NetCompatibilityRules rules = {});
 
   [[nodiscard]] std::expected<ByteArray, StarException> net_store() const;
   [[nodiscard]] std::expected<Json, StarException> diskStore() const;
@@ -235,7 +235,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> serverUpdate(SystemWorld& system, float dt);
 
   [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules = {});
-  [[nodiscard]] std::expected<void, StarException> read_net_state(ByteArray data, float interpolationTime, NetCompatibilityRules rules = {});
+  [[nodiscard]] std::expected<void, StarException> read_net_state(ByteArray const& data, float interpolation_time = 0.0f, NetCompatibilityRules rules = {});
 
   [[nodiscard]] std::expected<ByteArray, StarException> net_store() const;
 private:

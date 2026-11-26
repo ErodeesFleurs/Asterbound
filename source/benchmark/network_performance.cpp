@@ -140,8 +140,8 @@ openSnapshotTransport(Root& root, NetCompatibilityRules rules) {
   auto receiver = TcpPacketSocket::open(root.logger(), std::move(*incoming));
   if (!receiver)
     return std::unexpected(std::move(receiver.error()));
-  (*sender)->setNetRules(rules);
-  (*receiver)->setNetRules(rules);
+  (*sender)->set_net_rules(rules);
+  (*receiver)->set_net_rules(rules);
   return std::pair{std::make_unique<UniverseConnection>(std::move(*sender)),
                    std::make_unique<UniverseConnection>(std::move(*receiver))};
 }
@@ -161,26 +161,26 @@ bool snapshotFieldsEqual(std::shared_ptr<Packet> const& before, std::shared_ptr<
   if (auto expected = as<WorldStartPacket>(before)) {
     auto actual = as<WorldStartPacket>(after);
     return actual
-      && std::tie(expected->templateData, expected->skyData, expected->weatherData, expected->playerStart,
-                  expected->playerRespawn, expected->respawnInWorld, expected->worldProperties,
-                  expected->dungeonIdGravity, expected->dungeonIdBreathable, expected->protectedDungeonIds,
-                  expected->clientId, expected->local_interpolation_mode)
-      == std::tie(actual->templateData, actual->skyData, actual->weatherData, actual->playerStart,
-                  actual->playerRespawn, actual->respawnInWorld, actual->worldProperties, actual->dungeonIdGravity,
-                  actual->dungeonIdBreathable, actual->protectedDungeonIds, actual->clientId,
+      && std::tie(expected->template_data, expected->sky_data, expected->weather_data, expected->player_start,
+                  expected->player_respawn, expected->respawn_in_world, expected->world_properties,
+                  expected->dungeon_id_gravity, expected->dungeon_id_breathable, expected->protected_dungeon_ids,
+                  expected->client_id, expected->local_interpolation_mode)
+      == std::tie(actual->template_data, actual->sky_data, actual->weather_data, actual->player_start,
+                  actual->player_respawn, actual->respawn_in_world, actual->world_properties, actual->dungeon_id_gravity,
+                  actual->dungeon_id_breathable, actual->protected_dungeon_ids, actual->client_id,
                   actual->local_interpolation_mode);
   }
   if (auto expected = as<WorldLayoutUpdatePacket>(before)) {
     auto actual = as<WorldLayoutUpdatePacket>(after);
-    return actual && expected->layoutData == actual->layoutData;
+    return actual && expected->layout_data == actual->layout_data;
   }
   if (auto expected = as<CentralStructureUpdatePacket>(before)) {
     auto actual = as<CentralStructureUpdatePacket>(after);
-    return actual && expected->structureData == actual->structureData;
+    return actual && expected->structure_data == actual->structure_data;
   }
   if (auto expected = as<EntityUpdateSetPacket>(before)) {
     auto actual = as<EntityUpdateSetPacket>(after);
-    return actual && expected->forConnection == actual->forConnection && expected->deltas == actual->deltas;
+    return actual && expected->for_connection == actual->for_connection && expected->deltas == actual->deltas;
   }
   return sameBytes;
 }
@@ -252,16 +252,16 @@ std::expected<void, StarException> consumeSnapshot(Root& root, SnapshotFixture& 
     ++fixture.packets;
     fixture.payloadBytes += before->size();
     if (auto create = as<EntityCreatePacket>(packet)) {
-      if (updateSetSeen || client.entities.contains(create->entityId))
+      if (updateSetSeen || client.entities.contains(create->entity_id))
         return std::unexpected(
           StarException("Entity creation did not precede update sets or duplicated a visible entity"));
-      auto entity = (*factory)->net_load_entity(create->entityType, create->storeData, client.rules);
+      auto entity = (*factory)->net_load_entity(create->entity_type, create->store_data, client.rules);
       if (!entity)
         return std::unexpected(std::move(entity.error()));
-      auto read = (*entity)->read_net_state(create->firstNetState, 0.0f, client.rules);
+      auto read = (*entity)->read_net_state(create->first_net_state, 0.0f, client.rules);
       if (!read)
         return std::unexpected(std::move(read.error()));
-      client.entities.emplace(create->entityId, std::move(*entity));
+      client.entities.emplace(create->entity_id, std::move(*entity));
       ++fixture.creates;
     } else if (auto update = as<EntityUpdateSetPacket>(packet)) {
       updateSetSeen = true;
@@ -275,7 +275,7 @@ std::expected<void, StarException> consumeSnapshot(Root& root, SnapshotFixture& 
         ++fixture.deltas;
       }
     } else if (auto destroy = as<EntityDestroyPacket>(packet)) {
-      if (client.entities.erase(destroy->entityId) != 1)
+      if (client.entities.erase(destroy->entity_id) != 1)
         return std::unexpected(StarException("Entity destroy arrived for an unknown entity"));
       ++fixture.destroys;
     } else if (packet->type() == PacketType::TileArrayUpdate) {

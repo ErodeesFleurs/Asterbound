@@ -571,7 +571,7 @@ const GameTestRegistration presentation_removal_lifecycle(
       probe->next_particle->type = Particle::Type::Textured;
       probe->next_particle->image = tick_marker;
       auto damage = std::make_shared<DamageNotificationPacket>();
-      auto& hit = damage->remoteDamageNotification.damage_notification;
+      auto& hit = damage->remote_damage_notification.damage_notification;
       hit.target_entity_id = -19;
       hit.position = newborn.position + Vec2F{static_cast<float>(mode) * 4, 0};
       hit.damage_source_kind = "presentation-directive-test";

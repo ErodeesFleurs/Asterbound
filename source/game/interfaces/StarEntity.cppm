@@ -94,10 +94,9 @@ public:
   // with the version to pass into writeDeltaState on the next call.  The first
   // delta written to a slave entity will always be the delta starting with 0.
   [[nodiscard]] virtual std::expected<std::pair<ByteArray, std::uint64_t>, StarException> write_net_state(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {});
-  // Will be called with deltas written by writeDeltaState, including if the
-  // delta is empty.  interpolationTime will be provided if interpolation is
-  // enabled.
-  [[nodiscard]] virtual std::expected<void, StarException> read_net_state(ByteArray data, float interpolationTime = 0.0f, NetCompatibilityRules rules = {});
+  // Synchronously reads a delta from write_net_state, even if empty. The bytes
+  // are borrowed only for this call. An empty delta still drives interpolation.
+  [[nodiscard]] virtual std::expected<void, StarException> read_net_state(ByteArray const& data, float interpolation_time = 0.0f, NetCompatibilityRules rules = {});
 
   [[nodiscard]] virtual std::expected<void, StarException> enable_interpolation(float extrapolation_hint);
   [[nodiscard]] virtual std::expected<void, StarException> disable_interpolation();

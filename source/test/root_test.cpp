@@ -1101,7 +1101,7 @@ const GameTestRegistration missing_death_burst("WorldClientTest", "MissingPlayer
   auto const id = player->entityId();
   std::shared_ptr<EntityCreatePacket> birth;
   for (auto const& packet : world->getOutgoingPackets())
-    if (auto create = as<EntityCreatePacket>(packet); create && create->entityId == id)
+    if (auto create = as<EntityCreatePacket>(packet); create && create->entity_id == id)
       birth = std::move(create);
   ASSERT_TRUE(birth);
   ASSERT_TRUE(world->removeEntity(id, true));
@@ -1113,10 +1113,10 @@ const GameTestRegistration missing_death_burst("WorldClientTest", "MissingPlayer
   bool sent_drop = false;
   for (auto const& packet : world->getOutgoingPackets()) {
     if (auto spawn = as<SpawnEntityPacket>(packet))
-      sent_drop |= spawn->entityType == EntityType::ItemDrop;
+      sent_drop |= spawn->entity_type == EntityType::ItemDrop;
     if (auto create = as<EntityCreatePacket>(packet))
-      sent_drop |= create->entityType == EntityType::ItemDrop;
-    if (auto remove = as<EntityDestroyPacket>(packet); remove && remove->entityId == id && remove->death)
+      sent_drop |= create->entity_type == EntityType::ItemDrop;
+    if (auto remove = as<EntityDestroyPacket>(packet); remove && remove->entity_id == id && remove->death)
       death = std::move(remove);
   }
   EXPECT_TRUE(sent_drop);
@@ -1362,7 +1362,7 @@ const GameTestRegistration signed_broadcast_lifecycle("RootTest", "SignedBroadca
     auto damage = as<DamageNotificationPacket>(packet);
     if (!damage)
       continue;
-    auto wire = damage->remoteDamageNotification.damage_notification.target_material_kind.utf8();
+    auto wire = damage->remote_damage_notification.damage_notification.target_material_kind.utf8();
     constexpr std::string_view prefix("\0Broadcast\0", sizeof("\0Broadcast\0") - 1);
     if (!wire.starts_with(prefix))
       continue;
@@ -1388,8 +1388,8 @@ const GameTestRegistration signed_broadcast_lifecycle("RootTest", "SignedBroadca
     wire.append(signature.begin(), signature.end());
     wire.append(payload);
     auto packet = std::make_shared<DamageNotificationPacket>();
-    packet->remoteDamageNotification.source_entity_id = player->entityId();
-    packet->remoteDamageNotification.damage_notification.target_material_kind = String(std::move(wire));
+    packet->remote_damage_notification.source_entity_id = player->entityId();
+    packet->remote_damage_notification.damage_notification.target_material_kind = String(std::move(wire));
     return packet;
   };
   for (bool legacy : {false, true}) {
@@ -3434,7 +3434,7 @@ const GameTestRegistration monster_damage_sources("RootTest", "MonsterDamageSour
   EXPECT_FALSE((*donor)->damage_sources());
   auto state = (*donor)->write_net_state();
   ASSERT_TRUE(state) << state.error().what();
-  ASSERT_TRUE((*monster)->read_net_state(std::move(state->first)));
+  ASSERT_TRUE((*monster)->read_net_state(state->first));
   EXPECT_EQ((*monster)->monster_level(), new_level);
   sources = query();
   ASSERT_TRUE(sources) << sources.error().what();

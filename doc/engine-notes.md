@@ -145,6 +145,10 @@ not substitute an empty chunk for unreadable data.
 
 Entity creation encoders transfer completed buffers instead of copying them. Read-only RPC and monster/NPC variant decoders borrow their input only during decoding; decoded fields remain owned. Network formats and compatibility versions are unchanged. Frame data owns reusable entity collections and particle snapshots; painters borrow them only during submission. Typed spatial queries collect a single owned result list without changing traversal order, wrapping, deduplication or insertion-safe candidate snapshots.
 
+Subworld packet groups inherit the enclosing stream's compatibility version. Reading a complete group replaces its world ID and children together, including when the new group is empty. A failed read does not publish any children from the incomplete group.
+
+Entity delta readers borrow the payload only for the synchronous read. A missing delta still delivers an empty update to each entity owned by that connection; it is not equivalent to skipping the update or suppressing an empty forwarding packet.
+
 ### Team status frequency
 
 Team updates share one configuration snapshot within each update, without caching it across updates. Health, energy, position and travel state retain the configured status frequency. Names and portraits are included on the next eligible status update after ten seconds, or immediately on the next eligible update after first joining, changing teams or `forceUpdate`. Appearance changes can therefore reach other teammates later than dynamic status. The full-update timer advances only after successful local submission; encoding or enqueue failures do not consume it. Legacy RPC still maps remote failures to `null`, so submission is not a remote-delivery acknowledgment.

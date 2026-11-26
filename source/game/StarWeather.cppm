@@ -133,7 +133,7 @@ public:
   void setup(WorldGeometry worldGeometry, WeatherEffectsActiveQuery weatherEffectsActiveQuery);
 
   [[nodiscard]]
-  std::expected<void, StarException> readUpdate(ByteArray data, NetCompatibilityRules rules);
+  std::expected<void, StarException> readUpdate(ByteArray const& data, NetCompatibilityRules rules);
 
   [[nodiscard]]
   std::expected<void, StarException> clear();

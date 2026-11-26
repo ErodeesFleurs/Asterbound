@@ -489,7 +489,7 @@ std::expected<void, StarException> SystemWorldServer::handleIncomingPacket(Conne
     if (!randomPosition)
       return std::unexpected(std::move(randomPosition.error()));
     auto position = spawn->position.value_or(*randomPosition);
-    auto config = systemObjectConfig(spawn->typeName, spawn->uuid);
+    auto config = systemObjectConfig(spawn->type_name, spawn->uuid);
     if (!config)
       return std::unexpected(std::move(config.error()));
     auto object = SystemObject::create(root(), std::move(*config), spawn->uuid, position, time(), spawn->parameters);

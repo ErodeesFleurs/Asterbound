@@ -141,8 +141,8 @@ std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Sky::writeUpda
   return m_netGroup.write_net_state(fromVersion, rules);
 }
 
-std::expected<void, StarException> Sky::readUpdate(ByteArray data, NetCompatibilityRules rules) {
-  return m_netGroup.read_net_state(std::move(data), 0.0f, rules);
+std::expected<void, StarException> Sky::readUpdate(ByteArray const& data, NetCompatibilityRules rules) {
+  return m_netGroup.read_net_state(data, 0.0f, rules);
 }
 
 std::expected<void, StarException> Sky::stateUpdate() {

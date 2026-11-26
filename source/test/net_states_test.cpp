@@ -5,6 +5,7 @@ import star.format;
 
 import star.data_stream;
 import star.data_stream_devices;
+import star.casting;
 import star.list;
 import star.string;
 import star.vector;
@@ -342,6 +343,96 @@ TEST(NetElements, CustomCodecForwardsPendingWireValue) {
   EXPECT_FALSE(missing.net_load(wire, {}));
   EXPECT_FALSE(missing.net_store(wire));
   EXPECT_TRUE(wire.empty());
+}
+
+namespace {
+
+class SharedStateBorrowTest : public testing::Test {
+  static bool check(bool passed, std::string_view message, std::source_location at = std::source_location::current()) {
+    if (!passed)
+      testing::internal::AssertHelper(testing::TestPartResult::kNonFatalFailure, at.file_name(), static_cast<int>(at.line()), "")
+          = testing::Message() << message;
+    return passed;
+  }
+
+  struct Probe : NetElementInt {
+    std::span<char const> expected_bytes;
+    NetCompatibilityRules expected_rules;
+    std::optional<float> blank_time;
+
+    void check_borrow(DataStream& stream) const {
+      auto borrowed = as_ref<DataStreamReader>(stream);
+      if (!check(borrowed.has_value(), "read directly through the borrowed stream"))
+        return;
+      auto const bytes = borrowed->get().span();
+      check(bytes.data() == expected_bytes.data() && bytes.size() == expected_bytes.size(),
+          "read from the original byte storage");
+      check(stream.stream_compatibility_version() == expected_rules.version(),
+          "propagate the peer protocol to the reader");
+    }
+
+    std::expected<void, StarException> net_load(DataStream& stream, NetCompatibilityRules rules) override {
+      check_borrow(stream);
+      return NetElementInt::net_load(stream, rules);
+    }
+
+    std::expected<void, StarException> read_net_delta(DataStream& stream, float interpolation_time, NetCompatibilityRules rules) override {
+      check_borrow(stream);
+      return NetElementInt::read_net_delta(stream, interpolation_time, rules);
+    }
+
+    std::expected<void, StarException> blank_net_delta(float interpolation_time) override {
+      blank_time = interpolation_time;
+      return {};
+    }
+  };
+
+  void TestBody() override {
+    for (auto version : {legacy_version, open_protocol_version}) {
+      NetCompatibilityRules const rules(version);
+      NetElementTop<NetElementInt> sender;
+      sender.set(4);
+      auto const full = sender.write_net_state(0, rules);
+      if (!check(full.has_value(), "encode full state"))
+        return;
+      sender.set(39);
+      auto const delta = sender.write_net_state(full->second, rules);
+      if (!check(delta && !delta->first.empty(), "encode nonempty delta"))
+        return;
+
+      std::array<NetElementTop<Probe>, 2> receivers;
+      for (auto& receiver : receivers) {
+        receiver.expected_rules = rules;
+        if (!check(receiver.enable_net_interpolation().has_value(), "enable interpolation"))
+          return;
+        receiver.expected_bytes = full->first.span();
+        if (!check(receiver.read_net_state(full->first, 1.0f, rules).has_value(), "apply shared full state"))
+          return;
+        check(receiver.get() == 4, "full state is visible immediately");
+        receiver.expected_bytes = delta->first.span();
+        if (!check(receiver.read_net_state(delta->first, 1.0f, rules).has_value(), "apply shared delta"))
+          return;
+        check(receiver.get() == 4, "delta is not visible until interpolation advances");
+        check(receiver.read_net_state({}, 1.25f, rules).has_value() && receiver.blank_time == 1.25f,
+            "dispatch an empty update with its interpolation lead");
+        if (!check(receiver.tick_net_interpolation(1.0f).has_value(), "advance interpolation"))
+          return;
+        check(receiver.get() == 39, "retained decoded value becomes visible after interpolation");
+      }
+    }
+  }
+};
+
+auto const shared_state_borrow_registration = [] {
+  auto const location = std::source_location::current();
+  return testing::RegisterTest("NetElements", "SharedStateBorrowsOriginalBytesAndPreservesBlankInterpolation",
+      nullptr, nullptr, location.file_name(), static_cast<int>(location.line()),
+      [] {
+        std::unique_ptr<testing::Test> test = std::make_unique<SharedStateBorrowTest>();
+        return test.release();
+      });
+}();
+
 }
 
 TEST(NetElements, Forwarding) {
@@ -1383,12 +1474,12 @@ TEST(NetElements, DynamicGroupForwardsNestedFieldsWithPeerProtocol) {
   ASSERT_EQ(sender.add_net_element(std::move(first)), 1u);
   auto full = sender.write_net_state();
   ASSERT_TRUE(full);
-  ASSERT_TRUE(relay.read_net_state(std::move(full->first)));
+  ASSERT_TRUE(relay.read_net_state(full->first));
   auto legacy_full = relay.write_net_state(0, legacy);
   ASSERT_TRUE(legacy_full);
   // Full frame, count, id, payload length, one-byte legacy value.
   EXPECT_TRUE(std::ranges::equal(legacy_full->first.span(), std::array<char, 5>{1, 1, 1, 1, 41}));
-  ASSERT_TRUE(receiver.read_net_state(std::move(legacy_full->first), 0.0f, legacy));
+  ASSERT_TRUE(receiver.read_net_state(legacy_full->first, 0.0f, legacy));
   auto received_first = receiver.get_net_element(1);
   ASSERT_TRUE(received_first);
   EXPECT_EQ((*received_first)->get(), 41u);
@@ -1398,12 +1489,12 @@ TEST(NetElements, DynamicGroupForwardsNestedFieldsWithPeerProtocol) {
   ASSERT_EQ(sender.add_net_element(std::move(second)), 2u);
   auto delta = sender.write_net_state(full->second);
   ASSERT_TRUE(delta);
-  ASSERT_TRUE(relay.read_net_state(std::move(delta->first)));
+  ASSERT_TRUE(relay.read_net_state(delta->first));
   auto legacy_delta = relay.write_net_state(legacy_full->second, legacy);
   ASSERT_TRUE(legacy_delta);
   // Frame/inner delta flags, change code, add tag, uint32 id, length, value, terminator.
   EXPECT_TRUE(std::ranges::equal(legacy_delta->first.span(), std::array<char, 11>{0, 0, 1, 2, 0, 0, 0, 2, 1, 42, 0}));
-  ASSERT_TRUE(receiver.read_net_state(std::move(legacy_delta->first), 0.0f, legacy));
+  ASSERT_TRUE(receiver.read_net_state(legacy_delta->first, 0.0f, legacy));
   auto received_second = receiver.get_net_element(2);
   ASSERT_TRUE(received_second);
   EXPECT_EQ((*received_second)->get(), 42u);

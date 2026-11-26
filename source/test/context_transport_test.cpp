@@ -52,7 +52,7 @@ const GameTestRegistration retry_enqueued_packets("ContextTransport", "FailedSes
     return std::unexpected(StarException("Unexpected inbound test packet"));
   }, 1);
   ASSERT_TRUE(server);
-  auto pair = LocalPacketSocket::openPair();
+  auto pair = LocalPacketSocket::open_pair();
   ASSERT_TRUE((*server)->addConnection(1, UniverseConnection(std::move(pair.first))));
   UniverseConnection first_wire(std::move(pair.second));
   auto send = [&](ServerClientContext& session) {
@@ -87,7 +87,7 @@ const GameTestRegistration retry_enqueued_packets("ContextTransport", "FailedSes
   (*second)->update_ship_chunks(new_chunks);
   (*second)->update_custom_world_chunks("garden", {});
   (*second)->set_admin(false);
-  auto other_pair = LocalPacketSocket::openPair();
+  auto other_pair = LocalPacketSocket::open_pair();
   ASSERT_TRUE((*server)->addConnection(2, UniverseConnection(std::move(other_pair.first))));
   UniverseConnection second_wire(std::move(other_pair.second));
   ASSERT_TRUE(send(**second));

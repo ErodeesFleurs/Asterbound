@@ -52,6 +52,7 @@ import star.byte_array;
 
 import star.zstd_compression;
 import star.net_compatibility;
+import star.compression;
 
 import star.host_address;
 import star.socket;
@@ -349,10 +350,20 @@ struct SocketTestAccess {
     return !locker.owns_lock();
   }
   static std::span<char const> pending_plain(TcpPacketSocket const& socket) {
-    return socket.m_outputBuffer.span();
+    return socket.m_output_buffer.span();
   }
   static std::span<char const> pending_compressed(TcpPacketSocket const& socket) {
-    return socket.m_compressedOutputBuffer.span();
+    return socket.m_compressed_output_buffer.span();
+  }
+  static void hold_outgoing_stats_window(TcpPacketSocket& socket) {
+    socket.m_outgoing_stats.m_calculation_window = std::chrono::duration<float>::max();
+  }
+  static std::size_t outgoing_window_total(TcpPacketSocket const& socket) {
+    return socket.m_outgoing_stats.m_total_bytes;
+  }
+  static PacketStats finish_outgoing_stats_window(TcpPacketSocket& socket) {
+    socket.m_outgoing_stats.m_calculation_window = {};
+    return socket.m_outgoing_stats.stats();
   }
   [[nodiscard]] static std::expected<void, StarException> reset_on_close(Socket& socket) {
     std::shared_lock locker(socket.m_mutex);
@@ -411,7 +422,7 @@ private:
           auto request = convert<ProtocolRequestPacket>(*packet);
           if (!request)
             return std::unexpected(std::move(request.error()));
-          EXPECT_EQ((*request)->requestProtocolVersion, read);
+          EXPECT_EQ((*request)->request_protocol_version, read);
           ++read;
         }
       }
@@ -487,7 +498,7 @@ private:
       auto request = convert<ProtocolRequestPacket>(*packet);
       if (!request)
         return std::unexpected(std::move(request.error()));
-      EXPECT_EQ((*request)->requestProtocolVersion, i);
+      EXPECT_EQ((*request)->request_protocol_version, i);
       if (!m_connection.isOpen())
         break;
     }
@@ -531,7 +542,7 @@ const GameTestRegistration universeConnectionsAll("UniverseConnections", "All", 
 
   List<std::unique_ptr<ASyncClientThread>> localASyncClients;
   for (unsigned i = 0; i < NumLocalASyncConnections; ++i) {
-    auto pair = LocalPacketSocket::openPair();
+    auto pair = LocalPacketSocket::open_pair();
     ASSERT_TRUE((*server)->addConnection(++clientId, UniverseConnection(std::move(pair.first))));
     auto client = ASyncClientThread::create(UniverseConnection(std::move(pair.second)));
     ASSERT_TRUE(client) << client.error().what();
@@ -540,7 +551,7 @@ const GameTestRegistration universeConnectionsAll("UniverseConnections", "All", 
 
   List<std::unique_ptr<SyncClientThread>> localSyncClients;
   for (unsigned i = 0; i < NumLocalSyncConnections; ++i) {
-    auto pair = LocalPacketSocket::openPair();
+    auto pair = LocalPacketSocket::open_pair();
     ASSERT_TRUE((*server)->addConnection(++clientId, UniverseConnection(std::move(pair.first))));
     auto client = SyncClientThread::create(UniverseConnection(std::move(pair.second)));
     ASSERT_TRUE(client) << client.error().what();
@@ -799,7 +810,7 @@ const GameTestRegistration native_socket_timeouts("UniverseConnections", "Native
   auto request = convert<ProtocolRequestPacket>(*packet);
   if (!request)
     return std::unexpected(std::move(request.error()));
-  return (*request)->requestProtocolVersion;
+  return (*request)->request_protocol_version;
 }
 
 // std::async cannot report native thread-start failures without throwing.
@@ -911,37 +922,146 @@ const GameTestRegistration local_legacy_handshake("UniverseConnections", "LocalF
 });
 
 const GameTestRegistration packet_names_preserve_wire_and_lua_spelling(
-    "UniverseConnections", "PacketNamesPreserveWireAndLuaSpelling", [](GameTest&) {
+    "UniverseConnections", "PacketNamesPreserveWireAndLuaSpelling", [](GameTest& fixture) {
   for (unsigned wire = 0; wire <= std::to_underlying(PacketType::UniverseMessageResponse); ++wire) {
     auto type = static_cast<PacketType>(wire);
     auto name = packet_type_name(type);
-    ASSERT_TRUE(name) << name.error().what();
-    EXPECT_EQ(packet_type_from_name(*name), type);
+    if (!fixture.check(bool(name), name ? "look up wire packet name" : name.error().what()))
+      return;
+    fixture.check(packet_type_from_name(*name) == type, *name);
+    auto decoded = create_packet(type);
+    if (!fixture.check(bool(decoded), decoded ? *name : decoded.error().what()))
+      return;
+    fixture.check((*decoded)->type() == type, *name);
   }
 
   // The public spelling is intentionally not the C++ enumerator name.
   auto alias = packet_type_from_name("eNTiTyUPdAtE");
-  ASSERT_TRUE(alias) << alias.error().what();
-  EXPECT_EQ(std::to_underlying(*alias), 51u);
-  auto packet = createPacket(*alias);
-  ASSERT_TRUE(packet) << packet.error().what();
-  EXPECT_TRUE(is<EntityUpdateSetPacket>(*packet));
+  if (!fixture.check(bool(alias), alias ? "resolve EntityUpdate" : alias.error().what()))
+    return;
+  fixture.check(std::to_underlying(*alias) == 51u, "EntityUpdate remains wire ID 51");
+  auto packet = create_packet(*alias);
+  if (!fixture.check(bool(packet), packet ? "construct EntityUpdate" : packet.error().what()))
+    return;
+  fixture.check(is<EntityUpdateSetPacket>(*packet), "query reaches the concrete packet type");
+  fixture.check(is<PacketBase<PacketType::EntityUpdateSet>>(*packet), "query reaches its wire-typed base");
+  fixture.check(is<Packet>(*packet), "query reaches the Packet root");
+  fixture.check(!is<PacketBase<PacketType::EntityCreate>>(*packet), "query rejects another packet's wire-typed base");
+  fixture.check((*packet)->dynamic_type_name().ends_with("EntityUpdateSetPacket"), "report the concrete type name");
   auto name = packet_type_name((*packet)->type());
-  ASSERT_TRUE(name) << name.error().what();
-  EXPECT_EQ(Star::format("on{}Packet", *name), "onEntityUpdatePacket");
+  if (!fixture.check(bool(name), name ? "look up EntityUpdate name" : name.error().what()))
+    return;
+  fixture.check(Star::format("on{}Packet", *name) == "onEntityUpdatePacket", "preserve the Lua event name");
 
   for (std::string_view miss : {"EntityUpdateSet", "日本語"}) {
     auto result = packet_type_from_name(miss);
-    ASSERT_FALSE(result);
-    EXPECT_TRUE(result.error().is<MapException>());
-    EXPECT_TRUE(std::string_view(result.error().what()).contains(miss));
+    fixture.check(!result && result.error().is<MapException>() && std::string_view(result.error().what()).contains(miss),
+      miss);
   }
   auto invalid = packet_type_from_name(std::string_view("Ping\xff", 5));
-  ASSERT_FALSE(invalid);
-  EXPECT_TRUE(invalid.error().is<UnicodeException>());
-  auto unnamed = packet_type_name(static_cast<PacketType>(255));
-  ASSERT_FALSE(unnamed);
-  EXPECT_TRUE(unnamed.error().is<MapException>());
+  fixture.check(!invalid && invalid.error().is<UnicodeException>(), "reject malformed UTF-8 names");
+  RandomService random(473);
+  RandomService reference(473);
+  for (unsigned wire : {std::to_underlying(PacketType::UniverseMessageResponse) + 1u, 255u}) {
+    auto type = static_cast<PacketType>(wire);
+    auto unnamed = packet_type_name(type);
+    fixture.check(!unnamed && unnamed.error().is<MapException>(), "invalid wire ID has no name");
+    auto decoded = create_packet(type);
+    fixture.check(!decoded && decoded.error().is<StarPacketException>(), "invalid wire ID cannot be decoded");
+    auto outgoing = create_packet(random, type, std::nullopt);
+    fixture.check(!outgoing && outgoing.error().is<StarPacketException>(), "invalid wire ID cannot be sent");
+  }
+  fixture.check(random.next_u64() == reference.next_u64(), "invalid wire IDs consume no random draws");
+});
+
+const GameTestRegistration packet_factory_outgoing_identity(
+    "UniverseConnections", "PacketFactoryPreservesOutgoingIdentityDraws", [](GameTest& fixture) {
+  RandomService random(241);
+  RandomService reference(241);
+  auto check_identity = [&]<std::derived_from<Packet> T>(
+      std::invocable<T const&> auto identity, std::optional<Json> const& args = std::nullopt) {
+    auto staged = create_packet(T::packet_type);
+    if (!fixture.check(bool(staged), staged ? "stage packet for decoding" : staged.error().what()))
+      return;
+    auto staged_packet = as<T>(*staged);
+    if (!fixture.check(bool(staged_packet), "staging constructs the requested packet type"))
+      return;
+    fixture.check(std::invoke(identity, std::as_const(*staged_packet)) == Uuid::nil(),
+      "wire staging leaves identity unset");
+
+    auto outgoing = create_packet(random, T::packet_type, args);
+    if (!fixture.check(bool(outgoing), outgoing ? "construct outgoing packet" : outgoing.error().what()))
+      return;
+    auto outgoing_packet = as<T>(*outgoing);
+    if (!fixture.check(bool(outgoing_packet), "outgoing factory constructs the requested packet type"))
+      return;
+    fixture.check(std::invoke(identity, std::as_const(*outgoing_packet)) == Uuid(reference),
+      "outgoing factory generates the next identity from the supplied stream");
+  };
+
+  check_identity.operator()<ConnectSuccessPacket>(&ConnectSuccessPacket::server_uuid);
+  check_identity.operator()<ClientConnectPacket>(&ClientConnectPacket::player_uuid);
+  check_identity.operator()<EntityInteractPacket>(&EntityInteractPacket::request_id);
+  check_identity.operator()<EntityInteractResultPacket>(&EntityInteractResultPacket::request_id);
+  check_identity.operator()<EntityMessagePacket>(&EntityMessagePacket::uuid);
+  check_identity.operator()<EntityMessageResponsePacket>(&EntityMessageResponsePacket::uuid);
+  check_identity.operator()<SystemWorldStartPacket>(
+    [](SystemWorldStartPacket const& packet) -> Uuid const& { return packet.client_ship.first; });
+  check_identity.operator()<SystemObjectDestroyPacket>(&SystemObjectDestroyPacket::object_uuid);
+  check_identity.operator()<SystemShipDestroyPacket>(&SystemShipDestroyPacket::ship_uuid);
+  check_identity.operator()<SystemObjectSpawnPacket>(&SystemObjectSpawnPacket::uuid);
+  check_identity.operator()<UniverseMessage>(&UniverseMessage::uuid);
+  check_identity.operator()<UniverseMessageResponse>(&UniverseMessageResponse::uuid, Json{});
+
+  auto no_identity = create_packet(random, PacketType::Ping, std::nullopt);
+  fixture.check(bool(no_identity), "construct outgoing Ping");
+  fixture.check(random.next_u64() == reference.next_u64(), "Ping consumes no random draws");
+
+  auto explicit_uuid = Uuid::nil();
+  auto parsed = create_packet(random, PacketType::EntityMessage, JsonObject{
+    {"entityId", 42}, {"message", "example"}, {"args", JsonArray{}}, {"uuid", explicit_uuid.hex()}, {"fromConnection", 0}
+  });
+  if (!fixture.check(bool(parsed), parsed ? "construct EntityMessage from JSON" : parsed.error().what()))
+    return;
+  auto message = as<EntityMessagePacket>(*parsed);
+  fixture.check(message && message->uuid == explicit_uuid, "explicit JSON identity replaces the generated identity");
+  static_cast<void>(Uuid(reference));
+  fixture.check(random.next_u64() == reference.next_u64(), "explicit identity still consumes the historical draw");
+
+  auto invalid_json = create_packet(random, PacketType::EntityMessage, JsonObject{});
+  fixture.check(!invalid_json && invalid_json.error().is<JsonException>(), "invalid JSON is rejected");
+  static_cast<void>(Uuid(reference));
+  fixture.check(random.next_u64() == reference.next_u64(), "invalid JSON still consumes the historical draw");
+});
+
+const GameTestRegistration subworld_packet_replacement(
+    "UniverseConnections", "SubworldPacketReadReplacesOnlyCompleteGroup", [](GameTest& fixture) {
+  ClientSubWorldPackets target(7, {std::make_shared<StepUpdatePacket>(3.0)});
+  ClientSubWorldPackets replacement(11, {std::make_shared<StepUpdatePacket>(0.249)});
+  DataStreamBuffer wire;
+  wire.set_stream_compatibility_version(legacy_version);
+  if (!fixture.check(bool(replacement.write(wire)), "encode legacy subworld group")) return;
+  if (!fixture.check(wire.size() == 8 && wire.span().back() == 15, "write one legacy 15-step child")) return;
+  DataStreamReader first(wire.span());
+  first.set_stream_compatibility_version(legacy_version);
+  if (!fixture.check(bool(target.read(first)) && target.sub_world_id == 11 && target.packets.size() == 1,
+                     "replace old group and identity")) return;
+  auto step = as<StepUpdatePacket>(target.packets.front());
+  if (!fixture.check(step && step->remote_time == 0.25, "children inherit legacy time encoding")) return;
+
+  ClientSubWorldPackets incomplete(17, {std::make_shared<StepUpdatePacket>(1.0), std::make_shared<StepUpdatePacket>(2.0)});
+  DataStreamBuffer next;
+  if (!fixture.check(bool(incomplete.write(next)), "encode two children")) return;
+  DataStreamReader truncated(next.span().first(next.size() - 1));
+  if (!fixture.check(!target.read(truncated), "reject truncated final child")) return;
+  if (!fixture.check(target.sub_world_id == 11 && target.packets.size() == 1 && target.packets.front() == step,
+                     "failed group preserves previously published child and identity")) return;
+
+  DataStreamBuffer empty;
+  if (!fixture.check(bool(ClientSubWorldPackets(23, {}).write(empty)), "encode empty group")) return;
+  DataStreamReader last(empty.span());
+  fixture.check(bool(target.read(last)) && target.sub_world_id == 23 && target.packets.empty(),
+                "empty group clears the previous generation");
 });
 
 const GameTestRegistration log_map_broadcast("UniverseConnections", "LogMapBroadcastRetainsWireAndLocalPacket", [](GameTest& fixture) {
@@ -949,8 +1069,8 @@ const GameTestRegistration log_map_broadcast("UniverseConnections", "LogMapBroad
   log_map.set_value("z", "last");
   log_map.set_value("a", "first");
   auto batch = std::make_shared<LogMapUpdate>(log_map.drain());
-  auto local = LocalPacketSocket::openPair();
-  ASSERT_TRUE(local.first->sendPackets({batch}));
+  auto local = LocalPacketSocket::open_pair();
+  ASSERT_TRUE(local.first->send_packets({batch}));
   log_map.set_value("z", "next batch");
 
   auto pair = connectionTestTcpPair(fixture.root().logger());
@@ -969,11 +1089,11 @@ const GameTestRegistration log_map_broadcast("UniverseConnections", "LogMapBroad
   auto decoded = as<LogMapUpdate>(*received);
   ASSERT_TRUE(decoded);
   EXPECT_EQ(decoded->map, batch->map);
-  auto forwarded = local.second->receivePackets();
+  auto forwarded = local.second->receive_packets();
   ASSERT_TRUE(forwarded);
   ASSERT_EQ(forwarded->size(), 1u);
   EXPECT_EQ(forwarded->front(), batch);
-  EXPECT_EQ(batch->compressionMode(), PacketCompressionMode::Automatic);
+  EXPECT_EQ(batch->compression_mode(), PacketCompressionMode::Automatic);
   EXPECT_EQ(log_map.get_value("z"), "next batch");
 
   DataStreamBuffer wire;
@@ -990,20 +1110,219 @@ const GameTestRegistration universeConnectionsWorldUpdatePacketsTransferRvaluesA
   ByteArray parameters(4096, 'p');
   auto parametersAllocation = parameters.span().data();
   WorldParametersUpdatePacket movedParameters(std::move(parameters));
-  EXPECT_EQ(movedParameters.parametersData.span().data(), parametersAllocation);
+  EXPECT_EQ(movedParameters.parameters_data.span().data(), parametersAllocation);
   EXPECT_TRUE(parameters.empty());
-  WorldParametersUpdatePacket copiedParameters(movedParameters.parametersData);
-  EXPECT_NE(copiedParameters.parametersData.span().data(), parametersAllocation);
-  EXPECT_EQ(copiedParameters.parametersData, movedParameters.parametersData);
+  WorldParametersUpdatePacket copiedParameters(movedParameters.parameters_data);
+  EXPECT_NE(copiedParameters.parameters_data.span().data(), parametersAllocation);
+  EXPECT_EQ(copiedParameters.parameters_data, movedParameters.parameters_data);
 
   ByteArray delta(4096, 'd');
   auto deltaAllocation = delta.span().data();
   WorldClientStateUpdatePacket movedDelta(std::move(delta));
-  EXPECT_EQ(movedDelta.worldClientStateDelta.span().data(), deltaAllocation);
+  EXPECT_EQ(movedDelta.world_client_state_delta.span().data(), deltaAllocation);
   EXPECT_TRUE(delta.empty());
-  WorldClientStateUpdatePacket copiedDelta(movedDelta.worldClientStateDelta);
-  EXPECT_NE(copiedDelta.worldClientStateDelta.span().data(), deltaAllocation);
-  EXPECT_EQ(copiedDelta.worldClientStateDelta, movedDelta.worldClientStateDelta);
+  WorldClientStateUpdatePacket copiedDelta(movedDelta.world_client_state_delta);
+  EXPECT_NE(copiedDelta.world_client_state_delta.span().data(), deltaAllocation);
+  EXPECT_EQ(copiedDelta.world_client_state_delta, movedDelta.world_client_state_delta);
+});
+
+const GameTestRegistration tcp_batch_publication(
+    "UniverseConnections", "TcpFailedBatchPreservesQueueAndStreamGrouping", [](GameTest& fixture) {
+  for (bool streaming : {false, true}) {
+    std::string_view mode = streaming ? "TCP streaming" : "TCP legacy";
+    auto pair = connectionTestTcpPair(fixture.root().logger());
+    if (!fixture.check(bool(pair), pair ? mode : pair.error().what())) return;
+    auto transport = TcpPacketSocket::open(fixture.root().logger(), pair->first);
+    if (!fixture.check(bool(transport), transport ? mode : transport.error().what())) return;
+    auto& socket = **transport;
+    socket.set_net_rules(legacy_version);
+    socket.set_compression_stream_enabled(streaming);
+    SocketTestAccess::hold_outgoing_stats_window(socket);
+
+    if (!fixture.check(!socket.send_packets({std::make_shared<ProtocolRequestPacket>(99),
+        std::make_shared<StepUpdatePacket>(-1.0)}), Star::format("{} rejects the first failing batch", mode))) return;
+    fixture.check(!socket.sent_packets_pending(), Star::format("{} does not publish the failing batch", mode));
+    fixture.check(SocketTestAccess::outgoing_window_total(socket) == 0u,
+        Star::format("{} does not account for the failing batch", mode));
+    if (!fixture.check(bool(socket.send_packets({std::make_shared<ProtocolRequestPacket>(70)})),
+                      Star::format("{} queues the first valid frame", mode))) return;
+    auto first = connectionTestFrame(70);
+    if (!fixture.check(bool(first), first ? mode : first.error().what())) return;
+    fixture.check(std::ranges::equal(SocketTestAccess::pending_plain(socket), first->span()),
+        Star::format("{} queues the expected first frame", mode));
+
+    if (!fixture.check(!socket.send_packets({std::make_shared<ProtocolRequestPacket>(99),
+        std::make_shared<StepUpdatePacket>(-1.0)}), Star::format("{} rejects a failing append", mode))) return;
+    fixture.check(std::ranges::equal(SocketTestAccess::pending_plain(socket), first->span()),
+        Star::format("{} preserves existing output after a failing append", mode));
+    if (!fixture.check(bool(socket.send_packets({std::make_shared<ProtocolRequestPacket>(71),
+        std::make_shared<ProtocolRequestPacket>(72)})), Star::format("{} appends the next valid batch", mode))) return;
+
+    DataStreamBuffer expected(std::move(*first));
+    if (!fixture.check(expected.seek(expected.size()) && expected.write(PacketType::ProtocolRequest)
+        && expected.write_vlq_i(streaming ? sizeof(VersionNumber) : 2 * sizeof(VersionNumber))
+        && expected.write(VersionNumber{71}), Star::format("{} encodes the expected valid append", mode))) return;
+    if (streaming) {
+      if (!fixture.check(expected.write(PacketType::ProtocolRequest) && expected.write_vlq_i(sizeof(VersionNumber)),
+                         "TCP streaming encodes a separate header for the second packet")) return;
+    }
+    if (!fixture.check(bool(expected.write(VersionNumber{72})),
+                      Star::format("{} encodes the expected final packet", mode))) return;
+    fixture.check(std::ranges::equal(SocketTestAccess::pending_plain(socket), expected.span()),
+        Star::format("{} queues the expected frames in order", mode));
+    fixture.check(SocketTestAccess::outgoing_window_total(socket) == (streaming ? 0 : 3 * sizeof(VersionNumber)),
+        Star::format("{} counts only committed payload bytes before the native write", mode));
+    auto stats = SocketTestAccess::finish_outgoing_stats_window(socket);
+    fixture.check(stats.worst_packet_size == 3 * sizeof(VersionNumber)
+        && stats.worst_packet_type == PacketType::ProtocolRequest,
+        Star::format("{} includes only committed packets in the outgoing statistics", mode));
+  }
+});
+
+namespace {
+
+struct PacketDatagramWire {
+  List<ByteArray> messages;
+  std::size_t next_receive = 0;
+  std::size_t send_limit = 1;
+};
+
+class DatagramLoopback final : public P2PSocket {
+public:
+  explicit DatagramLoopback(PacketDatagramWire& wire) : m_wire(wire) {}
+
+  bool isOpen() override { return true; }
+
+  std::expected<bool, StarException> sendMessage(ByteArray const& message) override {
+    if (m_wire.messages.size() == m_wire.send_limit)
+      return false;
+    m_wire.messages.push_back(message);
+    return true;
+  }
+
+  std::expected<std::optional<ByteArray>, StarException> receiveMessage() override {
+    if (m_wire.next_receive == m_wire.messages.size())
+      return std::nullopt;
+    return std::optional<ByteArray>(m_wire.messages[m_wire.next_receive++]);
+  }
+
+private:
+  PacketDatagramWire& m_wire;
+};
+
+}
+
+const GameTestRegistration p2p_batch_publication(
+    "UniverseConnections", "P2PBatchWireModesOrderAndFailureRollback", [](GameTest& fixture) {
+  for (bool streaming : {false, true}) {
+    std::string_view mode = streaming ? "P2P streaming" : "P2P legacy";
+    PacketDatagramWire wire;
+    auto transport = P2PPacketSocket::open(fixture.root().logger(), std::make_unique<DatagramLoopback>(wire));
+    if (!fixture.check(bool(transport), transport ? mode : transport.error().what())) return;
+    auto& socket = **transport;
+    socket.set_compression_stream_enabled(streaming);
+    socket.set_net_rules(legacy_version);
+
+    auto first = std::make_shared<ProtocolRequestPacket>(70);
+    auto plain = std::make_shared<ProtocolRequestPacket>(71);
+    plain->set_compression_mode(PacketCompressionMode::Disabled);
+    auto forced_one = std::make_shared<ProtocolRequestPacket>(72);
+    auto forced_two = std::make_shared<ProtocolRequestPacket>(73);
+    forced_one->set_compression_mode(PacketCompressionMode::Enabled);
+    forced_two->set_compression_mode(PacketCompressionMode::Enabled);
+    auto small = std::make_shared<WorldClientStateUpdatePacket>(ByteArray(63, 'a'));
+    auto separator_one = std::make_shared<ProtocolRequestPacket>(74);
+    auto large = std::make_shared<WorldClientStateUpdatePacket>(ByteArray(64, 'a'));
+    auto separator_two = std::make_shared<ProtocolRequestPacket>(75);
+    ByteArray noise_bytes(64, 0);
+    std::uint32_t random_bits = 0x12345678;
+    for (auto& byte : noise_bytes) {
+      random_bits ^= random_bits << 13;
+      random_bits ^= random_bits >> 17;
+      random_bits ^= random_bits << 5;
+      byte = static_cast<char>(random_bits);
+    }
+    auto noise = std::make_shared<WorldClientStateUpdatePacket>(std::move(noise_bytes));
+
+    // A failing second group must neither publish its valid prefix nor advance
+    // the streaming encoder past bytes the receiver will never see.
+    if (!fixture.check(bool(socket.send_packets({first})), Star::format("{} queues the first datagram", mode))) return;
+    if (!fixture.check(!socket.send_packets({std::make_shared<ProtocolRequestPacket>(99),
+        std::make_shared<StepUpdatePacket>(-1.0)}), Star::format("{} rejects the failing second batch", mode))) return;
+    List<std::shared_ptr<Packet>> batch{plain, forced_one, forced_two, small, separator_one, large, separator_two, noise};
+    if (!fixture.check(bool(socket.send_packets(batch)), Star::format("{} appends the next valid batch", mode))) return;
+
+    if (!fixture.check(socket.write_data() == true && wire.messages.size() == 1u,
+                      Star::format("{} sends one datagram before backpressure", mode))) return;
+    fixture.check(socket.sent_packets_pending() && socket.write_data() == false,
+        Star::format("{} retains unsent datagrams while blocked", mode));
+    wire.send_limit = std::numeric_limits<std::size_t>::max();
+    if (!fixture.check(socket.write_data() == true && !socket.sent_packets_pending(),
+                      Star::format("{} drains the pending datagrams in full", mode))) return;
+
+    List<ByteArray> expected_frames;
+    auto append_expected_frame = [&](List<std::shared_ptr<Packet>> packets, bool compressed = false) -> bool {
+      DataStreamBuffer payload;
+      payload.set_stream_compatibility_version(legacy_version);
+      for (auto const& packet : packets)
+        if (!fixture.check(bool(packet->write(payload)), "encode expected P2P payload")) return false;
+      DataStreamBuffer frame;
+      if (!fixture.check(frame.write(packets.front()->type()) && frame.write(compressed),
+                        "encode expected P2P datagram header")) return false;
+      if (compressed) {
+        auto encoded = compress(payload.span());
+        if (!fixture.check(bool(encoded), encoded ? "compress expected P2P payload" : encoded.error().what())) return false;
+        if (!fixture.check(bool(frame.write_data(encoded->span())), "append expected compressed P2P payload")) return false;
+      } else {
+        if (!fixture.check(bool(frame.write_data(payload.span())), "append expected plain P2P payload")) return false;
+      }
+      expected_frames.push_back(frame.take_data());
+      return true;
+    };
+    if (!append_expected_frame({first})) return;
+    if (streaming) {
+      if (!append_expected_frame({plain, forced_one, forced_two})) return;
+    } else {
+      if (!append_expected_frame({plain}) || !append_expected_frame({forced_one, forced_two}, true)) return;
+    }
+    // The small group is exactly 64 serialized bytes; compressing the noisy
+    // group above that threshold would make it larger.
+    if (!append_expected_frame({small}) || !append_expected_frame({separator_one})
+        || !append_expected_frame({large}, !streaming) || !append_expected_frame({separator_two})
+        || !append_expected_frame({noise})) return;
+    if (!fixture.check(wire.messages.size() == expected_frames.size(),
+                      Star::format("{} preserves datagram boundaries", mode))) return;
+    if (streaming) {
+      auto decoder = DecompressionStream::create();
+      if (!fixture.check(bool(decoder), decoder ? mode : decoder.error().what())) return;
+      for (std::size_t i = 0; i < wire.messages.size(); ++i) {
+        auto frame = decoder->decompress(wire.messages[i].span());
+        if (!fixture.check(bool(frame), frame ? mode : frame.error().what())) return;
+        fixture.check(*frame == expected_frames[i], Star::format("{} wire datagram {}", mode, i));
+      }
+    } else {
+      fixture.check(wire.messages == expected_frames, "P2P legacy matches the expected wire datagrams");
+    }
+
+    if (!fixture.check(socket.read_data() == true, Star::format("{} receives the queued datagrams", mode))) return;
+    auto packets = socket.receive_packets();
+    if (!fixture.check(bool(packets), packets ? mode : packets.error().what())) return;
+    List<std::shared_ptr<Packet>> original{first};
+    original.append_range(std::move(batch));
+    if (!fixture.check(packets->size() == original.size(), Star::format("{} decodes every committed packet", mode))) return;
+    DataStreamBuffer written;
+    DataStreamBuffer received;
+    written.set_stream_compatibility_version(legacy_version);
+    received.set_stream_compatibility_version(legacy_version);
+    for (std::size_t i = 0; i < original.size(); ++i) {
+      fixture.check((*packets)[i]->type() == original[i]->type(), Star::format("{} packet {} type", mode, i));
+      if (!fixture.check(original[i]->write(written) && (*packets)[i]->write(received),
+                        Star::format("{} serializes packet {} for comparison", mode, i))) return;
+      fixture.check(received.data() == written.data(), Star::format("{} packet {} payload", mode, i));
+      written.clear();
+      received.clear();
+    }
+  }
 });
 
 const GameTestRegistration universeConnectionsTcpPartialDrainPreservesWireAndAppendOrder(
@@ -1016,29 +1335,29 @@ const GameTestRegistration universeConnectionsTcpPartialDrainPreservesWireAndApp
   auto transport = TcpPacketSocket::open(fixture.root().logger(), outgoing);
   ASSERT_TRUE(transport) << transport.error().what();
   auto parameters = std::make_shared<WorldParametersUpdatePacket>(ByteArray(4 << 20, 'p'));
-  parameters->setCompressionMode(PacketCompressionMode::Disabled);
+  parameters->set_compression_mode(PacketCompressionMode::Disabled);
   DataStreamBuffer payload;
   ASSERT_TRUE(parameters->write(payload));
   DataStreamBuffer expected;
   ASSERT_TRUE(expected.write(parameters->type()));
   ASSERT_TRUE(expected.write_vlq_i(payload.size()));
   ASSERT_TRUE(expected.write_data(payload.span()));
-  ASSERT_TRUE((*transport)->sendPackets({parameters}));
-  ASSERT_EQ((*transport)->writeData(), true);
-  ASSERT_TRUE((*transport)->sentPacketsPending());
+  ASSERT_TRUE((*transport)->send_packets({parameters}));
+  ASSERT_EQ((*transport)->write_data(), true);
+  ASSERT_TRUE((*transport)->sent_packets_pending());
   auto pending = SocketTestAccess::pending_plain(**transport);
   ASSERT_LT(pending.size(), expected.size());
   ASSERT_FALSE(pending.empty());
   EXPECT_TRUE(std::ranges::equal(pending, expected.span().last(pending.size())));
 
   auto delta = std::make_shared<WorldClientStateUpdatePacket>(ByteArray(4096, 'd'));
-  delta->setCompressionMode(PacketCompressionMode::Disabled);
+  delta->set_compression_mode(PacketCompressionMode::Disabled);
   DataStreamBuffer deltaPayload;
   ASSERT_TRUE(delta->write(deltaPayload));
   ASSERT_TRUE(expected.write(delta->type()));
   ASSERT_TRUE(expected.write_vlq_i(deltaPayload.size()));
   ASSERT_TRUE(expected.write_data(deltaPayload.span()));
-  ASSERT_TRUE((*transport)->sendPackets({delta}));
+  ASSERT_TRUE((*transport)->send_packets({delta}));
 
   ByteArray wire;
   auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
@@ -1047,13 +1366,13 @@ const GameTestRegistration universeConnectionsTcpPartialDrainPreservesWireAndApp
     auto received = incoming->receive(buffer);
     ASSERT_TRUE(received) << received.error().what();
     wire.append(std::span<char const>(buffer).first(*received));
-    auto written = (*transport)->writeData();
+    auto written = (*transport)->write_data();
     ASSERT_TRUE(written) << written.error().what();
     if (*received == 0 && !*written)
-      ASSERT_TRUE(wait_for_wire_progress(incoming, outgoing, (*transport)->sentPacketsPending(), deadline));
+      ASSERT_TRUE(wait_for_wire_progress(incoming, outgoing, (*transport)->sent_packets_pending(), deadline));
   }
   ASSERT_EQ(wire, expected.data()) << "received=" << wire.size() << " expected=" << expected.size();
-  EXPECT_FALSE((*transport)->sentPacketsPending());
+  EXPECT_FALSE((*transport)->sent_packets_pending());
   // Decode the actual captured wire, including both differently typed frames.
   DataStreamExternalBuffer frames(wire.span());
   for (auto const& packet : List<std::shared_ptr<Packet>>{parameters, delta}) {
@@ -1064,7 +1383,7 @@ const GameTestRegistration universeConnectionsTcpPartialDrainPreservesWireAndApp
     ASSERT_TRUE(position) << position.error().what();
     ASSERT_GE(*length, 0);
     DataStreamExternalBuffer body(frames.span().subspan(*position, *length));
-    auto decoded = createPacket(packet->type());
+    auto decoded = create_packet(packet->type());
     ASSERT_TRUE(decoded) << decoded.error().what();
     ASSERT_TRUE((*decoded)->read(body));
     ASSERT_EQ(body.at_end(), true);
@@ -1087,7 +1406,7 @@ const GameTestRegistration universeConnectionsTcpCompressedTailPrecedesNewPlainF
   ASSERT_TRUE(incoming->set_non_blocking(true));
   auto transport = TcpPacketSocket::open(fixture.root().logger(), outgoing);
   ASSERT_TRUE(transport) << transport.error().what();
-  (*transport)->setCompressionStreamEnabled(true);
+  (*transport)->set_compression_stream_enabled(true);
   ByteArray bytes(4 << 20, 0);
   std::uint32_t state = 0x12345678;
   for (auto& byte : bytes) {
@@ -1097,7 +1416,7 @@ const GameTestRegistration universeConnectionsTcpCompressedTailPrecedesNewPlainF
     byte = static_cast<char>(state);
   }
   auto parameters = std::make_shared<WorldParametersUpdatePacket>(std::move(bytes));
-  ASSERT_TRUE((*transport)->sendPackets({parameters}));
+  ASSERT_TRUE((*transport)->send_packets({parameters}));
   ByteArray original(SocketTestAccess::pending_plain(**transport));
   auto compressor = CompressionStream::create();
   ASSERT_TRUE(compressor) << compressor.error().what();
@@ -1105,19 +1424,19 @@ const GameTestRegistration universeConnectionsTcpCompressedTailPrecedesNewPlainF
   ASSERT_TRUE(encoded) << encoded.error().what();
   ByteArray expected = std::move(*encoded);
   auto compressedSize = expected.size();
-  ASSERT_EQ((*transport)->writeData(), true);
-  ASSERT_TRUE((*transport)->sentPacketsPending());
+  ASSERT_EQ((*transport)->write_data(), true);
+  ASSERT_TRUE((*transport)->sent_packets_pending());
   ASSERT_FALSE(SocketTestAccess::pending_compressed(**transport).empty());
   EXPECT_TRUE(SocketTestAccess::pending_plain(**transport).empty());
 
-  (*transport)->setCompressionStreamEnabled(false);
+  (*transport)->set_compression_stream_enabled(false);
   auto plain = connectionTestFrame(73);
   ASSERT_TRUE(plain) << plain.error().what();
   expected.append(*plain);
   auto request = std::make_shared<ProtocolRequestPacket>(73);
-  request->setCompressionMode(PacketCompressionMode::Disabled);
-  ASSERT_TRUE((*transport)->sendPackets({request}));
-  EXPECT_TRUE((*transport)->sentPacketsPending());
+  request->set_compression_mode(PacketCompressionMode::Disabled);
+  ASSERT_TRUE((*transport)->send_packets({request}));
+  EXPECT_TRUE((*transport)->sent_packets_pending());
   ByteArray wire;
   auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
   while (wire.size() < expected.size() && (deadline - std::chrono::steady_clock::now()).count() > 0) {
@@ -1125,13 +1444,13 @@ const GameTestRegistration universeConnectionsTcpCompressedTailPrecedesNewPlainF
     auto received = incoming->receive(buffer);
     ASSERT_TRUE(received) << received.error().what();
     wire.append(std::span<char const>(buffer).first(*received));
-    auto written = (*transport)->writeData();
+    auto written = (*transport)->write_data();
     ASSERT_TRUE(written) << written.error().what();
     if (*received == 0 && !*written)
-      ASSERT_TRUE(wait_for_wire_progress(incoming, outgoing, (*transport)->sentPacketsPending(), deadline));
+      ASSERT_TRUE(wait_for_wire_progress(incoming, outgoing, (*transport)->sent_packets_pending(), deadline));
   }
   ASSERT_EQ(wire, expected) << "received=" << wire.size() << " expected=" << expected.size();
-  EXPECT_FALSE((*transport)->sentPacketsPending());
+  EXPECT_FALSE((*transport)->sent_packets_pending());
   auto decompressor = DecompressionStream::create();
   ASSERT_TRUE(decompressor) << decompressor.error().what();
   auto decoded = decompressor->decompress(wire.span().first(compressedSize));
@@ -1150,18 +1469,18 @@ const GameTestRegistration universeConnectionsTcpEnablingCompressionUsesOnlyUnse
   auto transport = TcpPacketSocket::open(fixture.root().logger(), outgoing);
   ASSERT_TRUE(transport) << transport.error().what();
   auto parameters = std::make_shared<WorldParametersUpdatePacket>(ByteArray(4 << 20, 'p'));
-  parameters->setCompressionMode(PacketCompressionMode::Disabled);
-  ASSERT_TRUE((*transport)->sendPackets({parameters}));
+  parameters->set_compression_mode(PacketCompressionMode::Disabled);
+  ASSERT_TRUE((*transport)->send_packets({parameters}));
   ByteArray original(SocketTestAccess::pending_plain(**transport));
-  ASSERT_EQ((*transport)->writeData(), true);
+  ASSERT_EQ((*transport)->write_data(), true);
   auto pending = SocketTestAccess::pending_plain(**transport);
   ASSERT_FALSE(pending.empty());
   ASSERT_LT(pending.size(), original.size());
   auto consumed = original.size() - pending.size();
   ByteArray expected(original.span().first(consumed));
 
-  (*transport)->setCompressionStreamEnabled(true);
-  ASSERT_TRUE((*transport)->sendPackets({std::make_shared<ProtocolRequestPacket>(74)}));
+  (*transport)->set_compression_stream_enabled(true);
+  ASSERT_TRUE((*transport)->send_packets({std::make_shared<ProtocolRequestPacket>(74)}));
   ByteArray compressionInput(SocketTestAccess::pending_plain(**transport));
   auto compressor = CompressionStream::create();
   ASSERT_TRUE(compressor) << compressor.error().what();
@@ -1175,13 +1494,13 @@ const GameTestRegistration universeConnectionsTcpEnablingCompressionUsesOnlyUnse
     auto received = incoming->receive(buffer);
     ASSERT_TRUE(received) << received.error().what();
     wire.append(std::span<char const>(buffer).first(*received));
-    auto written = (*transport)->writeData();
+    auto written = (*transport)->write_data();
     ASSERT_TRUE(written) << written.error().what();
     if (*received == 0 && !*written)
       ASSERT_TRUE(incoming->wait_for_data(false, deadline));
   }
   ASSERT_EQ(wire, expected);
-  EXPECT_FALSE((*transport)->sentPacketsPending());
+  EXPECT_FALSE((*transport)->sent_packets_pending());
   auto decompressor = DecompressionStream::create();
   ASSERT_TRUE(decompressor) << decompressor.error().what();
   auto decoded = decompressor->decompress(wire.span().subspan(consumed));
@@ -1204,7 +1523,7 @@ const GameTestRegistration universeConnectionsTcpDrainCommitsPrefixBeforeNativeR
     ASSERT_TRUE(transport) << transport.error().what();
     ASSERT_TRUE(outgoing->set_non_blocking(false));
     ASSERT_TRUE(outgoing->set_timeout(500));
-    (*transport)->setCompressionStreamEnabled(compressed);
+    (*transport)->set_compression_stream_enabled(compressed);
     ByteArray bytes(8 << 20, 0);
     std::uint32_t state = 0x12345678;
     for (auto& byte : bytes) {
@@ -1214,8 +1533,8 @@ const GameTestRegistration universeConnectionsTcpDrainCommitsPrefixBeforeNativeR
       byte = static_cast<char>(state);
     }
     auto packet = std::make_shared<WorldParametersUpdatePacket>(std::move(bytes));
-    packet->setCompressionMode(PacketCompressionMode::Disabled);
-    ASSERT_TRUE((*transport)->sendPackets({packet}));
+    packet->set_compression_mode(PacketCompressionMode::Disabled);
+    ASSERT_TRUE((*transport)->send_packets({packet}));
     ByteArray expected(SocketTestAccess::pending_plain(**transport));
     if (compressed) {
       auto compressor = CompressionStream::create();
@@ -1224,7 +1543,7 @@ const GameTestRegistration universeConnectionsTcpDrainCommitsPrefixBeforeNativeR
       ASSERT_TRUE(encoded) << encoded.error().what();
       expected = std::move(*encoded);
     }
-    auto drain = ConnectionTestAsync<bool>::create([&] { return (*transport)->writeData(); });
+    auto drain = ConnectionTestAsync<bool>::create([&] { return (*transport)->write_data(); });
     ASSERT_TRUE(drain) << drain.error().what();
     auto cleanup = make_scope_exit([&] {
       incoming->close();
@@ -1246,7 +1565,7 @@ const GameTestRegistration universeConnectionsTcpDrainCommitsPrefixBeforeNativeR
     ASSERT_FALSE(pending.empty());
     ASSERT_LT(pending.size(), expected.size());
     EXPECT_TRUE(std::ranges::equal(pending, expected.span().last(pending.size())));
-    EXPECT_TRUE((*transport)->sentPacketsPending());
+    EXPECT_TRUE((*transport)->sent_packets_pending());
   }
 });
 
@@ -1258,41 +1577,41 @@ const GameTestRegistration universe_connections_tcp_compressed_batch_backpressur
   auto receiver = TcpPacketSocket::open(fixture.root().logger(), pair->second);
   ASSERT_TRUE(sender);
   ASSERT_TRUE(receiver);
-  (*sender)->setCompressionStreamEnabled(true);
-  (*receiver)->setCompressionStreamEnabled(true);
+  (*sender)->set_compression_stream_enabled(true);
+  (*receiver)->set_compression_stream_enabled(true);
   constexpr std::size_t payload_size = 34 * 1024 * 1024;
-  ASSERT_TRUE((*sender)->sendPackets({
+  ASSERT_TRUE((*sender)->send_packets({
       std::make_shared<WorldParametersUpdatePacket>(ByteArray(payload_size, 'a')),
       std::make_shared<WorldParametersUpdatePacket>(ByteArray(payload_size, 'b'))}));
   std::size_t received_count = 0;
   auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
   while (received_count != 2 && std::chrono::steady_clock::now() < deadline) {
-    ASSERT_TRUE((*sender)->writeData());
-    auto read = (*receiver)->readData();
+    ASSERT_TRUE((*sender)->write_data());
+    auto read = (*receiver)->read_data();
     ASSERT_TRUE(read) << read.error().what();
-    auto packets = (*receiver)->receivePackets();
+    auto packets = (*receiver)->receive_packets();
     ASSERT_TRUE(packets) << packets.error().what();
     for (auto const& packet : *packets) {
       auto parameters = convert<WorldParametersUpdatePacket>(packet);
       ASSERT_TRUE(parameters);
       ASSERT_LT(received_count, 2u);
-      ASSERT_EQ((*parameters)->parametersData.size(), payload_size);
+      ASSERT_EQ((*parameters)->parameters_data.size(), payload_size);
       auto expected_byte = received_count ? 'b' : 'a';
-      EXPECT_TRUE(std::ranges::all_of((*parameters)->parametersData, [=](char byte) { return byte == expected_byte; }));
+      EXPECT_TRUE(std::ranges::all_of((*parameters)->parameters_data, [=](char byte) { return byte == expected_byte; }));
       ++received_count;
     }
     if (!*read && received_count != 2)
       ASSERT_TRUE(pair->second->wait_for_data(false, deadline));
   }
   EXPECT_EQ(received_count, 2u);
-  EXPECT_TRUE((*receiver)->isOpen());
+  EXPECT_TRUE((*receiver)->is_open());
 });
 
 }
 
 const GameTestRegistration universeConnectionsLocalZeroDeadlineAndQueuedPacketAfterPeerClose(
     "UniverseConnections", "LocalZeroDeadlineAndQueuedPacketAfterPeerClose", [](GameTest&) {
-  auto pair = LocalPacketSocket::openPair();
+  auto pair = LocalPacketSocket::open_pair();
   UniverseConnection sender(std::move(pair.first));
   UniverseConnection receiver(std::move(pair.second));
   EXPECT_EQ(receiver.receiveAny(0), false);
@@ -1307,7 +1626,7 @@ const GameTestRegistration universeConnectionsLocalZeroDeadlineAndQueuedPacketAf
 
 const GameTestRegistration universeConnectionsLocalDeliveryAndPeerCloseWakeReadiness(
     "UniverseConnections", "LocalDeliveryAndPeerCloseWakeReadiness", [](GameTest&) {
-  auto pair = LocalPacketSocket::openPair();
+  auto pair = LocalPacketSocket::open_pair();
   UniverseConnection sender(std::move(pair.first));
   UniverseConnection receiver(std::move(pair.second));
   std::promise<void> starting;
@@ -1337,7 +1656,7 @@ const GameTestRegistration universeConnectionsLocalDeliveryAndPeerCloseWakeReadi
 
 const GameTestRegistration universeConnectionsLocalCloseDoesNotWaitForReceiveDeadline(
     "UniverseConnections", "LocalCloseDoesNotWaitForReceiveDeadline", [](GameTest&) {
-  auto pair = LocalPacketSocket::openPair();
+  auto pair = LocalPacketSocket::open_pair();
   UniverseConnection receiver(std::move(pair.first));
   std::promise<void> starting;
   auto started = starting.get_future();
@@ -1500,7 +1819,7 @@ const GameTestRegistration universeConnectionsTcpBufferedPacketSurvivesLocalClos
   ASSERT_TRUE(frame) << frame.error().what();
   ASSERT_EQ(sender->send(*frame), frame->size());
   ASSERT_TRUE(socket->wait_for_data(false, std::chrono::steady_clock::now() + std::chrono::seconds(2)));
-  ASSERT_EQ((*packetSocket)->readData(), true);
+  ASSERT_EQ((*packetSocket)->read_data(), true);
 
   UniverseConnection receiver(std::move(*packetSocket));
   receiver.close();
@@ -1559,7 +1878,7 @@ const GameTestRegistration universeConnectionsTcpPeerCloseWakesReceiveDeadline(
 const GameTestRegistration universeConnectionsLocalAndTcpReadinessRespectFiniteDeadline(
     "UniverseConnections", "LocalAndTcpReadinessRespectFiniteDeadline", [](GameTest& fixture) {
   {
-    auto pair = LocalPacketSocket::openPair();
+    auto pair = LocalPacketSocket::open_pair();
     UniverseConnection receiver(std::move(pair.first));
     auto before = std::chrono::steady_clock::now();
     EXPECT_EQ(receiver.receiveAny(25), false);
@@ -1592,10 +1911,10 @@ const GameTestRegistration universeConnectionsTcpCompressedBackpressureRetainsAn
   auto sendSocket = TcpPacketSocket::open(fixture.root().logger(), outgoing);
   ASSERT_TRUE(sendSocket) << sendSocket.error().what();
   auto& sendTransport = **sendSocket;
-  (*sendSocket)->setCompressionStreamEnabled(true);
+  (*sendSocket)->set_compression_stream_enabled(true);
   auto receiveSocket = TcpPacketSocket::open(fixture.root().logger(), incoming);
   ASSERT_TRUE(receiveSocket) << receiveSocket.error().what();
-  (*receiveSocket)->setCompressionStreamEnabled(true);
+  (*receiveSocket)->set_compression_stream_enabled(true);
   UniverseConnection sender(std::move(*sendSocket));
   UniverseConnection receiver(std::move(*receiveSocket));
   auto nextPayload = [](std::uint32_t& state) {
@@ -1621,11 +1940,11 @@ const GameTestRegistration universeConnectionsTcpCompressedBackpressureRetainsAn
     backpressured = !*sent;
   }
   ASSERT_TRUE(backpressured) << "Native socket never reported backpressure after " << packetCount << " packets";
-  ASSERT_TRUE(sendTransport.sentPacketsPending());
+  ASSERT_TRUE(sendTransport.sent_packets_pending());
   // Already-compressed bytes retain their wire encoding even if no new stream
   // compression is requested. Disabling the mode must not hide that tail.
-  sendTransport.setCompressionStreamEnabled(false);
-  EXPECT_TRUE(sendTransport.sentPacketsPending());
+  sendTransport.set_compression_stream_enabled(false);
+  EXPECT_TRUE(sendTransport.sent_packets_pending());
   auto receiveTask = ConnectionTestAsync<bool>::create([&]() -> std::expected<bool, StarException> {
     std::uint32_t receiveState = 0x12345678;
     for (std::size_t i = 0; i < packetCount; ++i) {
@@ -1649,7 +1968,7 @@ const GameTestRegistration universeConnectionsTcpCompressedBackpressureRetainsAn
   auto& received = **receiveTask;
   EXPECT_EQ(sender.sendAll(5000), true);
   EXPECT_EQ(received.get(), true);
-  EXPECT_FALSE(sendTransport.sentPacketsPending());
+  EXPECT_FALSE(sendTransport.sent_packets_pending());
 });
 
 const GameTestRegistration universeConnectionsShardCallbacksReenterAndRemovalReturnsUnprocessedQueues(
@@ -1681,7 +2000,7 @@ const GameTestRegistration universeConnectionsShardCallbacksReenterAndRemovalRet
     return server.sendPackets(id, std::move(packets));
   }, 2);
   ASSERT_TRUE(server) << server.error().what();
-  auto gatePair = LocalPacketSocket::openPair();
+  auto gatePair = LocalPacketSocket::open_pair();
   ASSERT_TRUE((*server)->addConnection(2, UniverseConnection(std::move(gatePair.first))));
   UniverseConnection gateClient(std::move(gatePair.second));
   ASSERT_TRUE(gateClient.pushSingle(std::make_shared<ProtocolRequestPacket>(1)));
@@ -1690,7 +2009,7 @@ const GameTestRegistration universeConnectionsShardCallbacksReenterAndRemovalRet
 
   // Same shard: the worker is inside the callback, so neither queue can have
   // been processed before removal. The returned connection owns both queues.
-  auto queuedPair = LocalPacketSocket::openPair();
+  auto queuedPair = LocalPacketSocket::open_pair();
   UniverseConnection queued(std::move(queuedPair.first));
   UniverseConnection queuedClient(std::move(queuedPair.second));
   ASSERT_TRUE(queued.pushSingle(std::make_shared<ProtocolRequestPacket>(46)));
@@ -1710,7 +2029,7 @@ const GameTestRegistration universeConnectionsShardCallbacksReenterAndRemovalRet
   EXPECT_FALSE((*server)->enqueue_packet(4, std::make_shared<ProtocolRequestPacket>(50)));
 
   // Another shard continues while the first shard is in its reentrant callback.
-  auto otherPair = LocalPacketSocket::openPair();
+  auto otherPair = LocalPacketSocket::open_pair();
   ASSERT_TRUE((*server)->addConnection(3, UniverseConnection(std::move(otherPair.first))));
   UniverseConnection otherClient(std::move(otherPair.second));
   ASSERT_TRUE(otherClient.pushSingle(std::make_shared<ProtocolRequestPacket>(48)));
@@ -2035,7 +2354,7 @@ const GameTestRegistration entity_reply_routes(
   if (!first_route || !second_route
       || !fixture.check(first_route->uuid != second_route->uuid, "Concurrent forwards must have distinct route UUIDs"))
     return;
-  fixture.check(first_route->fromConnection == requester && second_route->fromConnection == second_requester,
+  fixture.check(first_route->from_connection == requester && second_route->from_connection == second_requester,
                 "Forwarding must preserve each requester's connection");
 
   // Exercise the transport's native ownership check without relying on wire timing.

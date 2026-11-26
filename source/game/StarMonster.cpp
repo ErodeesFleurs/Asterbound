@@ -526,8 +526,8 @@ std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Monster::write
   return m_net_group.write_net_state(fromVersion, rules);
 }
 
-std::expected<void, StarException> Monster::read_net_state(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  return m_net_group.read_net_state(std::move(data), interpolationTime, rules);
+std::expected<void, StarException> Monster::read_net_state(ByteArray const& data, float interpolation_time, NetCompatibilityRules rules) {
+  return m_net_group.read_net_state(data, interpolation_time, rules);
 }
 
 std::expected<void, StarException> Monster::enable_interpolation(float extrapolation_hint) {

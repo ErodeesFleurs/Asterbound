@@ -370,8 +370,8 @@ std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Projectile::sn
   return m_netGroup.snapshot_net_state(rules);
 }
 
-std::expected<void, StarException> Projectile::read_net_state(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  return m_netGroup.read_net_state(std::move(data), interpolationTime, rules);
+std::expected<void, StarException> Projectile::read_net_state(ByteArray const& data, float interpolation_time, NetCompatibilityRules rules) {
+  return m_netGroup.read_net_state(data, interpolation_time, rules);
 }
 
 std::expected<void, StarException> Projectile::enable_interpolation(float extrapolation_hint) {

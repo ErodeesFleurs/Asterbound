@@ -48,7 +48,7 @@ public:
   [[nodiscard]]
   std::expected<ByteArray, StarException> writeDelta();
   [[nodiscard]]
-  std::expected<void, StarException> readDelta(ByteArray delta);
+  std::expected<void, StarException> readDelta(ByteArray const& delta);
 
   void setNetCompatibilityRules(NetCompatibilityRules netCompatibilityRules);
   NetCompatibilityRules netCompatibilityRules() const;

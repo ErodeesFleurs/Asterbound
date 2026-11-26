@@ -26,40 +26,41 @@ struct Packet;
 enum class PacketType : std::uint8_t;
 
 struct PacketStats {
-  HashMap<PacketType, float> packetBytesPerSecond;
-  float bytesPerSecond;
-  PacketType worstPacketType;
-  std::size_t worstPacketSize;
+  HashMap<PacketType, float> packet_bytes_per_second;
+  float bytes_per_second;
+  PacketType worst_packet_type;
+  std::size_t worst_packet_size;
 };
 
 // Collects PacketStats over a given window of time.
 class PacketStatCollector {
 public:
   PacketStatCollector();
-  PacketStatCollector(float calculationWindow);
+  PacketStatCollector(float calculation_window);
 
   void mix(std::size_t size);
-  void mix(PacketType type, std::size_t size, bool addToTotal = true);
-  void mix(HashMap<PacketType, std::size_t> const& sizes, bool addToTotal = true);
+  void mix(PacketType type, std::size_t size, bool add_to_total = true);
+  void mix(HashMap<PacketType, std::size_t> const& sizes, bool add_to_total = true);
 
   // Should always return packet statistics for the most recent completed
   // window of time
   PacketStats stats() const;
 
 private:
+  friend struct SocketTestAccess;
   void calculate();
 
-  std::chrono::duration<float> m_calculationWindow;
+  std::chrono::duration<float> m_calculation_window;
   PacketStats m_stats;
   Map<PacketType, float> m_unmixed;
-  std::size_t m_totalBytes;
-  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_lastMixTime;
+  std::size_t m_total_bytes;
+  std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds> m_last_mix_time;
 };
 
 // Interface for bidirectional communication using NetPackets, based around a
 // simple non-blocking polling interface.  Communication is assumed to be done
-// via writeData() and readData(), and any delay in calling writeData or
-// readData may translate directly into increased latency.
+// via write_data() and read_data(), and any delay in calling write_data or
+// read_data may translate directly into increased latency.
 class PacketSocket {
 public:
   virtual void query_type(TypeQuery& query) const noexcept { query_type_of<PacketSocket>(*this, query); }
@@ -67,40 +68,40 @@ public:
 
   virtual ~PacketSocket() = default;
 
-  virtual bool isOpen() const = 0;
+  virtual bool is_open() const = 0;
   virtual void close() = 0;
 
   // Takes all packets from the given list and queues them for sending.
-  [[nodiscard]] virtual std::expected<void, StarException> sendPackets(List<std::shared_ptr<Packet>> packets) = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> send_packets(List<std::shared_ptr<Packet>> packets) = 0;
   // Receives any packets from the incoming queue, if available
-  [[nodiscard]] virtual std::expected<List<std::shared_ptr<Packet>>, StarException> receivePackets() = 0;
+  [[nodiscard]] virtual std::expected<List<std::shared_ptr<Packet>>, StarException> receive_packets() = 0;
 
   // Returns true if any sent packets on the queue are still not completely
   // written.
-  virtual bool sentPacketsPending() const = 0;
+  virtual bool sent_packets_pending() const = 0;
 
   // Write all data possible without blocking, returns true if any data was
   // actually written.
-  [[nodiscard]] virtual std::expected<bool, StarException> writeData() = 0;
+  [[nodiscard]] virtual std::expected<bool, StarException> write_data() = 0;
   // Read all data available without blocking, returns true if any data was
   // actually received.
-  [[nodiscard]] virtual std::expected<bool, StarException> readData() = 0;
+  [[nodiscard]] virtual std::expected<bool, StarException> read_data() = 0;
 
   // Called after a nonblocking I/O attempt found no complete packet / pending
   // output. May return spuriously; callers retry I/O before checking the deadline.
   // Safe concurrently with close(), and never holds the caller's connection lock.
-  [[nodiscard]] virtual std::expected<void, StarException> waitForData(bool writable, std::chrono::steady_clock::time_point deadline) = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> wait_for_data(bool writable, std::chrono::steady_clock::time_point deadline) = 0;
 
   // Should return incoming / outgoing packet stats, if they are tracked.
   // Default implementations return nothing.
-  virtual std::optional<PacketStats> incomingStats() const;
-  virtual std::optional<PacketStats> outgoingStats() const;
+  virtual std::optional<PacketStats> incoming_stats() const;
+  virtual std::optional<PacketStats> outgoing_stats() const;
 
-  virtual void setNetRules(NetCompatibilityRules netRules);
-  virtual NetCompatibilityRules netRules() const;
+  virtual void set_net_rules(NetCompatibilityRules net_rules);
+  virtual NetCompatibilityRules net_rules() const;
 
 private:
-  NetCompatibilityRules m_netRules;
+  NetCompatibilityRules m_net_rules;
 };
 
 class CompressedPacketSocket : public PacketSocket {
@@ -112,40 +113,48 @@ public:
 
   ~CompressedPacketSocket() override = default;
 
-  virtual void setCompressionStreamEnabled(bool enabled);
-  virtual bool compressionStreamEnabled() const;
+  virtual void set_compression_stream_enabled(bool enabled);
+  virtual bool compression_stream_enabled() const;
 private:
-  bool m_useCompressionStream = false;
+  bool m_use_compression_stream = false;
 protected:
-  [[nodiscard]] std::expected<void, StarException> initializeCompression();
+  [[nodiscard]] std::expected<void, StarException> initialize_compression();
   std::optional<CompressionStream> m_compression_stream;
   std::optional<DecompressionStream> m_decompression_stream;
+
+  DataStreamBuffer m_packet_payload;
+  ByteArray m_codec_scratch;
+  HashMap<PacketType, std::size_t> m_encoded_packet_sizes;
 };
 
 // PacketSocket for local communication.
 class LocalPacketSocket : public PacketSocket {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
+  struct Pipe;
+
 public:
   void query_type(TypeQuery& query) const noexcept override {
     query_type_of<LocalPacketSocket, PacketSocket>(*this, query);
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<LocalPacketSocket>(); }
 
-  static std::pair<std::unique_ptr<LocalPacketSocket>, std::unique_ptr<LocalPacketSocket>> openPair();
+  static std::pair<std::unique_ptr<LocalPacketSocket>, std::unique_ptr<LocalPacketSocket>> open_pair();
+  LocalPacketSocket(ConstructionKey, std::shared_ptr<Pipe> incoming_pipe, std::weak_ptr<Pipe> outgoing_pipe);
   ~LocalPacketSocket() override;
 
-  bool isOpen() const override;
+  bool is_open() const override;
   void close() override;
 
-  [[nodiscard]] std::expected<void, StarException> sendPackets(List<std::shared_ptr<Packet>> packets) override;
-  [[nodiscard]] std::expected<List<std::shared_ptr<Packet>>, StarException> receivePackets() override;
+  [[nodiscard]] std::expected<void, StarException> send_packets(List<std::shared_ptr<Packet>> packets) override;
+  [[nodiscard]] std::expected<List<std::shared_ptr<Packet>>, StarException> receive_packets() override;
 
-  bool sentPacketsPending() const override;
+  bool sent_packets_pending() const override;
 
-  // write / read for local sockets is actually a no-op, sendPackets places
+  // write / read for local sockets is actually a no-op, send_packets places
   // packets directly in the incoming queue of the paired local socket.
-  [[nodiscard]] std::expected<bool, StarException> writeData() override;
-  [[nodiscard]] std::expected<bool, StarException> readData() override;
-  [[nodiscard]] std::expected<void, StarException> waitForData(bool writable, std::chrono::steady_clock::time_point deadline) override;
+  [[nodiscard]] std::expected<bool, StarException> write_data() override;
+  [[nodiscard]] std::expected<bool, StarException> read_data() override;
+  [[nodiscard]] std::expected<void, StarException> wait_for_data(bool writable, std::chrono::steady_clock::time_point deadline) override;
 
 private:
   struct Pipe {
@@ -153,17 +162,17 @@ private:
     std::condition_variable ready;
     Deque<std::shared_ptr<Packet>> queue;
     bool open = true;
-    bool peerOpen = true;
+    bool peer_open = true;
   };
 
-  LocalPacketSocket(std::shared_ptr<Pipe> incomingPipe, std::weak_ptr<Pipe> outgoingPipe);
-
-  std::shared_ptr<Pipe> m_incomingPipe;
-  std::weak_ptr<Pipe> m_outgoingPipe;
+  std::shared_ptr<Pipe> m_incoming_pipe;
+  std::weak_ptr<Pipe> m_outgoing_pipe;
 };
 
 // Wraps a TCP socket into a PacketSocket.
 class TcpPacketSocket : public CompressedPacketSocket {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
+
 public:
   void query_type(TypeQuery& query) const noexcept override {
     query_type_of<TcpPacketSocket, CompressedPacketSocket>(*this, query);
@@ -171,39 +180,41 @@ public:
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<TcpPacketSocket>(); }
 
   [[nodiscard]] static std::expected<std::unique_ptr<TcpPacketSocket>, StarException> open(Logger& logger, std::shared_ptr<TcpSocket> socket);
+  TcpPacketSocket(ConstructionKey, Logger& logger, std::shared_ptr<TcpSocket> socket);
 
-  bool isOpen() const override;
+  bool is_open() const override;
   void close() override;
 
-  [[nodiscard]] std::expected<void, StarException> sendPackets(List<std::shared_ptr<Packet>> packets) override;
-  [[nodiscard]] std::expected<List<std::shared_ptr<Packet>>, StarException> receivePackets() override;
+  [[nodiscard]] std::expected<void, StarException> send_packets(List<std::shared_ptr<Packet>> packets) override;
+  [[nodiscard]] std::expected<List<std::shared_ptr<Packet>>, StarException> receive_packets() override;
 
-  bool sentPacketsPending() const override;
+  bool sent_packets_pending() const override;
 
-  [[nodiscard]] std::expected<bool, StarException> writeData() override;
-  [[nodiscard]] std::expected<bool, StarException> readData() override;
-  [[nodiscard]] std::expected<void, StarException> waitForData(bool writable, std::chrono::steady_clock::time_point deadline) override;
+  [[nodiscard]] std::expected<bool, StarException> write_data() override;
+  [[nodiscard]] std::expected<bool, StarException> read_data() override;
+  [[nodiscard]] std::expected<void, StarException> wait_for_data(bool writable, std::chrono::steady_clock::time_point deadline) override;
 
-  std::optional<PacketStats> incomingStats() const override;
-  std::optional<PacketStats> outgoingStats() const override;
+  std::optional<PacketStats> incoming_stats() const override;
+  std::optional<PacketStats> outgoing_stats() const override;
 private:
   friend struct SocketTestAccess;
-  TcpPacketSocket(Logger& logger, std::shared_ptr<TcpSocket> socket);
 
   Logger& m_logger;
   std::shared_ptr<TcpSocket> m_socket;
 
-  PacketStatCollector m_incomingStats;
-  PacketStatCollector m_outgoingStats;
-  ByteArray m_outputBuffer;
-  ByteArray m_inputBuffer;
-  ByteArray m_compressedOutputBuffer;
+  PacketStatCollector m_incoming_stats;
+  PacketStatCollector m_outgoing_stats;
+  ByteArray m_output_buffer;
+  ByteArray m_input_buffer;
+  ByteArray m_compressed_output_buffer;
   ByteArray m_compressed_input;
   bool m_decompression_pending = false;
 };
 
 // Wraps a P2PSocket into a PacketSocket
 class P2PPacketSocket : public CompressedPacketSocket {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
+
 public:
   void query_type(TypeQuery& query) const noexcept override {
     query_type_of<P2PPacketSocket, CompressedPacketSocket>(*this, query);
@@ -211,35 +222,34 @@ public:
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<P2PPacketSocket>(); }
 
   [[nodiscard]] static std::expected<std::unique_ptr<P2PPacketSocket>, StarException> open(Logger& logger, std::unique_ptr<P2PSocket> socket);
+  P2PPacketSocket(ConstructionKey, Logger& logger, std::unique_ptr<P2PSocket> socket);
 
-  bool isOpen() const override;
+  bool is_open() const override;
   void close() override;
 
-  [[nodiscard]] std::expected<void, StarException> sendPackets(List<std::shared_ptr<Packet>> packets) override;
-  [[nodiscard]] std::expected<List<std::shared_ptr<Packet>>, StarException> receivePackets() override;
+  [[nodiscard]] std::expected<void, StarException> send_packets(List<std::shared_ptr<Packet>> packets) override;
+  [[nodiscard]] std::expected<List<std::shared_ptr<Packet>>, StarException> receive_packets() override;
 
-  bool sentPacketsPending() const override;
+  bool sent_packets_pending() const override;
 
-  [[nodiscard]] std::expected<bool, StarException> writeData() override;
-  [[nodiscard]] std::expected<bool, StarException> readData() override;
-  [[nodiscard]] std::expected<void, StarException> waitForData(bool writable, std::chrono::steady_clock::time_point deadline) override;
+  [[nodiscard]] std::expected<bool, StarException> write_data() override;
+  [[nodiscard]] std::expected<bool, StarException> read_data() override;
+  [[nodiscard]] std::expected<void, StarException> wait_for_data(bool writable, std::chrono::steady_clock::time_point deadline) override;
 
-  std::optional<PacketStats> incomingStats() const override;
-  std::optional<PacketStats> outgoingStats() const override;
+  std::optional<PacketStats> incoming_stats() const override;
+  std::optional<PacketStats> outgoing_stats() const override;
 
 private:
-  P2PPacketSocket(Logger& logger, std::shared_ptr<P2PSocket> socket);
-
   Logger& m_logger;
-  std::shared_ptr<P2PSocket> m_socket;
-  std::mutex m_waitMutex;
-  std::condition_variable m_waitCondition;
+  std::unique_ptr<P2PSocket> m_socket;
+  std::mutex m_wait_mutex;
+  std::condition_variable m_wait_condition;
   bool m_closed = false;
 
-  PacketStatCollector m_incomingStats;
-  PacketStatCollector m_outgoingStats;
-  Deque<ByteArray> m_outputMessages;
-  Deque<ByteArray> m_inputMessages;
+  PacketStatCollector m_incoming_stats;
+  PacketStatCollector m_outgoing_stats;
+  Deque<ByteArray> m_output_messages;
+  Deque<ByteArray> m_input_messages;
 };
 
 }

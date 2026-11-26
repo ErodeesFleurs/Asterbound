@@ -287,7 +287,7 @@ const GameTestRegistration armor_retry("ArmorWearerTest", "BadLegacyCosmeticCanR
     if (!packet)
       return std::unexpected(std::move(packet.error()));
     cursor = packet->second;
-    return (*replica)->read_net_state(std::move(packet->first), 0, rules);
+    return (*replica)->read_net_state(packet->first, 0, rules);
   };
   auto database = fixture.root().itemDatabase();
   if (!fixture.check(bool(database), "load catalog")) return;

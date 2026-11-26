@@ -90,7 +90,7 @@ struct StarPacketExceptionTag {
 };
 using StarPacketException = StarError<StarPacketExceptionTag, IOException>;
 
-extern VersionNumber const StarProtocolVersion;
+extern VersionNumber const star_protocol_version;
 
 // Packet types sent between the client and server over a NetSocket.  Does not
 // correspond to actual packets, simply logical portions of NetSocket data.
@@ -208,7 +208,7 @@ enum class NetCompressionMode : std::uint8_t {
   None,
   Zstd
 };
-extern std::expected<EnumMap<NetCompressionMode>, StarException> const NetCompressionModeNames;
+extern std::expected<EnumMap<NetCompressionMode>, StarException> const net_compression_mode_names;
 
 enum class PacketCompressionMode : std::uint8_t {
   Disabled,
@@ -230,50 +230,58 @@ struct Packet {
   [[nodiscard]] virtual std::expected<void, StarException> read_json(Json const& json);
   [[nodiscard]] virtual std::expected<Json, StarException> write_json() const;
 
-  PacketCompressionMode compressionMode() const;
-  void setCompressionMode(PacketCompressionMode compressionMode);
+  PacketCompressionMode compression_mode() const;
+  void set_compression_mode(PacketCompressionMode compression_mode);
 
-  PacketCompressionMode m_compressionMode = PacketCompressionMode::Automatic;
+  PacketCompressionMode compression_mode_setting = PacketCompressionMode::Automatic;
 };
 
 // Stages a packet for wire decoding; identity fields are initially unfilled.
-[[nodiscard]] std::expected<std::shared_ptr<Packet>, StarException> createPacket(PacketType type);
+[[nodiscard]] std::expected<std::shared_ptr<Packet>, StarException> create_packet(PacketType type);
 // Constructs a raw outgoing packet, generating identity fields before JSON load.
-[[nodiscard]] std::expected<std::shared_ptr<Packet>, StarException> createPacket(RandomService& random, PacketType type, std::optional<Json> const& args);
+[[nodiscard]] std::expected<std::shared_ptr<Packet>, StarException> create_packet(
+    RandomService& random, PacketType type, std::optional<Json> const& args);
 
-template <PacketType PacketT>
+template <PacketType packet_type_value>
 struct PacketBase : public Packet {
   void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<PacketBase<PacketT>, Packet>(*this, query);
+    query_type_of<PacketBase<packet_type_value>, Packet>(*this, query);
   }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PacketBase<PacketT>>(); }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PacketBase<packet_type_value>>(); }
 
-  static PacketType const Type = PacketT;
+  static PacketType const packet_type = packet_type_value;
 
-  PacketType type() const override { return Type; }
+  PacketType type() const override { return packet_type; }
 };
 
-struct ProtocolRequestPacket : PacketBase<PacketType::ProtocolRequest> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<ProtocolRequestPacket, PacketBase<PacketType::ProtocolRequest>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ProtocolRequestPacket>(); }
+// The concrete CRTP argument is incomplete until its class body is defined.
+template <typename T>
+concept packet_class = std::is_class_v<T>;
 
+// Share the concrete query implementation without adding another queryable
+// layer between the concrete type, its wire-typed PacketBase, and Packet.
+template <packet_class Derived, PacketType packet_type_value>
+struct TypedPacket : PacketBase<packet_type_value> {
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<Derived, PacketBase<packet_type_value>>(static_cast<Derived const&>(*this), query);
+  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<Derived>(); }
+
+protected:
+  TypedPacket() = default;
+};
+
+struct ProtocolRequestPacket : TypedPacket<ProtocolRequestPacket, PacketType::ProtocolRequest> {
   ProtocolRequestPacket();
-  ProtocolRequestPacket(VersionNumber requestProtocolVersion);
+  ProtocolRequestPacket(VersionNumber request_protocol_version);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  VersionNumber requestProtocolVersion;
+  VersionNumber request_protocol_version;
 };
 
-struct ProtocolResponsePacket : PacketBase<PacketType::ProtocolResponse> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<ProtocolResponsePacket, PacketBase<PacketType::ProtocolResponse>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ProtocolResponsePacket>(); }
-
+struct ProtocolResponsePacket : TypedPacket<ProtocolResponsePacket, PacketType::ProtocolResponse> {
   ProtocolResponsePacket();
   ProtocolResponsePacket(bool allowed, Json info = {});
 
@@ -284,12 +292,7 @@ struct ProtocolResponsePacket : PacketBase<PacketType::ProtocolResponse> {
   Json info;
 };
 
-struct ServerDisconnectPacket : PacketBase<PacketType::ServerDisconnect> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<ServerDisconnectPacket, PacketBase<PacketType::ServerDisconnect>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ServerDisconnectPacket>(); }
-
+struct ServerDisconnectPacket : TypedPacket<ServerDisconnectPacket, PacketType::ServerDisconnect> {
   ServerDisconnectPacket();
   ServerDisconnectPacket(String reason);
 
@@ -299,29 +302,19 @@ struct ServerDisconnectPacket : PacketBase<PacketType::ServerDisconnect> {
   String reason;
 };
 
-struct ConnectSuccessPacket : PacketBase<PacketType::ConnectSuccess> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<ConnectSuccessPacket, PacketBase<PacketType::ConnectSuccess>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ConnectSuccessPacket>(); }
-
+struct ConnectSuccessPacket : TypedPacket<ConnectSuccessPacket, PacketType::ConnectSuccess> {
   ConnectSuccessPacket();
-  ConnectSuccessPacket(ConnectionId clientId, Uuid serverUuid, CelestialBaseInformation celestialInformation);
+  ConnectSuccessPacket(ConnectionId client_id, Uuid server_uuid, CelestialBaseInformation celestial_information);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  ConnectionId clientId;
-  Uuid serverUuid;
-  CelestialBaseInformation celestialInformation;
+  ConnectionId client_id;
+  Uuid server_uuid;
+  CelestialBaseInformation celestial_information;
 };
 
-struct ConnectFailurePacket : PacketBase<PacketType::ConnectFailure> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<ConnectFailurePacket, PacketBase<PacketType::ConnectFailure>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ConnectFailurePacket>(); }
-
+struct ConnectFailurePacket : TypedPacket<ConnectFailurePacket, PacketType::ConnectFailure> {
   ConnectFailurePacket();
   ConnectFailurePacket(String reason);
 
@@ -331,27 +324,17 @@ struct ConnectFailurePacket : PacketBase<PacketType::ConnectFailure> {
   String reason;
 };
 
-struct HandshakeChallengePacket : PacketBase<PacketType::HandshakeChallenge> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<HandshakeChallengePacket, PacketBase<PacketType::HandshakeChallenge>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<HandshakeChallengePacket>(); }
-
+struct HandshakeChallengePacket : TypedPacket<HandshakeChallengePacket, PacketType::HandshakeChallenge> {
   HandshakeChallengePacket();
-  HandshakeChallengePacket(ByteArray const& passwordSalt);
+  HandshakeChallengePacket(ByteArray const& password_salt);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  ByteArray passwordSalt;
+  ByteArray password_salt;
 };
 
-struct ChatReceivePacket : PacketBase<PacketType::ChatReceive> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<ChatReceivePacket, PacketBase<PacketType::ChatReceive>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ChatReceivePacket>(); }
-
+struct ChatReceivePacket : TypedPacket<ChatReceivePacket, PacketType::ChatReceive> {
   ChatReceivePacket();
   ChatReceivePacket(ChatReceivedMessage received_message);
 
@@ -364,28 +347,18 @@ struct ChatReceivePacket : PacketBase<PacketType::ChatReceive> {
   ChatReceivedMessage received_message;
 };
 
-struct UniverseTimeUpdatePacket : PacketBase<PacketType::UniverseTimeUpdate> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<UniverseTimeUpdatePacket, PacketBase<PacketType::UniverseTimeUpdate>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<UniverseTimeUpdatePacket>(); }
-
+struct UniverseTimeUpdatePacket : TypedPacket<UniverseTimeUpdatePacket, PacketType::UniverseTimeUpdate> {
   UniverseTimeUpdatePacket();
-  UniverseTimeUpdatePacket(double universeTime);
+  UniverseTimeUpdatePacket(double universe_time);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  double universeTime;
+  double universe_time;
   float timescale;
 };
 
-struct CelestialResponsePacket : PacketBase<PacketType::CelestialResponse> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<CelestialResponsePacket, PacketBase<PacketType::CelestialResponse>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<CelestialResponsePacket>(); }
-
+struct CelestialResponsePacket : TypedPacket<CelestialResponsePacket, PacketType::CelestialResponse> {
   CelestialResponsePacket();
   CelestialResponsePacket(List<CelestialResponse> responses);
 
@@ -395,29 +368,19 @@ struct CelestialResponsePacket : PacketBase<PacketType::CelestialResponse> {
   List<CelestialResponse> responses;
 };
 
-struct PlayerWarpResultPacket : PacketBase<PacketType::PlayerWarpResult> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<PlayerWarpResultPacket, PacketBase<PacketType::PlayerWarpResult>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PlayerWarpResultPacket>(); }
-
+struct PlayerWarpResultPacket : TypedPacket<PlayerWarpResultPacket, PacketType::PlayerWarpResult> {
   PlayerWarpResultPacket();
-  PlayerWarpResultPacket(bool success, WarpAction warpAction, bool warpActionInvalid);
+  PlayerWarpResultPacket(bool success, WarpAction warp_action, bool warp_action_invalid);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
   bool success;
-  WarpAction warpAction;
-  bool warpActionInvalid;
+  WarpAction warp_action;
+  bool warp_action_invalid;
 };
 
-struct PlanetTypeUpdatePacket : PacketBase<PacketType::PlanetTypeUpdate> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<PlanetTypeUpdatePacket, PacketBase<PacketType::PlanetTypeUpdate>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PlanetTypeUpdatePacket>(); }
-
+struct PlanetTypeUpdatePacket : TypedPacket<PlanetTypeUpdatePacket, PacketType::PlanetTypeUpdate> {
   PlanetTypeUpdatePacket();
   PlanetTypeUpdatePacket(CelestialCoordinate coordinate);
 
@@ -427,12 +390,7 @@ struct PlanetTypeUpdatePacket : PacketBase<PacketType::PlanetTypeUpdate> {
   CelestialCoordinate coordinate;
 };
 
-struct PausePacket : PacketBase<PacketType::Pause> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<PausePacket, PacketBase<PacketType::Pause>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PausePacket>(); }
-
+struct PausePacket : TypedPacket<PausePacket, PacketType::Pause> {
   PausePacket();
   PausePacket(bool pause, float timescale = 1.0f);
 
@@ -446,14 +404,9 @@ struct PausePacket : PacketBase<PacketType::Pause> {
   float timescale = 1.0f;
 };
 
-struct ServerInfoPacket : PacketBase<PacketType::ServerInfo> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<ServerInfoPacket, PacketBase<PacketType::ServerInfo>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ServerInfoPacket>(); }
-
+struct ServerInfoPacket : TypedPacket<ServerInfoPacket, PacketType::ServerInfo> {
   ServerInfoPacket();
-  ServerInfoPacket(std::uint16_t players, std::uint16_t maxPlayers);
+  ServerInfoPacket(std::uint16_t players, std::uint16_t max_players);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
@@ -462,71 +415,50 @@ struct ServerInfoPacket : PacketBase<PacketType::ServerInfo> {
   [[nodiscard]] std::expected<Json, StarException> write_json() const override;
 
   std::uint16_t players;
-  std::uint16_t maxPlayers;
+  std::uint16_t max_players;
 };
 
-struct ClientConnectPacket : PacketBase<PacketType::ClientConnect> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<ClientConnectPacket, PacketBase<PacketType::ClientConnect>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ClientConnectPacket>(); }
-
+struct ClientConnectPacket : TypedPacket<ClientConnectPacket, PacketType::ClientConnect> {
   ClientConnectPacket();
-  ClientConnectPacket(ByteArray assetsDigest, bool allowAssetsMismatch, Uuid playerUuid, String playerName,
-      String shipSpecies, WorldChunks shipChunks, ShipUpgrades ship_upgrades, bool introComplete,
+  ClientConnectPacket(ByteArray assets_digest, bool allow_assets_mismatch, Uuid player_uuid, String player_name,
+      String ship_species, WorldChunks ship_chunks, ShipUpgrades ship_upgrades, bool intro_complete,
       String account, Json info = {});
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  ByteArray assetsDigest;
-  bool allowAssetsMismatch;
-  Uuid playerUuid;
-  String playerName;
-  String shipSpecies;
-  WorldChunks shipChunks;
+  ByteArray assets_digest;
+  bool allow_assets_mismatch;
+  Uuid player_uuid;
+  String player_name;
+  String ship_species;
+  WorldChunks ship_chunks;
   ShipUpgrades ship_upgrades;
-  bool introComplete;
+  bool intro_complete;
   String account;
   Json info;
 };
 
-struct ClientDisconnectRequestPacket : PacketBase<PacketType::ClientDisconnectRequest> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<ClientDisconnectRequestPacket, PacketBase<PacketType::ClientDisconnectRequest>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override {
-    return Star::type_name<ClientDisconnectRequestPacket>();
-  }
-
+struct ClientDisconnectRequestPacket : TypedPacket<ClientDisconnectRequestPacket, PacketType::ClientDisconnectRequest> {
   ClientDisconnectRequestPacket();
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 };
 
-struct HandshakeResponsePacket : PacketBase<PacketType::HandshakeResponse> {
+struct HandshakeResponsePacket : TypedPacket<HandshakeResponsePacket, PacketType::HandshakeResponse> {
   [[nodiscard]] static ByteArray password_digest(String const& password, String const& account, ByteArray const& salt);
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<HandshakeResponsePacket, PacketBase<PacketType::HandshakeResponse>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<HandshakeResponsePacket>(); }
 
   HandshakeResponsePacket();
-  HandshakeResponsePacket(ByteArray const& passHash);
+  HandshakeResponsePacket(ByteArray const& pass_hash);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  ByteArray passHash;
+  ByteArray pass_hash;
 };
 
-struct PlayerWarpPacket : PacketBase<PacketType::PlayerWarp> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<PlayerWarpPacket, PacketBase<PacketType::PlayerWarp>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PlayerWarpPacket>(); }
-
+struct PlayerWarpPacket : TypedPacket<PlayerWarpPacket, PacketType::PlayerWarp> {
   PlayerWarpPacket();
   PlayerWarpPacket(WarpAction action, bool deploy);
 
@@ -537,12 +469,7 @@ struct PlayerWarpPacket : PacketBase<PacketType::PlayerWarp> {
   bool deploy;
 };
 
-struct FlyShipPacket : PacketBase<PacketType::FlyShip> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<FlyShipPacket, PacketBase<PacketType::FlyShip>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<FlyShipPacket>(); }
-
+struct FlyShipPacket : TypedPacket<FlyShipPacket, PacketType::FlyShip> {
   FlyShipPacket();
   FlyShipPacket(Vec3I system, SystemLocation location, Json settings = {});
 
@@ -554,12 +481,7 @@ struct FlyShipPacket : PacketBase<PacketType::FlyShip> {
   Json settings;
 };
 
-struct ChatSendPacket : PacketBase<PacketType::ChatSend> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<ChatSendPacket, PacketBase<PacketType::ChatSend>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ChatSendPacket>(); }
-
+struct ChatSendPacket : TypedPacket<ChatSendPacket, PacketType::ChatSend> {
   ChatSendPacket();
   ChatSendPacket(String text, ChatSendMode send_mode);
   ChatSendPacket(String text, ChatSendMode send_mode, JsonObject data);
@@ -572,12 +494,7 @@ struct ChatSendPacket : PacketBase<PacketType::ChatSend> {
   JsonObject data;
 };
 
-struct CelestialRequestPacket : PacketBase<PacketType::CelestialRequest> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<CelestialRequestPacket, PacketBase<PacketType::CelestialRequest>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<CelestialRequestPacket>(); }
-
+struct CelestialRequestPacket : TypedPacket<CelestialRequestPacket, PacketType::CelestialRequest> {
   CelestialRequestPacket();
   CelestialRequestPacket(List<CelestialRequest> requests);
 
@@ -587,12 +504,7 @@ struct CelestialRequestPacket : PacketBase<PacketType::CelestialRequest> {
   List<CelestialRequest> requests;
 };
 
-struct ClientContextUpdatePacket : PacketBase<PacketType::ClientContextUpdate> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<ClientContextUpdatePacket, PacketBase<PacketType::ClientContextUpdate>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ClientContextUpdatePacket>(); }
-
+struct ClientContextUpdatePacket : TypedPacket<ClientContextUpdatePacket, PacketType::ClientContextUpdate> {
   ClientContextUpdatePacket();
   ClientContextUpdatePacket(ByteArray update_data);
 
@@ -603,38 +515,28 @@ struct ClientContextUpdatePacket : PacketBase<PacketType::ClientContextUpdate> {
 };
 
 // Sent when a client should initialize themselves on a new world
-struct WorldStartPacket : PacketBase<PacketType::WorldStart> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<WorldStartPacket, PacketBase<PacketType::WorldStart>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<WorldStartPacket>(); }
-
+struct WorldStartPacket : TypedPacket<WorldStartPacket, PacketType::WorldStart> {
   WorldStartPacket();
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  Json templateData;
-  ByteArray skyData;
-  ByteArray weatherData;
-  Vec2F playerStart;
-  Vec2F playerRespawn;
-  bool respawnInWorld;
-  HashMap<DungeonId, float> dungeonIdGravity;
-  HashMap<DungeonId, bool> dungeonIdBreathable;
-  StableHashSet<DungeonId> protectedDungeonIds;
-  Json worldProperties;
-  ConnectionId clientId;
+  Json template_data;
+  ByteArray sky_data;
+  ByteArray weather_data;
+  Vec2F player_start;
+  Vec2F player_respawn;
+  bool respawn_in_world;
+  HashMap<DungeonId, float> dungeon_id_gravity;
+  HashMap<DungeonId, bool> dungeon_id_breathable;
+  StableHashSet<DungeonId> protected_dungeon_ids;
+  Json world_properties;
+  ConnectionId client_id;
   bool local_interpolation_mode;
 };
 
 // Sent when a client is leaving a world
-struct WorldStopPacket : PacketBase<PacketType::WorldStop> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<WorldStopPacket, PacketBase<PacketType::WorldStop>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<WorldStopPacket>(); }
-
+struct WorldStopPacket : TypedPacket<WorldStopPacket, PacketType::WorldStop> {
   WorldStopPacket();
   WorldStopPacket(String const& reason);
 
@@ -645,62 +547,38 @@ struct WorldStopPacket : PacketBase<PacketType::WorldStop> {
 };
 
 // Sent when the region data for the client's current world changes
-struct WorldLayoutUpdatePacket : PacketBase<PacketType::WorldLayoutUpdate> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<WorldLayoutUpdatePacket, PacketBase<PacketType::WorldLayoutUpdate>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<WorldLayoutUpdatePacket>(); }
-
+struct WorldLayoutUpdatePacket : TypedPacket<WorldLayoutUpdatePacket, PacketType::WorldLayoutUpdate> {
   WorldLayoutUpdatePacket();
-  WorldLayoutUpdatePacket(Json const& layoutData);
+  WorldLayoutUpdatePacket(Json const& layout_data);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  Json layoutData;
+  Json layout_data;
 };
 
 // Sent when the environment status effect list for the client's current world changes
-struct WorldParametersUpdatePacket : PacketBase<PacketType::WorldParametersUpdate> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<WorldParametersUpdatePacket, PacketBase<PacketType::WorldParametersUpdate>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override {
-    return Star::type_name<WorldParametersUpdatePacket>();
-  }
-
+struct WorldParametersUpdatePacket : TypedPacket<WorldParametersUpdatePacket, PacketType::WorldParametersUpdate> {
   WorldParametersUpdatePacket();
-  WorldParametersUpdatePacket(ByteArray parametersData);
+  WorldParametersUpdatePacket(ByteArray parameters_data);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  ByteArray parametersData;
+  ByteArray parameters_data;
 };
 
-struct CentralStructureUpdatePacket : PacketBase<PacketType::CentralStructureUpdate> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<CentralStructureUpdatePacket, PacketBase<PacketType::CentralStructureUpdate>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override {
-    return Star::type_name<CentralStructureUpdatePacket>();
-  }
-
+struct CentralStructureUpdatePacket : TypedPacket<CentralStructureUpdatePacket, PacketType::CentralStructureUpdate> {
   CentralStructureUpdatePacket();
-  CentralStructureUpdatePacket(Json structureData);
+  CentralStructureUpdatePacket(Json structure_data);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  Json structureData;
+  Json structure_data;
 };
 
-struct TileArrayUpdatePacket : PacketBase<PacketType::TileArrayUpdate> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<TileArrayUpdatePacket, PacketBase<PacketType::TileArrayUpdate>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<TileArrayUpdatePacket>(); }
-
+struct TileArrayUpdatePacket : TypedPacket<TileArrayUpdatePacket, PacketType::TileArrayUpdate> {
   using TileArray = MultiArray<NetTile, 2>;
 
   TileArrayUpdatePacket();
@@ -712,12 +590,7 @@ struct TileArrayUpdatePacket : PacketBase<PacketType::TileArrayUpdate> {
   TileArray array;
 };
 
-struct TileUpdatePacket : PacketBase<PacketType::TileUpdate> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<TileUpdatePacket, PacketBase<PacketType::TileUpdate>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<TileUpdatePacket>(); }
-
+struct TileUpdatePacket : TypedPacket<TileUpdatePacket, PacketType::TileUpdate> {
   TileUpdatePacket() {}
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
@@ -726,12 +599,7 @@ struct TileUpdatePacket : PacketBase<PacketType::TileUpdate> {
   NetTile tile;
 };
 
-struct TileLiquidUpdatePacket : PacketBase<PacketType::TileLiquidUpdate> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<TileLiquidUpdatePacket, PacketBase<PacketType::TileLiquidUpdate>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<TileLiquidUpdatePacket>(); }
-
+struct TileLiquidUpdatePacket : TypedPacket<TileLiquidUpdatePacket, PacketType::TileLiquidUpdate> {
   TileLiquidUpdatePacket();
   TileLiquidUpdatePacket(Vec2I const& position, LiquidNetUpdate liquid_update);
 
@@ -742,14 +610,9 @@ struct TileLiquidUpdatePacket : PacketBase<PacketType::TileLiquidUpdate> {
   LiquidNetUpdate liquid_update;
 };
 
-struct TileDamageUpdatePacket : PacketBase<PacketType::TileDamageUpdate> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<TileDamageUpdatePacket, PacketBase<PacketType::TileDamageUpdate>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<TileDamageUpdatePacket>(); }
-
+struct TileDamageUpdatePacket : TypedPacket<TileDamageUpdatePacket, PacketType::TileDamageUpdate> {
   TileDamageUpdatePacket();
-  TileDamageUpdatePacket(Vec2I const& position, TileLayer layer, TileDamageStatus const& tileDamage);
+  TileDamageUpdatePacket(Vec2I const& position, TileLayer layer, TileDamageStatus const& tile_damage);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
@@ -757,17 +620,10 @@ struct TileDamageUpdatePacket : PacketBase<PacketType::TileDamageUpdate> {
   Vec2I position;
   TileLayer layer;
 
-  TileDamageStatus tileDamage;
+  TileDamageStatus tile_damage;
 };
 
-struct TileModificationFailurePacket : PacketBase<PacketType::TileModificationFailure> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<TileModificationFailurePacket, PacketBase<PacketType::TileModificationFailure>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override {
-    return Star::type_name<TileModificationFailurePacket>();
-  }
-
+struct TileModificationFailurePacket : TypedPacket<TileModificationFailurePacket, PacketType::TileModificationFailure> {
   TileModificationFailurePacket();
   TileModificationFailurePacket(TileModificationList modifications);
 
@@ -777,12 +633,7 @@ struct TileModificationFailurePacket : PacketBase<PacketType::TileModificationFa
   TileModificationList modifications;
 };
 
-struct GiveItemPacket : PacketBase<PacketType::GiveItem> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<GiveItemPacket, PacketBase<PacketType::GiveItem>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<GiveItemPacket>(); }
-
+struct GiveItemPacket : TypedPacket<GiveItemPacket, PacketType::GiveItem> {
   GiveItemPacket();
   GiveItemPacket(ItemDescriptor const& item);
 
@@ -795,30 +646,20 @@ struct GiveItemPacket : PacketBase<PacketType::GiveItem> {
   ItemDescriptor item;
 };
 
-struct EnvironmentUpdatePacket : PacketBase<PacketType::EnvironmentUpdate> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<EnvironmentUpdatePacket, PacketBase<PacketType::EnvironmentUpdate>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<EnvironmentUpdatePacket>(); }
-
+struct EnvironmentUpdatePacket : TypedPacket<EnvironmentUpdatePacket, PacketType::EnvironmentUpdate> {
   EnvironmentUpdatePacket();
-  EnvironmentUpdatePacket(ByteArray skyDelta, ByteArray weatherDelta);
+  EnvironmentUpdatePacket(ByteArray sky_delta, ByteArray weather_delta);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  ByteArray skyDelta;
-  ByteArray weatherDelta;
+  ByteArray sky_delta;
+  ByteArray weather_delta;
 };
 
-struct UpdateTileProtectionPacket : PacketBase<PacketType::UpdateTileProtection> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<UpdateTileProtectionPacket, PacketBase<PacketType::UpdateTileProtection>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<UpdateTileProtectionPacket>(); }
-
+struct UpdateTileProtectionPacket : TypedPacket<UpdateTileProtectionPacket, PacketType::UpdateTileProtection> {
   UpdateTileProtectionPacket();
-  UpdateTileProtectionPacket(DungeonId dungeonId, bool isProtected);
+  UpdateTileProtectionPacket(DungeonId dungeon_id, bool is_protected);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
@@ -826,18 +667,13 @@ struct UpdateTileProtectionPacket : PacketBase<PacketType::UpdateTileProtection>
   [[nodiscard]] std::expected<void, StarException> read_json(Json const& json) override;
   [[nodiscard]] std::expected<Json, StarException> write_json() const override;
 
-  DungeonId dungeonId;
-  bool isProtected;
+  DungeonId dungeon_id;
+  bool is_protected;
 };
 
-struct SetDungeonGravityPacket : PacketBase<PacketType::SetDungeonGravity> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<SetDungeonGravityPacket, PacketBase<PacketType::SetDungeonGravity>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SetDungeonGravityPacket>(); }
-
+struct SetDungeonGravityPacket : TypedPacket<SetDungeonGravityPacket, PacketType::SetDungeonGravity> {
   SetDungeonGravityPacket();
-  SetDungeonGravityPacket(DungeonId dungeonId, std::optional<float> gravity);
+  SetDungeonGravityPacket(DungeonId dungeon_id, std::optional<float> gravity);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
@@ -845,18 +681,13 @@ struct SetDungeonGravityPacket : PacketBase<PacketType::SetDungeonGravity> {
   [[nodiscard]] std::expected<void, StarException> read_json(Json const& json) override;
   [[nodiscard]] std::expected<Json, StarException> write_json() const override;
 
-  DungeonId dungeonId;
+  DungeonId dungeon_id;
   std::optional<float> gravity;
 };
 
-struct SetDungeonBreathablePacket : PacketBase<PacketType::SetDungeonBreathable> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<SetDungeonBreathablePacket, PacketBase<PacketType::SetDungeonBreathable>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SetDungeonBreathablePacket>(); }
-
+struct SetDungeonBreathablePacket : TypedPacket<SetDungeonBreathablePacket, PacketType::SetDungeonBreathable> {
   SetDungeonBreathablePacket();
-  SetDungeonBreathablePacket(DungeonId dungeonId, std::optional<bool> breathable);
+  SetDungeonBreathablePacket(DungeonId dungeon_id, std::optional<bool> breathable);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
@@ -864,18 +695,13 @@ struct SetDungeonBreathablePacket : PacketBase<PacketType::SetDungeonBreathable>
   [[nodiscard]] std::expected<void, StarException> read_json(Json const& json) override;
   [[nodiscard]] std::expected<Json, StarException> write_json() const override;
 
-  DungeonId dungeonId;
+  DungeonId dungeon_id;
   std::optional<bool> breathable;
 };
 
-struct SetPlayerStartPacket : PacketBase<PacketType::SetPlayerStart> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<SetPlayerStartPacket, PacketBase<PacketType::SetPlayerStart>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SetPlayerStartPacket>(); }
-
+struct SetPlayerStartPacket : TypedPacket<SetPlayerStartPacket, PacketType::SetPlayerStart> {
   SetPlayerStartPacket();
-  SetPlayerStartPacket(Vec2F playerStart, bool respawnInWorld);
+  SetPlayerStartPacket(Vec2F player_start, bool respawn_in_world);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
@@ -883,34 +709,23 @@ struct SetPlayerStartPacket : PacketBase<PacketType::SetPlayerStart> {
   [[nodiscard]] std::expected<void, StarException> read_json(Json const& json) override;
   [[nodiscard]] std::expected<Json, StarException> write_json() const override;
 
-  Vec2F playerStart;
-  bool respawnInWorld;
+  Vec2F player_start;
+  bool respawn_in_world;
 };
 
-struct FindUniqueEntityResponsePacket : PacketBase<PacketType::FindUniqueEntityResponse> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<FindUniqueEntityResponsePacket, PacketBase<PacketType::FindUniqueEntityResponse>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override {
-    return Star::type_name<FindUniqueEntityResponsePacket>();
-  }
-
+struct FindUniqueEntityResponsePacket
+    : TypedPacket<FindUniqueEntityResponsePacket, PacketType::FindUniqueEntityResponse> {
   FindUniqueEntityResponsePacket();
-  FindUniqueEntityResponsePacket(String uniqueEntityId, std::optional<Vec2F> entityPosition);
+  FindUniqueEntityResponsePacket(String unique_entity_id, std::optional<Vec2F> entity_position);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  String uniqueEntityId;
-  std::optional<Vec2F> entityPosition;
+  String unique_entity_id;
+  std::optional<Vec2F> entity_position;
 };
 
-struct PongPacket : PacketBase<PacketType::Pong> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<PongPacket, PacketBase<PacketType::Pong>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PongPacket>(); }
-
+struct PongPacket : TypedPacket<PongPacket, PacketType::Pong> {
   PongPacket();
   PongPacket(std::int64_t time);
 
@@ -920,190 +735,126 @@ struct PongPacket : PacketBase<PacketType::Pong> {
   std::int64_t time = 0;
 };
 
-struct ModifyTileListPacket : PacketBase<PacketType::ModifyTileList> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<ModifyTileListPacket, PacketBase<PacketType::ModifyTileList>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ModifyTileListPacket>(); }
-
+struct ModifyTileListPacket : TypedPacket<ModifyTileListPacket, PacketType::ModifyTileList> {
   ModifyTileListPacket();
-  ModifyTileListPacket(TileModificationList modifications, bool allowEntityOverlap);
+  ModifyTileListPacket(TileModificationList modifications, bool allow_entity_overlap);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
   TileModificationList modifications;
-  bool allowEntityOverlap;
+  bool allow_entity_overlap;
 };
 
-struct ReplaceTileListPacket : PacketBase<PacketType::ReplaceTileList> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<ReplaceTileListPacket, PacketBase<PacketType::ReplaceTileList>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ReplaceTileListPacket>(); }
-
+struct ReplaceTileListPacket : TypedPacket<ReplaceTileListPacket, PacketType::ReplaceTileList> {
   ReplaceTileListPacket();
-  ReplaceTileListPacket(TileModificationList modifications, TileDamage tileDamage, bool applyDamage);
+  ReplaceTileListPacket(TileModificationList modifications, TileDamage tile_damage, bool apply_damage);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
   TileModificationList modifications;
-  TileDamage tileDamage;
-  bool applyDamage;
+  TileDamage tile_damage;
+  bool apply_damage;
 };
 
-struct DamageTileGroupPacket : PacketBase<PacketType::DamageTileGroup> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<DamageTileGroupPacket, PacketBase<PacketType::DamageTileGroup>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<DamageTileGroupPacket>(); }
-
+struct DamageTileGroupPacket : TypedPacket<DamageTileGroupPacket, PacketType::DamageTileGroup> {
   DamageTileGroupPacket();
-  DamageTileGroupPacket(List<Vec2I> tilePositions, TileLayer layer, Vec2F sourcePosition, TileDamage tileDamage, std::optional<EntityId> sourceEntity);
+  DamageTileGroupPacket(List<Vec2I> tile_positions, TileLayer layer, Vec2F source_position, TileDamage tile_damage, std::optional<EntityId> source_entity);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  List<Vec2I> tilePositions;
+  List<Vec2I> tile_positions;
   TileLayer layer;
-  Vec2F sourcePosition;
-  TileDamage tileDamage;
-  std::optional<EntityId> sourceEntity;
+  Vec2F source_position;
+  TileDamage tile_damage;
+  std::optional<EntityId> source_entity;
 };
 
-struct CollectLiquidPacket : PacketBase<PacketType::CollectLiquid> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<CollectLiquidPacket, PacketBase<PacketType::CollectLiquid>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<CollectLiquidPacket>(); }
-
+struct CollectLiquidPacket : TypedPacket<CollectLiquidPacket, PacketType::CollectLiquid> {
   CollectLiquidPacket();
-  CollectLiquidPacket(List<Vec2I> tilePositions, LiquidId liquidId);
+  CollectLiquidPacket(List<Vec2I> tile_positions, LiquidId liquid_id);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  List<Vec2I> tilePositions;
-  LiquidId liquidId;
+  List<Vec2I> tile_positions;
+  LiquidId liquid_id;
 };
 
-struct RequestDropPacket : PacketBase<PacketType::RequestDrop> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<RequestDropPacket, PacketBase<PacketType::RequestDrop>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<RequestDropPacket>(); }
-
+struct RequestDropPacket : TypedPacket<RequestDropPacket, PacketType::RequestDrop> {
   RequestDropPacket();
-  RequestDropPacket(EntityId dropEntityId);
+  RequestDropPacket(EntityId drop_entity_id);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  EntityId dropEntityId;
+  EntityId drop_entity_id;
 };
 
-struct SpawnEntityPacket : PacketBase<PacketType::SpawnEntity> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<SpawnEntityPacket, PacketBase<PacketType::SpawnEntity>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SpawnEntityPacket>(); }
-
+struct SpawnEntityPacket : TypedPacket<SpawnEntityPacket, PacketType::SpawnEntity> {
   SpawnEntityPacket();
-  SpawnEntityPacket(EntityType entityType, ByteArray storeData, ByteArray firstNetState);
+  SpawnEntityPacket(EntityType entity_type, ByteArray store_data, ByteArray first_net_state);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  EntityType entityType;
-  ByteArray storeData;
-  ByteArray firstNetState;
+  EntityType entity_type;
+  ByteArray store_data;
+  ByteArray first_net_state;
 };
 
-struct ConnectWirePacket : PacketBase<PacketType::ConnectWire> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<ConnectWirePacket, PacketBase<PacketType::ConnectWire>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ConnectWirePacket>(); }
-
+struct ConnectWirePacket : TypedPacket<ConnectWirePacket, PacketType::ConnectWire> {
   ConnectWirePacket();
-  ConnectWirePacket(WireConnection outputConnection, WireConnection inputConnection);
+  ConnectWirePacket(WireConnection output_connection, WireConnection input_connection);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  WireConnection outputConnection;
-  WireConnection inputConnection;
+  WireConnection output_connection;
+  WireConnection input_connection;
 };
 
-struct DisconnectAllWiresPacket : PacketBase<PacketType::DisconnectAllWires> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<DisconnectAllWiresPacket, PacketBase<PacketType::DisconnectAllWires>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<DisconnectAllWiresPacket>(); }
-
+struct DisconnectAllWiresPacket : TypedPacket<DisconnectAllWiresPacket, PacketType::DisconnectAllWires> {
   DisconnectAllWiresPacket();
-  DisconnectAllWiresPacket(Vec2I entityPosition, WireNode wireNode);
+  DisconnectAllWiresPacket(Vec2I entity_position, WireNode wire_node);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  Vec2I entityPosition;
-  WireNode wireNode;
+  Vec2I entity_position;
+  WireNode wire_node;
 };
 
-struct WorldClientStateUpdatePacket : PacketBase<PacketType::WorldClientStateUpdate> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<WorldClientStateUpdatePacket, PacketBase<PacketType::WorldClientStateUpdate>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override {
-    return Star::type_name<WorldClientStateUpdatePacket>();
-  }
-
+struct WorldClientStateUpdatePacket : TypedPacket<WorldClientStateUpdatePacket, PacketType::WorldClientStateUpdate> {
   WorldClientStateUpdatePacket();
-  WorldClientStateUpdatePacket(ByteArray worldClientStateDelta);
+  WorldClientStateUpdatePacket(ByteArray world_client_state_delta);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  ByteArray worldClientStateDelta;
+  ByteArray world_client_state_delta;
 };
 
-struct FindUniqueEntityPacket : PacketBase<PacketType::FindUniqueEntity> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<FindUniqueEntityPacket, PacketBase<PacketType::FindUniqueEntity>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<FindUniqueEntityPacket>(); }
-
+struct FindUniqueEntityPacket : TypedPacket<FindUniqueEntityPacket, PacketType::FindUniqueEntity> {
   FindUniqueEntityPacket();
-  FindUniqueEntityPacket(String uniqueEntityId);
+  FindUniqueEntityPacket(String unique_entity_id);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  String uniqueEntityId;
+  String unique_entity_id;
 };
 
-struct WorldStartAcknowledgePacket : PacketBase<PacketType::WorldStartAcknowledge> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<WorldStartAcknowledgePacket, PacketBase<PacketType::WorldStartAcknowledge>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override {
-    return Star::type_name<WorldStartAcknowledgePacket>();
-  }
-
+struct WorldStartAcknowledgePacket : TypedPacket<WorldStartAcknowledgePacket, PacketType::WorldStartAcknowledge> {
   WorldStartAcknowledgePacket();
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 };
 
-struct PingPacket : PacketBase<PacketType::Ping> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<PingPacket, PacketBase<PacketType::Ping>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<PingPacket>(); }
-
+struct PingPacket : TypedPacket<PingPacket, PacketType::Ping> {
   PingPacket();
   PingPacket(std::int64_t time);
 
@@ -1113,68 +864,48 @@ struct PingPacket : PacketBase<PacketType::Ping> {
   std::int64_t time = 0;
 };
 
-struct EntityCreatePacket : PacketBase<PacketType::EntityCreate> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<EntityCreatePacket, PacketBase<PacketType::EntityCreate>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<EntityCreatePacket>(); }
-
+struct EntityCreatePacket : TypedPacket<EntityCreatePacket, PacketType::EntityCreate> {
   EntityCreatePacket();
-  EntityCreatePacket(EntityType entityType, ByteArray storeData, ByteArray firstNetState, EntityId entityId);
+  EntityCreatePacket(EntityType entity_type, ByteArray store_data, ByteArray first_net_state, EntityId entity_id);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  EntityType entityType;
-  ByteArray storeData;
-  ByteArray firstNetState;
-  EntityId entityId;
+  EntityType entity_type;
+  ByteArray store_data;
+  ByteArray first_net_state;
+  EntityId entity_id;
 };
 
 // All entity deltas will be sent at the same time for the same connection
 // where they are master, any entities whose master is from that connection can
 // be assumed to have produced a blank delta.
-struct EntityUpdateSetPacket : PacketBase<PacketType::EntityUpdateSet> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<EntityUpdateSetPacket, PacketBase<PacketType::EntityUpdateSet>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<EntityUpdateSetPacket>(); }
-
+struct EntityUpdateSetPacket : TypedPacket<EntityUpdateSetPacket, PacketType::EntityUpdateSet> {
   EntityUpdateSetPacket();
-  EntityUpdateSetPacket(ConnectionId forConnection);
+  EntityUpdateSetPacket(ConnectionId for_connection);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  ConnectionId forConnection;
+  ConnectionId for_connection;
   HashMap<EntityId, ByteArray> deltas;
 };
 
-struct EntityDestroyPacket : PacketBase<PacketType::EntityDestroy> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<EntityDestroyPacket, PacketBase<PacketType::EntityDestroy>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<EntityDestroyPacket>(); }
-
+struct EntityDestroyPacket : TypedPacket<EntityDestroyPacket, PacketType::EntityDestroy> {
   EntityDestroyPacket();
-  EntityDestroyPacket(EntityId entityId, ByteArray finalNetState, bool death);
+  EntityDestroyPacket(EntityId entity_id, ByteArray final_net_state, bool death);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  EntityId entityId;
-  ByteArray finalNetState;
+  EntityId entity_id;
+  ByteArray final_net_state;
   // If true, the entity removal is due to death rather simply for example
   // going out of range of the entity monitoring window.
   bool death;
 };
 
-struct EntityInteractPacket : PacketBase<PacketType::EntityInteract> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<EntityInteractPacket, PacketBase<PacketType::EntityInteract>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<EntityInteractPacket>(); }
-
+struct EntityInteractPacket : TypedPacket<EntityInteractPacket, PacketType::EntityInteract> {
   EntityInteractPacket() = default;
   EntityInteractPacket(InteractRequest interact_request, Uuid request_id);
 
@@ -1185,12 +916,7 @@ struct EntityInteractPacket : PacketBase<PacketType::EntityInteract> {
   Uuid request_id = Uuid::nil();
 };
 
-struct EntityInteractResultPacket : PacketBase<PacketType::EntityInteractResult> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<EntityInteractResultPacket, PacketBase<PacketType::EntityInteractResult>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<EntityInteractResultPacket>(); }
-
+struct EntityInteractResultPacket : TypedPacket<EntityInteractResultPacket, PacketType::EntityInteractResult> {
   EntityInteractResultPacket() = default;
   EntityInteractResultPacket(InteractAction action, Uuid request_id, EntityId source_entity_id);
 
@@ -1202,59 +928,39 @@ struct EntityInteractResultPacket : PacketBase<PacketType::EntityInteractResult>
   EntityId source_entity_id = null_entity_id;
 };
 
-struct HitRequestPacket : PacketBase<PacketType::HitRequest> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<HitRequestPacket, PacketBase<PacketType::HitRequest>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<HitRequestPacket>(); }
-
+struct HitRequestPacket : TypedPacket<HitRequestPacket, PacketType::HitRequest> {
   HitRequestPacket();
-  HitRequestPacket(RemoteHitRequest remoteHitRequest);
+  HitRequestPacket(RemoteHitRequest remote_hit_request);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  RemoteHitRequest remoteHitRequest;
+  RemoteHitRequest remote_hit_request;
 };
 
-struct DamageRequestPacket : PacketBase<PacketType::DamageRequest> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<DamageRequestPacket, PacketBase<PacketType::DamageRequest>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<DamageRequestPacket>(); }
-
+struct DamageRequestPacket : TypedPacket<DamageRequestPacket, PacketType::DamageRequest> {
   DamageRequestPacket();
-  DamageRequestPacket(RemoteDamageRequest remoteDamageRequest);
+  DamageRequestPacket(RemoteDamageRequest remote_damage_request);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  RemoteDamageRequest remoteDamageRequest;
+  RemoteDamageRequest remote_damage_request;
 };
 
-struct DamageNotificationPacket : PacketBase<PacketType::DamageNotification> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<DamageNotificationPacket, PacketBase<PacketType::DamageNotification>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<DamageNotificationPacket>(); }
-
+struct DamageNotificationPacket : TypedPacket<DamageNotificationPacket, PacketType::DamageNotification> {
   DamageNotificationPacket();
-  DamageNotificationPacket(RemoteDamageNotification remoteDamageNotification);
+  DamageNotificationPacket(RemoteDamageNotification remote_damage_notification);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  RemoteDamageNotification remoteDamageNotification;
+  RemoteDamageNotification remote_damage_notification;
 };
 
-struct EntityMessagePacket : PacketBase<PacketType::EntityMessage> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<EntityMessagePacket, PacketBase<PacketType::EntityMessage>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<EntityMessagePacket>(); }
-
+struct EntityMessagePacket : TypedPacket<EntityMessagePacket, PacketType::EntityMessage> {
   EntityMessagePacket();
-  EntityMessagePacket(std::variant<EntityId, String> entityId, String message, JsonArray args, Uuid uuid, ConnectionId fromConnection = server_connection_id);
+  EntityMessagePacket(std::variant<EntityId, String> entity_id, String message, JsonArray args, Uuid uuid, ConnectionId from_connection = server_connection_id);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
@@ -1262,21 +968,14 @@ struct EntityMessagePacket : PacketBase<PacketType::EntityMessage> {
   [[nodiscard]] std::expected<void, StarException> read_json(Json const& json) override;
   [[nodiscard]] std::expected<Json, StarException> write_json() const override;
 
-  std::variant<EntityId, String> entityId;
+  std::variant<EntityId, String> entity_id;
   String message;
   JsonArray args;
   Uuid uuid;
-  ConnectionId fromConnection;
+  ConnectionId from_connection;
 };
 
-struct EntityMessageResponsePacket : PacketBase<PacketType::EntityMessageResponse> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<EntityMessageResponsePacket, PacketBase<PacketType::EntityMessageResponse>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override {
-    return Star::type_name<EntityMessageResponsePacket>();
-  }
-
+struct EntityMessageResponsePacket : TypedPacket<EntityMessageResponsePacket, PacketType::EntityMessageResponse> {
   EntityMessageResponsePacket();
   EntityMessageResponsePacket(std::expected<Json, String> response, Uuid uuid);
 
@@ -1287,16 +986,9 @@ struct EntityMessageResponsePacket : PacketBase<PacketType::EntityMessageRespons
   Uuid uuid;
 };
 
-struct UpdateWorldPropertiesPacket : PacketBase<PacketType::UpdateWorldProperties> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<UpdateWorldPropertiesPacket, PacketBase<PacketType::UpdateWorldProperties>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override {
-    return Star::type_name<UpdateWorldPropertiesPacket>();
-  }
-
+struct UpdateWorldPropertiesPacket : TypedPacket<UpdateWorldPropertiesPacket, PacketType::UpdateWorldProperties> {
   UpdateWorldPropertiesPacket();
-  UpdateWorldPropertiesPacket(JsonObject const& updatedProperties);
+  UpdateWorldPropertiesPacket(JsonObject const& updated_properties);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
@@ -1304,15 +996,10 @@ struct UpdateWorldPropertiesPacket : PacketBase<PacketType::UpdateWorldPropertie
   [[nodiscard]] std::expected<void, StarException> read_json(Json const& json) override;
   [[nodiscard]] std::expected<Json, StarException> write_json() const override;
 
-  JsonObject updatedProperties;
+  JsonObject updated_properties;
 };
 
-struct StepUpdatePacket : PacketBase<PacketType::StepUpdate> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<StepUpdatePacket, PacketBase<PacketType::StepUpdate>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<StepUpdatePacket>(); }
-
+struct StepUpdatePacket : TypedPacket<StepUpdatePacket, PacketType::StepUpdate> {
   StepUpdatePacket() = default;
   StepUpdatePacket(double remote_time);
 
@@ -1322,139 +1009,94 @@ struct StepUpdatePacket : PacketBase<PacketType::StepUpdate> {
   double remote_time = 0.0;
 };
 
-struct SystemWorldStartPacket : PacketBase<PacketType::SystemWorldStart> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<SystemWorldStartPacket, PacketBase<PacketType::SystemWorldStart>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SystemWorldStartPacket>(); }
-
+struct SystemWorldStartPacket : TypedPacket<SystemWorldStartPacket, PacketType::SystemWorldStart> {
   SystemWorldStartPacket();
-  SystemWorldStartPacket(Vec3I location, List<ByteArray> objectStores, List<ByteArray> shipStores, std::pair<Uuid, SystemLocation> clientShip);
+  SystemWorldStartPacket(Vec3I location, List<ByteArray> object_stores, List<ByteArray> ship_stores, std::pair<Uuid, SystemLocation> client_ship);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
   Vec3I location;
-  List<ByteArray> objectStores;
-  List<ByteArray> shipStores;
-  std::pair<Uuid, SystemLocation> clientShip;
+  List<ByteArray> object_stores;
+  List<ByteArray> ship_stores;
+  std::pair<Uuid, SystemLocation> client_ship;
 };
 
-struct SystemWorldUpdatePacket : PacketBase<PacketType::SystemWorldUpdate> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<SystemWorldUpdatePacket, PacketBase<PacketType::SystemWorldUpdate>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SystemWorldUpdatePacket>(); }
-
+struct SystemWorldUpdatePacket : TypedPacket<SystemWorldUpdatePacket, PacketType::SystemWorldUpdate> {
   SystemWorldUpdatePacket();
-  SystemWorldUpdatePacket(HashMap<Uuid, ByteArray> objectUpdates, HashMap<Uuid, ByteArray> shipUpdates);
+  SystemWorldUpdatePacket(HashMap<Uuid, ByteArray> object_updates, HashMap<Uuid, ByteArray> ship_updates);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  HashMap<Uuid, ByteArray> objectUpdates;
-  HashMap<Uuid, ByteArray> shipUpdates;
+  HashMap<Uuid, ByteArray> object_updates;
+  HashMap<Uuid, ByteArray> ship_updates;
 };
 
-struct SystemObjectCreatePacket : PacketBase<PacketType::SystemObjectCreate> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<SystemObjectCreatePacket, PacketBase<PacketType::SystemObjectCreate>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SystemObjectCreatePacket>(); }
-
+struct SystemObjectCreatePacket : TypedPacket<SystemObjectCreatePacket, PacketType::SystemObjectCreate> {
   SystemObjectCreatePacket();
-  SystemObjectCreatePacket(ByteArray objectStore);
+  SystemObjectCreatePacket(ByteArray object_store);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  ByteArray objectStore;
+  ByteArray object_store;
 };
 
-struct SystemObjectDestroyPacket : PacketBase<PacketType::SystemObjectDestroy> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<SystemObjectDestroyPacket, PacketBase<PacketType::SystemObjectDestroy>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SystemObjectDestroyPacket>(); }
-
+struct SystemObjectDestroyPacket : TypedPacket<SystemObjectDestroyPacket, PacketType::SystemObjectDestroy> {
   SystemObjectDestroyPacket();
-  SystemObjectDestroyPacket(Uuid objectUuid);
+  SystemObjectDestroyPacket(Uuid object_uuid);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  Uuid objectUuid;
+  Uuid object_uuid;
 };
 
-struct SystemShipCreatePacket : PacketBase<PacketType::SystemShipCreate> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<SystemShipCreatePacket, PacketBase<PacketType::SystemShipCreate>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SystemShipCreatePacket>(); }
-
+struct SystemShipCreatePacket : TypedPacket<SystemShipCreatePacket, PacketType::SystemShipCreate> {
   SystemShipCreatePacket();
-  SystemShipCreatePacket(ByteArray shipStore);
+  SystemShipCreatePacket(ByteArray ship_store);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  ByteArray shipStore;
+  ByteArray ship_store;
 };
 
-struct SystemShipDestroyPacket : PacketBase<PacketType::SystemShipDestroy> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<SystemShipDestroyPacket, PacketBase<PacketType::SystemShipDestroy>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SystemShipDestroyPacket>(); }
-
+struct SystemShipDestroyPacket : TypedPacket<SystemShipDestroyPacket, PacketType::SystemShipDestroy> {
   SystemShipDestroyPacket();
-  SystemShipDestroyPacket(Uuid shipUuid);
+  SystemShipDestroyPacket(Uuid ship_uuid);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  Uuid shipUuid;
+  Uuid ship_uuid;
 };
 
-struct SystemObjectSpawnPacket : PacketBase<PacketType::SystemObjectSpawn> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<SystemObjectSpawnPacket, PacketBase<PacketType::SystemObjectSpawn>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<SystemObjectSpawnPacket>(); }
-
+struct SystemObjectSpawnPacket : TypedPacket<SystemObjectSpawnPacket, PacketType::SystemObjectSpawn> {
   SystemObjectSpawnPacket();
-  SystemObjectSpawnPacket(String typeName, Uuid uuid, std::optional<Vec2F> position, JsonObject parameters);
+  SystemObjectSpawnPacket(String type_name, Uuid uuid, std::optional<Vec2F> position, JsonObject parameters);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  String typeName;
+  String type_name;
   Uuid uuid;
   std::optional<Vec2F> position;
   JsonObject parameters;
 };
 
-struct UpdateWorldTemplatePacket : PacketBase<PacketType::UpdateWorldTemplate> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<UpdateWorldTemplatePacket, PacketBase<PacketType::UpdateWorldTemplate>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<UpdateWorldTemplatePacket>(); }
-
+struct UpdateWorldTemplatePacket : TypedPacket<UpdateWorldTemplatePacket, PacketType::UpdateWorldTemplate> {
   UpdateWorldTemplatePacket();
-  UpdateWorldTemplatePacket(Json templateData);
+  UpdateWorldTemplatePacket(Json template_data);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  Json templateData;
+  Json template_data;
 };
 
-struct ClientCustomWorldRequest : PacketBase<PacketType::ClientCustomWorldRequest> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<ClientCustomWorldRequest, PacketBase<PacketType::ClientCustomWorldRequest>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ClientCustomWorldRequest>(); }
-
+struct ClientCustomWorldRequest : TypedPacket<ClientCustomWorldRequest, PacketType::ClientCustomWorldRequest> {
   ClientCustomWorldRequest();
   ClientCustomWorldRequest(String name);
 
@@ -1464,12 +1106,7 @@ struct ClientCustomWorldRequest : PacketBase<PacketType::ClientCustomWorldReques
   String name;
 };
 
-struct ClientCustomWorldResponse : PacketBase<PacketType::ClientCustomWorldResponse> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<ClientCustomWorldResponse, PacketBase<PacketType::ClientCustomWorldResponse>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ClientCustomWorldResponse>(); }
-
+struct ClientCustomWorldResponse : TypedPacket<ClientCustomWorldResponse, PacketType::ClientCustomWorldResponse> {
   ClientCustomWorldResponse();
   ClientCustomWorldResponse(String name, WorldChunks chunks);
 
@@ -1480,91 +1117,61 @@ struct ClientCustomWorldResponse : PacketBase<PacketType::ClientCustomWorldRespo
   WorldChunks chunks;
 };
 
-struct ClientCustomWorldCreate : PacketBase<PacketType::ClientCustomWorldCreate> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<ClientCustomWorldCreate, PacketBase<PacketType::ClientCustomWorldCreate>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ClientCustomWorldCreate>(); }
-
+struct ClientCustomWorldCreate : TypedPacket<ClientCustomWorldCreate, PacketType::ClientCustomWorldCreate> {
   ClientCustomWorldCreate();
-  ClientCustomWorldCreate(String name, Json templateData);
+  ClientCustomWorldCreate(String name, Json template_data);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
   String name;
-  Json templateData;
+  Json template_data;
 };
 
 // wrapper packet for client world threads
-struct ClientSubWorldPackets : PacketBase<PacketType::ClientSubWorldPackets> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<ClientSubWorldPackets, PacketBase<PacketType::ClientSubWorldPackets>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ClientSubWorldPackets>(); }
-
+struct ClientSubWorldPackets : TypedPacket<ClientSubWorldPackets, PacketType::ClientSubWorldPackets> {
   ClientSubWorldPackets();
-  ClientSubWorldPackets(ClientSubWorldId const& subWorldId, List<std::shared_ptr<Packet>> packets);
+  ClientSubWorldPackets(ClientSubWorldId const& sub_world_id, List<std::shared_ptr<Packet>> packets);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  ClientSubWorldId subWorldId;
+  ClientSubWorldId sub_world_id{};
   List<std::shared_ptr<Packet>> packets;
 };
 
-struct ClientSubWorldRequest : PacketBase<PacketType::ClientSubWorldRequest> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<ClientSubWorldRequest, PacketBase<PacketType::ClientSubWorldRequest>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ClientSubWorldRequest>(); }
-
+struct ClientSubWorldRequest : TypedPacket<ClientSubWorldRequest, PacketType::ClientSubWorldRequest> {
   ClientSubWorldRequest();
-  ClientSubWorldRequest(ClientSubWorldId const& subWorldId, WorldId worldId);
+  ClientSubWorldRequest(ClientSubWorldId const& sub_world_id, WorldId world_id);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  ClientSubWorldId subWorldId;
-  WorldId worldId;
+  ClientSubWorldId sub_world_id;
+  WorldId world_id;
 };
 
-struct ClientSubWorldReject : PacketBase<PacketType::ClientSubWorldReject> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<ClientSubWorldReject, PacketBase<PacketType::ClientSubWorldReject>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<ClientSubWorldReject>(); }
-
+struct ClientSubWorldReject : TypedPacket<ClientSubWorldReject, PacketType::ClientSubWorldReject> {
   ClientSubWorldReject();
-  ClientSubWorldReject(ClientSubWorldId const& subWorldId);
+  ClientSubWorldReject(ClientSubWorldId const& sub_world_id);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  ClientSubWorldId subWorldId;
+  ClientSubWorldId sub_world_id;
 };
 
-struct NotifyWorldLoad : PacketBase<PacketType::NotifyWorldLoad> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<NotifyWorldLoad, PacketBase<PacketType::NotifyWorldLoad>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<NotifyWorldLoad>(); }
-
+struct NotifyWorldLoad : TypedPacket<NotifyWorldLoad, PacketType::NotifyWorldLoad> {
   NotifyWorldLoad();
-  NotifyWorldLoad(WorldId worldId);
+  NotifyWorldLoad(WorldId world_id);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
 
-  WorldId worldId;
+  WorldId world_id;
 };
 
-struct LogMapUpdate : PacketBase<PacketType::LogMapUpdate> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<LogMapUpdate, PacketBase<PacketType::LogMapUpdate>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<LogMapUpdate>(); }
-
+struct LogMapUpdate : TypedPacket<LogMapUpdate, PacketType::LogMapUpdate> {
   LogMapUpdate();
   LogMapUpdate(Map<String,String> map);
 
@@ -1574,14 +1181,9 @@ struct LogMapUpdate : PacketBase<PacketType::LogMapUpdate> {
   Map<String,String> map;
 };
 
-struct UniverseMessage : PacketBase<PacketType::UniverseMessage> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<UniverseMessage, PacketBase<PacketType::UniverseMessage>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<UniverseMessage>(); }
-
+struct UniverseMessage : TypedPacket<UniverseMessage, PacketType::UniverseMessage> {
   UniverseMessage();
-  UniverseMessage(ConnectionId connection, String message, JsonArray args, Uuid uuid, ConnectionId fromConnection = server_connection_id);
+  UniverseMessage(ConnectionId connection, String message, JsonArray args, Uuid uuid, ConnectionId from_connection = server_connection_id);
 
   [[nodiscard]] std::expected<void, StarException> read(DataStream& ds) override;
   [[nodiscard]] std::expected<void, StarException> write(DataStream& ds) const override;
@@ -1593,15 +1195,10 @@ struct UniverseMessage : PacketBase<PacketType::UniverseMessage> {
   String message;
   JsonArray args;
   Uuid uuid;
-  ConnectionId fromConnection;
+  ConnectionId from_connection;
 };
 
-struct UniverseMessageResponse : PacketBase<PacketType::UniverseMessageResponse> {
-  void query_type(TypeQuery& query) const noexcept override {
-    query_type_of<UniverseMessageResponse, PacketBase<PacketType::UniverseMessageResponse>>(*this, query);
-  }
-  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<UniverseMessageResponse>(); }
-
+struct UniverseMessageResponse : TypedPacket<UniverseMessageResponse, PacketType::UniverseMessageResponse> {
   UniverseMessageResponse();
   UniverseMessageResponse(std::expected<Json, String> response, Uuid uuid);
 
@@ -1619,14 +1216,14 @@ export namespace Star {
   using ::Star::Packet;
   using ::Star::StarPacketExceptionTag;
   using ::Star::StarPacketException;
-  using ::Star::StarProtocolVersion;
+  using ::Star::star_protocol_version;
   using ::Star::PacketType;
   using ::Star::packet_type_name;
   using ::Star::packet_type_from_name;
   using ::Star::NetCompressionMode;
-  using ::Star::NetCompressionModeNames;
+  using ::Star::net_compression_mode_names;
   using ::Star::PacketCompressionMode;
-  using ::Star::createPacket;
+  using ::Star::create_packet;
   using ::Star::PacketBase;
   using ::Star::ProtocolRequestPacket;
   using ::Star::ProtocolResponsePacket;

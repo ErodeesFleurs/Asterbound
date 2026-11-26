@@ -126,6 +126,10 @@ import star.world_structure;
 import star.world_template;
 import star.terrain_database;
 import star.entity_factory;
+import star.player;
+import star.test_universe;
+import star.universe_client;
+import star.world_client;
 
 #include "gtest/gtest.h"
 
@@ -896,9 +900,9 @@ const GameTestRegistration stoppedWorldRetainsClientsAndExportsRecoverableChunks
     auto finalPackets = thread.removeClient(min_client_connection_id);
     ASSERT_TRUE(finalPackets) << finalPackets.error().what();
     ASSERT_FALSE(finalPackets->empty());
-    auto transport = LocalPacketSocket::openPair();
-    ASSERT_TRUE(transport.first->sendPackets(std::move(*finalPackets)));
-    auto delivered = transport.second->receivePackets();
+    auto transport = LocalPacketSocket::open_pair();
+    ASSERT_TRUE(transport.first->send_packets(std::move(*finalPackets)));
+    auto delivered = transport.second->receive_packets();
     ASSERT_TRUE(delivered) << delivered.error().what();
     EXPECT_TRUE(delivered->contains(finalItem));
     ASSERT_FALSE(delivered->empty());
@@ -1164,7 +1168,7 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
           DataStreamBuffer wire;
           wire.set_stream_compatibility_version(rules);
           ASSERT_TRUE(original->write(wire));
-          auto decoded = createPacket(original->type());
+          auto decoded = create_packet(original->type());
           ASSERT_TRUE(decoded) << decoded.error().what();
           ASSERT_TRUE(wire.seek(0));
           ASSERT_TRUE((*decoded)->read(wire));
@@ -1177,26 +1181,26 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
           if (auto expected = as<WorldStartPacket>(original)) {
             auto actual = as<WorldStartPacket>(*decoded);
             ASSERT_TRUE(actual);
-            EXPECT_EQ(std::tie(expected->templateData, expected->skyData, expected->weatherData, expected->playerStart,
-                               expected->playerRespawn, expected->respawnInWorld, expected->worldProperties,
-                               expected->dungeonIdGravity, expected->dungeonIdBreathable, expected->protectedDungeonIds,
-                               expected->clientId, expected->local_interpolation_mode),
-                      std::tie(actual->templateData, actual->skyData, actual->weatherData, actual->playerStart,
-                               actual->playerRespawn, actual->respawnInWorld, actual->worldProperties,
-                               actual->dungeonIdGravity, actual->dungeonIdBreathable, actual->protectedDungeonIds,
-                               actual->clientId, actual->local_interpolation_mode));
+            EXPECT_EQ(std::tie(expected->template_data, expected->sky_data, expected->weather_data, expected->player_start,
+                               expected->player_respawn, expected->respawn_in_world, expected->world_properties,
+                               expected->dungeon_id_gravity, expected->dungeon_id_breathable, expected->protected_dungeon_ids,
+                               expected->client_id, expected->local_interpolation_mode),
+                      std::tie(actual->template_data, actual->sky_data, actual->weather_data, actual->player_start,
+                               actual->player_respawn, actual->respawn_in_world, actual->world_properties,
+                               actual->dungeon_id_gravity, actual->dungeon_id_breathable, actual->protected_dungeon_ids,
+                               actual->client_id, actual->local_interpolation_mode));
           } else if (auto expected = as<CentralStructureUpdatePacket>(original)) {
             auto actual = as<CentralStructureUpdatePacket>(*decoded);
             ASSERT_TRUE(actual);
-            EXPECT_EQ(expected->structureData, actual->structureData);
+            EXPECT_EQ(expected->structure_data, actual->structure_data);
           } else if (auto expected = as<WorldLayoutUpdatePacket>(original)) {
             auto actual = as<WorldLayoutUpdatePacket>(*decoded);
             ASSERT_TRUE(actual);
-            EXPECT_EQ(expected->layoutData, actual->layoutData);
+            EXPECT_EQ(expected->layout_data, actual->layout_data);
           } else if (auto expected = as<EntityUpdateSetPacket>(original)) {
             auto actual = as<EntityUpdateSetPacket>(*decoded);
             ASSERT_TRUE(actual);
-            EXPECT_EQ(expected->forConnection, actual->forConnection);
+            EXPECT_EQ(expected->for_connection, actual->for_connection);
             EXPECT_EQ(expected->deltas, actual->deltas);
           } else {
             EXPECT_EQ(wire.data(), encodedAgain.data());
@@ -1254,16 +1258,16 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
           if (auto entityCreate = as<EntityCreatePacket>(packet)) {
             EXPECT_TRUE(stepSeen);
             EXPECT_FALSE(updateSetSeen);
-            EXPECT_FALSE(visible[i].contains(entityCreate->entityId));
-            auto entity = (*factory)->net_load_entity(entityCreate->entityType, entityCreate->storeData, rules);
+            EXPECT_FALSE(visible[i].contains(entityCreate->entity_id));
+            auto entity = (*factory)->net_load_entity(entityCreate->entity_type, entityCreate->store_data, rules);
             ASSERT_TRUE(entity) << entity.error().what();
-            ASSERT_TRUE((*entity)->read_net_state(entityCreate->firstNetState, 0.0f, rules));
-            visible[i][entityCreate->entityId] = *entity;
-            targetCreated |= entityCreate->entityId == (*target)->entityId();
+            ASSERT_TRUE((*entity)->read_net_state(entityCreate->first_net_state, 0.0f, rules));
+            visible[i][entityCreate->entity_id] = *entity;
+            targetCreated |= entityCreate->entity_id == (*target)->entityId();
           } else if (auto entityDestroy = as<EntityDestroyPacket>(packet)) {
-            EXPECT_TRUE(visible[i].remove(entityDestroy->entityId));
+            EXPECT_TRUE(visible[i].remove(entityDestroy->entity_id));
             EXPECT_FALSE(entityDestroy->death);
-            targetDestroyed |= entityDestroy->entityId == (*target)->entityId();
+            targetDestroyed |= entityDestroy->entity_id == (*target)->entityId();
           } else if (auto update = as<EntityUpdateSetPacket>(packet)) {
             updateSetSeen = true;
             for (auto const& [id, delta] : update->deltas) {
@@ -1297,4 +1301,123 @@ const GameTestRegistration clientSnapshotsRetainPresenceAcrossCameraTransitions(
         EXPECT_EQ(wire.data(), retained.wire);
       }
     }
+  });
+
+const GameTestRegistration entity_update_set_borrows_packet(
+  "WorldSnapshot", "EntityUpdateSetBorrowsSharedPacketAndForwardsEmptyUpdate", [](GameTest& fixture) {
+    auto& root = fixture.root();
+    auto universe = TestUniverse::create(root, {100, 100});
+    if (!fixture.check(universe.has_value(), universe ? "create test universe" : universe.error().what()))
+      return;
+    auto close_universe = make_scope_exit([&] { fixture.check((*universe)->close().has_value(), "close test universe"); });
+    auto uuid = (*universe)->client()->mainPlayer()->uuid();
+    if (!fixture.check(uuid.has_value(), "get observer player UUID")
+        || !fixture.check((*universe)->warpPlayer(ClientShipWorldId(*uuid)).has_value(), "enter the observer world"))
+      return;
+    auto client = (*universe)->worldClient();
+    if (!fixture.check(client && client->inWorld(), "observer client is in a world"))
+      return;
+    ConnectionId const observer = client->connection();
+    ConnectionId const owner = observer + 1;
+    NetCompatibilityRules const rules;
+
+    auto storage = File::ephemeral_file(root.random());
+    if (!fixture.check(storage.has_value(), "create ephemeral server storage"))
+      return;
+    auto server = WorldServer::create(root, Vec2U(2048, 2048), *storage);
+    if (!fixture.check(server.has_value(), server ? "create world server" : server.error().what()))
+      return;
+    auto close_server = make_scope_exit([&] { fixture.check((*server)->close().has_value(), "close world server"); });
+    (*server)->setSpawningEnabled(false);
+    for (auto connection : {owner, observer}) {
+      auto added = (*server)->addClient(connection, SpawnTargetPosition(Vec2F(1024, 1024)), true, false, rules);
+      if (!fixture.check(added && *added, "add peer to the server world")
+          || !fixture.check((*server)->handleIncomingPackets(connection, {std::make_shared<WorldStartAcknowledgePacket>()}).has_value(),
+              "acknowledge world start"))
+        return;
+    }
+
+    auto database = root.projectileDatabase();
+    if (!fixture.check(database.has_value(), "load projectile database"))
+      return;
+    auto donor = (*database)->createProjectile("grenade", JsonObject{{"timeToLive", 3600}, {"scripts", JsonArray{}}});
+    if (!fixture.check(donor.has_value(), donor ? "create donor projectile" : donor.error().what()))
+      return;
+    (*donor)->setInitialPosition({20, 20});
+    auto store = (*donor)->net_store(rules);
+    auto baseline = (*donor)->write_net_state(0, rules);
+    if (!fixture.check(store && baseline, "encode projectile store and full state"))
+      return;
+    auto space = connection_entity_space(owner);
+    if (!fixture.check(space.has_value(), "get entity ID range for owner"))
+      return;
+    auto const hit = space->first;
+    auto const miss = hit + 1;
+    for (auto id : {hit, miss}) {
+      auto create = std::make_shared<EntityCreatePacket>(EntityType::Projectile, *store, baseline->first, id);
+      if (!fixture.check((*server)->handleIncomingPackets(owner, {create}).has_value(), "server accepts entity create")
+          || !fixture.check(client->handleIncomingPackets({create}).has_value(), "client accepts shared entity create"))
+        return;
+      for (auto const& entity : {(*server)->entity(id), client->entity(id)}) {
+        if (!fixture.check(entity && entity->isSlave(), "create publishes a slave projectile")
+            || !fixture.check(entity->disable_interpolation().has_value(), "disable automatic interpolation for this replica"))
+          return;
+        fixture.check(std::abs(entity->position()[0] - 20.0f) < 0.01f, "full state initializes replica position");
+      }
+    }
+
+    (*donor)->setInitialPosition({24, 20});
+    auto delta = (*donor)->write_net_state(baseline->second, rules);
+    if (!fixture.check(delta && !delta->first.empty(), "encode projectile movement delta"))
+      return;
+    // Give both omitted replicas a future sample. A blank delta at either
+    // world's current lead time retimes that sample rather than skipping it.
+    for (auto const& entity : {(*server)->entity(miss), client->entity(miss)}) {
+      if (!fixture.check(entity->enable_interpolation(0.0f).has_value(), "enable interpolation on omitted replica")
+          || !fixture.check(entity->read_net_state(delta->first, 1000.0f, rules).has_value(), "queue a future sample")
+          || !fixture.check(std::abs(entity->position()[0] - 20.0f) < 0.01f, "future sample is not yet visible"))
+        return;
+    }
+    auto shared = std::make_shared<EntityUpdateSetPacket>(owner);
+    shared->deltas[hit] = delta->first;
+    if (!fixture.check((*server)->handleIncomingPackets(owner, {shared}).has_value(), "server applies owner deltas")
+        || !fixture.check(client->handleIncomingPackets({shared}).has_value(), "client applies the same packet"))
+      return;
+    auto retained = shared->deltas.find_ref(hit);
+    fixture.check(retained && retained->get() == delta->first, "shared packet retains its exact delta bytes");
+    for (auto const& entity : {(*server)->entity(hit), client->entity(hit)})
+      fixture.check(std::abs(entity->position()[0] - 24.0f) < 0.01f, "replica with a delta applies the new position");
+    for (auto const& entity : {(*server)->entity(miss), client->entity(miss)})
+      fixture.check(std::abs(entity->position()[0] - 24.0f) < 0.01f,
+          "omitted replica gets a blank delta and retimes its future sample");
+
+    // Drain the prior relay so the next tick can only forward the blank set.
+    if (!fixture.check((*server)->update(1.0f / 60.0f).has_value(), "tick server after applying a delta")
+        || !fixture.check((*server)->getOutgoingPackets(observer).has_value(), "drain initial relay"))
+      return;
+    auto blank = std::make_shared<EntityUpdateSetPacket>(owner);
+    if (!fixture.check((*server)->handleIncomingPackets(owner, {blank}).has_value(), "server accepts empty update set")
+        || !fixture.check((*server)->update(1.0f / 60.0f).has_value(), "tick server to forward empty update set"))
+      return;
+    auto forwarded = (*server)->getOutgoingPackets(observer);
+    if (!fixture.check(forwarded.has_value(), "collect forwarded packets"))
+      return;
+    unsigned forwards = 0;
+    for (auto const& packet : *forwarded) {
+      if (auto update = as<EntityUpdateSetPacket>(packet); update && update->for_connection == owner) {
+        ++forwards;
+        fixture.check(update->deltas.empty(), "forwarded update set is empty");
+        fixture.check(client->handleIncomingPackets({update}).has_value(), "client accepts forwarded blank update");
+      }
+    }
+    fixture.check(forwards == 1u, "relay forwards exactly one owner update set");
+    if (!fixture.check((*server)->update(1.0f / 60.0f).has_value(), "tick without a new owner update"))
+      return;
+    auto idle = (*server)->getOutgoingPackets(observer);
+    if (!fixture.check(idle.has_value(), "collect idle outgoing packets"))
+      return;
+    fixture.check(std::ranges::none_of(*idle, [owner](auto const& packet) {
+      auto update = as<EntityUpdateSetPacket>(packet);
+      return update && update->for_connection == owner;
+    }), "idle tick does not forward the previous blank update again");
   });

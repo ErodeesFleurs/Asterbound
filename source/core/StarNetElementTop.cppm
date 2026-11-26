@@ -62,12 +62,12 @@ public:
   [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> snapshot_net_state(NetCompatibilityRules rules = {}) const;
   // Reads a state produced by a call to write_net_state, optionally with the
   // interpolation delay time for the data contained in this state update.  If
-  // the state is a full update rather than a delta, the interoplation delay
+  // the state is a full update rather than a delta, the interpolation delay
   // will be ignored.  Blank updates are not necessary to send to be read by
   // read_net_state, *unless* extrapolation is enabled.  If extrapolation is
   // enabled, reading a blank update calls 'blank_net_delta' which is necessary
   // to not improperly extrapolate past the end of incoming deltas.
-  [[nodiscard]] std::expected<void, StarException> read_net_state(ByteArray data, float interpolation_time = 0.0f, NetCompatibilityRules rules = {});
+  [[nodiscard]] std::expected<void, StarException> read_net_state(ByteArray const& data, float interpolation_time = 0.0f, NetCompatibilityRules rules = {});
 
 private:
   using BaseNetElement::init_net_version;
@@ -114,9 +114,9 @@ template <std::derived_from<NetElement> BaseNetElement>
 }
 
 template <std::derived_from<NetElement> BaseNetElement>
-[[nodiscard]] std::expected<void, StarException> NetElementTop<BaseNetElement>::read_net_state(ByteArray data, float interpolation_time, NetCompatibilityRules rules) {
+[[nodiscard]] std::expected<void, StarException> NetElementTop<BaseNetElement>::read_net_state(ByteArray const& data, float interpolation_time, NetCompatibilityRules rules) {
   if (data.empty()) return BaseNetElement::blank_net_delta(interpolation_time);
-  DataStreamBuffer ds(std::move(data));
+  DataStreamReader ds(data.span());
   ds.set_stream_compatibility_version(rules);
   auto full = ds.read<bool>();
   if (!full) return std::unexpected(std::move(full.error()));

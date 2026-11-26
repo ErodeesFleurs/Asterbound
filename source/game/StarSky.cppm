@@ -59,7 +59,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> jumpTo(SkyParameters SkyParameters);
 
   [[nodiscard]] std::expected<std::pair<ByteArray, std::uint64_t>, StarException> writeUpdate(std::uint64_t fromVersion = 0, NetCompatibilityRules rules = {});
-  [[nodiscard]] std::expected<void, StarException> readUpdate(ByteArray data, NetCompatibilityRules rules = {});
+  [[nodiscard]] std::expected<void, StarException> readUpdate(ByteArray const& data, NetCompatibilityRules rules = {});
   
   // handles flying and warp state transitions
   [[nodiscard]] std::expected<void, StarException> stateUpdate();

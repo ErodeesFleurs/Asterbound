@@ -580,7 +580,7 @@ std::expected<bool, StarException> LuaBindings::UniverseServerCallbacks::sendPac
   auto packet_type = packet_type_from_name(packetTypeName);
   if (!packet_type)
     return std::unexpected(std::move(packet_type.error()));
-  auto packet = createPacket(universe.root().random(), *packet_type, args);
+  auto packet = create_packet(universe.root().random(), *packet_type, args);
   if (!packet)
     return std::unexpected(std::move(packet.error()));
   return universe.sendPacket(clientId, std::move(*packet));

@@ -710,7 +710,7 @@ std::expected<bool, StarException> WorldServer::addClient(ConnectionId clientId,
   auto result52 = m_worldTemplate->store();
   if (!result52)
     return std::unexpected(std::move(result52.error()));
-  auto& templateData = worldStartPacket->templateData = std::move(*result52);
+  auto& templateData = worldStartPacket->template_data = std::move(*result52);
   // this makes it possible to use custom InstanceWorlds without clients having the mod that adds their dungeon:
   auto result53 = templateData.opt_query_string("worldParameters.primaryDungeon");
   if (!result53)
@@ -729,28 +729,28 @@ std::expected<bool, StarException> WorldServer::addClient(ConnectionId clientId,
     condition57 = static_cast<bool>(std::move(*result56).value_or(false));
   }
   if (condition57) {
-    auto result58 = worldStartPacket->templateData.set_path("worldParameters.primaryDungeon", "testarena");
+    auto result58 = worldStartPacket->template_data.set_path("worldParameters.primaryDungeon", "testarena");
     if (!result58)
       return std::unexpected(std::move(result58.error()));
-    worldStartPacket->templateData = std::move(*result58);
+    worldStartPacket->template_data = std::move(*result58);
   }
 
   auto result59 = m_sky->writeUpdate(0, netRules);
   if (!result59)
     return std::unexpected(std::move(result59.error()));
-  std::tie(worldStartPacket->skyData, clientInfo->skyNetVersion) = std::move(*result59);
+  std::tie(worldStartPacket->sky_data, clientInfo->skyNetVersion) = std::move(*result59);
   auto result60 = weatherForDomain(clientInfo->weatherDomain)->writeUpdate(0, netRules);
   if (!result60)
     return std::unexpected(std::move(result60.error()));
-  std::tie(worldStartPacket->weatherData, clientInfo->weatherNetVersion) = std::move(*result60);
-  worldStartPacket->playerStart = playerStart;
-  worldStartPacket->playerRespawn = m_playerStart;
-  worldStartPacket->respawnInWorld = m_respawnInWorld;
-  worldStartPacket->worldProperties = m_worldProperties;
-  worldStartPacket->dungeonIdGravity = m_dungeonIdGravity;
-  worldStartPacket->dungeonIdBreathable = m_dungeonIdBreathable;
-  worldStartPacket->protectedDungeonIds = m_protectedDungeonIds;
-  worldStartPacket->clientId = clientId;
+  std::tie(worldStartPacket->weather_data, clientInfo->weatherNetVersion) = std::move(*result60);
+  worldStartPacket->player_start = playerStart;
+  worldStartPacket->player_respawn = m_playerStart;
+  worldStartPacket->respawn_in_world = m_respawnInWorld;
+  worldStartPacket->world_properties = m_worldProperties;
+  worldStartPacket->dungeon_id_gravity = m_dungeonIdGravity;
+  worldStartPacket->dungeon_id_breathable = m_dungeonIdBreathable;
+  worldStartPacket->protected_dungeon_ids = m_protectedDungeonIds;
+  worldStartPacket->client_id = clientId;
   worldStartPacket->local_interpolation_mode = isLocal;
   clientInfo->outgoingPackets.push_back(worldStartPacket);
 
@@ -889,7 +889,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
     } else if (auto heartbeat = as<StepUpdatePacket>(packet)) {
       clientInfo->interpolation_tracker.receive_time_update(heartbeat->remote_time);
     } else if (auto wcsPacket = as<WorldClientStateUpdatePacket>(packet)) {
-      auto result69 = clientInfo->clientState->readDelta(wcsPacket->worldClientStateDelta);
+      auto result69 = clientInfo->clientState->readDelta(wcsPacket->world_client_state_delta);
       if (!result69)
         return std::unexpected(std::move(result69.error()));
 
@@ -935,7 +935,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
             return std::unexpected(std::move(result74.error()));
         }
       }
-      auto result75 = applyTileModifications(sanitized, mtpacket->allowEntityOverlap);
+      auto result75 = applyTileModifications(sanitized, mtpacket->allow_entity_overlap);
       if (!result75)
         return std::unexpected(std::move(result75.error()));
       auto unappliedModifications = std::move(*result75);
@@ -959,7 +959,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           rejected.push_back(pair);
         }
       }
-      auto result77 = replaceTiles(sanitized, rtpacket->tileDamage, rtpacket->applyDamage);
+      auto result77 = replaceTiles(sanitized, rtpacket->tile_damage, rtpacket->apply_damage);
       if (!result77)
         return std::unexpected(std::move(result77.error()));
       auto unappliedModifications = std::move(*result77);
@@ -967,20 +967,20 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       if (!unappliedModifications.empty())
         clientInfo->outgoingPackets.push_back(std::make_shared<TileModificationFailurePacket>(unappliedModifications));
     } else if (auto dtgpacket = as<DamageTileGroupPacket>(packet)) {
-      auto result78 = damageTiles(dtgpacket->tilePositions, dtgpacket->layer, dtgpacket->sourcePosition, dtgpacket->tileDamage, dtgpacket->sourceEntity);
+      auto result78 = damageTiles(dtgpacket->tile_positions, dtgpacket->layer, dtgpacket->source_position, dtgpacket->tile_damage, dtgpacket->source_entity);
       if (!result78)
         return std::unexpected(std::move(result78.error()));
     } else if (auto clpacket = as<CollectLiquidPacket>(packet)) {
       auto liquids_database = this->root().liquids_database();
       if (!liquids_database)
         return std::unexpected(std::move(liquids_database.error()));
-      if (!(*liquids_database)->is_valid_liquid_id(clpacket->liquidId)) {
-        auto result80 = this->root().logger().warn("WorldServer: dropped CollectLiquid with invalid liquid id {} from client {}", clpacket->liquidId, clientId);
+      if (!(*liquids_database)->is_valid_liquid_id(clpacket->liquid_id)) {
+        auto result80 = this->root().logger().warn("WorldServer: dropped CollectLiquid with invalid liquid id {} from client {}", clpacket->liquid_id, clientId);
         if (!result80)
           return std::unexpected(std::move(result80.error()));
         continue;
       }
-      auto result81 = collect_liquid(clpacket->tilePositions, clpacket->liquidId);
+      auto result81 = collect_liquid(clpacket->tile_positions, clpacket->liquid_id);
       if (!result81)
         return std::unexpected(std::move(result81.error()));
       if (auto item = std::move(*result81))
@@ -988,11 +988,11 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
     } else if (auto sepacket = as<SpawnEntityPacket>(packet)) {
       auto acceptEntity = [&, &world = *this]() -> std::expected<void, StarException> {
       auto netRules = clientInfo->clientState->netCompatibilityRules();
-      auto result82 = entityFactory->net_load_entity(sepacket->entityType, std::move(sepacket->storeData), netRules);
+      auto result82 = entityFactory->net_load_entity(sepacket->entity_type, sepacket->store_data, netRules);
       if (!result82)
       return std::unexpected(std::move(result82.error()));
       auto entity = std::move(*result82);
-      auto result83 = entity->read_net_state(std::move(sepacket->firstNetState), 0.0f, netRules);
+      auto result83 = entity->read_net_state(sepacket->first_net_state, 0.0f, netRules);
       if (!result83)
       return std::unexpected(std::move(result83.error()));
       auto result84 = world.addEntity(std::move(entity));
@@ -1008,7 +1008,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           return std::unexpected(std::move(logged.error()));
       }
     } else if (auto request_drop = as<RequestDropPacket>(packet)) {
-      if (auto drop = m_entityMap->get<ItemDrop>(request_drop->dropEntityId); drop && drop->isMaster()) {
+      if (auto drop = m_entityMap->get<ItemDrop>(request_drop->drop_entity_id); drop && drop->isMaster()) {
         auto taken = drop->take_by(clientInfo->clientState->playerId());
         if (!taken)
           return std::unexpected(std::move(taken.error()));
@@ -1016,25 +1016,25 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           clientInfo->outgoingPackets.push_back(std::make_shared<GiveItemPacket>((*taken)->descriptor()));
       }
     } else if (auto hit = as<HitRequestPacket>(packet)) {
-      auto owner = hit->remoteHitRequest.destination_connection();
+      auto owner = hit->remote_hit_request.destination_connection();
       if (!owner)
         return std::unexpected(WorldServerException("Hit request has no owning connection"));
       if (*owner == server_connection_id) {
-        auto result86 = m_damageManager->push_remote_hit_request(hit->remoteHitRequest);
+        auto result86 = m_damageManager->push_remote_hit_request(hit->remote_hit_request);
         if (!result86)
           return std::unexpected(std::move(result86.error()));
       } else {
         auto destination = m_clientInfo.get(*owner);
         if (!destination)
           return std::unexpected(std::move(destination.error()));
-        destination->get()->outgoingPackets.push_back(std::make_shared<HitRequestPacket>(hit->remoteHitRequest));
+        destination->get()->outgoingPackets.push_back(std::make_shared<HitRequestPacket>(hit->remote_hit_request));
       }
     } else if (auto damage = as<DamageRequestPacket>(packet)) {
-      auto owner = damage->remoteDamageRequest.destination_connection();
+      auto owner = damage->remote_damage_request.destination_connection();
       if (!owner)
         return std::unexpected(WorldServerException("Damage request has no owning connection"));
       if (*owner == server_connection_id) {
-        auto result87 = m_damageManager->push_remote_damage_request(damage->remoteDamageRequest);
+        auto result87 = m_damageManager->push_remote_damage_request(damage->remote_damage_request);
         if (!result87)
           return std::unexpected(std::move(result87.error()));
       } else {
@@ -1042,16 +1042,16 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         if (!destination)
           return std::unexpected(std::move(destination.error()));
         destination->get()->outgoingPackets.push_back(
-          std::make_shared<DamageRequestPacket>(damage->remoteDamageRequest));
+          std::make_shared<DamageRequestPacket>(damage->remote_damage_request));
       }
     } else if (auto damage = as<DamageNotificationPacket>(packet)) {
-      auto result88 = m_damageManager->push_remote_damage_notification(damage->remoteDamageNotification);
+      auto result88 = m_damageManager->push_remote_damage_notification(damage->remote_damage_notification);
       if (!result88)
         return std::unexpected(std::move(result88.error()));
       for (auto const& pair : m_clientInfo) {
-        if (pair.first != clientId && pair.second->needsDamageNotification(damage->remoteDamageNotification))
+        if (pair.first != clientId && pair.second->needsDamageNotification(damage->remote_damage_notification))
           pair.second->outgoingPackets.push_back(
-            std::make_shared<DamageNotificationPacket>(damage->remoteDamageNotification));
+            std::make_shared<DamageNotificationPacket>(damage->remote_damage_notification));
       }
     } else if (auto entity_interact = as<EntityInteractPacket>(packet)) {
       auto target_owner = connection_for_entity(entity_interact->interact_request.target_id);
@@ -1087,26 +1087,26 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       auto const& forward_client_info = result93->get();
       forward_client_info->outgoingPackets.push_back(interact_result);
     } else if (auto entityCreate = as<EntityCreatePacket>(packet)) {
-      auto legalEntityId = entity_id_in_space(entityCreate->entityId, clientInfo->clientId);
+      auto legalEntityId = entity_id_in_space(entityCreate->entity_id, clientInfo->clientId);
       if (!legalEntityId)
         return std::unexpected(std::move(legalEntityId.error()));
       if (!*legalEntityId) {
-        return std::unexpected(WorldServerException::format("WorldServer received entity create packet with illegal entity id {}.", entityCreate->entityId));
+        return std::unexpected(WorldServerException::format("WorldServer received entity create packet with illegal entity id {}.", entityCreate->entity_id));
       } else {
         auto acceptEntity = [&, &world = *this]() -> std::expected<void, StarException> {
-          if (world.m_entityMap->entity(entityCreate->entityId)) {
-            auto logged = world.root().logger().error("WorldServer received duplicate entity create packet from client, deleting old entity {}", entityCreate->entityId);
+          if (world.m_entityMap->entity(entityCreate->entity_id)) {
+            auto logged = world.root().logger().error("WorldServer received duplicate entity create packet from client, deleting old entity {}", entityCreate->entity_id);
             if (!logged)
               return std::unexpected(std::move(logged.error()));
-            if (auto result = world.removeEntity(entityCreate->entityId, false); !result)
+            if (auto result = world.removeEntity(entityCreate->entity_id, false); !result)
               return std::unexpected(std::move(result.error()));
           }
           auto netRules = clientInfo->clientState->netCompatibilityRules();
-          auto loaded = entityFactory->net_load_entity(entityCreate->entityType, entityCreate->storeData, netRules);
+          auto loaded = entityFactory->net_load_entity(entityCreate->entity_type, entityCreate->store_data, netRules);
           if (!loaded)
             return std::unexpected(std::move(loaded.error()));
           auto entity = std::move(*loaded);
-          if (auto result = entity->read_net_state(entityCreate->firstNetState, 0.0f, netRules); !result)
+          if (auto result = entity->read_net_state(entityCreate->first_net_state, 0.0f, netRules); !result)
             return std::unexpected(std::move(result.error()));
 
           bool published = false;
@@ -1117,7 +1117,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
               error = error.with_context(Star::format("Error uninitializing rejected slave entity: {}", result.error().what()));
             return std::unexpected(std::move(error));
           };
-          if (auto result = entity->init(world, entityCreate->entityId, EntityMode::Slave); !result)
+          if (auto result = entity->init(world, entityCreate->entity_id, EntityMode::Slave); !result)
             return reject(std::move(result.error()));
           if (auto result = world.m_entityMap->add_entity(entity); !result)
             return reject(std::move(result.error()));
@@ -1136,26 +1136,26 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
             return std::unexpected(std::move(logged.error()));
         }
       }
-    } else if (auto entityUpdateSet = as<EntityUpdateSetPacket>(packet)) {
-      float interpolation_lead_time = clientInfo->interpolation_tracker.interpolation_lead_time();
-      auto result102 = m_entityMap->for_all_entities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
-        EntityId entityId = entity->entityId();
-        if (connection_for_entity(entityId) == clientId) {
-          if constexpr (Star::debug_enabled) {
-            Star::star_assert_failed((entity->isSlave()));
-          }
-          auto result101 = entity->read_net_state(entityUpdateSet->deltas.value(entityId), interpolation_lead_time, clientInfo->clientState->netCompatibilityRules());
-          if (!result101)
-            return std::unexpected(std::move(result101.error()));
-        }
-        return {};
+    } else if (auto entity_update_set = as<EntityUpdateSetPacket>(packet)) {
+      auto const interpolation_lead_time = clientInfo->interpolation_tracker.interpolation_lead_time();
+      auto const rules = clientInfo->clientState->netCompatibilityRules();
+      auto const& deltas = entity_update_set->deltas;
+      ByteArray const empty_delta;
+      auto applied = m_entityMap->for_all_entities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
+        auto const entity_id = entity->entityId();
+        if (connection_for_entity(entity_id) != clientId)
+          return {};
+        if constexpr (Star::debug_enabled)
+          Star::star_assert_failed((entity->isSlave()));
+        auto const delta = deltas.find_ref(entity_id);
+        return entity->read_net_state(delta ? delta->get() : empty_delta, interpolation_lead_time, rules);
       });
-      if (!result102)
-        return std::unexpected(std::move(result102.error()));
+      if (!applied)
+        return std::unexpected(std::move(applied.error()));
       clientInfo->pendingForward = true;
     } else if (auto entityDestroy = as<EntityDestroyPacket>(packet)) {
-      if (auto entity = m_entityMap->entity(entityDestroy->entityId)) {
-        auto result103 = entity->read_net_state(entityDestroy->finalNetState, clientInfo->interpolation_tracker.interpolation_lead_time(), clientInfo->clientState->netCompatibilityRules());
+      if (auto entity = m_entityMap->entity(entityDestroy->entity_id)) {
+        auto result103 = entity->read_net_state(entityDestroy->final_net_state, clientInfo->interpolation_tracker.interpolation_lead_time(), clientInfo->clientState->netCompatibilityRules());
         if (!result103)
           return std::unexpected(std::move(result103.error()));
         // Before destroying the entity, we should make sure that the entity is
@@ -1163,20 +1163,20 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         auto result104 = entity->disable_interpolation();
         if (!result104)
           return std::unexpected(std::move(result104.error()));
-        auto result105 = removeEntity(entityDestroy->entityId, entityDestroy->death);
+        auto result105 = removeEntity(entityDestroy->entity_id, entityDestroy->death);
         if (!result105)
           return std::unexpected(std::move(result105.error()));
       }
     } else if (auto disconnectWires = as<DisconnectAllWiresPacket>(packet)) {
-      auto result106 = atTile<WireEntity>(disconnectWires->entityPosition);
+      auto result106 = atTile<WireEntity>(disconnectWires->entity_position);
       if (!result106)
         return std::unexpected(std::move(result106.error()));
       for (auto const& wireEntity : std::move(*result106)) {
-        auto result107 = wireEntity->connectionsForNode(disconnectWires->wireNode);
+        auto result107 = wireEntity->connectionsForNode(disconnectWires->wire_node);
         if (!result107)
           return std::unexpected(std::move(result107.error()));
         for (auto connection : std::move(*result107)) {
-          auto result108 = wireEntity->removeNodeConnection(disconnectWires->wireNode, connection);
+          auto result108 = wireEntity->removeNodeConnection(disconnectWires->wire_node, connection);
           if (!result108)
             return std::unexpected(std::move(result108.error()));
           auto result109 = atTile<WireEntity>(connection.entityLocation);
@@ -1184,41 +1184,41 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
             return std::unexpected(std::move(result109.error()));
           for (auto const& connectedEntity : std::move(*result109)) {
             auto result110 = connectedEntity->removeNodeConnection(
-              {.direction = otherWireDirection(disconnectWires->wireNode.direction), .nodeIndex = connection.nodeIndex},
-              WireConnection{.entityLocation = disconnectWires->entityPosition,
-                             .nodeIndex = disconnectWires->wireNode.nodeIndex});
+              {.direction = otherWireDirection(disconnectWires->wire_node.direction), .nodeIndex = connection.nodeIndex},
+              WireConnection{.entityLocation = disconnectWires->entity_position,
+                             .nodeIndex = disconnectWires->wire_node.nodeIndex});
             if (!result110)
               return std::unexpected(std::move(result110.error()));
           }
         }
       }
     } else if (auto connectWire = as<ConnectWirePacket>(packet)) {
-      auto result111 = atTile<WireEntity>(connectWire->inputConnection.entityLocation);
+      auto result111 = atTile<WireEntity>(connectWire->input_connection.entityLocation);
       if (!result111)
         return std::unexpected(std::move(result111.error()));
       for (auto const& source : std::move(*result111)) {
-        auto result112 = atTile<WireEntity>(connectWire->outputConnection.entityLocation);
+        auto result112 = atTile<WireEntity>(connectWire->output_connection.entityLocation);
         if (!result112)
           return std::unexpected(std::move(result112.error()));
         for (auto const& target : std::move(*result112)) {
           auto result113 = source->addNodeConnection(
-            WireNode{.direction = WireDirection::Input, .nodeIndex = connectWire->inputConnection.nodeIndex},
-            connectWire->outputConnection);
+            WireNode{.direction = WireDirection::Input, .nodeIndex = connectWire->input_connection.nodeIndex},
+            connectWire->output_connection);
           if (!result113)
             return std::unexpected(std::move(result113.error()));
           auto result114 = target->addNodeConnection(
-            WireNode{.direction = WireDirection::Output, .nodeIndex = connectWire->outputConnection.nodeIndex},
-            connectWire->inputConnection);
+            WireNode{.direction = WireDirection::Output, .nodeIndex = connectWire->output_connection.nodeIndex},
+            connectWire->input_connection);
           if (!result114)
             return std::unexpected(std::move(result114.error()));
         }
       }
     } else if (auto findUniqueEntity = as<FindUniqueEntityPacket>(packet)) {
-      auto result115 = m_worldStorage->findUniqueEntity(findUniqueEntity->uniqueEntityId);
+      auto result115 = m_worldStorage->findUniqueEntity(findUniqueEntity->unique_entity_id);
       if (!result115)
         return std::unexpected(std::move(result115.error()));
       clientInfo->outgoingPackets.push_back(
-        std::make_shared<FindUniqueEntityResponsePacket>(findUniqueEntity->uniqueEntityId, std::move(*result115)));
+        std::make_shared<FindUniqueEntityResponsePacket>(findUniqueEntity->unique_entity_id, std::move(*result115)));
     } else if (auto entityMessagePacket = as<EntityMessagePacket>(packet)) {
       auto rejectMessage = [&](String const& reason) -> std::expected<void, StarException> {
         auto logged = root.logger().warn("WorldServer: rejecting EntityMessage '{}' from client {}: {}",
@@ -1281,9 +1281,9 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         continue;
 
       std::shared_ptr<Entity> entity;
-      if (std::holds_alternative<EntityId>(entityMessagePacket->entityId))
-        entity = m_entityMap->entity(std::get<EntityId>(entityMessagePacket->entityId)); else {
-        auto result137 = loadUniqueEntity(std::get<String>(entityMessagePacket->entityId));
+      if (std::holds_alternative<EntityId>(entityMessagePacket->entity_id))
+        entity = m_entityMap->entity(std::get<EntityId>(entityMessagePacket->entity_id)); else {
+        auto result137 = loadUniqueEntity(std::get<String>(entityMessagePacket->entity_id));
         if (!result137)
           return std::unexpected(std::move(result137.error()));
         entity = m_entityMap->entity(std::move(*result137));
@@ -1322,7 +1322,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
         } else if (auto destination = m_clientInfo.value(*owner)) {
           // Client-generated UUIDs are scoped to the requester; the owner sees a world-unique route.
           entityMessagePacket->uuid = register_entity_reply({*owner, ClientEntityReply{clientId, entityMessagePacket->uuid}});
-          entityMessagePacket->fromConnection = clientId;
+          entityMessagePacket->from_connection = clientId;
           destination->outgoingPackets.push_back(std::move(entityMessagePacket));
         } else {
           clientInfo->outgoingPackets.push_back(std::make_shared<EntityMessageResponsePacket>(
@@ -1365,7 +1365,7 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       clientInfo->outgoingPackets.push_back(std::make_shared<PongPacket>(pingPacket->time));
     } else if (auto updateWorldProperties = as<UpdateWorldPropertiesPacket>(packet)) {
       // Kae: Properties set to null (nil from Lua) should be erased instead of lingering around
-      for (auto&& pair : updateWorldProperties->updatedProperties) {
+      for (auto&& pair : updateWorldProperties->updated_properties) {
         if (pair.second.is_null())
           m_worldProperties.erase(pair.first); else {
           m_worldProperties[pair.first] = pair.second;
@@ -1373,13 +1373,13 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       }
       for (auto const& pair : m_clientInfo)
         pair.second->outgoingPackets.push_back(
-          std::make_shared<UpdateWorldPropertiesPacket>(updateWorldProperties->updatedProperties));
+          std::make_shared<UpdateWorldPropertiesPacket>(updateWorldProperties->updated_properties));
     } else if (auto updateWorldTemplate = as<UpdateWorldTemplatePacket>(packet)) {
       if (!clientInfo->admin)
         continue;
       // nuh-uh!
 
-      auto result143 = WorldTemplate::create(this->root(), updateWorldTemplate->templateData);
+      auto result143 = WorldTemplate::create(this->root(), updateWorldTemplate->template_data);
       if (!result143)
         return std::unexpected(std::move(result143.error()));
       auto newWorldTemplate = std::move(*result143);

@@ -705,7 +705,7 @@ bool expect_forwarded_origin(GameTest& fixture, WorldServer& server, WorldClient
   auto stamped = as<EntityMessagePacket>(forwarded->front());
   if (!fixture.check(bool(stamped), "owner received the forwarded entity message"))
     return false;
-  fixture.check(stamped->fromConnection == sender, "forwarded origin is the authenticated sender");
+  fixture.check(stamped->from_connection == sender, "forwarded origin is the authenticated sender");
   if (!fixture.check(bool(owner.handleIncomingPackets(*forwarded)), "owner accepts the forwarded request"))
     return false;
   auto owner_replies = owner.getOutgoingPackets();
@@ -786,7 +786,7 @@ void check_origin_messages(GameTest& fixture, WorldServer& server, WorldClient& 
   auto request = as<EntityMessagePacket>(requests->front());
   if (!fixture.check(bool(request), "server queued an entity message"))
     return;
-  fixture.check(request->fromConnection == server_connection_id, "server-originated packet identifies the server");
+  fixture.check(request->from_connection == server_connection_id, "server-originated packet identifies the server");
   if (!fixture.check(bool(owner.handleIncomingPackets(*requests)), "owner accepts server request"))
     return;
   if (!fixture.check(bool(server.handleIncomingPackets(origin_owner, owner.getOutgoingPackets())),

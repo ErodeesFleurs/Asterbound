@@ -640,8 +640,8 @@ if (!result1229) return std::unexpected(std::move(result1229.error()));
 return std::move(*result1229);
 }
 
-std::expected<void, StarException> Vehicle::read_net_state(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  return m_netGroup.read_net_state(std::move(data), interpolationTime, rules);
+std::expected<void, StarException> Vehicle::read_net_state(ByteArray const& data, float interpolation_time, NetCompatibilityRules rules) {
+  return m_netGroup.read_net_state(data, interpolation_time, rules);
 }
 
 std::expected<void, StarException> Vehicle::enable_interpolation(float extrapolation_hint) {

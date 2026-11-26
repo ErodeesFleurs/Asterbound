@@ -2976,7 +2976,7 @@ namespace LuaBindings {
     auto type = packet_type_from_name(packetType);
     if (!type)
       return std::unexpected(std::move(type.error()));
-    auto packetResult = createPacket(world.root().random(), *type, packetData);
+    auto packetResult = create_packet(world.root().random(), *type, packetData);
     if (!packetResult)
       return std::unexpected(std::move(packetResult.error()));
     auto packet = std::move(*packetResult);

@@ -848,7 +848,7 @@ const GameTestRegistration item_drop_merge("ItemTest", "MergeTransfersOneWholeSt
   auto replica = ItemDrop::create(**root, std::move(*store));
   if (!fixture.check(replica && *replica && (*replica)->init(*world, 100, EntityMode::Slave), "initialize receiver replica")) return;
   auto uninit = make_scope_exit([&] { fixture.check(bool((*replica)->uninit()), "uninitialize receiver replica"); });
-  if (!fixture.check((*replica)->read_net_state(std::move(baseline->first)) && (*replica)->update(dt, 0)
+  if (!fixture.check((*replica)->read_net_state(baseline->first) && (*replica)->update(dt, 0)
       && (*replica)->item()->count() == 2, "read original replica count")) return;
   if (!fixture.check(bool(receiver->update(dt, 0)), "run one deterministic merge tick")) return;
   fixture.check(receiver->item()->count() == total && source.item()->empty() && !other.item()->empty(),
@@ -858,7 +858,7 @@ const GameTestRegistration item_drop_merge("ItemTest", "MergeTransfersOneWholeSt
   script(source, "return calls == 1");
   script(other, "return calls == nil");
   auto delta = receiver->write_net_state(baseline->second);
-  fixture.check(delta && (*replica)->read_net_state(std::move(delta->first)) && (*replica)->update(dt, 1)
+  fixture.check(delta && (*replica)->read_net_state(delta->first) && (*replica)->update(dt, 1)
       && (*replica)->item()->count() == total, "receiver count replicates in the incremental state");
 
   auto full = make_drop(Vec2F(2, 1040), 3);

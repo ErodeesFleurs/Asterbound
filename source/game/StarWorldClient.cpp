@@ -1576,24 +1576,24 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       if (!result97)
         return std::unexpected(std::move(result97.error()));
     } else if (auto entityCreate = as<EntityCreatePacket>(packet)) {
-      if (m_entityMap->entity(entityCreate->entityId)) {
-        auto result98 = this->root().logger().error("WorldClient received entity create packet with duplicate entity id {}, deleting old entity.", entityCreate->entityId);
+      if (m_entityMap->entity(entityCreate->entity_id)) {
+        auto result98 = this->root().logger().error("WorldClient received entity create packet with duplicate entity id {}, deleting old entity.", entityCreate->entity_id);
         if (!result98)
           return std::unexpected(std::move(result98.error()));
-        auto result99 = removeEntity(entityCreate->entityId, false);
+        auto result99 = removeEntity(entityCreate->entity_id, false);
         if (!result99)
           return std::unexpected(std::move(result99.error()));
       }
       
       auto netRules = m_clientState->netCompatibilityRules();
-      auto result100 = entityFactory->net_load_entity(entityCreate->entityType, entityCreate->storeData, netRules);
+      auto result100 = entityFactory->net_load_entity(entityCreate->entity_type, entityCreate->store_data, netRules);
       if (!result100)
         return std::unexpected(std::move(result100.error()));
       auto entity = (std::move(*result100));
-      auto result101 = entity->read_net_state(entityCreate->firstNetState, 0.0f, netRules);
+      auto result101 = entity->read_net_state(entityCreate->first_net_state, 0.0f, netRules);
       if (!result101)
         return std::unexpected(std::move(result101.error()));
-      auto result102 = entity->init(*this, entityCreate->entityId, EntityMode::Slave);
+      auto result102 = entity->init(*this, entityCreate->entity_id, EntityMode::Slave);
       if (!result102)
         return std::unexpected(std::move(result102.error()));
       auto result103 = m_entityMap->add_entity(entity);
@@ -1611,31 +1611,31 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         
         // Delay appearance of new slaved entities to match with interplation
         // state.
-        m_startupHiddenEntities.add(entityCreate->entityId);
-        timer(m_interpolation_tracker.interpolation_lead_time(), [&self = *this, entityId = entityCreate->entityId](World&)  -> std::expected<void, StarException> {
+        m_startupHiddenEntities.add(entityCreate->entity_id);
+        timer(m_interpolation_tracker.interpolation_lead_time(), [&self = *this, entityId = entityCreate->entity_id](World&)  -> std::expected<void, StarException> {
           self.m_startupHiddenEntities.remove(entityId);
           return {};
         });
       }
-    } else if (auto entityUpdateSet = as<EntityUpdateSetPacket>(packet)) {
-      float interpolation_lead_time = m_interpolation_tracker.interpolation_lead_time();
-      auto result106 = m_entityMap->for_all_entities([&, &self = *this](std::shared_ptr<Entity> const& entity)  -> std::expected<void, StarException> {
-              EntityId entityId = entity->entityId();
-              if (connection_for_entity(entityId) == entityUpdateSet->forConnection) {
-                if (Star::debug_enabled) {
-                  Star::star_assert_failed((entity->isSlave()));
-                }
-                auto result105 = entity->read_net_state(entityUpdateSet->deltas.value(entityId), interpolation_lead_time, self.m_clientState->netCompatibilityRules());
-                if (!result105)
-                  return std::unexpected(std::move(result105.error()));
-              }
-              return {};
-            });
-      if (!result106)
-        return std::unexpected(std::move(result106.error()));
+    } else if (auto entity_update_set = as<EntityUpdateSetPacket>(packet)) {
+      auto const interpolation_lead_time = m_interpolation_tracker.interpolation_lead_time();
+      auto const rules = m_clientState->netCompatibilityRules();
+      auto const& deltas = entity_update_set->deltas;
+      ByteArray const empty_delta;
+      auto applied = m_entityMap->for_all_entities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
+        auto const entity_id = entity->entityId();
+        if (connection_for_entity(entity_id) != entity_update_set->for_connection)
+          return {};
+        if constexpr (Star::debug_enabled)
+          Star::star_assert_failed((entity->isSlave()));
+        auto const delta = deltas.find_ref(entity_id);
+        return entity->read_net_state(delta ? delta->get() : empty_delta, interpolation_lead_time, rules);
+      });
+      if (!applied)
+        return std::unexpected(std::move(applied.error()));
     } else if (auto entityDestroy = as<EntityDestroyPacket>(packet)) {
-      if (auto entity = m_entityMap->entity(entityDestroy->entityId)) {
-        auto result107 = entity->read_net_state(entityDestroy->finalNetState, m_interpolation_tracker.interpolation_lead_time(), m_clientState->netCompatibilityRules());
+      if (auto entity = m_entityMap->entity(entityDestroy->entity_id)) {
+        auto result107 = entity->read_net_state(entityDestroy->final_net_state, m_interpolation_tracker.interpolation_lead_time(), m_clientState->netCompatibilityRules());
         if (!result107)
           return std::unexpected(std::move(result107.error()));
         
@@ -1645,11 +1645,11 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         if (m_interpolation_tracker.interpolation_enabled() && entityDestroy->death) {
           // Delay death packets by the interpolation step to give time for
           // interpolation to catch up.
-          timer(m_interpolation_tracker.interpolation_lead_time(), [&self = *this, entity, entityDestroy](World&)  -> std::expected<void, StarException> {
+          timer(m_interpolation_tracker.interpolation_lead_time(), [&self = *this, entity, entity_id = entityDestroy->entity_id](World&) -> std::expected<void, StarException> {
             auto result108 = entity->disable_interpolation();
             if (!result108)
               return std::unexpected(std::move(result108.error()));
-            auto result109 = self.removeEntity(entityDestroy->entityId, entityDestroy->death);
+            auto result109 = self.removeEntity(entity_id, true);
             if (!result109)
               return std::unexpected(std::move(result109.error()));
             return {};
@@ -1658,13 +1658,13 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
           auto result110 = entity->disable_interpolation();
           if (!result110)
             return std::unexpected(std::move(result110.error()));
-          auto result111 = removeEntity(entityDestroy->entityId, entityDestroy->death);
+          auto result111 = removeEntity(entityDestroy->entity_id, entityDestroy->death);
           if (!result111)
             return std::unexpected(std::move(result111.error()));
         }
       }
     } else if (auto structurePacket = as<CentralStructureUpdatePacket>(packet)) {
-      auto result112 = WorldStructure::create(structurePacket->structureData);
+      auto result112 = WorldStructure::create(structurePacket->structure_data);
       if (!result112)
         return std::unexpected(std::move(result112.error()));
       m_centralStructure = (std::move(*result112));
@@ -1699,9 +1699,9 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
     } else if (auto tileDamageUpdate = as<TileDamageUpdatePacket>(packet)) {
       if (auto tile = m_tileArray->modify_tile(tileDamageUpdate->position)) {
         if (tileDamageUpdate->layer == TileLayer::Foreground) {
-          tile->get().foregroundDamage = tileDamageUpdate->tileDamage;
+          tile->get().foregroundDamage = tileDamageUpdate->tile_damage;
         } else {
-          tile->get().backgroundDamage = tileDamageUpdate->tileDamage;
+          tile->get().backgroundDamage = tileDamageUpdate->tile_damage;
         }
         
         m_damagedBlocks.add(tileDamageUpdate->position);
@@ -1804,7 +1804,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
     } else if (auto step_update = as<StepUpdatePacket>(packet)) {
       m_interpolation_tracker.receive_time_update(step_update->remote_time);
     } else if (auto environmentUpdatePacket = as<EnvironmentUpdatePacket>(packet)) {
-      auto result124 = m_sky->readUpdate(environmentUpdatePacket->skyDelta, m_clientState->netCompatibilityRules());
+      auto result124 = m_sky->readUpdate(environmentUpdatePacket->sky_delta, m_clientState->netCompatibilityRules());
       if (!result124)
         return std::unexpected(std::move(result124.error()));
       auto result125 = currentWeatherDomain();
@@ -1817,24 +1817,24 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
           return std::unexpected(std::move(result126.error()));
         m_weatherDomain = std::exchange(weatherDomain, {});
       }
-      auto result127 = m_weather->readUpdate(environmentUpdatePacket->weatherDelta, m_clientState->netCompatibilityRules());
+      auto result127 = m_weather->readUpdate(environmentUpdatePacket->weather_delta, m_clientState->netCompatibilityRules());
       if (!result127)
         return std::unexpected(std::move(result127.error()));
     } else if (auto hit = as<HitRequestPacket>(packet)) {
-      auto result128 = m_damageManager->push_remote_hit_request(hit->remoteHitRequest);
+      auto result128 = m_damageManager->push_remote_hit_request(hit->remote_hit_request);
       if (!result128)
         return std::unexpected(std::move(result128.error()));
     } else if (auto damage = as<DamageRequestPacket>(packet)) {
-      auto result129 = m_damageManager->push_remote_damage_request(damage->remoteDamageRequest);
+      auto result129 = m_damageManager->push_remote_damage_request(damage->remote_damage_request);
       if (!result129)
         return std::unexpected(std::move(result129.error()));
     } else if (auto damage = as<DamageNotificationPacket>(packet)) {
-      std::string_view view = damage->remoteDamageNotification.damage_notification.target_material_kind.utf8();
+      std::string_view view = damage->remote_damage_notification.damage_notification.target_material_kind.utf8();
       constexpr auto full_size = secret_broadcast_prefix.size() + Curve25519::signature_size;
       constexpr auto legacy_full_size = legacy_voice_prefix.size() + Curve25519::signature_size;
 
       if (view.size() >= full_size && view.starts_with(secret_broadcast_prefix)) {
-        if (auto player = m_entityMap->get<Player>(damage->remoteDamageNotification.source_entity_id)) {
+        if (auto player = m_entityMap->get<Player>(damage->remote_damage_notification.source_entity_id)) {
           auto public_key = player->getSecretPropertyView(secret_broadcast_public_key);
           auto signature = view.substr(secret_broadcast_prefix.size(), Curve25519::signature_size);
           auto raw_broadcast = view.substr(full_size);
@@ -1848,7 +1848,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         }
       } else if (view.size() > legacy_full_size && view.starts_with(legacy_voice_prefix)) {
         // Preserve StarExtensions' signed voice framing on vanilla servers.
-        if (auto player = m_entityMap->get<Player>(damage->remoteDamageNotification.source_entity_id)) {
+        if (auto player = m_entityMap->get<Player>(damage->remote_damage_notification.source_entity_id)) {
           auto public_key = player->effectsAnimator()->globalTag(legacy_voice_public_key);
           auto signature = view.substr(legacy_voice_prefix.size(), Curve25519::signature_size);
           auto raw = view.substr(legacy_full_size);
@@ -1863,15 +1863,15 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
           }
         }
       } else {
-        auto result132 = m_damageManager->push_remote_damage_notification(damage->remoteDamageNotification);
+        auto result132 = m_damageManager->push_remote_damage_notification(damage->remote_damage_notification);
         if (!result132)
           return std::unexpected(std::move(result132.error()));
       }
     } else if (auto incoming = packet ? as_ref<EntityMessagePacket>(std::as_const(*packet)) : std::nullopt) {
       auto const& request = incoming->get();
-      auto entity = std::holds_alternative<EntityId>(request.entityId)
-          ? m_entityMap->entity(std::get<EntityId>(request.entityId))
-          : m_entityMap->unique_entity(std::get<String>(request.entityId));
+      auto entity = std::holds_alternative<EntityId>(request.entity_id)
+          ? m_entityMap->entity(std::get<EntityId>(request.entity_id))
+          : m_entityMap->unique_entity(std::get<String>(request.entity_id));
 
       if (!entity) {
         m_outgoingPackets.push_back(std::make_shared<EntityMessageResponsePacket>(
@@ -1884,7 +1884,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
           std::unexpected(String("Entity delivery error")), request.uuid));
       } else {
         std::weak_ptr const request_world = m_entityMap;
-        auto received = entity->receive_message(request.fromConnection, request.message, request.args);
+        auto received = entity->receive_message(request.from_connection, request.message, request.args);
         if (!received)
           return std::unexpected(std::move(received.error()));
         // A handler can reenter and change worlds. Never answer an old world's request in the new one.
@@ -1912,7 +1912,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       }
     } else if (auto updateWorldProperties = as<UpdateWorldPropertiesPacket>(packet)) {
       // Kae: Properties set to null (nil from Lua) should be erased instead of lingering around
-      for (auto&& pair : updateWorldProperties->updatedProperties) {
+      for (auto&& pair : updateWorldProperties->updated_properties) {
         if (pair.second.is_null()) {
           m_worldProperties.erase(pair.first);
         } else {
@@ -1920,18 +1920,18 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         }
       }
     } else if (auto updateTileProtection = as<UpdateTileProtectionPacket>(packet)) {
-      setTileProtection(updateTileProtection->dungeonId, updateTileProtection->isProtected);
+      setTileProtection(updateTileProtection->dungeon_id, updateTileProtection->is_protected);
     } else if (auto setDungeonGravity = as<SetDungeonGravityPacket>(packet)) {
       if (setDungeonGravity->gravity) {
-        m_dungeonIdGravity[setDungeonGravity->dungeonId] = *setDungeonGravity->gravity;
+        m_dungeonIdGravity[setDungeonGravity->dungeon_id] = *setDungeonGravity->gravity;
       } else {
-        m_dungeonIdGravity.remove(setDungeonGravity->dungeonId);
+        m_dungeonIdGravity.remove(setDungeonGravity->dungeon_id);
       }
     } else if (auto setDungeonBreathable = as<SetDungeonBreathablePacket>(packet)) {
       if (setDungeonBreathable->breathable.has_value()) {
-        m_dungeonIdBreathable[setDungeonBreathable->dungeonId] = *setDungeonBreathable->breathable;
+        m_dungeonIdBreathable[setDungeonBreathable->dungeon_id] = *setDungeonBreathable->breathable;
       } else {
-        m_dungeonIdBreathable.remove(setDungeonBreathable->dungeonId);
+        m_dungeonIdBreathable.remove(setDungeonBreathable->dungeon_id);
       }
     } else if (auto incoming = as<EntityInteractPacket>(packet)) {
       auto promise = interact(incoming->interact_request);
@@ -1949,12 +1949,12 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
           return std::unexpected(std::move(delivered.error()));
       }
     } else if (auto setPlayerStart = as<SetPlayerStartPacket>(packet)) {
-      m_playerStart = setPlayerStart->playerStart;
-      m_respawnInWorld = setPlayerStart->respawnInWorld;
+      m_playerStart = setPlayerStart->player_start;
+      m_respawnInWorld = setPlayerStart->respawn_in_world;
     } else if (auto findUniqueEntityResponse = as<FindUniqueEntityResponsePacket>(packet)) {
-      for (auto& promise : std::exchange(m_findUniqueEntityResponses[findUniqueEntityResponse->uniqueEntityId], {})) {
-        if (findUniqueEntityResponse->entityPosition) {
-          auto result145 = promise.fulfill(*findUniqueEntityResponse->entityPosition);
+      for (auto& promise : std::exchange(m_findUniqueEntityResponses[findUniqueEntityResponse->unique_entity_id], {})) {
+        if (findUniqueEntityResponse->entity_position) {
+          auto result145 = promise.fulfill(*findUniqueEntityResponse->entity_position);
           if (!result145)
             return std::unexpected(std::move(result145.error()));
         } else {
@@ -1964,12 +1964,12 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
         }
       }
     } else if (auto worldLayoutUpdate = as<WorldLayoutUpdatePacket>(packet)) {
-      auto result147 = WorldLayout::create(this->root(), worldLayoutUpdate->layoutData);
+      auto result147 = WorldLayout::create(this->root(), worldLayoutUpdate->layout_data);
       if (!result147)
         return std::unexpected(std::move(result147.error()));
       m_worldTemplate->setWorldLayout((std::move(*result147)));
     } else if (auto worldParametersUpdate = as<WorldParametersUpdatePacket>(packet)) {
-      auto result148 = net_load_visitable_world_parameters(worldParametersUpdate->parametersData);
+      auto result148 = net_load_visitable_world_parameters(worldParametersUpdate->parameters_data);
       if (!result148)
         return std::unexpected(std::move(result148.error()));
       auto result149 = m_worldTemplate->setWorldParameters((std::move(*result148)));
@@ -2777,7 +2777,7 @@ std::expected<void, StarException> WorldClient::queueUpdatePackets(bool sendEnti
   
   if (sendEntityUpdates) {
     auto entityUpdateSet = std::make_shared<EntityUpdateSetPacket>();
-    entityUpdateSet->forConnection = *m_clientId;
+    entityUpdateSet->for_connection = *m_clientId;
     auto netRules = m_clientState->netCompatibilityRules();
     auto result210 = m_entityMap->for_all_entities(
       [&, &self = *this](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
@@ -3241,12 +3241,12 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
     m_interpolation_tracker = std::move(*tracker);
     m_entity_update_timer = GameTimer(m_interpolation_tracker.entity_update_delta());
     
-    m_clientId = startPacket.clientId;
-    auto result257 = connection_entity_space(startPacket.clientId);
+    m_clientId = startPacket.client_id;
+    auto result257 = connection_entity_space(startPacket.client_id);
     if (!result257)
       return std::unexpected(std::move(result257.error()));
     auto entitySpace = (std::move(*result257));
-    auto result258 = WorldTemplate::create(this->root(), startPacket.templateData);
+    auto result258 = WorldTemplate::create(this->root(), startPacket.template_data);
     if (!result258)
       return std::unexpected(std::move(result258.error()));
     m_worldTemplate = (std::move(*result258));
@@ -3262,16 +3262,16 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
       }
       return std::cref(self.m_tileArray->tile(pos));
     };
-    m_damageManager = std::make_shared<DamageManager>(*this, startPacket.clientId);
-    m_playerStart = startPacket.playerRespawn;
-    m_respawnInWorld = startPacket.respawnInWorld;
-    auto result259 = startPacket.worldProperties.opt_object();
+    m_damageManager = std::make_shared<DamageManager>(*this, startPacket.client_id);
+    m_playerStart = startPacket.player_respawn;
+    m_respawnInWorld = startPacket.respawn_in_world;
+    auto result259 = startPacket.world_properties.opt_object();
     if (!result259)
       return std::unexpected(std::move(result259.error()));
     m_worldProperties = (std::move(*result259)).value_or(JsonObject{});
-    m_dungeonIdGravity = startPacket.dungeonIdGravity;
-    m_dungeonIdBreathable = startPacket.dungeonIdBreathable;
-    m_protectedDungeonIds = startPacket.protectedDungeonIds;
+    m_dungeonIdGravity = startPacket.dungeon_id_gravity;
+    m_dungeonIdBreathable = startPacket.dungeon_id_breathable;
+    m_protectedDungeonIds = startPacket.protected_dungeon_ids;
     
     m_geometry = WorldGeometry(m_worldTemplate->size());
     
@@ -3285,7 +3285,7 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
     if (!result261)
       return std::unexpected(std::move(result261.error()));
     m_sky = (std::move(*result261));
-    auto result262 = m_sky->readUpdate(startPacket.skyData, m_clientState->netCompatibilityRules());
+    auto result262 = m_sky->readUpdate(startPacket.sky_data, m_clientState->netCompatibilityRules());
     if (!result262)
       return std::unexpected(std::move(result262.error()));
     
@@ -3294,14 +3294,14 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
       return !is_real_material(tile.background) && !isSolidColliding(tile.getCollision());
     });
     {
-      auto result263 = m_worldTemplate->weatherLayerAt(Vec2I::floor(startPacket.playerStart));
+      auto result263 = m_worldTemplate->weatherLayerAt(Vec2I::floor(startPacket.player_start));
       if (!result263)
         return std::unexpected(std::move(result263.error()));
       if (auto layer = (std::move(*result263))) {
         m_weatherDomain = layer->get().domain;
       }
     }
-    auto result264 = m_weather->readUpdate(startPacket.weatherData, m_clientState->netCompatibilityRules());
+    auto result264 = m_weather->readUpdate(startPacket.weather_data, m_clientState->netCompatibilityRules());
     if (!result264)
       return std::unexpected(std::move(result264.error()));
     
@@ -3347,7 +3347,7 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
           return std::unexpected(std::move(result275.error()));
         }
       }
-      auto result276 = m_mainPlayer->moveTo(startPacket.playerStart);
+      auto result276 = m_mainPlayer->moveTo(startPacket.player_start);
       if (!result276)
         return std::unexpected(std::move(result276.error()));
       if (const auto& parameters = m_worldTemplate->worldParameters()) {
@@ -3421,7 +3421,7 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
 std::expected<void, StarException> WorldClient::initWorld(WorldStartPacket const& startPacket) {
   if (!m_headless) {
     auto const context = m_mainPlayer->client_context();
-    if (!context || context->connection_id() != startPacket.clientId)
+    if (!context || context->connection_id() != startPacket.client_id)
       return std::unexpected(WorldClientException("WorldStart client ID does not match ConnectSuccess"));
   }
   auto initialized = initializeWorld(startPacket);
@@ -3894,7 +3894,7 @@ bool WorldClient::sendSecretBroadcast(StringView broadcast, bool raw, bool compr
     return false;
 
   auto damageNotification = std::make_shared<DamageNotificationPacket>();
-  auto& remDmg = damageNotification->remoteDamageNotification;
+  auto& remDmg = damageNotification->remote_damage_notification;
   auto& dmg = remDmg.damage_notification;
 
   dmg.target_entity_id = dmg.source_entity_id = remDmg.source_entity_id = m_mainPlayer->entityId();
@@ -3915,7 +3915,7 @@ bool WorldClient::sendSecretBroadcast(StringView broadcast, bool raw, bool compr
   dmg.position = m_mainPlayer->position();
 
   if (!compress)
-    damageNotification->setCompressionMode(PacketCompressionMode::Disabled);
+    damageNotification->set_compression_mode(PacketCompressionMode::Disabled);
 
   m_outgoingPackets.emplace_back(std::move(damageNotification));
   return true;

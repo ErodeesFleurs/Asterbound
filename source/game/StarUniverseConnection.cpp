@@ -132,7 +132,7 @@ UniverseConnection& UniverseConnection::operator=(UniverseConnection&& rhs) {
 
 bool UniverseConnection::isOpen() const {
   std::lock_guard locker(m_mutex);
-  return m_packetSocket && m_packetSocket->isOpen();
+  return m_packetSocket && m_packetSocket->is_open();
 }
 
 void UniverseConnection::close() {
@@ -169,10 +169,10 @@ std::expected<bool, StarException> UniverseConnection::send() {
   std::lock_guard locker(m_mutex);
   if (!m_packetSocket)
     return std::unexpected(UniverseConnectionException("Cannot send on an empty connection"));
-  auto queued = m_packetSocket->sendPackets(std::exchange(m_sendQueue, {}));
+  auto queued = m_packetSocket->send_packets(std::exchange(m_sendQueue, {}));
   if (!queued)
     return std::unexpected(std::move(queued.error()));
-  return m_packetSocket->writeData();
+  return m_packetSocket->write_data();
 }
 
 std::expected<bool, StarException> UniverseConnection::sendAll(unsigned timeout) {
@@ -180,21 +180,21 @@ std::expected<bool, StarException> UniverseConnection::sendAll(unsigned timeout)
   std::unique_lock locker(m_mutex);
   if (!m_packetSocket)
     return std::unexpected(UniverseConnectionException("Cannot send on an empty connection"));
-  auto queued = m_packetSocket->sendPackets(std::exchange(m_sendQueue, {}));
+  auto queued = m_packetSocket->send_packets(std::exchange(m_sendQueue, {}));
   if (!queued)
     return std::unexpected(std::move(queued.error()));
   while (true) {
-    auto written = m_packetSocket->writeData();
+    auto written = m_packetSocket->write_data();
     if (!written)
       return std::unexpected(std::move(written.error()));
-    if (!m_packetSocket->sentPacketsPending())
+    if (!m_packetSocket->sent_packets_pending())
       return true;
-    if (std::chrono::steady_clock::now() >= deadline || !m_packetSocket->isOpen())
+    if (std::chrono::steady_clock::now() >= deadline || !m_packetSocket->is_open())
       return false;
 
     auto& socket = *m_packetSocket;
     locker.unlock();
-    auto waited = socket.waitForData(true, deadline);
+    auto waited = socket.wait_for_data(true, deadline);
     locker.lock();
     if (!waited)
       return std::unexpected(std::move(waited.error()));
@@ -205,10 +205,10 @@ std::expected<bool, StarException> UniverseConnection::receive() {
   std::lock_guard locker(m_mutex);
   if (!m_packetSocket)
     return std::unexpected(UniverseConnectionException("Cannot receive on an empty connection"));
-  auto received = m_packetSocket->readData();
+  auto received = m_packetSocket->read_data();
   if (!received)
     return std::unexpected(std::move(received.error()));
-  auto packets = m_packetSocket->receivePackets();
+  auto packets = m_packetSocket->receive_packets();
   if (!packets)
     return std::unexpected(std::move(packets.error()));
   m_receiveQueue.append_range(std::move(*packets));
@@ -223,21 +223,21 @@ std::expected<bool, StarException> UniverseConnection::receiveAny(unsigned timeo
   if (!m_receiveQueue.empty())
     return true;
   while (true) {
-    auto received = m_packetSocket->readData();
+    auto received = m_packetSocket->read_data();
     if (!received)
       return std::unexpected(std::move(received.error()));
-    auto packets = m_packetSocket->receivePackets();
+    auto packets = m_packetSocket->receive_packets();
     if (!packets)
       return std::unexpected(std::move(packets.error()));
     m_receiveQueue.append_range(std::move(*packets));
     if (!m_receiveQueue.empty())
       return true;
-    if (std::chrono::steady_clock::now() >= deadline || !m_packetSocket->isOpen())
+    if (std::chrono::steady_clock::now() >= deadline || !m_packetSocket->is_open())
       return false;
 
     auto& socket = *m_packetSocket;
     locker.unlock();
-    auto waited = socket.waitForData(false, deadline);
+    auto waited = socket.wait_for_data(false, deadline);
     locker.lock();
     if (!waited)
       return std::unexpected(std::move(waited.error()));
@@ -252,12 +252,12 @@ std::expected<std::reference_wrapper<PacketSocket>, StarException> UniverseConne
 
 std::optional<PacketStats> UniverseConnection::incomingStats() const {
   std::lock_guard locker(m_mutex);
-  return m_packetSocket->incomingStats();
+  return m_packetSocket->incoming_stats();
 }
 
 std::optional<PacketStats> UniverseConnection::outgoingStats() const {
   std::lock_guard locker(m_mutex);
-  return m_packetSocket->outgoingStats();
+  return m_packetSocket->outgoing_stats();
 }
 
 UniverseConnectionServer::UniverseConnectionServer(Logger& logger, PacketReceiveCallback packetReceiver, std::size_t numWorkerThreads)
@@ -320,21 +320,21 @@ std::expected<void, StarException> UniverseConnectionServer::processConnections(
     for (auto& p : connections) {
       ++handledCount;
       std::unique_lock connectionLocker(p.second->mutex);
-      if (!p.second->packetSocket || !p.second->packetSocket->isOpen())
+      if (!p.second->packetSocket || !p.second->packetSocket->is_open())
         continue;
       auto transmit = [&]() -> std::expected<void, StarException> {
-        auto queued = p.second->packetSocket->sendPackets(std::exchange(p.second->sendQueue, {}));
+        auto queued = p.second->packetSocket->send_packets(std::exchange(p.second->sendQueue, {}));
         if (!queued)
           return std::unexpected(std::move(queued.error()));
-        auto written = p.second->packetSocket->writeData();
+        auto written = p.second->packetSocket->write_data();
         if (!written)
           return std::unexpected(std::move(written.error()));
         dataTransmitted |= *written;
-        auto read = p.second->packetSocket->readData();
+        auto read = p.second->packetSocket->read_data();
         if (!read)
           return std::unexpected(std::move(read.error()));
         dataTransmitted |= *read;
-        auto packets = p.second->packetSocket->receivePackets();
+        auto packets = p.second->packetSocket->receive_packets();
         if (!packets)
           return std::unexpected(std::move(packets.error()));
         if (!packets->empty()) {
@@ -460,7 +460,7 @@ std::expected<bool, StarException> UniverseConnectionServer::connectionIsOpen(Co
   if (auto conn = m_connections[clientId % m_numWorkerThreads].value(clientId)) {
     std::lock_guard connectionLocker(conn->mutex);
     connectionsLocker.unlock();
-    return conn->packetSocket && conn->packetSocket->isOpen();
+    return conn->packetSocket && conn->packetSocket->is_open();
   }
 
   return std::unexpected(UniverseConnectionException::format("No such client '{}' in UniverseConnectionServer::connectionIsOpen", clientId));
@@ -549,7 +549,7 @@ std::expected<void, StarException> UniverseConnectionServer::enqueue_packet(Conn
   {
     std::lock_guard lock(connection->mutex);
     connections_lock.unlock();
-    if (!connection->packetSocket || !connection->packetSocket->isOpen())
+    if (!connection->packetSocket || !connection->packetSocket->is_open())
       return std::unexpected(UniverseConnectionException::format("Cannot enqueue a packet for closed client '{}'", client_id));
     connection->sendQueue.push_back(std::move(packet));
   }
@@ -565,11 +565,11 @@ std::expected<void, StarException> UniverseConnectionServer::sendPackets(Connect
     connectionsLocker.unlock();
     conn->sendQueue.append_range(std::move(packets));
 
-    if (conn->packetSocket && conn->packetSocket->isOpen()) {
-      auto queued = conn->packetSocket->sendPackets(std::exchange(conn->sendQueue, {}));
+    if (conn->packetSocket && conn->packetSocket->is_open()) {
+      auto queued = conn->packetSocket->send_packets(std::exchange(conn->sendQueue, {}));
       if (!queued)
         return std::unexpected(std::move(queued.error()));
-      auto written = conn->packetSocket->writeData();
+      auto written = conn->packetSocket->write_data();
       if (!written)
         return std::unexpected(std::move(written.error()));
     }

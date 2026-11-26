@@ -136,8 +136,8 @@ std::expected<ByteArray, StarException> WorldClientState::writeDelta() {
   return std::move(state->first);
 }
 
-std::expected<void, StarException> WorldClientState::readDelta(ByteArray delta) {
-  return m_netGroup.read_net_state(std::move(delta), 0.0f, m_netCompatibilityRules);
+std::expected<void, StarException> WorldClientState::readDelta(ByteArray const& delta) {
+  return m_netGroup.read_net_state(delta, 0.0f, m_netCompatibilityRules);
 }
 
 void WorldClientState::setNetCompatibilityRules(NetCompatibilityRules netCompatibilityRules) {

@@ -72,7 +72,7 @@ std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Entity::write_
   return std::pair<ByteArray, std::uint64_t>{ByteArray(), 0};
 }
 
-std::expected<void, StarException> Entity::read_net_state(ByteArray, float, NetCompatibilityRules) { return {}; }
+std::expected<void, StarException> Entity::read_net_state(ByteArray const&, float, NetCompatibilityRules) { return {}; }
 
 std::expected<void, StarException> Entity::enable_interpolation(float) { return {}; }
 
