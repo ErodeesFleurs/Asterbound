@@ -183,7 +183,7 @@ namespace Star::LuaBindings {
         float level,
         std::optional<std::uint64_t> seed,
         std::optional<JsonObject> const& parameters);
-    [[nodiscard]] std::expected<JsonArray, StarException> monsterPortrait(Root& root, String const& typeName, std::optional<JsonObject> const& parameters);
+    [[nodiscard]] std::expected<JsonArray, StarException> monster_portrait(Root& root, String const& type_name, std::optional<JsonObject> const& parameters);
     [[nodiscard]] std::expected<bool, StarException> isTreasurePool(Root& root, String const& pool);
     [[nodiscard]] std::expected<JsonArray, StarException> createTreasure(Root& root, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog, String const& pool, float level, std::optional<std::uint64_t> seed);
     enum class MaterialSound { Mining, Footstep };
@@ -404,8 +404,8 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
         callbacks
           .register_callback_with_signature<std::expected<JsonArray, StarException>, String, std::optional<JsonObject>>(
             "monsterPortrait",
-            [&root](String const& typeName, std::optional<JsonObject> const& parameters) {
-              return RootCallbacks::monsterPortrait(root, typeName, parameters);
+            [&root](String const& type_name, std::optional<JsonObject> const& parameters) {
+              return RootCallbacks::monster_portrait(root, type_name, parameters);
             });
       !r)
     return std::unexpected(std::move(r.error()));
@@ -615,26 +615,26 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
     return (*database)->liquid_id(liquid_name);
   }); !r) return std::unexpected(std::move(r.error()));
 
-  if (auto r = callbacks.register_callback("monsterSkillParameter", [&root](String const& skillName, String const& configParameterName) -> std::expected<Json, StarException> {
-    auto database = root.monsterDatabase();
+  if (auto r = callbacks.register_callback("monsterSkillParameter", [&root](String const& skill_name, String const& config_parameter_name) -> std::expected<Json, StarException> {
+    auto database = root.monster_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    return (*database)->skillConfigParameter(skillName, configParameterName);
+    return (*database)->skill_config_parameter(skill_name, config_parameter_name);
   }); !r) return std::unexpected(std::move(r.error()));
 
-  if (auto r = callbacks.register_callback("monsterParameters", [&root](String const& monsterType, std::optional<std::uint64_t> seed) -> std::expected<Json, StarException> {
-    auto database = root.monsterDatabase();
+  if (auto r = callbacks.register_callback("monsterParameters", [&root](String const& monster_type, std::optional<std::uint64_t> seed) -> std::expected<Json, StarException> {
+    auto database = root.monster_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    auto variant = (*database)->monsterVariant(monsterType, seed.value_or(0));
+    auto variant = (*database)->monster_variant(monster_type, seed.value_or(0));
     if (!variant) return std::unexpected(std::move(variant.error()));
     return std::move(variant->parameters);
   }); !r) return std::unexpected(std::move(r.error()));
 
-  if (auto r = callbacks.register_callback("monsterMovementSettings", [&root](String const& monsterType, std::optional<std::uint64_t> seed) -> std::expected<ActorMovementParameters, StarException> {
-    auto database = root.monsterDatabase();
+  if (auto r = callbacks.register_callback("monsterMovementSettings", [&root](String const& monster_type, std::optional<std::uint64_t> seed) -> std::expected<ActorMovementParameters, StarException> {
+    auto database = root.monster_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    auto variant = (*database)->monsterVariant(monsterType, seed.value_or(0));
+    auto variant = (*database)->monster_variant(monster_type, seed.value_or(0));
     if (!variant) return std::unexpected(std::move(variant.error()));
-    return std::move(variant->movementSettings);
+    return std::move(variant->movement_settings);
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.register_callback("createBiome", [&root](String const& biome_name, std::uint64_t seed, float vertical_mid_point, float threat_level) -> std::expected<Json, StarException> {
@@ -844,10 +844,10 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
     return config->get().to_json();
   }); !r) return std::unexpected(std::move(r.error()));
 
-  if (auto r = callbacks.register_callback("monsterConfig", [&root](String const& typeName) -> std::expected<Json, StarException> {
-    auto database = root.monsterDatabase();
+  if (auto r = callbacks.register_callback("monsterConfig", [&root](String const& type_name) -> std::expected<Json, StarException> {
+    auto database = root.monster_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    return (*database)->monsterConfig(typeName);
+    return (*database)->monster_config(type_name);
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.register_callback("biomeConfig", [&root](String const& type_name) -> std::expected<Json, StarException> {
@@ -1107,13 +1107,13 @@ std::expected<Json, StarException> LuaBindings::RootCallbacks::npcVariant(Root& 
   return (*database)->writeNpcVariantToJson(*variant);
 }
 
-std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::monsterPortrait(Root& root, String const& typeName, std::optional<JsonObject> const& parameters) {
-  auto database = root.monsterDatabase();
+std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::monster_portrait(Root& root, String const& type_name, std::optional<JsonObject> const& parameters) {
+  auto database = root.monster_database();
   if (!database) return std::unexpected(std::move(database.error()));
-  auto seed = 0; // use a static seed to utilize caching
-  auto variant = (*database)->monsterVariant(typeName, seed, parameters.value_or(JsonObject{}));
+  constexpr std::uint64_t seed = 0; // Reuse the cached portrait variant.
+  auto variant = (*database)->monster_variant(type_name, seed, parameters.value_or(JsonObject{}));
   if (!variant) return std::unexpected(std::move(variant.error()));
-  auto drawables = (*database)->monsterPortrait(*variant);
+  auto drawables = (*database)->monster_portrait(*variant);
   if (!drawables) return std::unexpected(std::move(drawables.error()));
   JsonArray result;
   result.reserve(drawables->size());

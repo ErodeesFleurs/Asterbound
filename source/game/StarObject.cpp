@@ -2161,7 +2161,7 @@ std::expected<LuaCallbacks, StarException> Object::makeAnimatorObjectCallbacks()
   return callbacks;
 }
 
-std::expected<List<DamageSource>, StarException> Object::damageSources() const {
+std::expected<List<DamageSource>, StarException> Object::damage_sources() const {
   auto sources = m_damageSources.get();
   if (auto orientation = currentOrientation()) {
     auto touchDamageConfig = json_merge(m_config->touchDamageConfig, orientation->touchDamageConfig);

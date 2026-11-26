@@ -219,7 +219,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> hitOther(EntityId targetEntityId, DamageRequest const& damageRequest) override;
   [[nodiscard]] std::expected<void, StarException> damagedOther(DamageNotification const& damage) override;
 
-  [[nodiscard]] std::expected<List<DamageSource>, StarException> damageSources() const override;
+  [[nodiscard]] std::expected<List<DamageSource>, StarException> damage_sources() const override;
 
   [[nodiscard]] std::expected<bool, StarException> should_destroy() const override;
   [[nodiscard]] std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) override;

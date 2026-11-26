@@ -772,16 +772,16 @@ std::expected<String, StarException> CommandProcessor::spawn_monster(ConnectionI
     auto required_argument = arguments.at(0);
     if (!required_argument) return std::unexpected(std::move(required_argument.error()));
 
-    auto monster_database_result = m_root.monsterDatabase();
+    auto monster_database_result = m_root.monster_database();
     if (!monster_database_result) return std::unexpected(std::move(monster_database_result.error()));
     auto monster_database = std::move(*monster_database_result);
     auto level = number_argument<float>(arguments, 1);
     if (!level) return std::unexpected(std::move(level.error()));
     auto parameters = object_argument(arguments, 2);
     if (!parameters) return std::unexpected(std::move(parameters.error()));
-    auto variant = monster_database->randomMonster(arguments[0], *parameters);
+    auto variant = monster_database->random_monster(arguments[0], *parameters);
     if (!variant) return std::unexpected(std::move(variant.error()));
-    auto created = monster_database->createMonster(*variant, level->value_or(1));
+    auto created = monster_database->create_monster(std::move(*variant), level->value_or(1));
     if (!created) return std::unexpected(std::move(created.error()));
     return place_at_aim(m_universe, connection_id, std::move(*created));
   }();

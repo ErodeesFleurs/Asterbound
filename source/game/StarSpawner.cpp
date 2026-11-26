@@ -456,7 +456,7 @@ std::expected<void, StarException> Spawner::spawnInCell(Vec2I const& cell) {
   if (!cellParameters) return std::unexpected(std::move(cellParameters.error()));
   if (!*cellParameters) return {};
   if (m_debug) m_debugSpawnInfo[cell] = SpawnCellDebugInfo{**cellParameters, 0, 0};
-  auto monsters = root().monsterDatabase();
+  auto monsters = root().monster_database();
   if (!monsters) return std::unexpected(std::move(monsters.error()));
   auto types = root().spawnTypeDatabase();
   if (!types) return std::unexpected(std::move(types.error()));
@@ -472,14 +472,16 @@ std::expected<void, StarException> Spawner::spawnInCell(Vec2I const& cell) {
       auto groupSize = root().random().uniform_int(type->groupSize[0], type->groupSize[1]);
       if (!groupSize) return std::unexpected(std::move(groupSize.error()));
       for (int i = 0; i < *groupSize; ++i) {
-        String monsterType;
-        if (std::holds_alternative<WeightedPool<String>>(type->monsterType)) monsterType = std::get<WeightedPool<String>>(type->monsterType).select(root().random());
-        else monsterType = std::get<String>(type->monsterType);
-        auto variant = (*monsters)->monsterVariant(monsterType, seed, type->monsterParameters);
+        String monster_type;
+        if (std::holds_alternative<WeightedPool<String>>(type->monsterType))
+          monster_type = std::get<WeightedPool<String>>(type->monsterType).select(root().random());
+        else
+          monster_type = std::get<String>(type->monsterType);
+        auto variant = (*monsters)->monster_variant(monster_type, seed, type->monsterParameters);
         if (!variant) return std::unexpected(std::move(variant.error()));
-        if (!variant->movementSettings.standing_poly)
+        if (!variant->movement_settings.standing_poly)
           return std::unexpected(MonsterException("Monster has no standing polygon"));
-        auto box = variant->movementSettings.standing_poly->bounding_box();
+        auto box = variant->movement_settings.standing_poly->bounding_box();
         if (m_debug) m_debugSpawnInfo[cell].spawnAttempts++;
         auto position = adjustSpawnRegion(region, box, type->spawnParameters);
         if (!position) return std::unexpected(std::move(position.error()));
@@ -498,7 +500,7 @@ std::expected<void, StarException> Spawner::spawnInCell(Vec2I const& cell) {
           }
           auto profile = m_facade->spawnProfile(**position);
           if (!profile) return std::unexpected(std::move(profile.error()));
-          auto entity = (*monsters)->createMonster(*variant, level, profile->monsterParameters);
+          auto entity = (*monsters)->create_monster(std::move(*variant), level, profile->monsterParameters);
           if (!entity) return std::unexpected(std::move(entity.error()));
           (*entity)->setPosition(**position);
           (*entity)->setKeepAlive(true);

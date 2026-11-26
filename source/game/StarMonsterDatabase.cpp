@@ -99,10 +99,10 @@ import star.byte_array;
 import star.static_random;
 namespace Star {
 
-MonsterDatabase::MonsterDatabase(Root& root) : m_root(root), m_monsterCache(root.random()) {}
+MonsterDatabase::MonsterDatabase(ConstructionKey, Root& root) : m_root(root), m_monster_cache(root.random()) {}
 
 std::expected<std::shared_ptr<MonsterDatabase>, StarException> MonsterDatabase::create(Root& root) {
-  auto database = std::shared_ptr<MonsterDatabase>(new MonsterDatabase(root));
+  auto database = std::make_shared<MonsterDatabase>(ConstructionKey{}, root);
   auto initialized = database->initialize();
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
@@ -114,380 +114,384 @@ std::expected<void, StarException> MonsterDatabase::initialize() {
   if (!rebuilder)
     return std::unexpected(std::move(rebuilder.error()));
   m_rebuilder = std::move(*rebuilder);
-  auto result1 = m_root.assets();
-if (!result1) return std::unexpected(std::move(result1.error()));
-auto assets = std::move(*result1);
+  auto assets = m_root.assets();
+  if (!assets)
+    return std::unexpected(std::move(assets.error()));
 
-  auto result2 = assets->scan_extension("monstertype");
-if (!result2) return std::unexpected(std::move(result2.error()));
-auto& monsterTypes = result2->get();
-  auto result3 = assets->scan_extension("monsterpart");
-if (!result3) return std::unexpected(std::move(result3.error()));
-auto& monsterParts = result3->get();
-  auto result4 = assets->scan_extension("monsterskill");
-if (!result4) return std::unexpected(std::move(result4.error()));
-auto& monsterSkills = result4->get();
-  auto result5 = assets->scan_extension("monstercolors");
-if (!result5) return std::unexpected(std::move(result5.error()));
-auto& monsterColors = result5->get();
+  auto monster_types = (*assets)->scan_extension("monstertype");
+  if (!monster_types)
+    return std::unexpected(std::move(monster_types.error()));
+  auto monster_parts = (*assets)->scan_extension("monsterpart");
+  if (!monster_parts)
+    return std::unexpected(std::move(monster_parts.error()));
+  auto monster_skills = (*assets)->scan_extension("monsterskill");
+  if (!monster_skills)
+    return std::unexpected(std::move(monster_skills.error()));
+  auto monster_colors = (*assets)->scan_extension("monstercolors");
+  if (!monster_colors)
+    return std::unexpected(std::move(monster_colors.error()));
 
-  auto result6 = assets->queue_jsons(monsterTypes);
-if (!result6) return std::unexpected(std::move(result6.error()));
-  auto result7 = assets->queue_jsons(monsterParts);
-if (!result7) return std::unexpected(std::move(result7.error()));
-  auto result8 = assets->queue_jsons(monsterSkills);
-if (!result8) return std::unexpected(std::move(result8.error()));
-  auto result9 = assets->queue_jsons(monsterColors);
-if (!result9) return std::unexpected(std::move(result9.error()));
-
-  for (auto const& assetFile : monsterTypes) {
-    auto const& file = assetFile.string();
-    auto loaded = [&, self = std::ref(*this)]() -> std::expected<void, StarException> {
-      auto result10 = assets->json(file);
-if (!result10) return std::unexpected(std::move(result10.error()));
-auto config = std::move(*result10);
-      auto result11 = config.get_string("type");
-if (!result11) return std::unexpected(std::move(result11.error()));
-String typeName = std::move(*result11);
-
-      if (self.get().m_monsterTypes.contains(typeName))
-        return std::unexpected(MonsterException(Star::format("Repeat monster type name '{}'", typeName)));
-
-      MonsterType& monsterType = self.get().m_monsterTypes[typeName];
-
-      monsterType.typeName = typeName;
-      auto result12 = config.opt_string("shortdescription");
-if (!result12) return std::unexpected(std::move(result12.error()));
-monsterType.shortDescription = std::move(*result12);
-      auto result13 = config.opt_string("description");
-if (!result13) return std::unexpected(std::move(result13.error()));
-monsterType.description = std::move(*result13);
-
-      auto result14 = config.get("categories");
-if (!result14) return std::unexpected(std::move(result14.error()));
-auto result15 = json_to_string_list(std::move(*result14));
-if (!result15) return std::unexpected(std::move(result15.error()));
-monsterType.categories = std::move(*result15);
-      auto result16 = config.get("parts");
-if (!result16) return std::unexpected(std::move(result16.error()));
-auto result17 = json_to_string_list(std::move(*result16));
-if (!result17) return std::unexpected(std::move(result17.error()));
-monsterType.partTypes = std::move(*result17);
-
-      auto result18 = config.get_string("animation");
-if (!result18) return std::unexpected(std::move(result18.error()));
-monsterType.animationConfigPath = AssetPath::relative_to(file, std::move(*result18));
-auto result19 = config.get_string("colors", "default");
-if (!result19) return std::unexpected(std::move(result19.error()));
-monsterType.colors = std::move(*result19);
-
-      auto result20 = config.get_bool("reversed", false);
-if (!result20) return std::unexpected(std::move(result20.error()));
-monsterType.reversed = std::move(*result20);
-
-      {
-  auto result21 = config.contains("dropPools");
-  if (!result21) return std::unexpected(std::move(result21.error()));
-  if (std::move(*result21))
-          {
-    auto result22 = config.get_array("dropPools");
-    if (!result22) return std::unexpected(std::move(result22.error()));
-    monsterType.dropPools = std::move(*result22);
+  for (auto const& files : {*monster_types, *monster_parts, *monster_skills, *monster_colors}) {
+    if (auto queued = (*assets)->queue_jsons(files.get()); !queued)
+      return std::unexpected(std::move(queued.error()));
   }
-}
 
-      auto result23 = config.get("baseParameters", {});
-if (!result23) return std::unexpected(std::move(result23.error()));
-monsterType.baseParameters = std::move(*result23);
+  for (auto const& asset_file : monster_types->get()) {
+    auto const& file = asset_file.string();
+    auto loaded = [&, self = std::ref(*this)]() -> std::expected<void, StarException> {
+      auto config = (*assets)->json(file);
+      if (!config)
+        return std::unexpected(std::move(config.error()));
+      auto type_name = config->get_string("type");
+      if (!type_name)
+        return std::unexpected(std::move(type_name.error()));
+      if (self.get().m_monster_types.contains(*type_name))
+        return std::unexpected(MonsterException(Star::format("Repeat monster type name '{}'", *type_name)));
 
-      // for updated monsters, use the partParameterDescription from the
-      // .partparams file
-      {
-  auto result24 = config.contains("partParameters");
-  if (!result24) return std::unexpected(std::move(result24.error()));
-  if (std::move(*result24)) {
-          auto result25 = config.get_string("partParameters");
-  if (!result25) return std::unexpected(std::move(result25.error()));
-  auto partParametersPath = AssetPath::relative_to(file, std::move(*result25));
-  auto partParameters = [&]() -> std::expected<void, StarException> {
-    auto source = assets->json(partParametersPath);
-    if (!source)
-      return std::unexpected(std::move(source.error()));
-    auto description = source->get_object("partParameterDescription");
-    if (!description)
-      return std::unexpected(std::move(description.error()));
-    monsterType.partParameterDescription = std::move(*description);
-    auto overrides = source->get_object("partParameters");
-    if (!overrides)
-      return std::unexpected(std::move(overrides.error()));
-    monsterType.partParameterOverrides = std::move(*overrides);
-    return {};
-  }();
-  if (!partParameters)
-    return std::unexpected(assets->with_asset_context(std::move(partParameters.error()), partParametersPath,
-                                                    "Loading monster part parameters"));
-        } else {
-          // outdated monsters still have partParameterDescription defined
-          // directly in the
-          // .monstertype file
-          auto result29 = config.get_object("partParameterDescription", {});
-  if (!result29) return std::unexpected(std::move(result29.error()));
-  monsterType.partParameterDescription = std::move(*result29);
-        }
-}
+      auto& monster_type = self.get().m_monster_types[*type_name];
+      monster_type.type_name = std::move(*type_name);
+      auto short_description = config->opt_string("shortdescription");
+      if (!short_description)
+        return std::unexpected(std::move(short_description.error()));
+      monster_type.short_description = std::move(*short_description);
+      auto description = config->opt_string("description");
+      if (!description)
+        return std::unexpected(std::move(description.error()));
+      monster_type.description = std::move(*description);
 
+      auto categories = config->get("categories");
+      if (!categories)
+        return std::unexpected(std::move(categories.error()));
+      auto category_names = json_to_string_list(*categories);
+      if (!category_names)
+        return std::unexpected(std::move(category_names.error()));
+      monster_type.categories = std::move(*category_names);
+      auto parts = config->get("parts");
+      if (!parts)
+        return std::unexpected(std::move(parts.error()));
+      auto part_types = json_to_string_list(*parts);
+      if (!part_types)
+        return std::unexpected(std::move(part_types.error()));
+      monster_type.part_types = std::move(*part_types);
+
+      auto animation = config->get_string("animation");
+      if (!animation)
+        return std::unexpected(std::move(animation.error()));
+      monster_type.animation_config_path = AssetPath::relative_to(file, *animation);
+      auto colors = config->get_string("colors", "default");
+      if (!colors)
+        return std::unexpected(std::move(colors.error()));
+      monster_type.colors = std::move(*colors);
+      auto reversed = config->get_bool("reversed", false);
+      if (!reversed)
+        return std::unexpected(std::move(reversed.error()));
+      monster_type.reversed = *reversed;
+
+      auto has_drop_pools = config->contains("dropPools");
+      if (!has_drop_pools)
+        return std::unexpected(std::move(has_drop_pools.error()));
+      if (*has_drop_pools) {
+        auto drop_pools = config->get_array("dropPools");
+        if (!drop_pools)
+          return std::unexpected(std::move(drop_pools.error()));
+        monster_type.drop_pools = std::move(*drop_pools);
+      }
+      auto base_parameters = config->get("baseParameters", {});
+      if (!base_parameters)
+        return std::unexpected(std::move(base_parameters.error()));
+      monster_type.base_parameters = std::move(*base_parameters);
+
+      auto has_part_parameters = config->contains("partParameters");
+      if (!has_part_parameters)
+        return std::unexpected(std::move(has_part_parameters.error()));
+      if (*has_part_parameters) {
+        auto part_parameters_file = config->get_string("partParameters");
+        if (!part_parameters_file)
+          return std::unexpected(std::move(part_parameters_file.error()));
+        auto part_parameters_path = AssetPath::relative_to(file, *part_parameters_file);
+        auto part_parameters = [&]() -> std::expected<void, StarException> {
+          auto source = (*assets)->json(part_parameters_path);
+          if (!source)
+            return std::unexpected(std::move(source.error()));
+          auto description = source->get_object("partParameterDescription");
+          if (!description)
+            return std::unexpected(std::move(description.error()));
+          monster_type.part_parameter_description = std::move(*description);
+          auto overrides = source->get_object("partParameters");
+          if (!overrides)
+            return std::unexpected(std::move(overrides.error()));
+          monster_type.part_parameter_overrides = std::move(*overrides);
+          return {};
+        }();
+        if (!part_parameters)
+          return std::unexpected((*assets)->with_asset_context(std::move(part_parameters.error()), part_parameters_path,
+                                                              "Loading monster part parameters"));
+      } else {
+        // Older .monstertype files define the merge rules inline.
+        auto part_parameter_description = config->get_object("partParameterDescription", {});
+        if (!part_parameter_description)
+          return std::unexpected(std::move(part_parameter_description.error()));
+        monster_type.part_parameter_description = std::move(*part_parameter_description);
+      }
       return {};
     }();
     if (!loaded)
-      return std::unexpected(MonsterException(Star::format("Error loading monster type '{}'", file), assets->with_asset_context(std::move(loaded.error()), file, "Loading monster type")));
+      return std::unexpected(MonsterException(Star::format("Error loading monster type '{}'", file),
+          (*assets)->with_asset_context(std::move(loaded.error()), file, "Loading monster type")));
   }
 
-  for (auto const& assetFile : monsterParts) {
-    auto const& file = assetFile.string();
+  for (auto const& asset_file : monster_parts->get()) {
+    auto const& file = asset_file.string();
     auto loaded = [&, self = std::ref(*this)]() -> std::expected<void, StarException> {
-      auto result30 = assets->json(file);
-if (!result30) return std::unexpected(std::move(result30.error()));
-auto config = std::move(*result30);
-      if (config.is_null())
+      auto config = (*assets)->json(file);
+      if (!config)
+        return std::unexpected(std::move(config.error()));
+      if (config->is_null())
         return {};
 
       MonsterPart part;
-      auto result31 = config.get_string("name");
-if (!result31) return std::unexpected(std::move(result31.error()));
-part.name = std::move(*result31);
-      auto result32 = config.get_string("category");
-if (!result32) return std::unexpected(std::move(result32.error()));
-part.category = std::move(*result32);
-      auto result33 = config.get_string("type");
-if (!result33) return std::unexpected(std::move(result33.error()));
-part.type = std::move(*result33);
+      auto name = config->get_string("name");
+      if (!name)
+        return std::unexpected(std::move(name.error()));
+      part.name = std::move(*name);
+      auto category = config->get_string("category");
+      if (!category)
+        return std::unexpected(std::move(category.error()));
+      part.category = std::move(*category);
+      auto type = config->get_string("type");
+      if (!type)
+        return std::unexpected(std::move(type.error()));
+      part.type = std::move(*type);
       part.path = AssetPath::directory(file);
-      auto result34 = config.get_object("frames");
-if (!result34) return std::unexpected(std::move(result34.error()));
-part.frames = std::move(*result34);
-      auto result35 = config.get("parameters", JsonObject());
-if (!result35) return std::unexpected(std::move(result35.error()));
-part.partParameters = std::move(*result35);
+      auto frames = config->get_object("frames");
+      if (!frames)
+        return std::unexpected(std::move(frames.error()));
+      part.frames = std::move(*frames);
+      auto parameters = config->get("parameters", JsonObject());
+      if (!parameters)
+        return std::unexpected(std::move(parameters.error()));
+      part.part_parameters = std::move(*parameters);
 
-      auto& partMap = self.get().m_partDirectory[part.category][part.type];
-
-      if (partMap.contains(part.name))
+      auto& part_map = self.get().m_part_directory[part.category][part.type];
+      if (part_map.contains(part.name))
         return std::unexpected(MonsterException(Star::format("Repeat monster part name '{}' for category '{}'", part.name, part.category)));
-      else
-        partMap[part.name] = part;
+      part_map[part.name] = std::move(part);
       return {};
     }();
     if (!loaded)
-      return std::unexpected(MonsterException(Star::format("Error loading monster part '{}'", file), assets->with_asset_context(std::move(loaded.error()), file, "Loading monster part")));
+      return std::unexpected(MonsterException(Star::format("Error loading monster part '{}'", file),
+          (*assets)->with_asset_context(std::move(loaded.error()), file, "Loading monster part")));
   }
 
-  for (auto const& assetFile : monsterSkills) {
-    auto const& file = assetFile.string();
+  for (auto const& asset_file : monster_skills->get()) {
+    auto const& file = asset_file.string();
     auto loaded = [&, self = std::ref(*this)]() -> std::expected<void, StarException> {
-      auto result36 = assets->json(file);
-if (!result36) return std::unexpected(std::move(result36.error()));
-auto config = std::move(*result36);
-      if (config.is_null())
+      auto config = (*assets)->json(file);
+      if (!config)
+        return std::unexpected(std::move(config.error()));
+      if (config->is_null())
         return {};
 
       MonsterSkill skill;
-      auto result37 = config.get_string("name");
-if (!result37) return std::unexpected(std::move(result37.error()));
-skill.name = std::move(*result37);
-      auto result38 = config.get_string("label");
-if (!result38) return std::unexpected(std::move(result38.error()));
-skill.label = std::move(*result38);
-      auto result39 = config.get_string("image");
-if (!result39) return std::unexpected(std::move(result39.error()));
-skill.image = std::move(*result39);
-
-      auto result40 = config.get("config", JsonObject());
-if (!result40) return std::unexpected(std::move(result40.error()));
-skill.config = std::move(*result40);
-      auto result41 = config.get("parameters", JsonObject());
-if (!result41) return std::unexpected(std::move(result41.error()));
-skill.parameters = std::move(*result41);
-      auto result42 = config.get("animationParameters", JsonObject());
-if (!result42) return std::unexpected(std::move(result42.error()));
-skill.animationParameters = std::move(*result42);
+      auto name = config->get_string("name");
+      if (!name)
+        return std::unexpected(std::move(name.error()));
+      skill.name = std::move(*name);
+      auto label = config->get_string("label");
+      if (!label)
+        return std::unexpected(std::move(label.error()));
+      skill.label = std::move(*label);
+      auto image = config->get_string("image");
+      if (!image)
+        return std::unexpected(std::move(image.error()));
+      skill.image = std::move(*image);
+      auto skill_config = config->get("config", JsonObject());
+      if (!skill_config)
+        return std::unexpected(std::move(skill_config.error()));
+      skill.config = std::move(*skill_config);
+      auto parameters = config->get("parameters", JsonObject());
+      if (!parameters)
+        return std::unexpected(std::move(parameters.error()));
+      skill.parameters = std::move(*parameters);
+      auto animation_parameters = config->get("animationParameters", JsonObject());
+      if (!animation_parameters)
+        return std::unexpected(std::move(animation_parameters.error()));
+      skill.animation_parameters = std::move(*animation_parameters);
 
       if (self.get().m_skills.contains(skill.name))
         return std::unexpected(MonsterException(Star::format("Repeat monster skill name '{}'", skill.name)));
-      else
-        self.get().m_skills[skill.name] = skill;
+      self.get().m_skills[skill.name] = std::move(skill);
       return {};
     }();
     if (!loaded)
-      return std::unexpected(MonsterException(Star::format("Error loading monster skill '{}'", file), assets->with_asset_context(std::move(loaded.error()), file, "Loading monster skill")));
+      return std::unexpected(MonsterException(Star::format("Error loading monster skill '{}'", file),
+          (*assets)->with_asset_context(std::move(loaded.error()), file, "Loading monster skill")));
   }
 
-  for (auto const& assetFile : monsterColors) {
-    auto const& file = assetFile.string();
+  for (auto const& asset_file : monster_colors->get()) {
+    auto const& file = asset_file.string();
     auto loaded = [&, self = std::ref(*this)]() -> std::expected<void, StarException> {
-      auto result43 = assets->json(file);
-if (!result43) return std::unexpected(std::move(result43.error()));
-auto config = std::move(*result43);
-      if (config.is_null())
+      auto config = (*assets)->json(file);
+      if (!config)
+        return std::unexpected(std::move(config.error()));
+      if (config->is_null())
         return {};
 
-      auto result44 = config.get_string("name");
-if (!result44) return std::unexpected(std::move(result44.error()));
-auto paletteName = std::move(*result44);
-      if (self.get().m_colorSwaps.contains(paletteName))
-        return std::unexpected(MonsterException(Star::format("Duplicate monster colors name '{}'", paletteName)));
+      auto palette_name = config->get_string("name");
+      if (!palette_name)
+        return std::unexpected(std::move(palette_name.error()));
+      if (self.get().m_color_swaps.contains(*palette_name))
+        return std::unexpected(MonsterException(Star::format("Duplicate monster colors name '{}'", *palette_name)));
 
-      ColorReplaceMap colorSwaps;
-      {
-  auto result45 = config.get_array("swaps");
-  if (!result45) return std::unexpected(std::move(result45.error()));
-  for (auto const& swapSet : std::move(*result45)) {
-          ColorReplaceMap colorSwaps;
-          {
-            auto result46 = swapSet.iterate_object();
-            if (!result46)
-              return std::unexpected(std::move(result46.error()));
-            for (auto const& swap : std::move(*result46)) {
-              auto result47 = Color::from_hex(swap.first);
-    if (!result47) return std::unexpected(std::move(result47.error()));
-    auto result48 = swap.second.to_string();
-    if (!result48) return std::unexpected(std::move(result48.error()));
-    auto result49 = Color::from_hex(*result48);
-    if (!result49) return std::unexpected(std::move(result49.error()));
-    colorSwaps[std::move(*result47).to_rgba()] = std::move(*result49).to_rgba();
-            }
-  }
-  self.get().m_colorSwaps[paletteName].push_back(colorSwaps);
+      auto swap_sets = config->get_array("swaps");
+      if (!swap_sets)
+        return std::unexpected(std::move(swap_sets.error()));
+      for (auto const& swap_set : *swap_sets) {
+        ColorReplaceMap color_swaps;
+        auto swaps = swap_set.iterate_object();
+        if (!swaps)
+          return std::unexpected(std::move(swaps.error()));
+        for (auto const& [key, value] : *swaps) {
+          auto from = Color::from_hex(key);
+          if (!from)
+            return std::unexpected(std::move(from.error()));
+          auto text = value.to_string();
+          if (!text)
+            return std::unexpected(std::move(text.error()));
+          auto to = Color::from_hex(*text);
+          if (!to)
+            return std::unexpected(std::move(to.error()));
+          color_swaps[from->to_rgba()] = to->to_rgba();
         }
-}
+        self.get().m_color_swaps[*palette_name].push_back(std::move(color_swaps));
+      }
       return {};
     }();
     if (!loaded)
-      return std::unexpected(MonsterException(Star::format("Error loading monster colors '{}'", file), assets->with_asset_context(std::move(loaded.error()), file, "Loading monster colors")));
+      return std::unexpected(MonsterException(Star::format("Error loading monster colors '{}'", file),
+          (*assets)->with_asset_context(std::move(loaded.error()), file, "Loading monster colors")));
   }
   return {};
 }
 
 void MonsterDatabase::cleanup() {
-  std::lock_guard locker(m_cacheMutex);
-  m_monsterCache.cleanup();
+  std::lock_guard lock(m_cache_mutex);
+  m_monster_cache.cleanup();
 }
 
-StringList MonsterDatabase::monsterTypes() const {
-  return m_monsterTypes.keys();
+StringList MonsterDatabase::monster_types() const {
+  return m_monster_types.keys();
 }
 
-std::expected<MonsterVariant, StarException> MonsterDatabase::randomMonster(String const& typeName, Json const& uniqueParameters) const {
-  std::size_t seed;
-  {
-  auto result50 = uniqueParameters.opt("seed");
-  if (!result50) return std::unexpected(std::move(result50.error()));
-  if (auto seedConfig = std::move(*result50)) {
-      if (seedConfig->type() == Json::Type::String) {
-        auto result51 = seedConfig->to_string();
-  if (!result51) return std::unexpected(std::move(result51.error()));
-  auto result52 = lexical_cast<std::uint64_t>(*result51);
-  if (!result52) return std::unexpected(std::move(result52.error()));
-  seed = std::move(*result52);
-      } else {
-        auto result53 = seedConfig->to_uint();
-  if (!result53) return std::unexpected(std::move(result53.error()));
-  seed = std::move(*result53);
-      }
-    } else {
-      seed = m_root.random().next_u64();
-    }
+std::expected<MonsterVariant, StarException> MonsterDatabase::random_monster(
+    String const& type_name, Json const& unique_parameters) const {
+  auto seed_config = unique_parameters.opt("seed");
+  if (!seed_config)
+    return std::unexpected(std::move(seed_config.error()));
+  if (!*seed_config)
+    return monster_variant(type_name, m_root.random().next_u64(), unique_parameters);
+
+  std::expected<std::uint64_t, StarException> seed;
+  if ((*seed_config)->type() == Json::Type::String) {
+    auto text = (*seed_config)->to_string();
+    if (!text)
+      return std::unexpected(std::move(text.error()));
+    seed = lexical_cast<std::uint64_t>(*text);
+  } else {
+    seed = (*seed_config)->to_uint();
+  }
+  if (!seed)
+    return std::unexpected(std::move(seed.error()));
+  return monster_variant(type_name, *seed, unique_parameters);
 }
 
-  return monsterVariant(typeName, seed, uniqueParameters);
-}
-
-std::expected<MonsterVariant, StarException> MonsterDatabase::monsterVariant(String const& typeName, std::uint64_t seed, Json const& uniqueParameters) const {
-  std::lock_guard locker(m_cacheMutex);
-  auto variant = m_monsterCache.get(std::make_tuple(typeName, seed, uniqueParameters),
+std::expected<MonsterVariant, StarException> MonsterDatabase::monster_variant(
+    String const& type_name, std::uint64_t seed, Json const& unique_parameters) const {
+  std::lock_guard lock(m_cache_mutex);
+  auto variant = m_monster_cache.get(std::make_tuple(type_name, seed, unique_parameters),
       [self = std::cref(*this)](std::tuple<String, std::uint64_t, Json> const& key) {
-        return self.get().produceMonster(std::get<0>(key), std::get<1>(key), std::get<2>(key));
+        return self.get().produce_monster(std::get<0>(key), std::get<1>(key), std::get<2>(key));
       });
   if (!variant)
     return std::unexpected(std::move(variant.error()));
   return variant->get();
 }
 
-std::expected<ByteArray, StarException> MonsterDatabase::writeMonsterVariant(MonsterVariant const& variant, NetCompatibilityRules rules) const {
+std::expected<ByteArray, StarException> MonsterDatabase::write_monster_variant(MonsterVariant const& variant, NetCompatibilityRules rules) const {
   DataStreamBuffer ds;
   ds.set_stream_compatibility_version(rules);
 
-  auto result58 = ds.write(variant.type);
-if (!result58) return std::unexpected(std::move(result58.error()));
+  if (auto written = ds.write(variant.type); !written)
+    return std::unexpected(std::move(written.error()));
+  if (auto written = ds.write(variant.seed); !written)
+    return std::unexpected(std::move(written.error()));
+  if (auto written = ds.write(variant.unique_parameters); !written)
+    return std::unexpected(std::move(written.error()));
 
-  auto result59 = ds.write(variant.seed);
-if (!result59) return std::unexpected(std::move(result59.error()));
-
-  auto result60 = ds.write(variant.uniqueParameters);
-if (!result60) return std::unexpected(std::move(result60.error()));
-
-return ds.take_data();
+  return ds.take_data();
 }
 
-std::expected<MonsterVariant, StarException> MonsterDatabase::readMonsterVariant(ByteArray const& data, NetCompatibilityRules rules) const {
+std::expected<MonsterVariant, StarException> MonsterDatabase::read_monster_variant(ByteArray const& data, NetCompatibilityRules rules) const {
   DataStreamReader ds(data.span());
   ds.set_stream_compatibility_version(rules);
 
-  auto result61 = ds.read<String>();
-if (!result61) return std::unexpected(std::move(result61.error()));
-String type = std::move(*result61);
-  auto result62 = ds.read<std::uint64_t>();
-if (!result62) return std::unexpected(std::move(result62.error()));
-std::uint64_t seed = std::move(*result62);
-  auto result63 = ds.read<Json>();
-if (!result63) return std::unexpected(std::move(result63.error()));
-Json uniqueParameters = std::move(*result63);
-
-  return monsterVariant(type, seed, uniqueParameters);
+  auto type = ds.read<String>();
+  if (!type)
+    return std::unexpected(std::move(type.error()));
+  auto seed = ds.read<std::uint64_t>();
+  if (!seed)
+    return std::unexpected(std::move(seed.error()));
+  auto unique_parameters = ds.read<Json>();
+  if (!unique_parameters)
+    return std::unexpected(std::move(unique_parameters.error()));
+  return monster_variant(*type, *seed, *unique_parameters);
 }
 
-std::expected<Json, StarException> MonsterDatabase::writeMonsterVariantToJson(MonsterVariant const& mVar) const {
+std::expected<Json, StarException> MonsterDatabase::write_monster_variant_to_json(MonsterVariant const& variant) const {
   return JsonObject{
-      {"type", mVar.type},
-      {"seed", mVar.seed},
-      {"uniqueParameters", mVar.uniqueParameters},
+      {"type", variant.type},
+      {"seed", variant.seed},
+      {"uniqueParameters", variant.unique_parameters},
   };
 }
 
-std::expected<MonsterVariant, StarException> MonsterDatabase::readMonsterVariantFromJson(Json const& variant) const {
-  auto result64 = variant.get_string("type");
-if (!result64) return std::unexpected(std::move(result64.error()));
-auto result65 = variant.get_uint("seed");
-if (!result65) return std::unexpected(std::move(result65.error()));
-auto result66 = variant.get_object("uniqueParameters");
-if (!result66) return std::unexpected(std::move(result66.error()));
-return monsterVariant(std::move(*result64), std::move(*result65), std::move(*result66));
+std::expected<MonsterVariant, StarException> MonsterDatabase::read_monster_variant_from_json(Json const& variant) const {
+  auto type = variant.get_string("type");
+  if (!type)
+    return std::unexpected(std::move(type.error()));
+  auto seed = variant.get_uint("seed");
+  if (!seed)
+    return std::unexpected(std::move(seed.error()));
+  auto unique_parameters = variant.get_object("uniqueParameters");
+  if (!unique_parameters)
+    return std::unexpected(std::move(unique_parameters.error()));
+  return monster_variant(*type, *seed, std::move(*unique_parameters));
 }
 
-std::expected<std::shared_ptr<Monster>, StarException> MonsterDatabase::createMonster(
-    MonsterVariant monsterVariant, std::optional<float> level, Json uniqueParameters) const {
-  if (uniqueParameters) {
-    monsterVariant.uniqueParameters = json_merge(monsterVariant.uniqueParameters, uniqueParameters);
-    monsterVariant.parameters = json_merge(monsterVariant.parameters, monsterVariant.uniqueParameters);
-    auto result67 = readCommonParameters(monsterVariant);
-if (!result67) return std::unexpected(std::move(result67.error()));
-
+std::expected<std::shared_ptr<Monster>, StarException> MonsterDatabase::create_monster(
+    MonsterVariant variant, std::optional<float> level, Json unique_parameters) const {
+  if (unique_parameters) {
+    variant.unique_parameters = json_merge(variant.unique_parameters, unique_parameters);
+    variant.parameters = json_merge(variant.parameters, variant.unique_parameters);
+    if (auto read = read_common_parameters(variant); !read)
+      return std::unexpected(std::move(read.error()));
   }
-  return Monster::create(m_root, monsterVariant, level);
+  return Monster::create(m_root, std::move(variant), level);
 }
 
-std::expected<std::shared_ptr<Monster>, StarException> MonsterDatabase::diskLoadMonster(Json const& diskStore) const {
+std::expected<std::shared_ptr<Monster>, StarException> MonsterDatabase::disk_load_monster(Json const& disk_store) const {
   auto attempt = [root = std::ref(m_root)](Json const& store) -> std::expected<std::shared_ptr<Monster>, StarException> {
     return Monster::create(root.get(), store);
   };
-  auto monster = attempt(diskStore);
+  auto monster = attempt(disk_store);
   if (monster)
     return monster;
-  StarException lastError = std::move(monster.error());
-  auto rebuilt = m_rebuilder->rebuild(diskStore, lastError, [&](Json const& store) -> std::expected<void, StarException> {
+  StarException last_error = std::move(monster.error());
+  auto rebuilt = m_rebuilder->rebuild(disk_store, last_error, [&](Json const& store) -> std::expected<void, StarException> {
     auto replacement = attempt(store);
     if (!replacement) {
-      lastError = std::move(replacement.error());
-      return std::unexpected(lastError);
+      last_error = std::move(replacement.error());
+      return std::unexpected(last_error);
     }
     monster = std::move(replacement);
     return {};
@@ -495,631 +499,575 @@ std::expected<std::shared_ptr<Monster>, StarException> MonsterDatabase::diskLoad
   if (!rebuilt)
     return std::unexpected(std::move(rebuilt.error()));
   if (!*rebuilt)
-    return std::unexpected(std::move(lastError));
+    return std::unexpected(std::move(last_error));
   return monster;
 }
 
 std::expected<std::shared_ptr<Monster>, StarException> MonsterDatabase::net_load_monster(ByteArray const& net_store, NetCompatibilityRules rules) const {
-  auto result68 = readMonsterVariant(net_store, rules);
-if (!result68) return std::unexpected(std::move(result68.error()));
-return Monster::create(m_root, std::move(*result68));
+  auto variant = read_monster_variant(net_store, rules);
+  if (!variant)
+    return std::unexpected(std::move(variant.error()));
+  return Monster::create(m_root, std::move(*variant));
 }
 
-std::expected<List<Drawable>, StarException> MonsterDatabase::monsterPortrait(MonsterVariant const& variant) const {
-  auto result69 = NetworkedAnimator::create(m_root, variant.animatorConfig);
-if (!result69) return std::unexpected(std::move(result69.error()));
-auto animator = std::move(*result69);
-  for (auto const& pair : variant.animatorPartTags)
-    animator->setPartTag(pair.first, "partImage", pair.second);
-  animator->setZoom(variant.animatorZoom);
-  auto result70 = variant.parameters.get_string("colors", "default");
-if (!result70) return std::unexpected(std::move(result70.error()));
-auto result71 = this->colorSwap(std::move(*result70), variant.seed);
-if (!result71) return std::unexpected(std::move(result71.error()));
-auto colorSwap = variant.colorSwap.value_or(std::move(*result71));
-  if (!colorSwap.empty())
-    animator->setProcessingDirectives(image_operation_to_string(ColorReplaceImageOperation{colorSwap}));
-  auto result72 = animator->drawables();
-if (!result72) return std::unexpected(std::move(result72.error()));
-auto drawables = std::move(*result72);
-  Drawable::scale_all(drawables, tile_pixels);
+std::expected<List<Drawable>, StarException> MonsterDatabase::monster_portrait(MonsterVariant const& variant) const {
+  auto animator = NetworkedAnimator::create(m_root, variant.animator_config);
+  if (!animator)
+    return std::unexpected(std::move(animator.error()));
+  for (auto const& [part, image] : variant.animator_part_tags)
+    (*animator)->setPartTag(part, "partImage", image);
+  (*animator)->setZoom(variant.animator_zoom);
+  auto colors = variant.parameters.get_string("colors", "default");
+  if (!colors)
+    return std::unexpected(std::move(colors.error()));
+  auto palette = color_swap(*colors, variant.seed);
+  if (!palette)
+    return std::unexpected(std::move(palette.error()));
+  auto swaps = variant.color_swap.value_or(std::move(*palette));
+  if (!swaps.empty())
+    (*animator)->setProcessingDirectives(image_operation_to_string(ColorReplaceImageOperation{std::move(swaps)}));
+  auto drawables = (*animator)->drawables();
+  if (!drawables)
+    return std::unexpected(std::move(drawables.error()));
+  Drawable::scale_all(*drawables, tile_pixels);
   return drawables;
 }
 
-std::expected<std::pair<String, String>, StarException> MonsterDatabase::skillInfo(String const& skillName) const {
-  if (m_skills.contains(skillName)) {
-    auto result73 = m_skills.get(skillName);
-if (!result73) return std::unexpected(std::move(result73.error()));
-auto& skill = result73->get();
-    return std::make_pair(skill.label, skill.image);
-  } else {
-    return std::pair<String, String>{};
+std::expected<std::pair<String, String>, StarException> MonsterDatabase::skill_info(String const& skill_name) const {
+  if (auto skill = m_skills.find(skill_name); skill != m_skills.end())
+    return std::make_pair(skill->second.label, skill->second.image);
+  return std::pair<String, String>{};
+}
+
+std::expected<Json, StarException> MonsterDatabase::skill_config_parameter(String const& skill_name, String const& config_parameter_name) const {
+  if (auto skill = m_skills.find(skill_name); skill != m_skills.end())
+    return skill->second.config.get(config_parameter_name, Json());
+  return Json();
+}
+
+std::expected<ColorReplaceMap, StarException> MonsterDatabase::color_swap(String const& set_name, std::uint64_t seed) const {
+  auto swaps = m_color_swaps.find_ref(set_name);
+  if (!swaps) {
+    auto reported = m_root.logger().error("Monster colors '{}' not found!", set_name);
+    if (!reported)
+      return std::unexpected(std::move(reported.error()));
+    auto fallback = m_color_swaps.get("default");
+    if (!fallback)
+      return std::unexpected(std::move(fallback.error()));
+    swaps = *fallback;
   }
+  auto selected = static_random_from(swaps->get(), seed);
+  if (!selected)
+    return std::unexpected(std::move(selected.error()));
+  return selected->get();
 }
 
-std::expected<Json, StarException> MonsterDatabase::skillConfigParameter(String const& skillName, String const& configParameterName) const {
-  if (m_skills.contains(skillName)) {
-    auto result74 = m_skills.get(skillName);
-if (!result74) return std::unexpected(std::move(result74.error()));
-auto& skill = result74->get();
-    return skill.config.get(configParameterName, Json());
-  } else {
-    return Json();
+std::expected<Json, StarException> MonsterDatabase::monster_config(String const& type_name) const {
+  auto type = m_monster_types.get(type_name);
+  if (!type)
+    return std::unexpected(std::move(type.error()));
+  return type->get().to_json();
+}
+
+std::expected<Json, StarException> MonsterDatabase::merge_part_parameters(Json const& part_parameter_description, JsonArray const& parameters) {
+  JsonObject merged;
+  auto descriptions = part_parameter_description.iterate_object();
+  if (!descriptions)
+    return std::unexpected(std::move(descriptions.error()));
+  for (auto const& [key, description] : *descriptions) {
+    auto default_value = description.get(1);
+    if (!default_value)
+      return std::unexpected(std::move(default_value.error()));
+    merged[key] = std::move(*default_value);
   }
-}
 
-std::expected<ColorReplaceMap, StarException> MonsterDatabase::colorSwap(String const& setName, std::uint64_t seed) const {
-  if (m_colorSwaps.contains(setName))
-    {
-  auto result75 = m_colorSwaps.get(setName);
-  if (!result75) return std::unexpected(std::move(result75.error()));
-  auto result76 = static_random_from(result75->get(), seed);
-  if (!result76) return std::unexpected(std::move(result76.error()));
-  return result76->get();
-}
-  else {
-    auto result77 = m_root.logger().error("Monster colors '{}' not found!", setName);
-if (!result77) return std::unexpected(std::move(result77.error()));
-    auto result78 = m_colorSwaps.get("default");
-if (!result78) return std::unexpected(std::move(result78.error()));
-auto result79 = static_random_from(result78->get(), seed);
-if (!result79) return std::unexpected(std::move(result79.error()));
-return result79->get();
-  }
-}
+  for (auto const& part_parameters : parameters) {
+    auto entries = part_parameters.iterate_object();
+    if (!entries)
+      return std::unexpected(std::move(entries.error()));
+    for (auto const& [key, next] : *entries) {
+      auto description = part_parameter_description.get(key);
+      if (!description)
+        return std::unexpected(std::move(description.error()));
+      auto method = description->get_string(0);
+      if (!method)
+        return std::unexpected(std::move(method.error()));
+      auto value = merged.get(key);
+      if (!value)
+        return std::unexpected(std::move(value.error()));
+      auto& current = value->get();
 
-std::expected<Json, StarException> MonsterDatabase::monsterConfig(String const& typeName) const {
-  auto result80 = m_monsterTypes.get(typeName);
-if (!result80) return std::unexpected(std::move(result80.error()));
-return result80->get().toJson();
-}
-
-std::expected<Json, StarException> MonsterDatabase::mergePartParameters(Json const& partParameterDescription, JsonArray const& parameters) {
-  JsonObject mergedParameters;
-
-  // First assign all the defaults.
-  {
-    auto result81 = partParameterDescription.iterate_object();
-    if (!result81)
-      return std::unexpected(std::move(result81.error()));
-    for (auto const& pair : std::move(*result81)) {
-      auto result82 = pair.second.get(1);
-      if (!result82)
-        return std::unexpected(std::move(result82.error()));
-      mergedParameters[pair.first] = std::move(*result82);
-    }
-}
-
-  // Then go through parameter list and merge based on the merge rules.
-  for (auto const& applyParams : parameters) {
-    {
-      auto result83 = applyParams.iterate_object();
-      if (!result83)
-        return std::unexpected(std::move(result83.error()));
-      for (auto const& pair : std::move(*result83)) {
-        auto result84 = partParameterDescription.get(pair.first);
-  if (!result84) return std::unexpected(std::move(result84.error()));
-  auto result85 = std::move(*result84).get_string(0);
-  if (!result85) return std::unexpected(std::move(result85.error()));
-  String mergeMethod = std::move(*result85);
-        auto result86 = mergedParameters.get(pair.first);
-  if (!result86) return std::unexpected(std::move(result86.error()));
-  Json value = result86->get();
-
-        {
-    auto result87 = mergeMethod.equals_ignore_case("add");
-    if (!result87) return std::unexpected(std::move(result87.error()));
-    if (std::move(*result87)) {
-            auto result88 = value.to_double();
-    if (!result88) return std::unexpected(std::move(result88.error()));
-    auto result89 = pair.second.to_double();
-    if (!result89) return std::unexpected(std::move(result89.error()));
-    value = std::move(*result88) + std::move(*result89);
-          } else {
-      auto result90 = mergeMethod.equals_ignore_case("multiply");
-      if (!result90) return std::unexpected(std::move(result90.error()));
-      if (std::move(*result90)) {
-              auto result91 = value.to_double();
-      if (!result91) return std::unexpected(std::move(result91.error()));
-      auto result92 = pair.second.to_double();
-      if (!result92) return std::unexpected(std::move(result92.error()));
-      value = std::move(*result91) * std::move(*result92);
-            } else {
-        auto result93 = mergeMethod.equals_ignore_case("merge");
-        if (!result93) return std::unexpected(std::move(result93.error()));
-        if (std::move(*result93)) {
-                // "merge" means to either merge maps, or *append* lists together
-                if (!pair.second.is_null()) {
-                  if (value.is_null()) {
-                    value = pair.second;
-                  } else if (value.type() != pair.second.type()) {
-                    value = pair.second;
-                  } else {
-                    if (pair.second.type() == Json::Type::Array) {
-                      auto left = value.array_ptr();
-                      if (!left) return std::unexpected(std::move(left.error()));
-                      auto right = pair.second.array_ptr();
-                      if (!right) return std::unexpected(std::move(right.error()));
-                      JsonArray combined;
-                      combined.reserve((*left)->size() + (*right)->size());
-                      combined.append_range(**left);
-                      combined.append_range(**right);
-                      value = std::move(combined);
-                    } else if (pair.second.type() == Json::Type::Object) {
-                      auto combined = value.to_object();
-                      if (!combined) return std::unexpected(std::move(combined.error()));
-                      auto right = pair.second.object_ptr();
-                      if (!right) return std::unexpected(std::move(right.error()));
-                      combined->merge(**right, true);
-                      value = std::move(*combined);
-                    }
-                  }
-                }
-              } else {
-          auto result98 = mergeMethod.equals_ignore_case("override");
-          if (!result98) return std::unexpected(std::move(result98.error()));
-          if (std::move(*result98) && !pair.second.is_null()) {
-                  value = pair.second;
-                }
-        }
+      auto add = method->equals_ignore_case("add");
+      if (!add)
+        return std::unexpected(std::move(add.error()));
+      auto multiply = *add ? std::expected<bool, StarException>(false) : method->equals_ignore_case("multiply");
+      if (!multiply)
+        return std::unexpected(std::move(multiply.error()));
+      if (*add || *multiply) {
+        auto left = current.to_double();
+        if (!left)
+          return std::unexpected(std::move(left.error()));
+        auto right = next.to_double();
+        if (!right)
+          return std::unexpected(std::move(right.error()));
+        current = *add ? *left + *right : *left * *right;
+        continue;
       }
+
+      auto merge = method->equals_ignore_case("merge");
+      if (!merge)
+        return std::unexpected(std::move(merge.error()));
+      if (*merge) {
+        if (next.is_null())
+          continue;
+        if (current.is_null() || current.type() != next.type()) {
+          current = next;
+        } else if (next.type() == Json::Type::Array) {
+          auto left = current.array_ptr();
+          if (!left)
+            return std::unexpected(std::move(left.error()));
+          auto right = next.array_ptr();
+          if (!right)
+            return std::unexpected(std::move(right.error()));
+          JsonArray combined;
+          combined.reserve((*left)->size() + (*right)->size());
+          combined.append_range(**left);
+          combined.append_range(**right);
+          current = std::move(combined);
+        } else if (next.type() == Json::Type::Object) {
+          auto combined = current.to_object();
+          if (!combined)
+            return std::unexpected(std::move(combined.error()));
+          auto right = next.object_ptr();
+          if (!right)
+            return std::unexpected(std::move(right.error()));
+          combined->merge(**right, true);
+          current = std::move(*combined);
+        }
+        continue;
+      }
+
+      auto replace = method->equals_ignore_case("override");
+      if (!replace)
+        return std::unexpected(std::move(replace.error()));
+      if (*replace && !next.is_null())
+        current = next;
     }
   }
+  return merged;
+}
 
-        mergedParameters[pair.first] = value;
+std::expected<JsonObject, StarException> MonsterDatabase::merge_final_parameters(JsonArray const& parameters) {
+  JsonObject merged;
+  for (auto const& source : parameters) {
+    auto entries = source.iterate_object();
+    if (!entries)
+      return std::unexpected(std::move(entries.error()));
+    for (auto const& [key, next] : *entries) {
+      auto& value = merged[key];
+      // Scripts and skill lists append instead of replacing.
+      if (key == "scripts" || key == "skills" || key == "specialSkills" || key == "baseSkills") {
+        auto current = value.opt_array();
+        if (!current)
+          return std::unexpected(std::move(current.error()));
+        auto appended = next.opt_array();
+        if (!appended)
+          return std::unexpected(std::move(appended.error()));
+        auto array = std::move(*current).value_or(JsonArray{});
+        if (*appended)
+          array.append_range(**appended);
+        value = std::move(array);
+      } else {
+        value = json_merge(value, next);
       }
-}
+    }
   }
-
-  return mergedParameters;
+  return merged;
 }
 
-std::expected<Json, StarException> MonsterDatabase::mergeFinalParameters(JsonArray const& parameters) {
-  JsonObject mergedParameters;
+std::expected<void, StarException> MonsterDatabase::read_common_parameters(MonsterVariant& variant) {
+  auto const& parameters = variant.parameters;
+  auto short_description = parameters.opt_string("shortdescription");
+  if (!short_description) return std::unexpected(std::move(short_description.error()));
+  if (*short_description)
+    variant.short_description = std::move(*short_description);
+  auto drop_pool = parameters.get("dropPools", variant.drop_pool_config);
+  if (!drop_pool) return std::unexpected(std::move(drop_pool.error()));
+  variant.drop_pool_config = std::move(*drop_pool);
 
-  for (auto const& applyParams : parameters) {
-    {
-      auto result99 = applyParams.iterate_object();
-      if (!result99)
-        return std::unexpected(std::move(result99.error()));
-      for (auto const& pair : std::move(*result99)) {
-        Json value = mergedParameters.value(pair.first);
+  auto script_paths = parameters.get("scripts");
+  if (!script_paths) return std::unexpected(std::move(script_paths.error()));
+  auto scripts = json_to_string_list(*script_paths);
+  if (!scripts) return std::unexpected(std::move(scripts.error()));
+  variant.scripts = std::move(*scripts);
+  auto animation_script_paths = parameters.get_array("animationScripts", {});
+  if (!animation_script_paths) return std::unexpected(std::move(animation_script_paths.error()));
+  auto animation_scripts = json_to_string_list(std::move(*animation_script_paths));
+  if (!animation_scripts) return std::unexpected(std::move(animation_scripts.error()));
+  variant.animation_scripts = std::move(*animation_scripts);
 
-        // Hard-coded merge for scripts and skills parameters, otherwise merge.
-        if (pair.first == "scripts" || pair.first == "skills" || pair.first == "specialSkills"
-            || pair.first == "baseSkills") {
-          auto result100 = value.opt_array();
-  if (!result100) return std::unexpected(std::move(result100.error()));
-  auto array = std::move(*result100).value_or(JsonArray{});
-          auto result101 = pair.second.opt_array();
-  if (!result101) return std::unexpected(std::move(result101.error()));
-  array.append_range(std::move(*result101).value_or(JsonArray{}));
-  value = std::move(array);
-        } else {
-          value = json_merge(value, pair.second);
-        }
-
-        mergedParameters[pair.first] = value;
-      }
-}
-  }
-
-  return mergedParameters;
-}
-
-std::expected<void, StarException> MonsterDatabase::readCommonParameters(MonsterVariant& variant) {
-  auto result102 = variant.parameters.opt_string("shortdescription");
-if (!result102) return std::unexpected(std::move(result102.error()));
-auto shortDescription = std::move(*result102);
-  variant.shortDescription = shortDescription ? std::move(shortDescription) : variant.shortDescription;
-  auto result103 = variant.parameters.get("dropPools", variant.dropPoolConfig);
-if (!result103) return std::unexpected(std::move(result103.error()));
-variant.dropPoolConfig = std::move(*result103);
-  auto result104 = variant.parameters.get("scripts");
-if (!result104) return std::unexpected(std::move(result104.error()));
-auto result105 = json_to_string_list(std::move(*result104));
-if (!result105) return std::unexpected(std::move(result105.error()));
-variant.scripts = std::move(*result105);
-  auto result106 = variant.parameters.get_array("animationScripts", {});
-if (!result106) return std::unexpected(std::move(result106.error()));
-auto result107 = json_to_string_list(std::move(*result106));
-if (!result107) return std::unexpected(std::move(result107.error()));
-variant.animationScripts = std::move(*result107);
-  auto result108 = variant.parameters.get("animationCustom", JsonObject());
-if (!result108) return std::unexpected(std::move(result108.error()));
-variant.animatorConfig = json_merge(variant.animatorConfig, std::move(*result108));
-  auto result109 = variant.parameters.get_uint("initialScriptDelta", 5);
-if (!result109) return std::unexpected(std::move(result109.error()));
-variant.initialScriptDelta = std::move(*result109);
-  auto result110 = variant.parameters.get("metaBoundBox");
-if (!result110) return std::unexpected(std::move(result110.error()));
-auto result111 = json_to_rectf(std::move(*result110));
-if (!result111) return std::unexpected(std::move(result111.error()));
-variant.meta_bound_box = std::move(*result111);
-  auto renderLayerName = variant.parameters.opt_string("renderLayer");
-  if (!renderLayerName) return std::unexpected(std::move(renderLayerName.error()));
-  variant.renderLayer = render_layer_monster;
-  if (*renderLayerName) {
-    auto layer = parse_render_layer(**renderLayerName);
+  auto animation_custom = parameters.get("animationCustom", JsonObject());
+  if (!animation_custom) return std::unexpected(std::move(animation_custom.error()));
+  variant.animator_config = json_merge(variant.animator_config, *animation_custom);
+  auto initial_script_delta = parameters.get_uint("initialScriptDelta", 5);
+  if (!initial_script_delta) return std::unexpected(std::move(initial_script_delta.error()));
+  variant.initial_script_delta = *initial_script_delta;
+  auto bounds = parameters.get("metaBoundBox");
+  if (!bounds) return std::unexpected(std::move(bounds.error()));
+  auto meta_bound_box = json_to_rectf(*bounds);
+  if (!meta_bound_box) return std::unexpected(std::move(meta_bound_box.error()));
+  variant.meta_bound_box = *meta_bound_box;
+  auto render_layer_name = parameters.opt_string("renderLayer");
+  if (!render_layer_name) return std::unexpected(std::move(render_layer_name.error()));
+  variant.render_layer = render_layer_monster;
+  if (*render_layer_name) {
+    auto layer = parse_render_layer(**render_layer_name);
     if (!layer) return std::unexpected(std::move(layer.error()));
-    variant.renderLayer = *layer;
+    variant.render_layer = *layer;
   }
-  auto result112 = variant.parameters.get_float("scale");
-if (!result112) return std::unexpected(std::move(result112.error()));
-variant.scale = std::move(*result112);
-  auto result113 = variant.parameters.get("movementSettings", {});
-if (!result113) return std::unexpected(std::move(result113.error()));
-auto result114 = ActorMovementParameters::create(std::move(*result113));
-if (!result114) return std::unexpected(std::move(result114.error()));
-variant.movementSettings = std::move(*result114);
-  auto result115 = variant.parameters.get_float("walkMultiplier", 1.0f);
-if (!result115) return std::unexpected(std::move(result115.error()));
-variant.walkMultiplier = std::move(*result115);
-  auto result116 = variant.parameters.get_float("runMultiplier", 1.0f);
-if (!result116) return std::unexpected(std::move(result116.error()));
-variant.runMultiplier = std::move(*result116);
-  auto result117 = variant.parameters.get_float("jumpMultiplier", 1.0f);
-if (!result117) return std::unexpected(std::move(result117.error()));
-variant.jumpMultiplier = std::move(*result117);
-  auto result118 = variant.parameters.get_float("weightMultiplier", 1.0f);
-if (!result118) return std::unexpected(std::move(result118.error()));
-variant.weightMultiplier = std::move(*result118);
-  auto result119 = variant.parameters.get_float("healthMultiplier", 1.0f);
-if (!result119) return std::unexpected(std::move(result119.error()));
-variant.healthMultiplier = std::move(*result119);
-  auto result120 = variant.parameters.get_float("touchDamageMultiplier", 1.0f);
-if (!result120) return std::unexpected(std::move(result120.error()));
-variant.touchDamageMultiplier = std::move(*result120);
-  auto result121 = variant.parameters.get("touchDamage", {});
-if (!result121) return std::unexpected(std::move(result121.error()));
-variant.touchDamageConfig = std::move(*result121);
-  auto result122 = variant.parameters.get_object("animationDamageParts", {});
-if (!result122) return std::unexpected(std::move(result122.error()));
-variant.animationDamageParts = std::move(*result122);
-  auto result123 = variant.parameters.get("statusSettings");
-if (!result123) return std::unexpected(std::move(result123.error()));
-variant.statusSettings = std::move(*result123);
-  auto result124 = variant.parameters.get("mouthOffset");
-if (!result124) return std::unexpected(std::move(result124.error()));
-auto result125 = json_to_vec2f(std::move(*result124));
-if (!result125) return std::unexpected(std::move(result125.error()));
-variant.mouthOffset = std::move(*result125) / tile_pixels;
-  auto result126 = variant.parameters.get("feetOffset");
-if (!result126) return std::unexpected(std::move(result126.error()));
-auto result127 = json_to_vec2f(std::move(*result126));
-if (!result127) return std::unexpected(std::move(result127.error()));
-variant.feetOffset = std::move(*result127) / tile_pixels;
-  auto result128 = variant.parameters.get_string("powerLevelFunction", "monsterLevelPowerMultiplier");
-if (!result128) return std::unexpected(std::move(result128.error()));
-variant.powerLevelFunction = std::move(*result128);
-  auto result129 = variant.parameters.get_string("healthLevelFunction", "monsterLevelHealthMultiplier");
-if (!result129) return std::unexpected(std::move(result129.error()));
-variant.healthLevelFunction = std::move(*result129);
-  auto result130 = variant.parameters.get_string("clientEntityMode", "ClientSlaveOnly");
-if (!result130) return std::unexpected(std::move(result130.error()));
-if (!ClientEntityModeNames) return std::unexpected(ClientEntityModeNames.error());
-auto result131 = ClientEntityModeNames->get_left(std::move(*result130));
-if (!result131) return std::unexpected(std::move(result131.error()));
-variant.client_entity_mode = result131->get();
-  auto result132 = variant.parameters.get_bool("persistent", false);
-if (!result132) return std::unexpected(std::move(result132.error()));
-variant.persistent = std::move(*result132);
-  auto result133 = variant.parameters.get_string("damageTeamType", "enemy");
-if (!result133) return std::unexpected(std::move(result133.error()));
-auto damageTeamType = enum_value<TeamTypeNames>(*result133);
-if (!damageTeamType)
-  return std::unexpected(std::move(damageTeamType.error()));
-variant.damageTeamType = *damageTeamType;
-auto result135 = variant.parameters.get_uint("damageTeam", 2);
-if (!result135) return std::unexpected(std::move(result135.error()));
-variant.damageTeam = std::move(*result135);
+  auto scale = parameters.get_float("scale");
+  if (!scale) return std::unexpected(std::move(scale.error()));
+  variant.scale = *scale;
 
-  {
-  auto result136 = variant.parameters.get("selfDamagePoly", {});
-  if (!result136) return std::unexpected(std::move(result136.error()));
-  if (auto sdp = std::move(*result136))
-      {
-    auto result137 = json_to_polyf(sdp);
-    if (!result137) return std::unexpected(std::move(result137.error()));
-    variant.selfDamagePoly = std::move(*result137);
+  auto movement = parameters.get("movementSettings", {});
+  if (!movement) return std::unexpected(std::move(movement.error()));
+  auto movement_settings = ActorMovementParameters::create(*movement);
+  if (!movement_settings) return std::unexpected(std::move(movement_settings.error()));
+  variant.movement_settings = std::move(*movement_settings);
+  auto walk_multiplier = parameters.get_float("walkMultiplier", 1.0f);
+  if (!walk_multiplier) return std::unexpected(std::move(walk_multiplier.error()));
+  variant.walk_multiplier = *walk_multiplier;
+  auto run_multiplier = parameters.get_float("runMultiplier", 1.0f);
+  if (!run_multiplier) return std::unexpected(std::move(run_multiplier.error()));
+  variant.run_multiplier = *run_multiplier;
+  auto jump_multiplier = parameters.get_float("jumpMultiplier", 1.0f);
+  if (!jump_multiplier) return std::unexpected(std::move(jump_multiplier.error()));
+  variant.jump_multiplier = *jump_multiplier;
+  auto weight_multiplier = parameters.get_float("weightMultiplier", 1.0f);
+  if (!weight_multiplier) return std::unexpected(std::move(weight_multiplier.error()));
+  variant.weight_multiplier = *weight_multiplier;
+  auto health_multiplier = parameters.get_float("healthMultiplier", 1.0f);
+  if (!health_multiplier) return std::unexpected(std::move(health_multiplier.error()));
+  variant.health_multiplier = *health_multiplier;
+  auto touch_damage_multiplier = parameters.get_float("touchDamageMultiplier", 1.0f);
+  if (!touch_damage_multiplier) return std::unexpected(std::move(touch_damage_multiplier.error()));
+  variant.touch_damage_multiplier = *touch_damage_multiplier;
+
+  auto touch_damage = parameters.get("touchDamage", {});
+  if (!touch_damage) return std::unexpected(std::move(touch_damage.error()));
+  variant.touch_damage_config = std::move(*touch_damage);
+  auto animation_damage_parts = parameters.get_object("animationDamageParts", {});
+  if (!animation_damage_parts) return std::unexpected(std::move(animation_damage_parts.error()));
+  variant.animation_damage_parts = std::move(*animation_damage_parts);
+  auto status_settings = parameters.get("statusSettings");
+  if (!status_settings) return std::unexpected(std::move(status_settings.error()));
+  variant.status_settings = std::move(*status_settings);
+  auto mouth = parameters.get("mouthOffset");
+  if (!mouth) return std::unexpected(std::move(mouth.error()));
+  auto mouth_offset = json_to_vec2f(*mouth);
+  if (!mouth_offset) return std::unexpected(std::move(mouth_offset.error()));
+  variant.mouth_offset = *mouth_offset / tile_pixels;
+  auto feet = parameters.get("feetOffset");
+  if (!feet) return std::unexpected(std::move(feet.error()));
+  auto feet_offset = json_to_vec2f(*feet);
+  if (!feet_offset) return std::unexpected(std::move(feet_offset.error()));
+  variant.feet_offset = *feet_offset / tile_pixels;
+
+  auto power_level_function = parameters.get_string("powerLevelFunction", "monsterLevelPowerMultiplier");
+  if (!power_level_function) return std::unexpected(std::move(power_level_function.error()));
+  variant.power_level_function = std::move(*power_level_function);
+  auto health_level_function = parameters.get_string("healthLevelFunction", "monsterLevelHealthMultiplier");
+  if (!health_level_function) return std::unexpected(std::move(health_level_function.error()));
+  variant.health_level_function = std::move(*health_level_function);
+  auto client_mode_name = parameters.get_string("clientEntityMode", "ClientSlaveOnly");
+  if (!client_mode_name) return std::unexpected(std::move(client_mode_name.error()));
+  if (!ClientEntityModeNames)
+    return std::unexpected(ClientEntityModeNames.error());
+  auto client_mode = ClientEntityModeNames->get_left(*client_mode_name);
+  if (!client_mode) return std::unexpected(std::move(client_mode.error()));
+  variant.client_entity_mode = client_mode->get();
+  auto persistent = parameters.get_bool("persistent", false);
+  if (!persistent) return std::unexpected(std::move(persistent.error()));
+  variant.persistent = *persistent;
+  auto damage_team_name = parameters.get_string("damageTeamType", "enemy");
+  if (!damage_team_name) return std::unexpected(std::move(damage_team_name.error()));
+  auto damage_team_type = enum_value<TeamTypeNames>(*damage_team_name);
+  if (!damage_team_type) return std::unexpected(std::move(damage_team_type.error()));
+  variant.damage_team_type = *damage_team_type;
+  auto damage_team = parameters.get_uint("damageTeam", 2);
+  if (!damage_team) return std::unexpected(std::move(damage_team.error()));
+  variant.damage_team = *damage_team;
+
+  auto poly = parameters.get("selfDamagePoly", {});
+  if (!poly) return std::unexpected(std::move(poly.error()));
+  if (*poly) {
+    auto self_damage_poly = json_to_polyf(*poly);
+    if (!self_damage_poly) return std::unexpected(std::move(self_damage_poly.error()));
+    variant.self_damage_poly = std::move(*self_damage_poly);
+  } else {
+    if (!variant.movement_settings.standing_poly)
+      return std::unexpected(MonsterException("Monster has no standing polygon"));
+    variant.self_damage_poly = *variant.movement_settings.standing_poly;
   }
-    else {
-      if (!variant.movementSettings.standing_poly)
-        return std::unexpected(MonsterException("Monster has no standing polygon"));
-      variant.selfDamagePoly = *variant.movementSettings.standing_poly;
-    }
-}
 
-  auto result138 = variant.parameters.opt_string("portraitIcon");
-if (!result138) return std::unexpected(std::move(result138.error()));
-variant.portraitIcon = std::move(*result138);
-  auto result139 = variant.parameters.get_float("damageReceivedAggressiveDuration", 1.0f);
-if (!result139) return std::unexpected(std::move(result139.error()));
-variant.damageReceivedAggressiveDuration = std::move(*result139);
-  auto result140 = variant.parameters.get_float("onDamagedOthersAggressiveDuration", 5.0f);
-if (!result140) return std::unexpected(std::move(result140.error()));
-variant.onDamagedOthersAggressiveDuration = std::move(*result140);
-  auto result141 = variant.parameters.get_float("onFireAggressiveDuration", 5.0f);
-if (!result141) return std::unexpected(std::move(result141.error()));
-variant.onFireAggressiveDuration = std::move(*result141);
+  auto portrait_icon = parameters.opt_string("portraitIcon");
+  if (!portrait_icon) return std::unexpected(std::move(portrait_icon.error()));
+  variant.portrait_icon = std::move(*portrait_icon);
+  auto damage_received_aggressive_duration = parameters.get_float("damageReceivedAggressiveDuration", 1.0f);
+  if (!damage_received_aggressive_duration) return std::unexpected(std::move(damage_received_aggressive_duration.error()));
+  variant.damage_received_aggressive_duration = *damage_received_aggressive_duration;
+  auto on_damaged_others_aggressive_duration = parameters.get_float("onDamagedOthersAggressiveDuration", 5.0f);
+  if (!on_damaged_others_aggressive_duration) return std::unexpected(std::move(on_damaged_others_aggressive_duration.error()));
+  variant.on_damaged_others_aggressive_duration = *on_damaged_others_aggressive_duration;
+  auto on_fire_aggressive_duration = parameters.get_float("onFireAggressiveDuration", 5.0f);
+  if (!on_fire_aggressive_duration) return std::unexpected(std::move(on_fire_aggressive_duration.error()));
+  variant.on_fire_aggressive_duration = *on_fire_aggressive_duration;
 
-  auto result142 = variant.parameters.get("nametagColor", JsonArray{255, 255, 255});
-if (!result142) return std::unexpected(std::move(result142.error()));
-auto result143 = json_to_vec3b(std::move(*result142));
-if (!result143) return std::unexpected(std::move(result143.error()));
-variant.nametagColor = std::move(*result143);
-
-  auto colorSwaps = variant.parameters.opt_object("colorSwap");
-  if (!colorSwaps) return std::unexpected(std::move(colorSwaps.error()));
-  if (*colorSwaps) {
+  auto color = parameters.get("nametagColor", JsonArray{255, 255, 255});
+  if (!color) return std::unexpected(std::move(color.error()));
+  auto nametag_color = json_to_vec3b(*color);
+  if (!nametag_color) return std::unexpected(std::move(nametag_color.error()));
+  variant.nametag_color = *nametag_color;
+  auto color_swap = parameters.opt_object("colorSwap");
+  if (!color_swap) return std::unexpected(std::move(color_swap.error()));
+  if (*color_swap) {
     ColorReplaceMap swaps;
-    for (auto const& pair : **colorSwaps) {
-      auto from = Color::from_hex(pair.first);
+    for (auto const& [key, value] : **color_swap) {
+      auto from = Color::from_hex(key);
       if (!from) return std::unexpected(std::move(from.error()));
-      auto text = pair.second.to_string();
+      auto text = value.to_string();
       if (!text) return std::unexpected(std::move(text.error()));
       auto to = Color::from_hex(*text);
       if (!to) return std::unexpected(std::move(to.error()));
       swaps.insert(from->to_rgba(), to->to_rgba());
     }
-    variant.colorSwap = std::move(swaps);
+    variant.color_swap = std::move(swaps);
   }
   return {};
 }
 
-std::expected<MonsterVariant, StarException> MonsterDatabase::produceMonster(String const& typeName, std::uint64_t seed, Json const& uniqueParameters) const {
-  RandomSource rand = RandomSource(seed);
+std::expected<MonsterVariant, StarException> MonsterDatabase::produce_monster(
+    String const& type_name, std::uint64_t seed, Json const& unique_parameters) const {
+  RandomSource random(seed);
+  auto type = m_monster_types.get(type_name);
+  if (!type)
+    return std::unexpected(std::move(type.error()));
+  auto const& monster_type = type->get();
 
-  auto result144 = m_monsterTypes.get(typeName);
-if (!result144) return std::unexpected(std::move(result144.error()));
-auto const& monsterType = result144->get();
+  MonsterVariant variant;
+  variant.type = type_name;
+  variant.short_description = monster_type.short_description;
+  variant.description = monster_type.description;
+  variant.seed = seed;
+  variant.unique_parameters = unique_parameters;
 
-  MonsterVariant monsterVariant;
-  monsterVariant.type = typeName;
-  monsterVariant.shortDescription = monsterType.shortDescription;
-  monsterVariant.description = monsterType.description;
-  monsterVariant.seed = seed;
-  monsterVariant.uniqueParameters = uniqueParameters;
+  auto assets = m_root.assets();
+  if (!assets)
+    return std::unexpected(std::move(assets.error()));
+  auto animation = (*assets)->fetch_json(monster_type.animation_config_path);
+  if (!animation)
+    return std::unexpected((*assets)->with_asset_context(std::move(animation.error()),
+        monster_type.animation_config_path, "Loading monster animation"));
+  variant.animator_config = std::move(*animation);
+  variant.reversed = monster_type.reversed;
 
-  auto result145 = m_root.assets();
-if (!result145) return std::unexpected(std::move(result145.error()));
-auto result146 = (*result145)->fetch_json(monsterType.animationConfigPath);
-if (!result146) return std::unexpected((*result145)->with_asset_context(std::move(result146.error()), monsterType.animationConfigPath, "Loading monster animation"));
-monsterVariant.animatorConfig = std::move(*result146);
-  monsterVariant.reversed = monsterType.reversed;
-
-  // select a list of monster parts
-  List<MonsterPart> monsterParts;
-  auto result147 = rand.sample_ref(monsterType.categories);
-if (!result147) return std::unexpected(std::move(result147.error()));
-auto const& categoryName = result147->get();
-
-  for (auto const& partTypeName : monsterType.partTypes) {
-    auto result148 = m_partDirectory.get(categoryName);
-if (!result148) return std::unexpected(std::move(result148.error()));
-auto result149 = result148->get().get(partTypeName);
-if (!result149) return std::unexpected(std::move(result149.error()));
-auto result150 = rand.sample_ref(result149->get());
-if (!result150) return std::unexpected(std::move(result150.error()));
-auto const& randPart = result150->get().second;
-    auto result151 = uniqueParameters.get("selectedParts", JsonObject());
-if (!result151) return std::unexpected(std::move(result151.error()));
-auto result152 = std::move(*result151).opt_string(partTypeName);
-if (!result152) return std::unexpected(std::move(result152.error()));
-auto selectedPart = std::move(*result152);
-    if (selectedPart)
-      {
-      auto result155 = result149->get().get(*selectedPart);
-      if (!result155)
-        return std::unexpected(std::move(result155.error()));
-      monsterParts.push_back(result155->get());
-}
-    else
-  monsterParts.push_back(randPart);
-  }
-
-  for (auto const& partConfig : monsterParts) {
-    for (auto const& pair : partConfig.frames)
-      {
-  auto result156 = pair.second.to_string();
-  if (!result156) return std::unexpected(std::move(result156.error()));
-  monsterVariant.animatorPartTags[pair.first] = AssetPath::relative_to(partConfig.path, std::move(*result156));
-}
-  }
-  JsonArray partParameterList;
-  for (auto const& partConfig : monsterParts) {
-    partParameterList.push_back(partConfig.partParameters);
-    // Include part parameter overrides
-    {
-  bool condition158 = static_cast<bool>(!monsterType.partParameterOverrides.is_null());
-  if (condition158) {
-    auto result157 = monsterType.partParameterOverrides.contains(partConfig.name);
-    if (!result157) return std::unexpected(std::move(result157.error()));
-    condition158 = static_cast<bool>(std::move(*result157));
-  }
-  if (condition158)
-        {
-    auto result159 = monsterType.partParameterOverrides.get_object(partConfig.name);
-    if (!result159) return std::unexpected(std::move(result159.error()));
-    partParameterList.push_back(std::move(*result159));
-  }
-}
-  }
-
-  // merge part parameters and unique parameters into base parameters
-  Json baseParameters = monsterType.baseParameters;
-  auto result160 = mergePartParameters(monsterType.partParameterDescription, partParameterList);
-if (!result160) return std::unexpected(std::move(result160.error()));
-Json mergedPartParameters = std::move(*result160);
-  auto result161 = mergeFinalParameters({baseParameters, mergedPartParameters});
-if (!result161) return std::unexpected(std::move(result161.error()));
-monsterVariant.parameters = std::move(*result161);
-  monsterVariant.parameters = json_merge(monsterVariant.parameters, uniqueParameters);
-
-  auto result162 = chooseSkills(monsterVariant.parameters, monsterVariant.animatorConfig, rand);
-if (!result162) return std::unexpected(std::move(result162.error()));
-std::tie(monsterVariant.parameters, monsterVariant.animatorConfig) = std::move(*result162);
-  monsterVariant.animatorZoom = 1.0f;
-  monsterVariant.dropPoolConfig = monsterType.dropPools;
-
-  auto result163 = readCommonParameters(monsterVariant);
-if (!result163) return std::unexpected(std::move(result163.error()));
-
-  monsterVariant.animatorZoom = monsterVariant.scale;
-  if (monsterVariant.dropPoolConfig.is_type(Json::Type::Array))
-    {
-    auto result164 = monsterVariant.dropPoolConfig.array_ptr();
-    if (!result164)
-      return std::unexpected(std::move(result164.error()));
-    auto dropPool = rand.sample_value(**result164);
-    if (!dropPool)
-      return std::unexpected(std::move(dropPool.error()));
-    monsterVariant.dropPoolConfig = std::move(*dropPool);
-}
-
-  return monsterVariant;
-}
-
-std::expected<std::pair<Json, Json>, StarException> MonsterDatabase::chooseSkills(
-    Json const& parameters, Json const& animatorConfig, RandomSource& rand) const {
-  // Pick a subset of skills, then merge in any params from those skills
-  {
-  auto result165 = parameters.contains("baseSkills");
-  if (!result165) return std::unexpected(std::move(result165.error()));
-  bool condition167 = static_cast<bool>(std::move(*result165));
-  if (!condition167) {
-    auto result166 = parameters.contains("specialSkills");
-    if (!result166) return std::unexpected(std::move(result166.error()));
-    condition167 = static_cast<bool>(std::move(*result166));
-  }
-  if (condition167) {
-      auto result168 = parameters.get_uint("skillCount", 2);
-  if (!result168) return std::unexpected(std::move(result168.error()));
-  auto skillCount = std::move(*result168);
-
-      auto result169 = parameters.get("baseSkills");
-  if (!result169) return std::unexpected(std::move(result169.error()));
-  auto result170 = json_to_string_list(std::move(*result169));
-  if (!result170) return std::unexpected(std::move(result170.error()));
-  auto baseSkillNames = std::move(*result170);
-      auto result171 = parameters.get("specialSkills");
-  if (!result171) return std::unexpected(std::move(result171.error()));
-  auto result172 = json_to_string_list(std::move(*result171));
-  if (!result172) return std::unexpected(std::move(result172.error()));
-  auto specialSkillNames = std::move(*result172);
-
-      List<String> skillNames;
-
-      // First, pick from base skills
-      while (!baseSkillNames.empty() && skillNames.size() < skillCount)
-        {
-        auto index = rand.uniform_int(baseSkillNames.size() - 1);
-        if (!index)
-          return std::unexpected(std::move(index.error()));
-        auto result174 = baseSkillNames.take_at(*index);
-        if (!result174)
-          return std::unexpected(std::move(result174.error()));
-        skillNames.push_back(std::move(*result174));
-  }
-
-      // ...then fill in from special skills as needed
-      while (!specialSkillNames.empty() && skillNames.size() < skillCount)
-        {
-        auto index = rand.uniform_int(specialSkillNames.size() - 1);
-        if (!index)
-          return std::unexpected(std::move(index.error()));
-        auto result176 = specialSkillNames.take_at(*index);
-        if (!result176)
-          return std::unexpected(std::move(result176.error()));
-        skillNames.push_back(std::move(*result176));
-  }
-
-      Json finalAnimatorConfig = animatorConfig;
-      JsonArray allParameters({parameters});
-      for (auto& skillName : skillNames) {
-        if (m_skills.contains(skillName)) {
-          auto result177 = m_skills.get(skillName);
-  if (!result177) return std::unexpected(std::move(result177.error()));
-  auto const& skill = result177->get();
-  allParameters.push_back(skill.parameters);
-  finalAnimatorConfig = json_merge(finalAnimatorConfig, skill.animationParameters);
-        }
+  auto category = random.sample_ref(monster_type.categories);
+  if (!category)
+    return std::unexpected(std::move(category.error()));
+  // Part records belong to this immutable directory and are borrowed only during generation.
+  SmallList<std::reference_wrapper<MonsterPart const>, 4> parts;
+  parts.reserve(monster_type.part_types.size());
+  if (!monster_type.part_types.empty()) {
+    auto category_parts = m_part_directory.get(category->get());
+    if (!category_parts)
+      return std::unexpected(std::move(category_parts.error()));
+    std::optional<Json> selected_parts;
+    for (auto const& part_type : monster_type.part_types) {
+      auto part_map = category_parts->get().get(part_type);
+      if (!part_map)
+        return std::unexpected(std::move(part_map.error()));
+      // The draw is consumed even when selectedParts overrides this part.
+      auto sampled = random.sample_ref(part_map->get());
+      if (!sampled)
+        return std::unexpected(std::move(sampled.error()));
+      if (!selected_parts) {
+        auto configured_parts = unique_parameters.get("selectedParts", JsonObject());
+        if (!configured_parts)
+          return std::unexpected(std::move(configured_parts.error()));
+        selected_parts = std::move(*configured_parts);
       }
-
-      // Need to override the final list of skills, instead of merging the lists
-      auto result178 = mergeFinalParameters(allParameters);
-  if (!result178) return std::unexpected(std::move(result178.error()));
-  auto result179 = std::move(*result178).set("skills", json_from_string_list(skillNames));
-  if (!result179) return std::unexpected(std::move(result179.error()));
-  Json finalParameters = std::move(*result179);
-
-      return std::make_pair(finalParameters, finalAnimatorConfig);
-    } else {
-    auto result180 = parameters.contains("skills");
-    if (!result180) return std::unexpected(std::move(result180.error()));
-    if (std::move(*result180)) {
-        auto result181 = parameters.get("skills");
-    if (!result181) return std::unexpected(std::move(result181.error()));
-    auto result182 = json_to_string_list(std::move(*result181));
-    if (!result182) return std::unexpected(std::move(result182.error()));
-    auto availableSkillNames = std::move(*result182);
-        auto result183 = parameters.get_uint("skillCount", 2);
-    if (!result183) return std::unexpected(std::move(result183.error()));
-    auto skillCount = std::min<std::size_t>(std::move(*result183), availableSkillNames.size());
-
-        List<String> skillNames;
-        for (std::size_t i = 0; i < skillCount; ++i)
-          {
-          auto index = rand.uniform_int(availableSkillNames.size() - 1);
-          if (!index)
-            return std::unexpected(std::move(index.error()));
-          auto result185 = availableSkillNames.take_at(*index);
-          if (!result185)
-            return std::unexpected(std::move(result185.error()));
-          skillNames.push_back(std::move(*result185));
-    }
-
-        Json finalAnimatorConfig = animatorConfig;
-        JsonArray allParameters({parameters});
-        for (auto& skillName : skillNames) {
-          if (m_skills.contains(skillName)) {
-            auto result186 = m_skills.get(skillName);
-    if (!result186) return std::unexpected(std::move(result186.error()));
-    auto const& skill = result186->get();
-    allParameters.push_back(skill.parameters);
-    finalAnimatorConfig = json_merge(finalAnimatorConfig, skill.animationParameters);
-          }
-        }
-
-        // Need to override the final list of skills, instead of merging the lists
-        auto result187 = mergeFinalParameters(allParameters);
-    if (!result187) return std::unexpected(std::move(result187.error()));
-    auto result188 = std::move(*result187).set("skills", json_from_string_list(skillNames));
-    if (!result188) return std::unexpected(std::move(result188.error()));
-    Json finalParameters = std::move(*result188);
-
-        return std::make_pair(finalParameters, finalAnimatorConfig);
+      auto name = selected_parts->opt_string(part_type);
+      if (!name)
+        return std::unexpected(std::move(name.error()));
+      if (*name) {
+        auto selected = part_map->get().get(**name);
+        if (!selected)
+          return std::unexpected(std::move(selected.error()));
+        parts.push_back(*selected);
       } else {
-        return std::make_pair(parameters, animatorConfig);
+        parts.push_back(std::cref(sampled->get().second));
       }
+    }
   }
-}
+
+  // Resolve only selected frames, before reading any part parameter overrides.
+  for (MonsterPart const& part : parts) {
+    for (auto const& [tag, frame] : part.frames) {
+      auto image = frame.to_string();
+      if (!image)
+        return std::unexpected(std::move(image.error()));
+      variant.animator_part_tags[tag] = AssetPath::relative_to(part.path, *image);
+    }
+  }
+
+  JsonArray part_parameters;
+  part_parameters.reserve(parts.size());
+  auto const& overrides = monster_type.part_parameter_overrides;
+  for (MonsterPart const& part : parts) {
+    part_parameters.push_back(part.part_parameters);
+    if (overrides.is_null())
+      continue;
+    auto has_override = overrides.contains(part.name);
+    if (!has_override)
+      return std::unexpected(std::move(has_override.error()));
+    if (*has_override) {
+      auto parameters = overrides.get_object(part.name);
+      if (!parameters)
+        return std::unexpected(std::move(parameters.error()));
+      part_parameters.push_back(std::move(*parameters));
+    }
+  }
+
+  auto merged_parts = merge_part_parameters(monster_type.part_parameter_description, part_parameters);
+  if (!merged_parts)
+    return std::unexpected(std::move(merged_parts.error()));
+  auto merged = merge_final_parameters({monster_type.base_parameters, std::move(*merged_parts)});
+  if (!merged)
+    return std::unexpected(std::move(merged.error()));
+  variant.parameters = json_merge(std::move(*merged), unique_parameters);
+  if (auto chosen = choose_skills(variant, random); !chosen)
+    return std::unexpected(std::move(chosen.error()));
+
+  variant.drop_pool_config = monster_type.drop_pools;
+  if (auto read = read_common_parameters(variant); !read)
+    return std::unexpected(std::move(read.error()));
+  variant.animator_zoom = variant.scale;
+  if (variant.drop_pool_config.is_type(Json::Type::Array)) {
+    auto drop_pools = variant.drop_pool_config.array_ptr();
+    if (!drop_pools)
+      return std::unexpected(std::move(drop_pools.error()));
+    auto drop_pool = random.sample_value(**drop_pools);
+    if (!drop_pool)
+      return std::unexpected(std::move(drop_pool.error()));
+    variant.drop_pool_config = std::move(*drop_pool);
+  }
+  return variant;
 }
 
-Json MonsterDatabase::MonsterType::toJson() const {
+std::expected<void, StarException> MonsterDatabase::choose_skills(MonsterVariant& variant, RandomSource& random) const {
+  auto const& parameters = variant.parameters;
+  auto split = parameters.contains("baseSkills");
+  if (!split)
+    return std::unexpected(std::move(split.error()));
+  if (!*split) {
+    split = parameters.contains("specialSkills");
+    if (!split)
+      return std::unexpected(std::move(split.error()));
+  }
+
+  StringList primary_skills;
+  StringList special_skills;
+  std::uint64_t skill_count;
+  if (*split) {
+    auto requested = parameters.get_uint("skillCount", 2);
+    if (!requested)
+      return std::unexpected(std::move(requested.error()));
+    skill_count = *requested;
+    auto base_list = parameters.get("baseSkills");
+    if (!base_list)
+      return std::unexpected(std::move(base_list.error()));
+    auto base_names = json_to_string_list(*base_list);
+    if (!base_names)
+      return std::unexpected(std::move(base_names.error()));
+    primary_skills = std::move(*base_names);
+    auto special_list = parameters.get("specialSkills");
+    if (!special_list)
+      return std::unexpected(std::move(special_list.error()));
+    auto special_names = json_to_string_list(*special_list);
+    if (!special_names)
+      return std::unexpected(std::move(special_names.error()));
+    special_skills = std::move(*special_names);
+  } else {
+    auto has_skills = parameters.contains("skills");
+    if (!has_skills)
+      return std::unexpected(std::move(has_skills.error()));
+    if (!*has_skills)
+      return {};
+    auto skill_list = parameters.get("skills");
+    if (!skill_list)
+      return std::unexpected(std::move(skill_list.error()));
+    auto names = json_to_string_list(*skill_list);
+    if (!names)
+      return std::unexpected(std::move(names.error()));
+    primary_skills = std::move(*names);
+    auto requested = parameters.get_uint("skillCount", 2);
+    if (!requested)
+      return std::unexpected(std::move(requested.error()));
+    skill_count = std::min<std::size_t>(*requested, primary_skills.size());
+  }
+
+  auto primary_count = std::min<std::uint64_t>(skill_count, primary_skills.size());
+  auto special_count = std::min<std::uint64_t>(skill_count - primary_count, special_skills.size());
+  JsonArray selected_names;
+  selected_names.reserve(primary_count + special_count);
+  JsonArray all_parameters;
+  all_parameters.reserve(1 + primary_count + special_count);
+  all_parameters.push_back(parameters);
+  auto select = [&](StringList& available, std::size_t count) -> std::expected<void, StarException> {
+    while (count-- != 0) {
+      auto index = random.uniform_int(available.size() - 1);
+      if (!index)
+        return std::unexpected(std::move(index.error()));
+      // Keep the remaining list ordered: swapping with its tail changes later picks.
+      auto name = available.take_at(*index);
+      if (!name)
+        return std::unexpected(std::move(name.error()));
+      if (auto skill = m_skills.find(*name); skill != m_skills.end()) {
+        all_parameters.push_back(skill->second.parameters);
+        variant.animator_config = json_merge(variant.animator_config, skill->second.animation_parameters);
+      }
+      selected_names.push_back(std::move(*name));
+    }
+    return {};
+  };
+  if (auto selected = select(primary_skills, primary_count); !selected)
+    return std::unexpected(std::move(selected.error()));
+  if (auto selected = select(special_skills, special_count); !selected)
+    return std::unexpected(std::move(selected.error()));
+
+  auto final_parameters = merge_final_parameters(all_parameters);
+  if (!final_parameters)
+    return std::unexpected(std::move(final_parameters.error()));
+  // Replace the final list rather than appending it to the input lists.
+  (*final_parameters)["skills"] = std::move(selected_names);
+  variant.parameters = std::move(*final_parameters);
+  return {};
+}
+
+Json MonsterDatabase::MonsterType::to_json() const {
   return JsonObject{
-    {"type", typeName},
-    {"shortdescription", shortDescription.value_or(String{})},
+    {"type", type_name},
+    {"shortdescription", short_description.value_or(String{})},
     {"description", description.value_or(String{})},
     {"categories", json_from_string_list(categories)},
-    {"parts", json_from_string_list(partTypes)},
-    {"animation", animationConfigPath},
+    {"parts", json_from_string_list(part_types)},
+    {"animation", animation_config_path},
     {"colors", colors},
     {"reversed", reversed},
-    {"dropPools", dropPools},
-    {"baseParameters", baseParameters},
-    {"partParameters", partParameterOverrides},
-    {"partParameterDescription", partParameterDescription}
+    {"dropPools", drop_pools},
+    {"baseParameters", base_parameters},
+    {"partParameters", part_parameter_overrides},
+    {"partParameterDescription", part_parameter_description}
   };
 }
 }

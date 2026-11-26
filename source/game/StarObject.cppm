@@ -168,7 +168,7 @@ public:
   [[nodiscard]] std::expected<List<PersistentStatusEffect>, StarException> statusEffects() const override;
   PolyF statusEffectArea() const override;
 
-  [[nodiscard]] std::expected<List<DamageSource>, StarException> damageSources() const override;
+  [[nodiscard]] std::expected<List<DamageSource>, StarException> damage_sources() const override;
 
   [[nodiscard]] std::expected<std::optional<HitType>, StarException>
   queryHit(DamageSource const& source) const override;

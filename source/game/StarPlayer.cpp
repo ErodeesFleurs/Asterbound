@@ -1410,7 +1410,7 @@ std::expected<void, StarException> Player::damagedOther(DamageNotification const
   return {};
 }
 
-std::expected<List<DamageSource>, StarException> Player::damageSources() const {
+std::expected<List<DamageSource>, StarException> Player::damage_sources() const {
   return m_damageSources;
 }
 

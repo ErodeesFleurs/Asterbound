@@ -73,6 +73,13 @@ import star.item_descriptor;
 import star.plant_database;
 import star.quest_template_database;
 import star.monster_database;
+import star.monster;
+import star.actor_movement_controller;
+import star.damage;
+import star.damage_types;
+import star.line;
+import star.poly;
+import star.stored_functions;
 import star.status_controller;
 import star.status_types;
 import star.light_source;
@@ -524,7 +531,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
     ASSERT_NO_FATAL_FAILURE(expectCatalog("objectDatabase", root.objectDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("plantDatabase", root.plantDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("projectileDatabase", root.projectileDatabase()));
-    ASSERT_NO_FATAL_FAILURE(expectCatalog("monsterDatabase", root.monsterDatabase()));
+    ASSERT_NO_FATAL_FAILURE(expectCatalog("monsterDatabase", root.monster_database()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("npcDatabase", root.npcDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("playerFactory", root.playerFactory()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("entityFactory", root.entityFactory()));
@@ -2245,15 +2252,15 @@ const GameTestRegistration npcEquipmentBoundaries("RootTest", "NpcEquipmentBound
   }
 });
 
-const GameTestRegistration monsterDropPoolBoundaries("RootTest", "MonsterDropPoolBoundaries", [](GameTest& fixture) {
-  auto database = fixture.root().monsterDatabase();
+const GameTestRegistration monster_drop_pool_boundaries("RootTest", "MonsterDropPoolBoundaries", [](GameTest& fixture) {
+  auto database = fixture.root().monster_database();
   ASSERT_TRUE(database) << database.error().what();
   auto pool = Json(JsonObject{{"default", "borrowed-pool"}, {"fire", "borrowed-fire-pool"}});
   for (auto const& config : {Json(JsonArray{}), Json("borrowed-pool"), Json(JsonArray{pool})}) {
-    auto variant = (*database)->monsterVariant("poptop", 0x12345678, JsonObject{{"dropPools", config}});
+    auto variant = (*database)->monster_variant("poptop", 0x12345678, JsonObject{{"dropPools", config}});
     ASSERT_TRUE(variant) << variant.error().what();
     auto expected = config.is_type(Json::Type::Array) ? (config == Json(JsonArray{}) ? Json() : pool) : config;
-    EXPECT_EQ(variant->dropPoolConfig, expected);
+    EXPECT_EQ(variant->drop_pool_config, expected);
   }
 });
 
@@ -2283,9 +2290,9 @@ const GameTestRegistration monster_part_merge("RootTest", "MonsterPartShallowMer
   }));
   auto root = Root::create(std::move(*settings));
   ASSERT_TRUE(root) << root.error().what();
-  auto database = (*root)->monsterDatabase();
+  auto database = (*root)->monster_database();
   ASSERT_TRUE(database) << database.error().what();
-  auto variant = (*database)->monsterVariant("merge-probe", 42);
+  auto variant = (*database)->monster_variant("merge-probe", 42);
   ASSERT_TRUE(variant) << variant.error().what();
   auto expected = Json::parse_json(R"JSON({
     "list":[1,2,3,4],"map":{"left":1,"nested":{"new":2},"right":2},
@@ -2296,6 +2303,133 @@ const GameTestRegistration monster_part_merge("RootTest", "MonsterPartShallowMer
   ASSERT_TRUE(fields) << fields.error().what();
   for (auto const& [key, value] : *fields)
     EXPECT_EQ(variant->parameters.get(key), value) << key.utf8();
+});
+
+const GameTestRegistration monster_generation_rng("RootTest", "MonsterGenerationRng", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto settings = isolationSettings(fixture.rootSettings(), *directory, "monster-generation");
+  ASSERT_TRUE(settings) << settings.error().what();
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(writeIsolationModules(overlay, {
+    {"generation-probe.animation", "{}"},
+    {"generation-probe.monstertype", R"JSON({
+      "type":"generation-probe","categories":["generation-probe"],"parts":["body","tail"],
+      "animation":"generation-probe.animation","dropPools":["pool0","pool1","pool2"],
+      "baseParameters":{"scripts":[],"scale":1,"metaBoundBox":[0,0,1,1],"mouthOffset":[0,0],"feetOffset":[0,0],
+        "statusSettings":{"minimumLiquidStatusEffectPercentage":1,"appliesEnvironmentStatusEffects":false,
+          "appliesWeatherStatusEffects":false},"selfDamagePoly":[[0,0],[1,0],[0,1]]}
+    })JSON"},
+    {"generation-empty.monstertype", R"JSON({
+      "type":"generation-empty","categories":["generation-empty"],"parts":[],
+      "animation":"generation-probe.animation",
+      "baseParameters":{"scripts":[],"scale":1,"metaBoundBox":[0,0,1,1],"mouthOffset":[0,0],"feetOffset":[0,0],
+        "statusSettings":{},"selfDamagePoly":[[0,0],[1,0],[0,1]]}
+    })JSON"},
+    {"generation-a.monsterpart", R"JSON({
+      "name":"a","category":"generation-probe","type":"body","frames":{"body":"body-a.png","shared":"body-a.png"}
+    })JSON"},
+    {"generation-b.monsterpart", R"JSON({
+      "name":"b","category":"generation-probe","type":"body","frames":{"body":"body-b.png","shared":"body-b.png"}
+    })JSON"},
+    {"generation-c.monsterpart", R"JSON({
+      "name":"c","category":"generation-probe","type":"body","frames":{"body":5}
+    })JSON"},
+    {"generation-x.monsterpart", R"JSON({
+      "name":"x","category":"generation-probe","type":"tail","frames":{"tail":"tail-x.png","shared":"tail-x.png"}
+    })JSON"},
+    {"generation-y.monsterpart", R"JSON({
+      "name":"y","category":"generation-probe","type":"tail","frames":{"tail":"tail-y.png","shared":"tail-y.png"}
+    })JSON"},
+    {"generation-a.monsterskill", R"JSON({
+      "name":"generation-a","label":"a","image":"a.png",
+      "parameters":{"generationMarker":"a"},"animationParameters":{"generationAnimation":"a"}
+    })JSON"},
+    {"generation-d.monsterskill", R"JSON({
+      "name":"generation-d","label":"d","image":"d.png",
+      "parameters":{"generationMarker":"d"},"animationParameters":{"generationAnimation":"d"}
+    })JSON"}
+  }));
+  auto root = Root::create(std::move(*settings));
+  ASSERT_TRUE(root) << root.error().what();
+  auto database = (*root)->monster_database();
+  ASSERT_TRUE(database) << database.error().what();
+  auto& monsters = **database;
+  constexpr std::uint64_t seed = 0x8123456789abcdef;
+
+  Json parameters = JsonObject{
+      {"seed", "9305357566071262703"},
+      {"skills", JsonArray{"generation-a", "generation-b", "generation-c", "generation-d", "generation-e"}},
+      {"skillCount", 3}};
+  auto generated = monsters.random_monster("generation-probe", parameters);
+  ASSERT_TRUE(generated) << generated.error().what();
+  EXPECT_EQ(generated->seed, seed);
+  EXPECT_EQ(generated->animator_part_tags.value("body"), "/body-b.png");
+  EXPECT_EQ(generated->animator_part_tags.value("tail"), "/tail-y.png");
+  EXPECT_EQ(generated->animator_part_tags.value("shared"), "/tail-y.png");
+  auto generated_skills = generated->parameters.get("skills");
+  ASSERT_TRUE(generated_skills) << generated_skills.error().what();
+  EXPECT_EQ(*generated_skills, Json(JsonArray{"generation-d", "generation-b", "generation-a"}));
+  EXPECT_EQ(generated->parameters.get("generationMarker"), Json("a"));
+  EXPECT_EQ(generated->animator_config.get("generationAnimation"), Json("a"));
+  EXPECT_EQ(generated->drop_pool_config, Json("pool1"));
+
+  auto numeric_seed = parameters.set("seed", seed);
+  ASSERT_TRUE(numeric_seed) << numeric_seed.error().what();
+  auto numeric = monsters.random_monster("generation-probe", *numeric_seed);
+  ASSERT_TRUE(numeric) << numeric.error().what();
+  EXPECT_EQ(numeric->seed, seed);
+  EXPECT_EQ(numeric->animator_part_tags, generated->animator_part_tags);
+  EXPECT_EQ(numeric->parameters.get("skills"), *generated_skills);
+
+  auto selected_parts = parameters.set("selectedParts", JsonObject{{"body", "a"}, {"tail", "x"}});
+  ASSERT_TRUE(selected_parts) << selected_parts.error().what();
+  auto selected = monsters.random_monster("generation-probe", *selected_parts);
+  ASSERT_TRUE(selected) << selected.error().what();
+  EXPECT_EQ(selected->animator_part_tags.value("body"), "/body-a.png");
+  EXPECT_EQ(selected->animator_part_tags.value("tail"), "/tail-x.png");
+  EXPECT_EQ(selected->animator_part_tags.value("shared"), "/tail-x.png");
+  EXPECT_EQ(selected->parameters.get("skills"), *generated_skills);
+  EXPECT_EQ(selected->drop_pool_config, generated->drop_pool_config);
+
+  auto split = monsters.monster_variant("generation-probe", seed,
+      JsonObject{{"baseSkills", JsonArray{"base0", "base1"}},
+                 {"specialSkills", JsonArray{"generation-a", "generation-b", "generation-c", "generation-d"}},
+                 {"skillCount", 5}});
+  ASSERT_TRUE(split) << split.error().what();
+  EXPECT_EQ(split->parameters.get("skills"), Json(JsonArray{"base1", "base0", "generation-a", "generation-c", "generation-b"}));
+  EXPECT_EQ(split->drop_pool_config, Json("pool0"));
+
+  // A malformed frame is parsed only if its part survives selection. Even a
+  // category with no parts must not inspect selectedParts.
+  constexpr std::uint64_t malformed_seed = 0xffffffffffffffff;
+  EXPECT_FALSE(monsters.monster_variant("generation-probe", malformed_seed));
+  auto rescued = monsters.monster_variant("generation-probe", malformed_seed, *selected_parts);
+  ASSERT_TRUE(rescued) << rescued.error().what();
+  auto empty = monsters.monster_variant("generation-empty", seed, JsonObject{{"selectedParts", 7}});
+  ASSERT_TRUE(empty) << empty.error().what();
+  EXPECT_TRUE(empty->animator_part_tags.empty());
+
+  auto stored = monsters.write_monster_variant_to_json(*selected);
+  ASSERT_TRUE(stored) << stored.error().what();
+  EXPECT_EQ(stored->get_uint("seed"), seed);
+  auto from_disk = monsters.read_monster_variant_from_json(*stored);
+  ASSERT_TRUE(from_disk) << from_disk.error().what();
+  EXPECT_EQ(from_disk->seed, seed);
+  EXPECT_EQ(from_disk->unique_parameters, *selected_parts);
+  EXPECT_EQ(from_disk->animator_part_tags, selected->animator_part_tags);
+
+  auto wire = monsters.write_monster_variant(*selected);
+  ASSERT_TRUE(wire) << wire.error().what();
+  auto from_wire = monsters.read_monster_variant(*wire);
+  ASSERT_TRUE(from_wire) << from_wire.error().what();
+  EXPECT_EQ(from_wire->seed, seed);
+  EXPECT_EQ(from_wire->unique_parameters, *selected_parts);
+  EXPECT_EQ(from_wire->animator_part_tags, selected->animator_part_tags);
+  auto created = monsters.create_monster(std::move(*from_wire), 1.0f);
+  ASSERT_TRUE(created) << created.error().what();
+  EXPECT_EQ((*created)->net_store(), *wire);
 });
 
 void expectIsolationModuleError(Json const& result, String const& field, String const& fragment) {
@@ -2838,6 +2972,247 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
   EXPECT_EQ(world.lineTileCollision(center - Vec2F(0.25f, 0), center + Vec2F(0.25f, 0)), collides);
   return {};
 }
+
+const GameTestRegistration monster_damage_sources("RootTest", "MonsterDamageSources", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  auto storage = File::ephemeral_file(root.random());
+  ASSERT_TRUE(storage) << storage.error().what();
+  auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
+  ASSERT_TRUE(world) << world.error().what();
+  auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
+  Vec2I origin(1024, 1024);
+  ASSERT_TRUE((*world)->generateRegion(RectI::with_size(origin - Vec2I(24, 5), Vec2I(48, 10))));
+
+  auto database = root.monster_database();
+  ASSERT_TRUE(database) << database.error().what();
+  auto variant = (*database)->monster_variant("poptop", 1234, JsonObject{{"scripts", JsonArray{}}});
+  ASSERT_TRUE(variant) << variant.error().what();
+  auto animation = Json::parse_json(R"JSON({
+    "transformationGroups":{"probe":{}},
+    "animatedParts":{"parts":{"body":{"properties":{"transformationGroups":["probe"]}}}}
+  })JSON");
+  ASSERT_TRUE(animation) << animation.error().what();
+  variant->animator_config = std::move(*animation);
+  variant->animator_part_tags.clear();
+  variant->animator_zoom = 1;
+  auto parts = Json::parse_json(R"JSON({
+    "omitted":{"anchorPart":"body","damageSource":{"damage":4,"line":[[0,0],[18,0]],"damageSourceKind":"omitted"}},
+    "unchecked":{"anchorPart":"body","checkLineCollision":false,"bounces":"ignored","damageSource":{"damage":4,"line":[[0,0],[18,0]],"damageSourceKind":"unchecked"}},
+    "ray":{"anchorPart":"body","checkLineCollision":true,"bounces":2,"damageSource":{"damage":4,"line":[[0,0],[18,0]],"knockback":[2,1],"sourceEntityId":61,"teamType":"enemy","teamNumber":7,"damageSourceKind":"ray"}},
+    "poly":{"anchorPart":"body","checkLineCollision":"ignored","damageSource":{"damage":3,"poly":[[0,0],[1,0],[0,1]],"damageSourceKind":"poly"}},
+    "shapeless":{"anchorPart":"not-a-part","damageSource":{"damage":5,"damageArea":null,"damageSourceKind":"shapeless"}},
+    "brokenSource":{"anchorPart":"body","damageSource":{"damage":"invalid","damageArea":null}},
+    "brokenTransform":{"anchorPart":"not-a-part","checkLineCollision":false,"damageSource":{"damage":4,"line":[[0,0],[18,0]]}},
+    "brokenFlag":{"anchorPart":"body","checkLineCollision":"invalid","damageSource":{"damage":4,"line":[[0,0],[18,0]]}},
+    "brokenBounces":{"anchorPart":"body","checkLineCollision":true,"bounces":"invalid","damageSource":{"damage":4,"line":[[0,0],[18,0]]}}
+  })JSON");
+  ASSERT_TRUE(parts) << parts.error().what();
+  auto part_map = parts->to_object();
+  ASSERT_TRUE(part_map) << part_map.error().what();
+  variant->animation_damage_parts = std::move(*part_map);
+  StringList part_order;
+  for (auto const& [name, config] : variant->animation_damage_parts) {
+    if (name == "ray" || name == "poly" || name == "shapeless")
+      part_order.push_back(name);
+  }
+  variant->touch_damage_config = JsonObject{{"damage", 7}, {"poly", JsonArray{JsonArray{0, 0}, JsonArray{1, 0}, JsonArray{0, 1}}},
+    {"sourceEntityId", 62}, {"teamType", "enemy"}, {"teamNumber", 8}, {"damageSourceKind", "touch"}};
+  variant->touch_damage_multiplier = 2;
+  variant->damage_team_type = TeamType::Enemy;
+  variant->damage_team = 4;
+
+  auto functions = root.functionDatabase();
+  ASSERT_TRUE(functions) << functions.error().what();
+  auto power = (*functions)->function(variant->power_level_function);
+  ASSERT_TRUE(power) << power.error().what();
+  constexpr float level = 2.5f;
+  auto level_power = (*power)->evaluate(level);
+  ASSERT_TRUE(level_power) << level_power.error().what();
+  {
+    auto uninitialized = Monster::create(root, MonsterVariant(*variant));
+    ASSERT_TRUE(uninitialized) << uninitialized.error().what();
+    auto idle_error = (*uninitialized)->damage_sources();
+    ASSERT_FALSE(idle_error);
+    EXPECT_NE(std::string_view(idle_error.error().what()).find("Monster level is not initialized"), std::string_view::npos);
+  }
+  auto monster = Monster::create(root, MonsterVariant(*variant), level);
+  ASSERT_TRUE(monster) << monster.error().what();
+  (*monster)->movement_controller().setPosition(Vec2F(origin) + Vec2F(0.5f, 0.5f));
+  ASSERT_TRUE((*world)->addEntity(*monster, 17));
+
+  auto script = [&](String const& code) {
+    auto result = (*monster)->eval_script(code + "\nreturn true");
+    ASSERT_TRUE(result) << result.error().what();
+    ASSERT_TRUE(*result);
+  };
+  auto query = [&] { return (*monster)->damage_sources(); };
+  auto sources = query();
+  ASSERT_TRUE(sources) << sources.error().what();
+  EXPECT_TRUE(sources->empty());
+  ASSERT_NO_FATAL_FAILURE(script(R"LUA(
+    monster.setDamageParts({"omitted", "unchecked"})
+  )LUA"));
+  sources = query();
+  ASSERT_TRUE(sources) << sources.error().what();
+  EXPECT_TRUE(sources->empty());
+
+  // Inactive malformed templates must not poison another source or creation.
+  // A false collision flag still requires resolving the line's live anchor.
+  for (auto name : {"brokenSource", "brokenTransform", "brokenFlag", "brokenBounces"}) {
+    SCOPED_TRACE(name);
+    ASSERT_NO_FATAL_FAILURE(script(String(Star::format("monster.setDamageParts({{\"{}\"}})", name))));
+    auto failed = query();
+    auto retried = query();
+    ASSERT_FALSE(failed);
+    ASSERT_FALSE(retried);
+    EXPECT_EQ(std::string_view(failed.error().what()), std::string_view(retried.error().what()));
+    if (std::string_view(name) == "brokenTransform")
+      EXPECT_NE(std::string_view(failed.error().what()).find("not-a-part"), std::string_view::npos);
+  }
+  ASSERT_NO_FATAL_FAILURE(script(R"LUA(
+    monster.setDamageOnTouch(true)
+    monster.setDamageParts({"omitted", "unchecked", "ray", "poly", "shapeless"})
+    monster.setDamageSources({{damage=9, line={{0,0},{1,0}}, damageSourceKind="script", sourceEntityId=60, teamType="enemy", teamNumber=6}})
+  )LUA"));
+
+  struct Segment {
+    Line2F line;
+    Vec2F knockback;
+  };
+  auto check_sources = [&](List<DamageSource> const& damage, std::span<Segment const> segments,
+                           float status_power, bool changed) {
+    ASSERT_EQ(damage.size(), 4 + segments.size());
+    auto const& script_source = damage[0];
+    EXPECT_EQ(script_source.damage_source_kind, std::string_view(changed ? "scriptChanged" : "script"));
+    EXPECT_EQ(script_source.damage, changed ? 11 : 9);
+    EXPECT_EQ(script_source.source_entity_id, changed ? 63 : 60);
+    EXPECT_EQ(script_source.team, changed ? EntityDamageTeam(TeamType::Passive) : EntityDamageTeam(TeamType::Enemy, 6));
+
+    auto const& touch = damage[1];
+    EXPECT_EQ(touch.damage_source_kind, "touch");
+    EXPECT_FLOAT_EQ(touch.damage, 7.0f * (2.0f * static_cast<float>(*level_power) * status_power));
+    EXPECT_EQ(touch.source_entity_id, 17);
+    EXPECT_EQ(touch.team, changed ? EntityDamageTeam(TeamType::Friendly, 9) : EntityDamageTeam(TeamType::Enemy, 4));
+    ASSERT_TRUE(std::holds_alternative<PolyF>(touch.damage_area));
+    auto const& touch_poly = std::get<PolyF>(touch.damage_area);
+    EXPECT_TRUE(touch_poly.contains(changed ? Vec2F(-0.25f, 0.25f) : Vec2F(0.25f, 0.25f)));
+    EXPECT_FALSE(touch_poly.contains(changed ? Vec2F(0.25f, 0.25f) : Vec2F(-0.25f, 0.25f)));
+
+    std::size_t next = 2;
+    for (auto const& part : part_order) {
+      if (part == "ray") {
+        for (auto const& segment : segments) {
+          auto const& ray = damage[next++];
+          EXPECT_EQ(ray.damage_source_kind, part);
+          EXPECT_FLOAT_EQ(ray.damage, 4.0f * (static_cast<float>(*level_power) * status_power));
+          EXPECT_EQ(ray.source_entity_id, 61);
+          EXPECT_EQ(ray.team, EntityDamageTeam(TeamType::Enemy, 7));
+          ASSERT_TRUE(std::holds_alternative<Line2F>(ray.damage_area));
+          ASSERT_TRUE(std::holds_alternative<Vec2F>(ray.knockback));
+          auto const& line = std::get<Line2F>(ray.damage_area);
+          auto const& knockback = std::get<Vec2F>(ray.knockback);
+          EXPECT_NEAR(line.min()[0], segment.line.min()[0], 0.0002f);
+          EXPECT_NEAR(line.min()[1], segment.line.min()[1], 0.0002f);
+          EXPECT_NEAR(line.max()[0], segment.line.max()[0], 0.0002f);
+          EXPECT_NEAR(line.max()[1], segment.line.max()[1], 0.0002f);
+          EXPECT_NEAR(knockback[0], segment.knockback[0], 0.00001f);
+          EXPECT_NEAR(knockback[1], segment.knockback[1], 0.00001f);
+        }
+      } else {
+        auto const& source = damage[next++];
+        EXPECT_EQ(source.damage_source_kind, part);
+        EXPECT_FLOAT_EQ(source.damage, (part == "poly" ? 3.0f : 5.0f) * (static_cast<float>(*level_power) * status_power));
+        EXPECT_EQ(source.source_entity_id, null_entity_id);
+        EXPECT_EQ(source.team, EntityDamageTeam(TeamType::Passive));
+        if (part == "poly") {
+          ASSERT_TRUE(std::holds_alternative<PolyF>(source.damage_area));
+          EXPECT_TRUE(std::get<PolyF>(source.damage_area).contains(changed ? Vec2F(1.75f, 2.25f) : Vec2F(0.25f, 0.25f)));
+        } else {
+          EXPECT_TRUE(std::holds_alternative<std::monostate>(source.damage_area));
+        }
+      }
+    }
+  };
+  constexpr float status_power = 1;
+  ASSERT_NO_FATAL_FAILURE(script("assert(status.stat('powerMultiplier') == 1)"));
+  sources = query();
+  ASSERT_TRUE(sources) << sources.error().what();
+  std::array clear_segments{Segment{Line2F({0, 0}, {18, 0}), {2, 1}}};
+  ASSERT_NO_FATAL_FAILURE(check_sources(*sources, clear_segments, status_power, false));
+
+  auto materials = root.material_database();
+  ASSERT_TRUE(materials) << materials.error().what();
+  auto dirt = (*materials)->material_id("dirt");
+  ASSERT_TRUE(dirt) << dirt.error().what();
+  (*world)->setTileProtectionEnabled(false);
+  for (int wall_x : {-4, 4}) {
+    auto position = origin + Vec2I(wall_x, 0);
+    auto tile = (*world)->modifyServerTile(position, true);
+    ASSERT_TRUE(tile && *tile);
+    (*tile)->get().background = structure_material_id;
+    auto placed = (*world)->forceModifyTile(position,
+        PlaceMaterial{TileLayer::Foreground, *dirt, MaterialHue(0), TileCollisionOverride::Block}, true);
+    ASSERT_TRUE(placed && *placed);
+  }
+  sources = query();
+  ASSERT_TRUE(sources) << sources.error().what();
+  std::array bounced_segments{
+    Segment{Line2F({0, 0}, {3.5f, 0}), {2, 1}},
+    Segment{Line2F({3.5f, 0}, {-3.5f, 0}), {-2, -1}},
+    Segment{Line2F({-3.5f, 0}, {3.5f, 0}), {2, 1}}
+  };
+  ASSERT_NO_FATAL_FAILURE(check_sources(*sources, bounced_segments, status_power, false));
+
+  ASSERT_NO_FATAL_FAILURE(script(R"LUA(
+    animator.translateTransformationGroup("probe", {0, 2})
+    animator.setFlipped(true, 1)
+    mcontroller.setRotation(math.pi / 2)
+    monster.setDamageTeam({type="friendly", team=9})
+    status.setPersistentEffects("probe", {{stat="powerMultiplier", amount=0.75}})
+    assert(status.stat("powerMultiplier") == 1.75)
+    monster.setDamageSources({{damage=11, line={{0,0},{1,0}}, damageSourceKind="scriptChanged", sourceEntityId=63}})
+  )LUA"));
+  sources = query();
+  ASSERT_TRUE(sources) << sources.error().what();
+  std::array moved_segments{Segment{Line2F({2, 2}, {-16, 2}), {-2, 3}}};
+  ASSERT_NO_FATAL_FAILURE(check_sources(*sources, moved_segments, 1.75f, true));
+
+  ASSERT_NO_FATAL_FAILURE(script(R"LUA(
+    monster.setDamageOnTouch(false)
+    monster.setDamageParts({})
+    monster.setDamageSources()
+    status.clearPersistentEffects("probe")
+  )LUA"));
+  sources = query();
+  ASSERT_TRUE(sources) << sources.error().what();
+  EXPECT_TRUE(sources->empty());
+
+  // A level arriving through the existing wire path must change a warm query's
+  // level scaling, even when the receiver reuses the same touch template.
+  constexpr float new_level = 6.5f;
+  auto new_level_power = (*power)->evaluate(new_level);
+  ASSERT_TRUE(new_level_power) << new_level_power.error().what();
+  ASSERT_NE(*new_level_power, *level_power);
+  variant->touch_damage_config = JsonObject{{"damage", "invalid"}, {"damageArea", Json()}};
+  auto donor = Monster::create(root, std::move(*variant), new_level);
+  ASSERT_TRUE(donor) << donor.error().what();
+  ASSERT_TRUE((*world)->addEntity(*donor, 18));
+  auto inactive = (*donor)->damage_sources();
+  ASSERT_TRUE(inactive) << inactive.error().what();
+  EXPECT_TRUE(inactive->empty());
+  auto enabled = (*donor)->eval_script("monster.setDamageOnTouch(true); return true");
+  ASSERT_TRUE(enabled && *enabled);
+  EXPECT_FALSE((*donor)->damage_sources());
+  auto state = (*donor)->write_net_state();
+  ASSERT_TRUE(state) << state.error().what();
+  ASSERT_TRUE((*monster)->read_net_state(std::move(state->first)));
+  EXPECT_EQ((*monster)->monster_level(), new_level);
+  sources = query();
+  ASSERT_TRUE(sources) << sources.error().what();
+  ASSERT_EQ(sources->size(), 1u);
+  EXPECT_EQ(sources->front().damage_source_kind, "touch");
+  EXPECT_FLOAT_EQ(sources->front().damage, 7.0f * (2.0f * static_cast<float>(*new_level_power) * status_power));
+});
 
 const GameTestRegistration simultaneousWorldMaterials("RootTest", "SimultaneousWorldMaterials", [](GameTest& fixture) {
   // Select a genuinely unused real ID, rather than assuming a mod collection

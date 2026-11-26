@@ -30,6 +30,7 @@ import star.color;
 import star.string;
 import star.rect;
 import star.image_processing;
+import star.image_metadata_database;
 import star.hash;
 import star.string_view;
 import star.directives;
@@ -118,117 +119,128 @@ import star.net_compatibility;
 import star.byte_array;
 import star.line;
 import star.algorithm;
+import star.matrix3;
+import star.small_vector;
 namespace Star {
 
-Monster::Monster(Root& rootContext) : Entity(rootContext), m_scriptComponent(rootContext), m_scriptedAnimator(rootContext) {}
+Monster::Monster(ConstructionKey, Root& root_context, MonsterVariant&& variant)
+    : Entity(root_context), m_monster_variant(std::move(variant)),
+      m_script_component(root_context), m_scripted_animator(root_context) {}
 
-std::expected<std::shared_ptr<Monster>, StarException> Monster::create(Root& rootContext, MonsterVariant const& monsterVariant, std::optional<float> level) {
-  auto creature = std::shared_ptr<Monster>(new Monster(rootContext));
-  auto initialized = creature->initialize(monsterVariant, level);
+std::expected<std::shared_ptr<Monster>, StarException> Monster::create(
+    Root& root_context, MonsterVariant&& variant, std::optional<float> level) {
+  auto monster = std::make_shared<Monster>(ConstructionKey{}, root_context, std::move(variant));
+  auto initialized = monster->initialize(level);
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
-  return creature;
+  return monster;
 }
 
-std::expected<void, StarException> Monster::initialize(MonsterVariant const& monsterVariant, std::optional<float> level) {
-  m_monsterLevel = level;
+std::expected<void, StarException> Monster::initialize(std::optional<float> level) {
+  auto const& variant = m_monster_variant;
+  m_monster_level = level;
 
-  m_damageOnTouch = false;
+  m_damage_on_touch = false;
   m_aggressive = false;
 
-  m_knockedOut = false;
-  m_knockoutTimer = 0.0;
+  m_knocked_out = false;
+  m_knockout_timer = 0.0;
 
-  m_dropPool = monsterVariant.dropPoolConfig;
+  m_drop_pool = variant.drop_pool_config;
 
-  m_monsterVariant = monsterVariant;
+  auto assets = root().assets();
+  if (!assets)
+    return std::unexpected(std::move(assets.error()));
+  auto indicator_config = (*assets)->json("/quests/quests.config:defaultIndicatorOffset");
+  if (!indicator_config)
+    return std::unexpected(std::move(indicator_config.error()));
+  auto indicator_offset = json_to_vec2f(*indicator_config);
+  if (!indicator_offset)
+    return std::unexpected(std::move(indicator_offset.error()));
+  m_quest_indicator_offset = *indicator_offset;
 
-  auto result1 = this->root().assets();
-if (!result1) return std::unexpected(std::move(result1.error()));
-auto result2 = std::move(*result1)->json("/quests/quests.config:defaultIndicatorOffset");
-if (!result2) return std::unexpected(std::move(result2.error()));
-auto result3 = json_to_vec2f(std::move(*result2));
-if (!result3) return std::unexpected(std::move(result3.error()));
-m_questIndicatorOffset = std::move(*result3);
+  setTeam(EntityDamageTeam(variant.damage_team_type, variant.damage_team));
 
-  setTeam(EntityDamageTeam(m_monsterVariant.damageTeamType, m_monsterVariant.damageTeam));
+  auto animator = NetworkedAnimator::create(root(), variant.animator_config);
+  if (!animator)
+    return std::unexpected(std::move(animator.error()));
+  m_networked_animator = std::move(*animator);
+  auto emitter = EffectEmitter::create(root());
+  if (!emitter)
+    return std::unexpected(std::move(emitter.error()));
+  m_effect_emitter = std::move(*emitter);
+  for (auto const& [part, image] : variant.animator_part_tags)
+    m_networked_animator->setPartTag(part, "partImage", image);
+  m_networked_animator->setZoom(variant.animator_zoom);
+  auto database = root().monster_database();
+  if (!database)
+    return std::unexpected(std::move(database.error()));
+  auto colors = variant.parameters.get_string("colors", "default");
+  if (!colors)
+    return std::unexpected(std::move(colors.error()));
+  auto palette = (*database)->color_swap(*colors, variant.seed);
+  if (!palette)
+    return std::unexpected(std::move(palette.error()));
+  auto swaps = variant.color_swap.value_or(std::move(*palette));
+  if (!swaps.empty())
+    m_networked_animator->setProcessingDirectives(image_operation_to_string(ColorReplaceImageOperation{std::move(swaps)}));
 
-  auto result4 = NetworkedAnimator::create(this->root(), m_monsterVariant.animatorConfig);
-if (!result4) return std::unexpected(std::move(result4.error()));
-m_networkedAnimator = std::move(*result4);
-  auto result5 = EffectEmitter::create(this->root());
-if (!result5) return std::unexpected(std::move(result5.error()));
-m_effectEmitter = std::move(*result5);
-  for (auto const& pair : m_monsterVariant.animatorPartTags)
-    m_networkedAnimator->setPartTag(pair.first, "partImage", pair.second);
-  m_networkedAnimator->setZoom(m_monsterVariant.animatorZoom);
-  auto result6 = this->root().monsterDatabase();
-if (!result6) return std::unexpected(std::move(result6.error()));
-auto result7 = m_monsterVariant.parameters.get_string("colors", "default");
-if (!result7) return std::unexpected(std::move(result7.error()));
-auto result8 = std::move(*result6)->colorSwap(std::move(*result7), m_monsterVariant.seed);
-if (!result8) return std::unexpected(std::move(result8.error()));
-auto colorSwap = m_monsterVariant.colorSwap.value_or(std::move(*result8));
-  if (!colorSwap.empty())
-    m_networkedAnimator->setProcessingDirectives(image_operation_to_string(ColorReplaceImageOperation{colorSwap}));
+  auto status = StatusController::create(root(), variant.status_settings);
+  if (!status)
+    return std::unexpected(std::move(status.error()));
+  m_status_controller = std::move(*status);
 
-  auto result9 = StatusController::create(this->root(), m_monsterVariant.statusSettings);
-if (!result9) return std::unexpected(std::move(result9.error()));
-m_statusController = std::move(*result9);
-
-  auto scriptsConfig = m_monsterVariant.parameters.opt_array("scripts");
-  if (!scriptsConfig) return std::unexpected(std::move(scriptsConfig.error()));
-  if (*scriptsConfig) {
-    auto scripts = json_to_string_list(**scriptsConfig);
-    if (!scripts) return std::unexpected(std::move(scripts.error()));
-    auto result10 = m_scriptComponent.set_scripts(*scripts);
-if (!result10) return std::unexpected(std::move(result10.error()));
-
-  } else {
-    auto result11 = m_scriptComponent.set_scripts(m_monsterVariant.scripts);
-if (!result11) return std::unexpected(std::move(result11.error()));
-
+  auto script_config = variant.parameters.opt_array("scripts");
+  if (!script_config)
+    return std::unexpected(std::move(script_config.error()));
+  if (*script_config) {
+    auto scripts = json_to_string_list(std::move(**script_config));
+    if (!scripts)
+      return std::unexpected(std::move(scripts.error()));
+    if (auto set = m_script_component.set_scripts(*scripts); !set)
+      return std::unexpected(std::move(set.error()));
+  } else if (auto set = m_script_component.set_scripts(variant.scripts); !set) {
+    return std::unexpected(std::move(set.error()));
   }
-  m_scriptComponent.set_update_delta(m_monsterVariant.initialScriptDelta);
+  m_script_component.set_update_delta(variant.initial_script_delta);
 
-  auto result12 = ActorMovementParameters::sensible_defaults(this->root());
-if (!result12) return std::unexpected(std::move(result12.error()));
-auto movementParameters = std::move(*result12).merge(monsterVariant.movementSettings);
-  if (movementParameters.standing_poly)
-    movementParameters.standing_poly->scale(m_monsterVariant.animatorZoom);
-  if (movementParameters.crouching_poly)
-    movementParameters.crouching_poly->scale(m_monsterVariant.animatorZoom);
-  *movementParameters.walk_speed *= monsterVariant.walkMultiplier;
-  *movementParameters.run_speed *= monsterVariant.runMultiplier;
-  *movementParameters.air_jump_profile.jump_speed *= monsterVariant.jumpMultiplier;
-  *movementParameters.liquid_jump_profile.jump_speed *= monsterVariant.jumpMultiplier;
-  *movementParameters.mass *= monsterVariant.weightMultiplier;
-  if (!movementParameters.physics_effect_categories)
-    movementParameters.physics_effect_categories = StringSet{"monster"};
-  auto result13 = ActorMovementController::create(this->root(), movementParameters);
-if (!result13) return std::unexpected(std::move(result13.error()));
-m_movement_controller = std::move(*result13);
+  auto defaults = ActorMovementParameters::sensible_defaults(root());
+  if (!defaults)
+    return std::unexpected(std::move(defaults.error()));
+  auto movement_parameters = std::move(*defaults).merge(variant.movement_settings);
+  if (movement_parameters.standing_poly)
+    movement_parameters.standing_poly->scale(variant.animator_zoom);
+  if (movement_parameters.crouching_poly)
+    movement_parameters.crouching_poly->scale(variant.animator_zoom);
+  *movement_parameters.walk_speed *= variant.walk_multiplier;
+  *movement_parameters.run_speed *= variant.run_multiplier;
+  *movement_parameters.air_jump_profile.jump_speed *= variant.jump_multiplier;
+  *movement_parameters.liquid_jump_profile.jump_speed *= variant.jump_multiplier;
+  *movement_parameters.mass *= variant.weight_multiplier;
+  if (!movement_parameters.physics_effect_categories)
+    movement_parameters.physics_effect_categories = StringSet{"monster"};
+  auto movement = ActorMovementController::create(root(), movement_parameters);
+  if (!movement)
+    return std::unexpected(std::move(movement.error()));
+  m_movement_controller = std::move(*movement);
 
-  setPersistent(m_monsterVariant.persistent);
+  setPersistent(variant.persistent);
 
-  auto result14 = setupNetStates();
-if (!result14) return std::unexpected(std::move(result14.error()));
-
-  auto result15 = setNetStates();
-if (!result15) return std::unexpected(std::move(result15.error()));
-  return {};
+  if (auto setup = setupNetStates(); !setup)
+    return std::unexpected(std::move(setup.error()));
+  return setNetStates();
 }
 
-std::expected<std::shared_ptr<Monster>, StarException> Monster::create(Root& rootContext, Json const& diskStore) {
-  auto database = rootContext.monsterDatabase();
+std::expected<std::shared_ptr<Monster>, StarException> Monster::create(Root& root_context, Json const& disk_store) {
+  auto database = root_context.monster_database();
   if (!database) return std::unexpected(std::move(database.error()));
-  auto encoded = diskStore.get("monsterVariant");
+  auto encoded = disk_store.get("monsterVariant");
   if (!encoded) return std::unexpected(std::move(encoded.error()));
-  auto variant = (*database)->readMonsterVariantFromJson(*encoded);
+  auto variant = (*database)->read_monster_variant_from_json(*encoded);
   if (!variant) return std::unexpected(std::move(variant.error()));
-  auto creature = create(rootContext, *variant, {});
+  auto creature = create(root_context, std::move(*variant), {});
   if (!creature) return std::unexpected(std::move(creature.error()));
-  auto loaded = (*creature)->loadState(diskStore);
+  auto loaded = (*creature)->loadState(disk_store);
   if (!loaded) return std::unexpected(std::move(loaded.error()));
   return creature;
 }
@@ -236,7 +248,7 @@ std::expected<std::shared_ptr<Monster>, StarException> Monster::create(Root& roo
 std::expected<void, StarException> Monster::loadState(Json const& diskStore) {
   auto result16 = diskStore.opt_float("monsterLevel");
 if (!result16) return std::unexpected(std::move(result16.error()));
-m_monsterLevel = std::move(*result16);
+m_monster_level = std::move(*result16);
   auto result17 = diskStore.get("movementState");
 if (!result17) return std::unexpected(std::move(result17.error()));
 auto result18 = m_movement_controller->load_state(std::move(*result17));
@@ -244,35 +256,35 @@ if (!result18) return std::unexpected(std::move(result18.error()));
 
   auto result19 = diskStore.get("statusController");
 if (!result19) return std::unexpected(std::move(result19.error()));
-auto result20 = m_statusController->diskLoad(std::move(*result19));
+auto result20 = m_status_controller->diskLoad(std::move(*result19));
 if (!result20) return std::unexpected(std::move(result20.error()));
 
   auto result21 = diskStore.get_bool("damageOnTouch");
 if (!result21) return std::unexpected(std::move(result21.error()));
-m_damageOnTouch = std::move(*result21);
+m_damage_on_touch = std::move(*result21);
   auto result22 = diskStore.get_bool("aggressive");
 if (!result22) return std::unexpected(std::move(result22.error()));
 m_aggressive = std::move(*result22);
   auto result23 = diskStore.get_string("deathParticleBurst");
 if (!result23) return std::unexpected(std::move(result23.error()));
-m_deathParticleBurst = std::move(*result23);
+m_death_particle_burst = std::move(*result23);
   auto result24 = diskStore.get_string("deathSound");
 if (!result24) return std::unexpected(std::move(result24.error()));
-m_deathSound = std::move(*result24);
+m_death_sound = std::move(*result24);
   auto result25 = diskStore.get_string("activeSkillName");
 if (!result25) return std::unexpected(std::move(result25.error()));
-m_activeSkillName = std::move(*result25);
+m_active_skill_name = std::move(*result25);
   auto result26 = diskStore.get("dropPool");
 if (!result26) return std::unexpected(std::move(result26.error()));
-m_dropPool = std::move(*result26);
+m_drop_pool = std::move(*result26);
   auto result27 = diskStore.get("effectEmitter");
 if (!result27) return std::unexpected(std::move(result27.error()));
-auto result28 = m_effectEmitter->fromJson(std::move(*result27));
+auto result28 = m_effect_emitter->fromJson(std::move(*result27));
 if (!result28) return std::unexpected(std::move(result28.error()));
 
   auto result29 = diskStore.get_object("scriptStorage");
 if (!result29) return std::unexpected(std::move(result29.error()));
-auto result30 = m_scriptComponent.set_script_storage(std::move(*result29));
+auto result30 = m_script_component.set_script_storage(std::move(*result29));
 if (!result30) return std::unexpected(std::move(result30.error()));
 
 
@@ -297,28 +309,28 @@ setUniqueId(std::move(*result31));
 std::expected<Json, StarException> Monster::diskStore() const {
   auto result35 = m_movement_controller->store_state();
 if (!result35) return std::unexpected(std::move(result35.error()));
-auto result36 = m_statusController->diskStore();
+auto result36 = m_status_controller->diskStore();
 if (!result36) return std::unexpected(std::move(result36.error()));
-auto result37 = m_effectEmitter->toJson();
+auto result37 = m_effect_emitter->toJson();
 if (!result37) return std::unexpected(std::move(result37.error()));
-auto result38 = this->root().monsterDatabase();
+auto result38 = this->root().monster_database();
 if (!result38) return std::unexpected(std::move(result38.error()));
-auto result39 = std::move(*result38)->writeMonsterVariantToJson(m_monsterVariant);
+auto result39 = (*result38)->write_monster_variant_to_json(m_monster_variant);
 if (!result39) return std::unexpected(std::move(result39.error()));
-auto result40 = m_scriptComponent.get_script_storage();
+auto result40 = m_script_component.get_script_storage();
 if (!result40) return std::unexpected(std::move(result40.error()));
 auto result41 = getTeam().to_json();
 if (!result41) return std::unexpected(std::move(result41.error()));
 return JsonObject{
-    {"monsterLevel", json_from_optional(m_monsterLevel)},
+    {"monsterLevel", json_from_optional(m_monster_level)},
     {"movementState", std::move(*result35)},
     {"statusController", std::move(*result36)},
-    {"damageOnTouch", m_damageOnTouch},
+    {"damageOnTouch", m_damage_on_touch},
     {"aggressive", aggressive()},
-    {"deathParticleBurst", m_deathParticleBurst},
-    {"deathSound", m_deathSound},
-    {"activeSkillName", m_activeSkillName},
-    {"dropPool", m_dropPool},
+    {"deathParticleBurst", m_death_particle_burst},
+    {"deathSound", m_death_sound},
+    {"activeSkillName", m_active_skill_name},
+    {"dropPool", m_drop_pool},
     {"effectEmitter", std::move(*result37)},
     {"monsterVariant", std::move(*result39)},
     {"scriptStorage", std::move(*result40)},
@@ -328,9 +340,9 @@ return JsonObject{
 }
 
 std::expected<ByteArray, StarException> Monster::net_store(NetCompatibilityRules rules) {
-  auto result42 = this->root().monsterDatabase();
+  auto result42 = this->root().monster_database();
 if (!result42) return std::unexpected(std::move(result42.error()));
-return std::move(*result42)->writeMonsterVariant(m_monsterVariant, rules);
+return (*result42)->write_monster_variant(m_monster_variant, rules);
 }
 
 EntityType Monster::entity_type() const {
@@ -338,7 +350,7 @@ EntityType Monster::entity_type() const {
 }
 
 ClientEntityMode Monster::client_entity_mode() const {
-  return m_monsterVariant.client_entity_mode;
+  return m_monster_variant.client_entity_mode;
 }
 
 std::expected<void, StarException> Monster::init(World& world, EntityId entityId, EntityMode mode) {
@@ -348,98 +360,98 @@ if (!result43) return std::unexpected(std::move(result43.error()));
 
   m_movement_controller->init(world);
   m_movement_controller->setIgnorePhysicsEntities({entityId});
-  auto result44 = m_statusController->init(*this, *m_movement_controller);
+  auto result44 = m_status_controller->init(*this, *m_movement_controller);
 if (!result44) return std::unexpected(std::move(result44.error()));
 
 
-  if (!m_monsterLevel)
+  if (!m_monster_level)
     {
   auto result45 = world.threatLevel();
   if (!result45) return std::unexpected(std::move(result45.error()));
-  m_monsterLevel = std::move(*result45);
+  m_monster_level = std::move(*result45);
 }
 
   if (isMaster()) {
     auto result46 = this->root().functionDatabase();
 if (!result46) return std::unexpected(std::move(result46.error()));
 auto functionDatabase = std::move(*result46);
-    auto result47 = functionDatabase->function(m_monsterVariant.healthLevelFunction);
+    auto result47 = functionDatabase->function(m_monster_variant.health_level_function);
 if (!result47) return std::unexpected(std::move(result47.error()));
-auto result48 = monsterLevel();
+auto result48 = monster_level();
 if (!result48) return std::unexpected(std::move(result48.error()));
 auto result49 = std::move(*result47)->evaluate(std::move(*result48));
 if (!result49) return std::unexpected(std::move(result49.error()));
-float healthMultiplier = m_monsterVariant.healthMultiplier * std::move(*result49);
-    auto result50 = m_statusController->setPersistentEffects("innate", {StatModifier(StatBaseMultiplier{"maxHealth", healthMultiplier})});
+float healthMultiplier = m_monster_variant.health_multiplier * std::move(*result49);
+    auto result50 = m_status_controller->setPersistentEffects("innate", {StatModifier(StatBaseMultiplier{"maxHealth", healthMultiplier})});
 if (!result50) return std::unexpected(std::move(result50.error()));
 
 
     auto result51 = makeMonsterCallbacks();
 if (!result51) return std::unexpected(std::move(result51.error()));
-auto result52 = m_scriptComponent.add_callbacks("monster", std::move(*result51));
+auto result52 = m_script_component.add_callbacks("monster", std::move(*result51));
 if (!result52) return std::unexpected(std::move(result52.error()));
 
     auto result53 = LuaBindings::makeConfigCallbacks([this](String const& name, Json const& def) {
-        return m_monsterVariant.parameters.query(name, def);
+        return m_monster_variant.parameters.query(name, def);
       });
 if (!result53) return std::unexpected(std::move(result53.error()));
-auto result54 = m_scriptComponent.add_callbacks("config", std::move(*result53));
+auto result54 = m_script_component.add_callbacks("config", std::move(*result53));
 if (!result54) return std::unexpected(std::move(result54.error()));
 
     auto result55 = LuaBindings::makeEntityCallbacks(*this);
 if (!result55) return std::unexpected(std::move(result55.error()));
-auto result56 = m_scriptComponent.add_callbacks("entity", std::move(*result55));
+auto result56 = m_script_component.add_callbacks("entity", std::move(*result55));
 if (!result56) return std::unexpected(std::move(result56.error()));
 
-    auto result57 = LuaBindings::makeNetworkedAnimatorCallbacks(*m_networkedAnimator);
+    auto result57 = LuaBindings::makeNetworkedAnimatorCallbacks(*m_networked_animator);
 if (!result57) return std::unexpected(std::move(result57.error()));
-auto result58 = m_scriptComponent.add_callbacks("animator", std::move(*result57));
+auto result58 = m_script_component.add_callbacks("animator", std::move(*result57));
 if (!result58) return std::unexpected(std::move(result58.error()));
 
-    auto result59 = LuaBindings::makeStatusControllerCallbacks(*m_statusController);
+    auto result59 = LuaBindings::makeStatusControllerCallbacks(*m_status_controller);
 if (!result59) return std::unexpected(std::move(result59.error()));
-auto result60 = m_scriptComponent.add_callbacks("status", std::move(*result59));
+auto result60 = m_script_component.add_callbacks("status", std::move(*result59));
 if (!result60) return std::unexpected(std::move(result60.error()));
 
     auto result61 = LuaBindings::make_behavior_callbacks(this->root(), m_behaviors);
 if (!result61) return std::unexpected(std::move(result61.error()));
-auto result62 = m_scriptComponent.add_callbacks("behavior", std::move(*result61));
+auto result62 = m_script_component.add_callbacks("behavior", std::move(*result61));
 if (!result62) return std::unexpected(std::move(result62.error()));
 
-    auto result63 = m_scriptComponent.add_actor_movement_callbacks(*m_movement_controller);
+    auto result63 = m_script_component.add_actor_movement_callbacks(*m_movement_controller);
 if (!result63) return std::unexpected(std::move(result63.error()));
 
-    auto result64 = recover_lua_script_error(m_scriptComponent.init(world));
+    auto result64 = recover_lua_script_error(m_script_component.init(world));
 if (!result64) return std::unexpected(std::move(result64.error()));
 
   }
 
   if (world.isClient()) {
-    auto result65 = m_scriptedAnimator.set_scripts(m_monsterVariant.animationScripts);
+    auto result65 = m_scripted_animator.set_scripts(m_monster_variant.animation_scripts);
 if (!result65) return std::unexpected(std::move(result65.error()));
 
 
-    auto result66 = LuaBindings::makeScriptedAnimatorCallbacks(*m_networkedAnimator,
+    auto result66 = LuaBindings::makeScriptedAnimatorCallbacks(*m_networked_animator,
       [this](String const& name, Json const& defaultValue) -> Json {
-        return m_scriptedAnimationParameters.value(name, defaultValue);
+        return m_scripted_animation_parameters.value(name, defaultValue);
       });
 if (!result66) return std::unexpected(std::move(result66.error()));
-auto result67 = m_scriptedAnimator.add_callbacks("animationConfig", std::move(*result66));
+auto result67 = m_scripted_animator.add_callbacks("animationConfig", std::move(*result66));
 if (!result67) return std::unexpected(std::move(result67.error()));
 
     auto result68 = LuaBindings::makeConfigCallbacks([this](String const& name, Json const& def) {
-        return m_monsterVariant.parameters.query(name, def);
+        return m_monster_variant.parameters.query(name, def);
       });
 if (!result68) return std::unexpected(std::move(result68.error()));
-auto result69 = m_scriptedAnimator.add_callbacks("config", std::move(*result68));
+auto result69 = m_scripted_animator.add_callbacks("config", std::move(*result68));
 if (!result69) return std::unexpected(std::move(result69.error()));
 
     auto result70 = LuaBindings::makeEntityCallbacks(*this);
 if (!result70) return std::unexpected(std::move(result70.error()));
-auto result71 = m_scriptedAnimator.add_callbacks("entity", std::move(*result70));
+auto result71 = m_scripted_animator.add_callbacks("entity", std::move(*result70));
 if (!result71) return std::unexpected(std::move(result71.error()));
 
-    auto result72 = recover_lua_script_error(m_scriptedAnimator.init(world));
+    auto result72 = recover_lua_script_error(m_scripted_animator.init(world));
 if (!result72) return std::unexpected(std::move(result72.error()));
 
   }
@@ -450,25 +462,25 @@ if (!result72) return std::unexpected(std::move(result72.error()));
 
 std::expected<void, StarException> Monster::uninit() {
   if (isMaster()) {
-    auto result73 = recover_lua_script_error(m_scriptComponent.uninit());
+    auto result73 = recover_lua_script_error(m_script_component.uninit());
 if (!result73) return std::unexpected(std::move(result73.error()));
 
-    auto result74 = m_scriptComponent.remove_callbacks("monster");
+    auto result74 = m_script_component.remove_callbacks("monster");
 if (!result74) return std::unexpected(std::move(result74.error()));
 
-    auto result75 = m_scriptComponent.remove_callbacks("config");
+    auto result75 = m_script_component.remove_callbacks("config");
 if (!result75) return std::unexpected(std::move(result75.error()));
 
-    auto result76 = m_scriptComponent.remove_callbacks("entity");
+    auto result76 = m_script_component.remove_callbacks("entity");
 if (!result76) return std::unexpected(std::move(result76.error()));
 
-    auto result77 = m_scriptComponent.remove_callbacks("animator");
+    auto result77 = m_script_component.remove_callbacks("animator");
 if (!result77) return std::unexpected(std::move(result77.error()));
 
-    auto result78 = m_scriptComponent.remove_callbacks("status");
+    auto result78 = m_script_component.remove_callbacks("status");
 if (!result78) return std::unexpected(std::move(result78.error()));
 
-    auto result79 = m_scriptComponent.remove_actor_movement_callbacks();
+    auto result79 = m_script_component.remove_actor_movement_callbacks();
 if (!result79) return std::unexpected(std::move(result79.error()));
 
   }
@@ -476,18 +488,18 @@ if (!result79) return std::unexpected(std::move(result79.error()));
   auto result80 = world();
   if (!result80) return std::unexpected(std::move(result80.error()));
   if (result80->get().isClient()) {
-      auto result81 = m_scriptedAnimator.remove_callbacks("animationConfig");
+      auto result81 = m_scripted_animator.remove_callbacks("animationConfig");
   if (!result81) return std::unexpected(std::move(result81.error()));
 
-      auto result82 = m_scriptedAnimator.remove_callbacks("config");
+      auto result82 = m_scripted_animator.remove_callbacks("config");
   if (!result82) return std::unexpected(std::move(result82.error()));
 
-      auto result83 = m_scriptedAnimator.remove_callbacks("entity");
+      auto result83 = m_scripted_animator.remove_callbacks("entity");
   if (!result83) return std::unexpected(std::move(result83.error()));
 
     }
 }
-  auto result84 = m_statusController->uninit();
+  auto result84 = m_status_controller->uninit();
 if (!result84) return std::unexpected(std::move(result84.error()));
 
   m_movement_controller->uninit();
@@ -497,16 +509,12 @@ if (!result85) return std::unexpected(std::move(result85.error()));
   return {};
 }
 
-std::expected<Vec2F, StarException> Monster::mouthOffset() const {
-  auto result86 = getAbsolutePosition(m_monsterVariant.mouthOffset);
-if (!result86) return std::unexpected(std::move(result86.error()));
-return std::move(*result86) - position();
+Vec2F Monster::mouth_offset() const {
+  return absolute_position(m_monster_variant.mouth_offset) - position();
 }
 
-std::expected<Vec2F, StarException> Monster::feetOffset() const {
-  auto result87 = getAbsolutePosition(m_monsterVariant.feetOffset);
-if (!result87) return std::unexpected(std::move(result87.error()));
-return std::move(*result87) - position();
+Vec2F Monster::feet_offset() const {
+  return absolute_position(m_monster_variant.feet_offset) - position();
 }
 
 Vec2F Monster::position() const {
@@ -514,7 +522,7 @@ Vec2F Monster::position() const {
 }
 
 RectF Monster::meta_bound_box() const {
-  return m_monsterVariant.meta_bound_box;
+  return m_monster_variant.meta_bound_box;
 }
 
 RectF Monster::collision_area() const {
@@ -526,22 +534,22 @@ Vec2F Monster::velocity() const {
 }
 
 std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Monster::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
-  return m_netGroup.write_net_state(fromVersion, rules);
+  return m_net_group.write_net_state(fromVersion, rules);
 }
 
 std::expected<void, StarException> Monster::read_net_state(ByteArray data, float interpolationTime, NetCompatibilityRules rules) {
-  return m_netGroup.read_net_state(std::move(data), interpolationTime, rules);
+  return m_net_group.read_net_state(std::move(data), interpolationTime, rules);
 }
 
 std::expected<void, StarException> Monster::enable_interpolation(float extrapolation_hint) {
-  auto result89 = m_netGroup.enable_net_interpolation(extrapolation_hint);
+  auto result89 = m_net_group.enable_net_interpolation(extrapolation_hint);
 if (!result89) return std::unexpected(std::move(result89.error()));
 
   return {};
 }
 
 std::expected<void, StarException> Monster::disable_interpolation() {
-  auto result90 = m_netGroup.disable_net_interpolation();
+  auto result90 = m_net_group.disable_net_interpolation();
 if (!result90) return std::unexpected(std::move(result90.error()));
 
   return {};
@@ -549,15 +557,15 @@ if (!result90) return std::unexpected(std::move(result90.error()));
 
 std::expected<String, StarException> Monster::name() const {
   auto const& name = m_name.get();
-  return (name ? name : m_monsterVariant.shortDescription).value_or("");
+  return (name ? name : m_monster_variant.short_description).value_or("");
 }
 
 std::expected<String, StarException> Monster::description() const {
-  return m_monsterVariant.description.value_or("Some indescribable horror");
+  return m_monster_variant.description.value_or("Some indescribable horror");
 }
 
 std::expected<std::optional<HitType>, StarException> Monster::queryHit(DamageSource const& source) const {
-  if (!inWorld() || m_knockedOut || m_statusController->statPositive("invulnerable"))
+  if (!inWorld() || m_knocked_out || m_status_controller->statPositive("invulnerable"))
     return {};
 
   auto body = hitPoly();
@@ -576,7 +584,7 @@ std::expected<std::optional<HitType>, StarException> Monster::queryHit(DamageSou
 }
 
 std::expected<std::optional<PolyF>, StarException> Monster::hitPoly() const {
-  PolyF hitBody = m_monsterVariant.selfDamagePoly;
+  PolyF hitBody = m_monster_variant.self_damage_poly;
   hitBody.rotate(m_movement_controller->rotation());
   hitBody.translate(position());
   return hitBody;
@@ -586,7 +594,7 @@ std::expected<List<DamageNotification>, StarException> Monster::applyDamage(Dama
   if (!inWorld())
     return {};
 
-  auto result93 = m_statusController->apply_damage_request(damage);
+  auto result93 = m_status_controller->apply_damage_request(damage);
 if (!result93) return std::unexpected(std::move(result93.error()));
 auto notifications = std::move(*result93);
 
@@ -595,7 +603,7 @@ auto notifications = std::move(*result93);
     totalDamage += notification.health_lost;
 
   if (totalDamage > 0.0f) {
-    auto result94 = recover_lua_script_error(m_scriptComponent.invoke("damage", JsonObject{
+    auto result94 = recover_lua_script_error(m_script_component.invoke("damage", JsonObject{
         {"sourceId", damage.source_entity_id},
         {"damage", totalDamage},
         {"sourceDamage", damage.damage},
@@ -605,183 +613,283 @@ if (!result94) return std::unexpected(std::move(result94.error()));
 
   }
 
-  if (!m_statusController->resourcePositive("health"))
-    m_deathDamageSourceKinds.add(damage.damage_source_kind);
+  if (!m_status_controller->resourcePositive("health"))
+    m_death_damage_source_kinds.add(damage.damage_source_kind);
 
   return notifications;
 }
 
 std::expected<List<DamageNotification>, StarException> Monster::selfDamageNotifications() {
-  return m_statusController->pull_self_damage_notifications();
+  return m_status_controller->pull_self_damage_notifications();
 }
 
-std::expected<List<DamageSource>, StarException> Monster::damageSources() const {
-  List<DamageSource> damageSources = m_damageSources.get();
+std::expected<float, StarException> Monster::damage_level_power() const {
+  auto functions = root().functionDatabase();
+  if (!functions)
+    return std::unexpected(std::move(functions.error()));
 
-  auto result95 = this->root().functionDatabase();
-if (!result95) return std::unexpected(std::move(result95.error()));
-auto result96 = std::move(*result95)->function(m_monsterVariant.powerLevelFunction);
-if (!result96) return std::unexpected(std::move(result96.error()));
-auto result97 = monsterLevel();
-if (!result97) return std::unexpected(std::move(result97.error()));
-auto result98 = std::move(*result96)->evaluate(std::move(*result97));
-if (!result98) return std::unexpected(std::move(result98.error()));
-float levelPowerMultiplier = std::move(*result98);
-  if (m_damageOnTouch && !m_monsterVariant.touchDamageConfig.is_null()) {
-    auto result99 = DamageSource::create(m_monsterVariant.touchDamageConfig);
-if (!result99) return std::unexpected(std::move(result99.error()));
-auto damageSource = std::move(*result99);
-    if (std::holds_alternative<PolyF>(damageSource.damage_area))
-      std::get<PolyF>(damageSource.damage_area).rotate(m_movement_controller->rotation());
-    damageSource.damage *= m_monsterVariant.touchDamageMultiplier * levelPowerMultiplier * m_statusController->stat("powerMultiplier");
-    damageSource.source_entity_id = entityId();
-    damageSource.team = getTeam();
-    damageSources.push_back(damageSource);
+  // A root reload may replace the catalog. Compare owners without keeping the
+  // old database alive, and only cache a successfully evaluated exact level.
+  if (m_monster_level
+      && m_damage_level_power.level_bits == std::bit_cast<std::uint32_t>(*m_monster_level)
+      && !m_damage_level_power.functions.owner_before(*functions)
+      && !functions->owner_before(m_damage_level_power.functions))
+    return m_damage_level_power.multiplier;
+
+  auto function = (*functions)->function(m_monster_variant.power_level_function);
+  if (!function)
+    return std::unexpected(std::move(function.error()));
+  auto level = monster_level();
+  if (!level)
+    return std::unexpected(std::move(level.error()));
+  auto multiplier = (*function)->evaluate(*level);
+  if (!multiplier)
+    return std::unexpected(std::move(multiplier.error()));
+
+  m_damage_level_power = {*functions, std::bit_cast<std::uint32_t>(*level), static_cast<float>(*multiplier)};
+  return m_damage_level_power.multiplier;
+}
+
+std::expected<List<DamageSource>, StarException> Monster::damage_sources() const {
+  auto level_power = damage_level_power();
+  if (!level_power)
+    return std::unexpected(std::move(level_power.error()));
+
+  auto const& scripted_sources = m_damage_sources.get();
+  auto const& active_parts = m_animation_damage_parts.get();
+  bool damage_on_touch = m_damage_on_touch && !m_monster_variant.touch_damage_config.is_null();
+  if (!damage_on_touch && active_parts.empty())
+    return scripted_sources;
+
+  List<DamageSource> sources;
+  if (damage_on_touch)
+    sources.reserve(scripted_sources.size() + 1);
+  sources.append_range(scripted_sources);
+
+  std::optional<float> status_power;
+  auto status_multiplier = [&] {
+    if (!status_power)
+      status_power = m_status_controller->stat("powerMultiplier");
+    return *status_power;
+  };
+
+  if (damage_on_touch) {
+    if (!m_touch_damage_source_template) {
+      auto source = DamageSource::create(m_monster_variant.touch_damage_config);
+      if (!source)
+        return std::unexpected(std::move(source.error()));
+      m_touch_damage_source_template.emplace(std::move(*source));
+    }
+    auto& touch = sources.emplace_back(*m_touch_damage_source_template);
+    if (std::holds_alternative<PolyF>(touch.damage_area))
+      std::get<PolyF>(touch.damage_area).rotate(m_movement_controller->rotation());
+    touch.damage *= m_monster_variant.touch_damage_multiplier * *level_power * status_multiplier();
+    touch.source_entity_id = entityId();
+    touch.team = getTeam();
   }
 
-  auto animationDamageParts = m_monsterVariant.animationDamageParts;
-  for (auto const& pair : m_monsterVariant.animationDamageParts) {
-    if (!m_animationDamageParts.get().contains(pair.first))
+  if (active_parts.empty())
+    return sources;
+
+  // Animations can change between queries. Within this query, sources anchored
+  // to the same part (including their knockback) use one current transform.
+  using AnchorTransform = std::pair<std::reference_wrapper<String const>, Mat3F>;
+  SmallVector<AnchorTransform, 4> transforms;
+  auto anchor_transform = [&](String const& anchor) -> std::expected<std::reference_wrapper<Mat3F const>, StarException> {
+    auto found = std::ranges::find_if(transforms, [&](AnchorTransform const& entry) { return entry.first.get() == anchor; });
+    if (found != transforms.end())
+      return std::cref(found->second);
+    auto transform = m_networked_animator->partTransformation(anchor);
+    if (!transform)
+      return std::unexpected(std::move(transform.error()));
+    transforms.emplace_back(std::cref(anchor), std::move(*transform));
+    return std::cref(transforms[transforms.size() - 1].second);
+  };
+
+  bool flipped = m_networked_animator->flipped();
+  float flip_center = flipped ? m_networked_animator->flippedRelativeCenterLine() : 0.0f;
+  auto const& part_configs = m_monster_variant.animation_damage_parts;
+  std::size_t next_index = 0;
+  for (auto const& [name, config] : part_configs) {
+    auto index = next_index++;
+    if (!active_parts.contains(name))
       continue;
 
-    auto result100 = pair.second.get_string("anchorPart");
-if (!result100) return std::unexpected(std::move(result100.error()));
-String anchorPart = std::move(*result100);
-    auto result101 = pair.second.get("damageSource");
-if (!result101) return std::unexpected(std::move(result101.error()));
-auto result102 = DamageSource::create(std::move(*result101));
-if (!result102) return std::unexpected(std::move(result102.error()));
-DamageSource ds = std::move(*result102);
-    ds.damage *= levelPowerMultiplier * m_statusController->stat("powerMultiplier");
-    auto result104 = std::visit([this,&anchorPart](auto& poly) -> std::expected<void, StarException> {
-      if constexpr (!std::is_same_v<std::remove_cvref_t<decltype(poly)>, std::monostate>) {
-        auto result103 = m_networkedAnimator->partTransformation(anchorPart);
-if (!result103) return std::unexpected(std::move(result103.error()));
-poly.transform(std::move(*result103));
-        if (m_networkedAnimator->flipped())
-          poly.flip_horizontal(m_networkedAnimator->flippedRelativeCenterLine());
-      }
-      return {};
-    }, ds.damage_area);
-if (!result104) return std::unexpected(std::move(result104.error()));
-
-    if (std::holds_alternative<Vec2F>(ds.knockback)) {
-      Vec2F knockback = std::get<Vec2F>(ds.knockback);
-      auto result106 = m_networkedAnimator->partTransformation(anchorPart);
-if (!result106) return std::unexpected(std::move(result106.error()));
-knockback = std::move(*result106).transform_point(knockback);
-      if (m_networkedAnimator->flipped())
-        knockback = Vec2F(-knockback[0], knockback[1]);
-      ds.knockback = knockback;
+    if (m_animation_damage_source_templates.empty())
+      m_animation_damage_source_templates.resize(part_configs.size());
+    auto& part = m_animation_damage_source_templates[index];
+    if (!part) {
+      auto anchor = config.get_string("anchorPart");
+      if (!anchor)
+        return std::unexpected(std::move(anchor.error()));
+      auto damage_config = config.get("damageSource");
+      if (!damage_config)
+        return std::unexpected(std::move(damage_config.error()));
+      auto source = DamageSource::create(*damage_config);
+      if (!source)
+        return std::unexpected(std::move(source.error()));
+      part.emplace(AnimationDamageSourceTemplate{std::move(*anchor), std::move(*source), std::nullopt});
     }
 
-    List<DamageSource> partSources;
-    if (std::holds_alternative<Line2F>(ds.damage_area)) {
-      {
-  auto result107 = pair.second.get_bool("checkLineCollision", false);
-  if (!result107) return std::unexpected(std::move(result107.error()));
-  if (std::move(*result107)) {
-          Line2F worldLine = std::get<Line2F>(ds.damage_area).translated(position());
-          float length = worldLine.length();
+    auto const& source = part->source;
+    bool directional = std::holds_alternative<Vec2F>(source.knockback);
+    std::optional<std::reference_wrapper<Mat3F const>> transform;
+    if (!std::holds_alternative<std::monostate>(source.damage_area) || directional) {
+      auto resolved = anchor_transform(part->anchor_part);
+      if (!resolved)
+        return std::unexpected(std::move(resolved.error()));
+      transform = *resolved;
+    }
 
-          auto result108 = pair.second.get_int("bounces", 0);
-  if (!result108) return std::unexpected(std::move(result108.error()));
-  auto bounces = std::move(*result108);
-          while (true) {
-    auto result109 = world();
-    if (!result109) return std::unexpected(std::move(result109.error()));
-    auto result110 = result109->get().lineTileCollisionPoint(worldLine.min(), worldLine.max());
-    if (!result110) return std::unexpected(std::move(result110.error()));
-    auto collision =  std::move(*result110);
-    if (!collision) break;
-    worldLine = Line2F(worldLine.min(), collision.value_or(std::pair<Vec2F, Vec2I>{}).first);
-              ds.damage_area = worldLine.translated(-position());
-              length = length - worldLine.length();
-
-              if (--bounces >= 0 && length > 0.0f) {
-                partSources.push_back(ds);
-                ds = DamageSource(ds);
-                Vec2F dir = worldLine.direction();
-                Vec2F normal = Vec2F((*collision).second);
-                Vec2F reflection = dir - (2 * dir.piecewise_multiply(normal).sum() * normal);
-                if (std::holds_alternative<Vec2F>(ds.knockback))
-                  ds.knockback = std::get<Vec2F>(ds.knockback).rotate(reflection.angle_between(worldLine.direction()));
-
-                worldLine.min() = (*collision).first;
-                worldLine.max() = worldLine.min() + (reflection * length);
-                ds.damage_area = worldLine.translated(-position());
-              } else {
-                break;
-              }
-  }
-  partSources.push_back(ds);
+    bool line = std::holds_alternative<Line2F>(source.damage_area);
+    if (line) {
+      // Resolve the live anchor before parsing line settings, even when the
+      // flag is false and the line will not emit any segments.
+      if (!part->line_collision) {
+        auto enabled = config.get_bool("checkLineCollision", false);
+        if (!enabled)
+          return std::unexpected(std::move(enabled.error()));
+        std::int64_t bounces = 0;
+        if (*enabled) {
+          auto count = config.get_int("bounces", 0);
+          if (!count)
+            return std::unexpected(std::move(count.error()));
+          bounces = *count;
         }
-}
-    } else {
-      partSources.push_back(ds);
+        part->line_collision.emplace(AnimationDamageSourceTemplate::LineCollision{*enabled, bounces});
+      }
+      if (!part->line_collision->enabled)
+        continue;
     }
-    damageSources.append_range(partSources);
-  }
 
-  return damageSources;
+    std::optional<Vec2F> knockback;
+    if (directional) {
+      knockback = transform->get().transform_point(std::get<Vec2F>(source.knockback));
+      if (flipped)
+        (*knockback)[0] = -(*knockback)[0];
+    }
+    float part_power = *level_power * status_multiplier();
+    auto append_source = [&]() -> DamageSource& {
+      auto& output = sources.emplace_back(source);
+      output.damage *= part_power;
+      if (knockback)
+        output.knockback = *knockback;
+      return output;
+    };
+
+    if (!line) {
+      auto& output = append_source();
+      if (std::holds_alternative<PolyF>(output.damage_area)) {
+        auto& poly = std::get<PolyF>(output.damage_area);
+        poly.transform(transform->get());
+        if (flipped)
+          poly.flip_horizontal(flip_center);
+      }
+      continue;
+    }
+
+    auto local_line = std::get<Line2F>(source.damage_area).transformed(transform->get());
+    if (flipped)
+      local_line.flip_horizontal(flip_center);
+
+    auto current_world = world();
+    if (!current_world)
+      return std::unexpected(std::move(current_world.error()));
+    auto origin = position();
+    auto world_line = local_line.translated(origin);
+    auto bounces = part->line_collision->bounces;
+    float remaining = bounces > 0 ? world_line.length() : 0.0f;
+    bool reflected = false;
+    while (true) {
+      auto collision = current_world->get().lineTileCollisionPoint(world_line.min(), world_line.max());
+      if (!collision)
+        return std::unexpected(std::move(collision.error()));
+      if (*collision)
+        world_line.max() = (**collision).first;
+      // The first unobstructed segment retains its exact local coordinates.
+      append_source().damage_area = *collision || reflected ? world_line.translated(-origin) : local_line;
+      if (!*collision || bounces <= 0)
+        break;
+
+      remaining -= world_line.length();
+      if (!(remaining > 0.0f))
+        break;
+      --bounces;
+      Vec2F direction = world_line.direction();
+      Vec2F normal((**collision).second);
+      Vec2F reflection = direction - (2 * direction.piecewise_multiply(normal).sum() * normal);
+      if (knockback) {
+        auto incoming = world_line.direction();
+        // Rounded normalization can perturb acos(-1) on exact reversal.
+        auto angle = incoming != Vec2F{} && reflection == -incoming
+            ? std::numbers::pi_v<float> : reflection.angle_between(incoming);
+        *knockback = knockback->rotate(angle);
+      }
+
+      world_line.min() = (**collision).first;
+      world_line.max() = world_line.min() + reflection * remaining;
+      reflected = true;
+    }
+  }
+  return sources;
 }
 
-std::expected<bool, StarException> Monster::shouldDie() {
-  auto result = recover_lua_script_error(m_scriptComponent.invoke<bool>("shouldDie"));
+std::expected<bool, StarException> Monster::should_die() {
+  auto result = recover_lua_script_error(m_script_component.invoke<bool>("shouldDie"));
   if (!result)
     return std::unexpected(std::move(result.error()));
   if (*result)
     return **result;
-  return !m_statusController->resourcePositive("health") || m_scriptComponent.error();
+  return !m_status_controller->resourcePositive("health") || m_script_component.error();
 }
 
 std::expected<void, StarException> Monster::knockout() {
-  m_knockedOut = true;
-  auto result113 = m_monsterVariant.parameters.get_float("knockoutTime", 1.0f);
+  m_knocked_out = true;
+  auto result113 = m_monster_variant.parameters.get_float("knockoutTime", 1.0f);
 if (!result113) return std::unexpected(std::move(result113.error()));
-m_knockoutTimer = std::move(*result113);
+m_knockout_timer = std::move(*result113);
 
-  m_damageOnTouch = false;
+  m_damage_on_touch = false;
 
-  auto result114 = m_monsterVariant.parameters.get_string("knockoutEffect");
+  auto result114 = m_monster_variant.parameters.get_string("knockoutEffect");
 if (!result114) return std::unexpected(std::move(result114.error()));
 String knockoutEffect = std::move(*result114);
   if (!knockoutEffect.empty())
     {
-  auto result115 = m_networkedAnimator->setEffectEnabled(knockoutEffect, true);
+  auto result115 = m_networked_animator->setEffectEnabled(knockoutEffect, true);
   if (!result115) return std::unexpected(std::move(result115.error()));
 
 }
 
-  auto result116 = m_monsterVariant.parameters.get_object("knockoutAnimationStates", JsonObject());
+  auto result116 = m_monster_variant.parameters.get_object("knockoutAnimationStates", JsonObject());
 if (!result116) return std::unexpected(std::move(result116.error()));
 auto knockoutAnimationStates = std::move(*result116);
 for (auto const& pair : knockoutAnimationStates) {
   auto result117 = pair.second.to_string();
   if (!result117) return std::unexpected(std::move(result117.error()));
-  auto result118 = m_networkedAnimator->setState(pair.first, std::move(*result117));
+  auto result118 = m_networked_animator->setState(pair.first, std::move(*result117));
   if (!result118) return std::unexpected(std::move(result118.error()));
 }
   return {};
 }
 
 std::expected<bool, StarException> Monster::should_destroy() const {
-  return m_knockedOut && m_knockoutTimer <= 0;
+  return m_knocked_out && m_knockout_timer <= 0;
 }
 
 std::expected<void, StarException> Monster::destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) {
-  auto result119 = recover_lua_script_error(m_scriptComponent.invoke("die"));
+  auto result119 = recover_lua_script_error(m_script_component.invoke("die"));
 if (!result119) return std::unexpected(std::move(result119.error()));
 
 
-  if (isMaster() && !m_dropPool.is_null()) {
+  if (isMaster() && !m_drop_pool.is_null()) {
     auto result120 = this->root().treasureDatabase();
 if (!result120) return std::unexpected(std::move(result120.error()));
 auto treasureDatabase = std::move(*result120);
 
     String treasurePool;
-    if (m_dropPool.is_type(Json::Type::String)) {
-      auto result121 = m_dropPool.to_string();
+    if (m_drop_pool.is_type(Json::Type::String)) {
+      auto result121 = m_drop_pool.to_string();
 if (!result121) return std::unexpected(std::move(result121.error()));
 treasurePool = std::move(*result121);
     } else {
@@ -789,13 +897,13 @@ treasurePool = std::move(*result121);
       // death are in the damage pool map, if so spawn treasure from that,
       // otherwise set the treasure pool to the "default" entry.
 
-      for (auto const& damageSourceKind : m_deathDamageSourceKinds) {
+      for (auto const& damageSourceKind : m_death_damage_source_kinds) {
         {
-  auto result122 = m_dropPool.contains(damageSourceKind);
+  auto result122 = m_drop_pool.contains(damageSourceKind);
   if (!result122) return std::unexpected(std::move(result122.error()));
   if (std::move(*result122))
             {
-    auto result123 = m_dropPool.get_string(damageSourceKind);
+    auto result123 = m_drop_pool.get_string(damageSourceKind);
     if (!result123) return std::unexpected(std::move(result123.error()));
     treasurePool = std::move(*result123);
   }
@@ -804,7 +912,7 @@ treasurePool = std::move(*result121);
 
       if (treasurePool.empty())
         {
-  auto result124 = m_dropPool.get_string("default");
+  auto result124 = m_drop_pool.get_string("default");
   if (!result124) return std::unexpected(std::move(result124.error()));
   treasurePool = std::move(*result124);
 }
@@ -812,7 +920,7 @@ treasurePool = std::move(*result121);
 
     auto dropped = [&]() -> std::expected<void, StarException> {
       {
-  auto result125 = monsterLevel();
+  auto result125 = monster_level();
   if (!result125) return std::unexpected(std::move(result125.error()));
   auto result126 = treasureDatabase->createTreasure(treasurePool, std::move(*result125));
   if (!result126) return std::unexpected(std::move(result126.error()));
@@ -832,40 +940,40 @@ treasurePool = std::move(*result121);
     if (!dropped) {
       auto const& e = dropped.error();
       auto result130 = this->root().logger().warn_exception(
-        Star::format("Failed to create treasure for monster '{}'", m_monsterVariant.type), ExceptionDiagnostic(e));
+        Star::format("Failed to create treasure for monster '{}'", m_monster_variant.type), ExceptionDiagnostic(e));
       if (!result130)
         return std::unexpected(std::move(result130.error()));
     }
   }
 
   if (render_callback) {
-    if (!m_deathParticleBurst.empty())
+    if (!m_death_particle_burst.empty())
       {
-  auto result131 = m_networkedAnimator->burstParticleEmitter(m_deathParticleBurst);
+  auto result131 = m_networked_animator->burstParticleEmitter(m_death_particle_burst);
   if (!result131) return std::unexpected(std::move(result131.error()));
 
 }
 
-    if (!m_deathSound.empty())
+    if (!m_death_sound.empty())
       {
-  auto result132 = m_networkedAnimator->playSound(m_deathSound);
+  auto result132 = m_networked_animator->playSound(m_death_sound);
   if (!result132) return std::unexpected(std::move(result132.error()));
 
 }
 
-    auto result133 = m_networkedAnimator->update(0.0, std::ref(m_networkedAnimatorDynamicTarget));
+    auto result133 = m_networked_animator->update(0.0, std::ref(m_networked_animator_dynamic_target));
 if (!result133) return std::unexpected(std::move(result133.error()));
 
 
-    auto result134 = render_callback->get().add_audios(m_networkedAnimatorDynamicTarget.pullNewAudios());
+    auto result134 = render_callback->get().add_audios(m_networked_animator_dynamic_target.pullNewAudios());
 if (!result134) return std::unexpected(std::move(result134.error()));
-    auto result135 = render_callback->get().add_particles(m_networkedAnimatorDynamicTarget.pullNewParticles());
+    auto result135 = render_callback->get().add_particles(m_networked_animator_dynamic_target.pullNewParticles());
 if (!result135) return std::unexpected(std::move(result135.error()));
-    auto result136 = render_callback->get().add_particles(m_statusController->pullNewParticles());
+    auto result136 = render_callback->get().add_particles(m_status_controller->pullNewParticles());
 if (!result136) return std::unexpected(std::move(result136.error()));
   }
 
-  m_deathDamageSourceKinds.clear();
+  m_death_damage_source_kinds.clear();
 
   if (isMaster())
     {
@@ -877,23 +985,23 @@ if (!result136) return std::unexpected(std::move(result136.error()));
 }
 
 std::expected<List<LightSource>, StarException> Monster::light_sources() const {
-  auto lights = m_networkedAnimator->light_sources(position());
+  auto lights = m_networked_animator->light_sources(position());
   if (!lights)
     return std::unexpected(std::move(lights.error()));
-  if (auto result = m_statusController->append_light_sources(*lights); !result)
+  if (auto result = m_status_controller->append_light_sources(*lights); !result)
     return std::unexpected(std::move(result.error()));
   return lights;
 }
 
 std::expected<void, StarException> Monster::hitOther(EntityId targetEntityId, DamageRequest const& damageRequest) {
   if (inWorld() && isMaster())
-    m_statusController->hit_other(targetEntityId, damageRequest);
+    m_status_controller->hit_other(targetEntityId, damageRequest);
   return {};
 }
 
 std::expected<void, StarException> Monster::damagedOther(DamageNotification const& damage) {
   if (inWorld() && isMaster())
-    m_statusController->damaged_other(damage);
+    m_status_controller->damaged_other(damage);
   return {};
 }
 
@@ -904,75 +1012,44 @@ std::expected<void, StarException> Monster::update(float dt, std::uint64_t) {
   m_movement_controller->setTimestep(dt);
 
   if (isMaster()) {
-    m_networkedAnimator->setFlipped((m_movement_controller->facing_direction() == Direction::Left) != m_monsterVariant.reversed);
+    m_networked_animator->setFlipped((m_movement_controller->facing_direction() == Direction::Left) != m_monster_variant.reversed);
 
-    if (m_knockedOut) {
-      m_knockoutTimer -= dt;
+    if (m_knocked_out) {
+      m_knockout_timer -= dt;
     } else {
-      if (m_scriptComponent.update_ready())
+      if (m_script_component.update_ready())
         m_physics_forces.set({});
-      auto result140 = recover_lua_script_error(m_scriptComponent.update(m_scriptComponent.update_dt(dt)));
-if (!result140) return std::unexpected(std::move(result140.error()));
-
-
-      {
-  auto result141 = shouldDie();
-  if (!result141) return std::unexpected(std::move(result141.error()));
-  if (std::move(*result141))
-          {
-    auto result142 = knockout();
-    if (!result142) return std::unexpected(std::move(result142.error()));
-
-  }
-}
+      auto script = recover_lua_script_error(m_script_component.update(m_script_component.update_dt(dt)));
+      if (!script) return std::unexpected(std::move(script.error()));
+      auto dying = should_die();
+      if (!dying) return std::unexpected(std::move(dying.error()));
+      if (*dying) {
+        if (auto result = knockout(); !result) return result;
+      }
     }
 
-    auto result143 = m_movement_controller->tick_master(dt);
-if (!result143) return std::unexpected(std::move(result143.error()));
-
-
-    auto result144 = m_statusController->tickMaster(dt);
-if (!result144) return std::unexpected(std::move(result144.error()));
-
-    auto result145 = updateStatus(dt);
-if (!result145) return std::unexpected(std::move(result145.error()));
-
+    if (auto result = m_movement_controller->tick_master(dt); !result) return result;
+    if (auto result = m_status_controller->tickMaster(dt); !result) return result;
+    if (auto result = update_status(dt); !result) return result;
   } else {
-    auto result146 = m_netGroup.tick_net_interpolation(dt);
-if (!result146) return std::unexpected(std::move(result146.error()));
-
-
-    auto result147 = m_statusController->tickSlave(dt);
-if (!result147) return std::unexpected(std::move(result147.error()));
-
-    auto result148 = updateStatus(dt);
-if (!result148) return std::unexpected(std::move(result148.error()));
-
-
-    auto result149 = m_movement_controller->tick_slave(dt);
-if (!result149) return std::unexpected(std::move(result149.error()));
-
+    if (auto result = m_net_group.tick_net_interpolation(dt); !result) return result;
+    if (auto result = m_status_controller->tickSlave(dt); !result) return result;
+    if (auto result = update_status(dt); !result) return result;
+    if (auto result = m_movement_controller->tick_slave(dt); !result) return result;
   }
 
-  {
-  auto result150 = world();
-  if (!result150) return std::unexpected(std::move(result150.error()));
-  if (result150->get().isServer()) {
-      auto result151 = m_networkedAnimator->update(dt, std::nullopt);
-  if (!result151) return std::unexpected(std::move(result151.error()));
+  auto current_world = world();
+  if (!current_world) return std::unexpected(std::move(current_world.error()));
+  if (current_world->get().isServer())
+    return m_networked_animator->update(dt, std::nullopt);
 
-    } else {
-      auto result152 = m_networkedAnimator->update(dt, std::ref(m_networkedAnimatorDynamicTarget));
-  if (!result152) return std::unexpected(std::move(result152.error()));
-
-      m_networkedAnimatorDynamicTarget.updatePosition(position());
-
-      auto result153 = recover_lua_script_error(m_scriptedAnimator.update());
-  if (!result153) return std::unexpected(std::move(result153.error()));
-
-  this->root().spatialLogger().log_poly("world", m_movement_controller->collisionBody(), {255, 0, 0, 255});
-    }
-}
+  if (auto result = m_networked_animator->update(dt, std::ref(m_networked_animator_dynamic_target)); !result) return result;
+  m_networked_animator_dynamic_target.updatePosition(position());
+  auto animation = recover_lua_script_error(m_scripted_animator.update());
+  if (!animation) return std::unexpected(std::move(animation.error()));
+  auto& spatial_log = root().spatialLogger();
+  if (spatial_log.observed())
+    spatial_log.log_poly("world", m_movement_controller->collisionBody(), {255, 0, 0, 255});
   return {};
 }
 
@@ -981,69 +1058,67 @@ std::uint64_t Monster::presentation_epoch() const {
 }
 
 std::expected<void, StarException> Monster::collectRenderEvents(RenderCallback& render_callback) {
-  auto result158 = render_callback.add_audios(m_networkedAnimatorDynamicTarget.pullNewAudios());
+  auto result158 = render_callback.add_audios(m_networked_animator_dynamic_target.pullNewAudios());
 if (!result158) return std::unexpected(std::move(result158.error()));
-  auto result159 = render_callback.add_particles(m_networkedAnimatorDynamicTarget.pullNewParticles());
+  auto result159 = render_callback.add_particles(m_networked_animator_dynamic_target.pullNewParticles());
 if (!result159) return std::unexpected(std::move(result159.error()));
-  auto result162 = render_callback.add_particles(m_statusController->pullNewParticles());
+  auto result162 = render_callback.add_particles(m_status_controller->pullNewParticles());
 if (!result162) return std::unexpected(std::move(result162.error()));
-  auto result163 = render_callback.add_audios(m_statusController->pullNewAudios());
+  auto result163 = render_callback.add_audios(m_status_controller->pullNewAudios());
 if (!result163) return std::unexpected(std::move(result163.error()));
 
-  auto result164 = m_effectEmitter->collectRenderEvents(render_callback);
+  auto result164 = m_effect_emitter->collectRenderEvents(render_callback);
 if (!result164) return std::unexpected(std::move(result164.error()));
-  auto result166 = render_callback.add_audios(m_scriptedAnimator.pull_new_audios());
+  auto result166 = render_callback.add_audios(m_scripted_animator.pull_new_audios());
 if (!result166) return std::unexpected(std::move(result166.error()));
-  auto result167 = render_callback.add_particles(m_scriptedAnimator.pull_new_particles());
+  auto result167 = render_callback.add_particles(m_scripted_animator.pull_new_particles());
 if (!result167) return std::unexpected(std::move(result167.error()));
   return {};
 }
 
 std::expected<void, StarException> Monster::render(RenderCallback& render_callback) {
-  auto sample = m_networkedAnimator->sample(render_callback.presentation().interpolation());
-  {
-  auto result154 = sample.drawables(position());
-  if (!result154) return std::unexpected(std::move(result154.error()));
-  for (auto& drawable : std::move(*result154)) {
-      if (drawable.is_image())
-        {
-    auto result155 = this->root().image_metadata_database();
-    if (!result155) return std::unexpected(std::move(result155.error()));
-    auto result156 = drawable.image_part().add_directives_group(*std::move(*result155), m_statusController->parentDirectives(), true);
-    if (!result156) return std::unexpected(std::move(result156.error()));
-
-  }
-      auto result157 = render_callback.add_drawable(std::move(drawable), m_monsterVariant.renderLayer);
-  if (!result157) return std::unexpected(std::move(result157.error()));
+  auto interpolation = render_callback.presentation().interpolation();
+  auto sample = m_networked_animator->sample(interpolation);
+  auto parts = sample.drawables(position());
+  if (!parts) return std::unexpected(std::move(parts.error()));
+  auto layer = m_monster_variant.render_layer;
+  auto const& directives = m_status_controller->parentDirectives();
+  std::shared_ptr<ImageMetadataDatabase const> metadata;
+  for (auto& drawable : *parts) {
+    if (!directives.empty() && drawable.is_image()) {
+      if (!metadata) {
+        auto loaded = root().image_metadata_database();
+        if (!loaded) return std::unexpected(std::move(loaded.error()));
+        metadata = std::move(*loaded);
+      }
+      auto applied = drawable.image_part().add_directives_group(*metadata, directives, true);
+      if (!applied) return std::unexpected(std::move(applied.error()));
     }
-}
+    if (auto result = render_callback.add_drawable(std::move(drawable), layer); !result) return result;
+  }
 
-
-  auto result160 = m_statusController->drawables(render_callback.presentation().interpolation());
-if (!result160) return std::unexpected(std::move(result160.error()));
-auto result161 = render_callback.add_drawables(std::move(*result160), m_monsterVariant.renderLayer);
-if (!result161) return std::unexpected(std::move(result161.error()));
-
-for (auto const& drawablePair : m_scriptedAnimator.drawables()) {
-  auto result165 = render_callback.add_drawable(drawablePair.first, drawablePair.second.value_or(m_monsterVariant.renderLayer));
-  if (!result165) return std::unexpected(std::move(result165.error()));
-}
+  auto effects = m_status_controller->drawables(interpolation);
+  if (!effects) return std::unexpected(std::move(effects.error()));
+  if (auto result = render_callback.add_drawables(std::move(*effects), layer); !result) return result;
+  for (auto const& [drawable, override_layer] : m_scripted_animator.drawables()) {
+    if (auto result = render_callback.add_drawable(drawable, override_layer.value_or(layer)); !result) return result;
+  }
   return {};
 }
 
 std::expected<void, StarException> Monster::render_light_sources(RenderCallback& render_callback) {
-  auto sample = m_networkedAnimator->sample(render_callback.presentation().interpolation());
+  auto sample = m_networked_animator->sample(render_callback.presentation().interpolation());
   auto lights = sample.light_sources(position());
   if (!lights)
     return std::unexpected(std::move(lights.error()));
   if (auto added = render_callback.add_light_sources(*lights); !added)
     return std::unexpected(std::move(added.error()));
   lights->clear();
-  if (auto result = m_statusController->append_light_sources(*lights, render_callback.presentation().interpolation()); !result)
+  if (auto result = m_status_controller->append_light_sources(*lights, render_callback.presentation().interpolation()); !result)
     return std::unexpected(std::move(result.error()));
   if (auto added = render_callback.add_light_sources(*lights); !added)
     return std::unexpected(std::move(added.error()));
-  return render_callback.add_light_sources(m_scriptedAnimator.light_sources());
+  return render_callback.add_light_sources(m_scripted_animator.light_sources());
 }
 
 void Monster::setPosition(Vec2F const& pos) {
@@ -1055,79 +1130,73 @@ MessageResponseResult Monster::receive_message(ConnectionId sending_connection, 
   auto current_world = world();
   if (!current_world)
     return std::unexpected(std::move(current_world.error()));
-  auto response = recover_lua_script_error(m_scriptComponent.handle_message(message, current_world->get().connection() == sending_connection, args));
+  auto response = recover_lua_script_error(m_script_component.handle_message(message, current_world->get().connection() == sending_connection, args));
   if (!response || *response)
     return response;
   // The script may have changed world membership before declining the message.
   auto fallback_world = world();
   if (!fallback_world)
     return std::unexpected(std::move(fallback_world.error()));
-  return m_statusController->receive_message(message, fallback_world->get().connection() == sending_connection, args);
+  return m_status_controller->receive_message(message, fallback_world->get().connection() == sending_connection, args);
 }
 
 std::expected<float, StarException> Monster::maxHealth() const {
-  auto maximum = m_statusController->resourceMax("health");
+  auto maximum = m_status_controller->resourceMax("health");
   if (!maximum) return std::unexpected(std::move(maximum.error()));
   if (!*maximum) return std::unexpected(MonsterException("Health resource has no maximum"));
   return **maximum;
 }
 
 float Monster::health() const {
-  return m_statusController->resource("health");
+  return m_status_controller->resource("health");
 }
 
 DamageBarType Monster::damageBar() const {
-  return m_damageBar.get();
+  return m_damage_bar.get();
 }
 
-std::expected<Vec2F, StarException> Monster::getAbsolutePosition(Vec2F relativePosition) const {
+Vec2F Monster::absolute_position(Vec2F relative_position) const {
   if (m_movement_controller->facing_direction() == Direction::Left)
-    relativePosition[0] *= -1;
-  if (m_movement_controller->rotation() != 0)
-    relativePosition = relativePosition.rotate(m_movement_controller->rotation());
-  return m_movement_controller->position() + relativePosition;
+    relative_position[0] *= -1;
+  if (auto rotation = m_movement_controller->rotation(); rotation != 0)
+    relative_position = relative_position.rotate(rotation);
+  return position() + relative_position;
 }
 
-std::expected<void, StarException> Monster::updateStatus(float dt) {
-  m_effectEmitter->setSourcePosition("normal", position());
-  auto result177 = mouthOffset();
-if (!result177) return std::unexpected(std::move(result177.error()));
-m_effectEmitter->setSourcePosition("mouth", position() + std::move(*result177));
-  auto result178 = feetOffset();
-if (!result178) return std::unexpected(std::move(result178.error()));
-m_effectEmitter->setSourcePosition("feet", position() + std::move(*result178));
-  m_effectEmitter->setDirection(m_movement_controller->facing_direction());
-  auto result179 = m_effectEmitter->tick(dt, *entityMode());
-if (!result179) return std::unexpected(std::move(result179.error()));
-
-  return {};
+std::expected<void, StarException> Monster::update_status(float dt) {
+  auto origin = position();
+  m_effect_emitter->setSourcePosition("normal", origin);
+  m_effect_emitter->setSourcePosition("mouth", origin + mouth_offset());
+  m_effect_emitter->setSourcePosition("feet", origin + feet_offset());
+  m_effect_emitter->setDirection(m_movement_controller->facing_direction());
+  return m_effect_emitter->tick(dt, *entityMode());
 }
 
 std::expected<LuaCallbacks, StarException> Monster::makeMonsterCallbacks() {
   LuaCallbacks callbacks;
 
   auto result180 = callbacks.register_callback("type", [this]() {
-      return m_monsterVariant.type;
+      return m_monster_variant.type;
     });
 if (!result180) return std::unexpected(std::move(result180.error()));
 
   auto result181 = callbacks.register_callback("seed", [this]() {
-      return Star::to_string(m_monsterVariant.seed);
+      return Star::to_string(m_monster_variant.seed);
     });
 if (!result181) return std::unexpected(std::move(result181.error()));
 
   auto result182 = callbacks.register_callback("uniqueParameters", [this]() {
-      return m_monsterVariant.uniqueParameters;
+      return m_monster_variant.unique_parameters;
     });
 if (!result182) return std::unexpected(std::move(result182.error()));
 
   auto result183 = callbacks.register_callback("level", [this]() {
-      return monsterLevel();
+      return monster_level();
     });
 if (!result183) return std::unexpected(std::move(result183.error()));
 
   auto result184 = callbacks.register_callback("setDamageOnTouch", [this](bool arg1) {
-      m_damageOnTouch = arg1;
+      m_damage_on_touch = arg1;
     });
 if (!result184) return std::unexpected(std::move(result184.error()));
 
@@ -1138,13 +1207,13 @@ if (!result184) return std::unexpected(std::move(result184.error()));
         if (!damage) return std::unexpected(std::move(damage.error()));
         parsed.push_back(std::move(*damage));
       }
-      m_damageSources.set(std::move(parsed));
+      m_damage_sources.set(std::move(parsed));
       return {};
     });
 if (!result185) return std::unexpected(std::move(result185.error()));
 
   auto result186 = callbacks.register_callback("setDamageParts", [this](StringSet const& parts) {
-      m_animationDamageParts.set(parts);
+      m_animation_damage_parts.set(parts);
     });
 if (!result186) return std::unexpected(std::move(result186.error()));
 
@@ -1154,17 +1223,17 @@ if (!result186) return std::unexpected(std::move(result186.error()));
 if (!result187) return std::unexpected(std::move(result187.error()));
 
   auto result188 = callbacks.register_callback("setActiveSkillName", [this](std::optional<String> const& activeSkillName) {
-      m_activeSkillName = activeSkillName.value_or(String{});
+      m_active_skill_name = activeSkillName.value_or(String{});
     });
 if (!result188) return std::unexpected(std::move(result188.error()));
 
   auto result189 = callbacks.register_callback("setDropPool", [this](Json dropPool) {
-      m_dropPool = std::move(dropPool);
+      m_drop_pool = std::move(dropPool);
     });
 if (!result189) return std::unexpected(std::move(result189.error()));
 
   auto result190 = callbacks.register_callback("toAbsolutePosition", [this](Vec2F const& p) {
-      return getAbsolutePosition(p);
+      return absolute_position(p);
     });
 if (!result190) return std::unexpected(std::move(result190.error()));
 
@@ -1185,12 +1254,12 @@ m_movement_controller->control_fly(result192->get().geometry().diff(arg1, positi
 if (!result193) return std::unexpected(std::move(result193.error()));
 
   auto result194 = callbacks.register_callback("setDeathParticleBurst", [this](std::optional<String> const& arg1) {
-      m_deathParticleBurst = arg1.value_or(String{});
+      m_death_particle_burst = arg1.value_or(String{});
     });
 if (!result194) return std::unexpected(std::move(result194.error()));
 
   auto result195 = callbacks.register_callback("setDeathSound", [this](std::optional<String> const& arg1) {
-      m_deathSound = arg1.value_or(String{});
+      m_death_sound = arg1.value_or(String{});
     });
 if (!result195) return std::unexpected(std::move(result195.error()));
 
@@ -1211,7 +1280,7 @@ if (!result196) return std::unexpected(std::move(result196.error()));
     });
 if (!result197) return std::unexpected(std::move(result197.error()));
   auto result198 = callbacks.register_callback("setDisplayNametag", [this](bool display) {
-      m_displayNametag.set(display);
+      m_display_nametag.set(display);
     });
 if (!result198) return std::unexpected(std::move(result198.error()));
 
@@ -1262,7 +1331,7 @@ if (!result205) return std::unexpected(std::move(result205.error()));
       auto result206 = DamageBarTypeNames->get_left(damageBarType);
       if (!result206)
         return std::unexpected(std::move(result206.error()));
-      m_damageBar.set(result206->get());
+      m_damage_bar.set(result206->get());
       return {};
 });
 if (!result207) return std::unexpected(std::move(result207.error()));
@@ -1273,7 +1342,7 @@ if (!result207) return std::unexpected(std::move(result207.error()));
 if (!result208) return std::unexpected(std::move(result208.error()));
 
   auto result209 = callbacks.register_callback("setAnimationParameter", [this](String name, Json value) {
-      m_scriptedAnimationParameters.set(std::move(name), std::move(value));
+      m_scripted_animation_parameters.set(std::move(name), std::move(value));
     });
 if (!result209) return std::unexpected(std::move(result209.error()));
 
@@ -1300,121 +1369,121 @@ std::expected<void, StarException> Monster::add_chat_message(String const& messa
 }
 
 std::expected<void, StarException> Monster::setupNetStates() {
-  auto result212 = m_netGroup.add_net_element(m_uniqueIdNetState);
+  auto result212 = m_net_group.add_net_element(m_unique_id_net_state);
 if (!result212) return std::unexpected(std::move(result212.error()));
 
-  auto result213 = m_netGroup.add_net_element(m_teamNetState);
+  auto result213 = m_net_group.add_net_element(m_team_net_state);
 if (!result213) return std::unexpected(std::move(result213.error()));
 
-  auto result214 = m_netGroup.add_net_element(m_monsterLevelNetState);
+  auto result214 = m_net_group.add_net_element(m_monster_level_net_state);
 if (!result214) return std::unexpected(std::move(result214.error()));
 
-  auto result215 = m_netGroup.add_net_element(m_damageOnTouchNetState);
+  auto result215 = m_net_group.add_net_element(m_damage_on_touch_net_state);
 if (!result215) return std::unexpected(std::move(result215.error()));
 
-  auto result216 = m_netGroup.add_net_element(m_damageSources);
+  auto result216 = m_net_group.add_net_element(m_damage_sources);
 if (!result216) return std::unexpected(std::move(result216.error()));
 
-  auto result217 = m_netGroup.add_net_element(m_aggressiveNetState);
+  auto result217 = m_net_group.add_net_element(m_aggressive_net_state);
 if (!result217) return std::unexpected(std::move(result217.error()));
 
-  auto result218 = m_netGroup.add_net_element(m_knockedOutNetState);
+  auto result218 = m_net_group.add_net_element(m_knocked_out_net_state);
 if (!result218) return std::unexpected(std::move(result218.error()));
 
-  auto result219 = m_netGroup.add_net_element(m_deathParticleBurstNetState);
+  auto result219 = m_net_group.add_net_element(m_death_particle_burst_net_state);
 if (!result219) return std::unexpected(std::move(result219.error()));
 
-  auto result220 = m_netGroup.add_net_element(m_deathSoundNetState);
+  auto result220 = m_net_group.add_net_element(m_death_sound_net_state);
 if (!result220) return std::unexpected(std::move(result220.error()));
 
-  auto result221 = m_netGroup.add_net_element(m_activeSkillNameNetState);
+  auto result221 = m_net_group.add_net_element(m_active_skill_name_net_state);
 if (!result221) return std::unexpected(std::move(result221.error()));
 
-  auto result222 = m_netGroup.add_net_element(m_name);
+  auto result222 = m_net_group.add_net_element(m_name);
 if (!result222) return std::unexpected(std::move(result222.error()));
 
-  auto result223 = m_netGroup.add_net_element(m_displayNametag);
+  auto result223 = m_net_group.add_net_element(m_display_nametag);
 if (!result223) return std::unexpected(std::move(result223.error()));
 
-  auto result224 = m_netGroup.add_net_element(m_dropPoolNetState);
+  auto result224 = m_net_group.add_net_element(m_drop_pool_net_state);
 if (!result224) return std::unexpected(std::move(result224.error()));
 
-  auto result225 = m_netGroup.add_net_element(m_physics_forces);
+  auto result225 = m_net_group.add_net_element(m_physics_forces);
 if (!result225) return std::unexpected(std::move(result225.error()));
 
 
-  auto result226 = m_netGroup.add_net_element(*m_networkedAnimator);
+  auto result226 = m_net_group.add_net_element(*m_networked_animator);
 if (!result226) return std::unexpected(std::move(result226.error()));
 
-  auto result227 = m_netGroup.add_net_element(*m_movement_controller);
+  auto result227 = m_net_group.add_net_element(*m_movement_controller);
 if (!result227) return std::unexpected(std::move(result227.error()));
 
-  auto result228 = m_netGroup.add_net_element(*m_statusController);
+  auto result228 = m_net_group.add_net_element(*m_status_controller);
 if (!result228) return std::unexpected(std::move(result228.error()));
 
-  auto result229 = m_netGroup.add_net_element(*m_effectEmitter);
+  auto result229 = m_net_group.add_net_element(*m_effect_emitter);
 if (!result229) return std::unexpected(std::move(result229.error()));
 
 
-  auto result230 = m_netGroup.add_net_element(m_new_chat_message_event);
+  auto result230 = m_net_group.add_net_element(m_new_chat_message_event);
 if (!result230) return std::unexpected(std::move(result230.error()));
 
-  auto result231 = m_netGroup.add_net_element(m_chat_message);
+  auto result231 = m_net_group.add_net_element(m_chat_message);
 if (!result231) return std::unexpected(std::move(result231.error()));
 
-  auto result232 = m_netGroup.add_net_element(m_chat_portrait);
+  auto result232 = m_net_group.add_net_element(m_chat_portrait);
 if (!result232) return std::unexpected(std::move(result232.error()));
 
 
-  auto result233 = m_netGroup.add_net_element(m_damageBar);
+  auto result233 = m_net_group.add_net_element(m_damage_bar);
 if (!result233) return std::unexpected(std::move(result233.error()));
 
-  auto result234 = m_netGroup.add_net_element(m_interactive);
+  auto result234 = m_net_group.add_net_element(m_interactive);
 if (!result234) return std::unexpected(std::move(result234.error()));
 
 
     // don't interpolate scripted animation parameters or animationdamageparts
-  auto result235 = m_netGroup.add_net_element(m_animationDamageParts, false);
+  auto result235 = m_net_group.add_net_element(m_animation_damage_parts, false);
 if (!result235) return std::unexpected(std::move(result235.error()));
 
-  auto result236 = m_netGroup.add_net_element(m_scriptedAnimationParameters, false);
+  auto result236 = m_net_group.add_net_element(m_scripted_animation_parameters, false);
 if (!result236) return std::unexpected(std::move(result236.error()));
 
 
-  m_netGroup.set_needs_load_callback([this](bool initial) { return getNetStates(initial); });
-  m_netGroup.set_needs_store_callback([this] { return setNetStates(); });
+  m_net_group.set_needs_load_callback([this](bool initial) { return getNetStates(initial); });
+  m_net_group.set_needs_store_callback([this] { return setNetStates(); });
   return {};
 }
 
 std::expected<void, StarException> Monster::setNetStates() {
-  m_uniqueIdNetState.set(uniqueId());
-  m_teamNetState.set(getTeam());
-  m_monsterLevelNetState.set(m_monsterLevel);
-  m_damageOnTouchNetState.set(m_damageOnTouch);
-  m_aggressiveNetState.set(aggressive());
-  m_knockedOutNetState.set(m_knockedOut);
-  m_deathParticleBurstNetState.set(m_deathParticleBurst);
-  m_deathSoundNetState.set(m_deathSound);
-  m_activeSkillNameNetState.set(m_activeSkillName);
-  m_dropPoolNetState.set(m_dropPool);
+  m_unique_id_net_state.set(uniqueId());
+  m_team_net_state.set(getTeam());
+  m_monster_level_net_state.set(m_monster_level);
+  m_damage_on_touch_net_state.set(m_damage_on_touch);
+  m_aggressive_net_state.set(aggressive());
+  m_knocked_out_net_state.set(m_knocked_out);
+  m_death_particle_burst_net_state.set(m_death_particle_burst);
+  m_death_sound_net_state.set(m_death_sound);
+  m_active_skill_name_net_state.set(m_active_skill_name);
+  m_drop_pool_net_state.set(m_drop_pool);
   return {};
 }
 
 std::expected<void, StarException> Monster::getNetStates(bool initial) {
-  setUniqueId(m_uniqueIdNetState.get());
-  setTeam(m_teamNetState.get());
-  m_monsterLevel = m_monsterLevelNetState.get();
-  m_damageOnTouch = m_damageOnTouchNetState.get();
-  m_aggressive = m_aggressiveNetState.get();
-  m_knockedOut = m_knockedOutNetState.get();
-  if (m_deathParticleBurstNetState.pull_updated())
-    m_deathParticleBurst = m_deathParticleBurstNetState.get();
-  if (m_deathSoundNetState.pull_updated())
-    m_deathSound = m_deathSoundNetState.get();
-  if (m_activeSkillNameNetState.pull_updated())
-    m_activeSkillName = m_activeSkillNameNetState.get();
-  if (m_dropPoolNetState.pull_updated())
-    m_dropPool = m_dropPoolNetState.get();
+  setUniqueId(m_unique_id_net_state.get());
+  setTeam(m_team_net_state.get());
+  m_monster_level = m_monster_level_net_state.get();
+  m_damage_on_touch = m_damage_on_touch_net_state.get();
+  m_aggressive = m_aggressive_net_state.get();
+  m_knocked_out = m_knocked_out_net_state.get();
+  if (m_death_particle_burst_net_state.pull_updated())
+    m_death_particle_burst = m_death_particle_burst_net_state.get();
+  if (m_death_sound_net_state.pull_updated())
+    m_death_sound = m_death_sound_net_state.get();
+  if (m_active_skill_name_net_state.pull_updated())
+    m_active_skill_name = m_active_skill_name_net_state.get();
+  if (m_drop_pool_net_state.pull_updated())
+    m_drop_pool = m_drop_pool_net_state.get();
 
   if (m_new_chat_message_event.pull_occurred() && !initial) {
     if (m_chat_portrait.get().empty())
@@ -1434,40 +1503,35 @@ std::expected<void, StarException> Monster::getNetStates(bool initial) {
   return {};
 }
 
-std::expected<float, StarException> Monster::monsterLevel() const {
-  if (!m_monsterLevel) return std::unexpected(MonsterException("Monster level is not initialized"));
-  return *m_monsterLevel;
+std::expected<float, StarException> Monster::monster_level() const {
+  if (!m_monster_level) return std::unexpected(MonsterException("Monster level is not initialized"));
+  return *m_monster_level;
 }
 
 std::expected<Monster::SkillInfo, StarException> Monster::activeSkillInfo() const {
-  SkillInfo skillInfo;
-
-  if (!m_activeSkillName.empty()) {
-    auto result239 = this->root().monsterDatabase();
-if (!result239) return std::unexpected(std::move(result239.error()));
-auto monsterDatabase = std::move(*result239);
-    auto result240 = monsterDatabase->skillInfo(m_activeSkillName);
-if (!result240) return std::unexpected(std::move(result240.error()));
-auto monsterSkillInfo = std::move(*result240);
-    skillInfo.label = monsterSkillInfo.first;
-    skillInfo.image = monsterSkillInfo.second;
-  }
-
-  return skillInfo;
+  if (m_active_skill_name.empty())
+    return SkillInfo{};
+  auto database = root().monster_database();
+  if (!database)
+    return std::unexpected(std::move(database.error()));
+  auto skill = (*database)->skill_info(m_active_skill_name);
+  if (!skill)
+    return std::unexpected(std::move(skill.error()));
+  return SkillInfo{std::move(skill->first), std::move(skill->second)};
 }
 
 std::expected<List<Drawable>, StarException> Monster::portrait(PortraitMode) const {
-  if (m_monsterVariant.portraitIcon) {
+  if (m_monster_variant.portrait_icon) {
     auto result241 = this->root().image_metadata_database();
 if (!result241) return std::unexpected(std::move(result241.error()));
-auto result242 = Drawable::make_image(*std::move(*result241), *m_monsterVariant.portraitIcon, 1.0f, true, Vec2F());
+auto result242 = Drawable::make_image(*std::move(*result241), *m_monster_variant.portrait_icon, 1.0f, true, Vec2F());
 if (!result242) return std::unexpected(std::move(result242.error()));
 return List<Drawable>{std::move(*result242)};
   } else {
-    auto result243 = NetworkedAnimator::create(*m_networkedAnimator);
+    auto result243 = NetworkedAnimator::create(*m_networked_animator);
 if (!result243) return std::unexpected(std::move(result243.error()));
 auto animator = std::move(*result243);
-    animator->setFlipped(!m_monsterVariant.reversed);
+    animator->setFlipped(!m_monster_variant.reversed);
     auto result244 = animator->drawables();
 if (!result244) return std::unexpected(std::move(result244.error()));
 auto drawables = std::move(*result244);
@@ -1476,12 +1540,12 @@ auto drawables = std::move(*result244);
   }
 }
 
-String Monster::typeName() const {
-  return m_monsterVariant.type;
+String Monster::type_name() const {
+  return m_monster_variant.type;
 }
 
-MonsterVariant Monster::monsterVariant() const {
-  return m_monsterVariant;
+MonsterVariant Monster::monster_variant() const {
+  return m_monster_variant;
 }
 
 std::optional<String> Monster::statusText() const {
@@ -1489,11 +1553,11 @@ std::optional<String> Monster::statusText() const {
 }
 
 bool Monster::displayNametag() const {
-  return m_displayNametag.get();
+  return m_display_nametag.get();
 }
 
 std::expected<Vec3B, StarException> Monster::nametagColor() const {
-  return m_monsterVariant.nametagColor;
+  return m_monster_variant.nametag_color;
 }
 
 std::expected<Vec2F, StarException> Monster::nametagOrigin() const {
@@ -1509,17 +1573,15 @@ bool Monster::aggressive() const {
 }
 
 std::expected<std::optional<LuaValue>, StarException> Monster::call_script(String const& func, LuaVariadic<LuaValue> const& args) {
-  return recover_lua_script_error(m_scriptComponent.invoke(func, args));
+  return recover_lua_script_error(m_script_component.invoke(func, args));
 }
 
 std::expected<std::optional<LuaValue>, StarException> Monster::eval_script(String const& code) {
-  return recover_lua_script_error(m_scriptComponent.eval(code));
+  return recover_lua_script_error(m_script_component.eval(code));
 }
 
 std::expected<Vec2F, StarException> Monster::mouth_position() const {
-  auto result245 = mouthOffset();
-if (!result245) return std::unexpected(std::move(result245.error()));
-return std::move(*result245) + position();
+  return mouth_offset() + position();
 }
 
 std::expected<Vec2F, StarException> Monster::mouth_position(bool) const {
@@ -1535,7 +1597,7 @@ std::expected<List<PhysicsForceRegion>, StarException> Monster::force_regions() 
 }
 
 std::expected<InteractAction, StarException> Monster::interact(InteractRequest const& request) {
-  auto result = recover_lua_script_error(m_scriptComponent.invoke<Json>("interact",
+  auto result = recover_lua_script_error(m_script_component.invoke<Json>("interact",
       JsonObject{{"sourceId", request.source_id}, {"sourcePosition", json_from_vec2f(request.source_position)}}));
   if (!result)
     return std::unexpected(std::move(result.error()));
@@ -1549,7 +1611,7 @@ bool Monster::isInteractive() const {
 }
 
 std::expected<Vec2F, StarException> Monster::questIndicatorPosition() const {
-  Vec2F pos = position() + m_questIndicatorOffset;
+  Vec2F pos = position() + m_quest_indicator_offset;
   pos[1] += collision_area().y_max();
   return pos;
 }
@@ -1559,7 +1621,7 @@ ActorMovementController& Monster::movement_controller() {
 }
 
 StatusController& Monster::statusController() {
-  return *m_statusController;
+  return *m_status_controller;
 }
 
 }

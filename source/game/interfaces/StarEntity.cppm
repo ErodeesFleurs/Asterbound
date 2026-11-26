@@ -134,7 +134,7 @@ public:
   [[nodiscard]] virtual std::expected<List<LightSource>, StarException> light_sources() const;
 
   // All damage sources for this frame.
-  [[nodiscard]] virtual std::expected<List<DamageSource>, StarException> damageSources() const;
+  [[nodiscard]] virtual std::expected<List<DamageSource>, StarException> damage_sources() const;
 
   // Return the damage that would result from being hit by the given damage
   // source.  Will be called on master and slave entities.  Culling based on

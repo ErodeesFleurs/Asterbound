@@ -98,6 +98,7 @@ namespace Star {
 
 class StatusController;
 class BehaviorState;
+class FunctionDatabase;
 
 class Monster
   : public virtual DamageBarEntity,
@@ -108,6 +109,8 @@ class Monster
     public virtual ChattyEntity,
     public virtual InteractiveEntity,
     public virtual ActorEntity {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
+
 public:
   void query_type(TypeQuery& query) const noexcept override {
     query_type_of<Monster, DamageBarEntity, AggressiveEntity, ScriptedEntity, PhysicsEntity, NametagEntity,
@@ -120,8 +123,10 @@ public:
     String image;
   };
 
-  [[nodiscard]] static std::expected<std::shared_ptr<Monster>, StarException> create(Root& rootContext, MonsterVariant const& variant, std::optional<float> level = {});
-  [[nodiscard]] static std::expected<std::shared_ptr<Monster>, StarException> create(Root& rootContext, Json const& diskStore);
+  Monster(ConstructionKey, Root& root_context, MonsterVariant&& variant);
+
+  [[nodiscard]] static std::expected<std::shared_ptr<Monster>, StarException> create(Root& root_context, MonsterVariant&& variant, std::optional<float> level = {});
+  [[nodiscard]] static std::expected<std::shared_ptr<Monster>, StarException> create(Root& root_context, Json const& disk_store);
 
   [[nodiscard]] std::expected<Json, StarException> diskStore() const;
   [[nodiscard]] std::expected<ByteArray, StarException> net_store(NetCompatibilityRules rules = {});
@@ -137,8 +142,8 @@ public:
 
   Vec2F velocity() const;
 
-  [[nodiscard]] std::expected<Vec2F, StarException> mouthOffset() const;
-  [[nodiscard]] std::expected<Vec2F, StarException> feetOffset() const;
+  [[nodiscard]] Vec2F mouth_offset() const;
+  [[nodiscard]] Vec2F feet_offset() const;
 
   RectF collision_area() const override;
 
@@ -162,9 +167,9 @@ public:
   [[nodiscard]] std::expected<List<DamageNotification>, StarException> applyDamage(DamageRequest const& damage) override;
   [[nodiscard]] std::expected<List<DamageNotification>, StarException> selfDamageNotifications() override;
 
-  [[nodiscard]] std::expected<List<DamageSource>, StarException> damageSources() const override;
+  [[nodiscard]] std::expected<List<DamageSource>, StarException> damage_sources() const override;
 
-  [[nodiscard]] std::expected<bool, StarException> shouldDie();
+  [[nodiscard]] std::expected<bool, StarException> should_die();
   [[nodiscard]] std::expected<void, StarException> knockout();
 
   [[nodiscard]] std::expected<bool, StarException> should_destroy() const override;
@@ -188,12 +193,12 @@ public:
   float health() const override;
   DamageBarType damageBar() const override;
 
-  [[nodiscard]] std::expected<float, StarException> monsterLevel() const;
+  [[nodiscard]] std::expected<float, StarException> monster_level() const;
   [[nodiscard]] std::expected<SkillInfo, StarException> activeSkillInfo() const;
 
   [[nodiscard]] std::expected<List<Drawable>, StarException> portrait(PortraitMode mode) const override;
-  String typeName() const;
-  MonsterVariant monsterVariant() const;
+  String type_name() const;
+  MonsterVariant monster_variant() const;
 
   std::optional<String> statusText() const override;
   bool displayNametag() const override;
@@ -224,13 +229,12 @@ public:
   using Entity::setUniqueId;
 
 private:
-  explicit Monster(Root& rootContext);
-  [[nodiscard]] std::expected<void, StarException> initialize(MonsterVariant const& monsterVariant, std::optional<float> level);
+  [[nodiscard]] std::expected<void, StarException> initialize(std::optional<float> level);
   [[nodiscard]] std::expected<void, StarException> loadState(Json const& diskStore);
 
-  [[nodiscard]] std::expected<Vec2F, StarException> getAbsolutePosition(Vec2F relativePosition) const;
+  [[nodiscard]] Vec2F absolute_position(Vec2F relative_position) const;
 
-  [[nodiscard]] std::expected<void, StarException> updateStatus(float dt);
+  [[nodiscard]] std::expected<void, StarException> update_status(float dt);
   [[nodiscard]] std::expected<LuaCallbacks, StarException> makeMonsterCallbacks();
 
   [[nodiscard]] std::expected<void, StarException> add_chat_message(String const& message, String const& portrait = "");
@@ -239,55 +243,79 @@ private:
   [[nodiscard]] std::expected<void, StarException> getNetStates(bool initial);
   [[nodiscard]] std::expected<void, StarException> setNetStates();
 
-  NetElementTopGroup m_netGroup;
+  struct AnimationDamageSourceTemplate {
+    struct LineCollision {
+      bool enabled;
+      std::int64_t bounces;
+    };
 
-  NetElementData<std::optional<String>> m_uniqueIdNetState;
-  NetElementData<EntityDamageTeam> m_teamNetState;
-  MonsterVariant m_monsterVariant;
-  std::optional<float> m_monsterLevel;
+    String anchor_part;
+    DamageSource source;
+    std::optional<LineCollision> line_collision;
+  };
 
-  std::shared_ptr<NetworkedAnimator> m_networkedAnimator;
-  NetworkedAnimator::DynamicTarget m_networkedAnimatorDynamicTarget;
+  struct DamageLevelPower {
+    std::weak_ptr<FunctionDatabase const> functions;
+    std::uint32_t level_bits = 0;
+    float multiplier = 0.0f;
+  };
+
+  [[nodiscard]] std::expected<float, StarException> damage_level_power() const;
+
+  mutable DamageLevelPower m_damage_level_power;
+  mutable std::optional<DamageSource> m_touch_damage_source_template;
+  // Allocated on first use and indexed in immutable variant iteration order.
+  mutable List<std::optional<AnimationDamageSourceTemplate>> m_animation_damage_source_templates;
+
+  NetElementTopGroup m_net_group;
+
+  NetElementData<std::optional<String>> m_unique_id_net_state;
+  NetElementData<EntityDamageTeam> m_team_net_state;
+  MonsterVariant m_monster_variant;
+  std::optional<float> m_monster_level;
+
+  std::shared_ptr<NetworkedAnimator> m_networked_animator;
+  NetworkedAnimator::DynamicTarget m_networked_animator_dynamic_target;
 
   std::shared_ptr<ActorMovementController> m_movement_controller;
-  std::shared_ptr<StatusController> m_statusController;
+  std::shared_ptr<StatusController> m_status_controller;
 
-  std::shared_ptr<EffectEmitter> m_effectEmitter;
+  std::shared_ptr<EffectEmitter> m_effect_emitter;
 
   // The set of damage source kinds that were used to kill this entity.
-  StringSet m_deathDamageSourceKinds;
+  StringSet m_death_damage_source_kinds;
 
-  bool m_damageOnTouch;
+  bool m_damage_on_touch;
   bool m_aggressive;
 
-  bool m_knockedOut;
-  double m_knockoutTimer;
-  String m_deathParticleBurst;
-  String m_deathSound;
+  bool m_knocked_out;
+  double m_knockout_timer;
+  String m_death_particle_burst;
+  String m_death_sound;
 
-  String m_activeSkillName;
-  Json m_dropPool;
+  String m_active_skill_name;
+  Json m_drop_pool;
 
-  Vec2F m_questIndicatorOffset;
+  Vec2F m_quest_indicator_offset;
 
   List<std::shared_ptr<BehaviorState>> m_behaviors;
-  mutable LuaActorScript m_scriptComponent;
-  LuaAnimationScript m_scriptedAnimator;
+  mutable LuaActorScript m_script_component;
+  LuaAnimationScript m_scripted_animator;
 
   NetElementData<List<PhysicsForceRegion>> m_physics_forces;
 
-  NetElementData<std::optional<float>> m_monsterLevelNetState;
-  NetElementBool m_damageOnTouchNetState;
-  NetElementData<StringSet> m_animationDamageParts;
-  NetElementData<List<DamageSource>> m_damageSources;
-  NetElementData<Json> m_dropPoolNetState;
-  NetElementBool m_aggressiveNetState;
-  NetElementBool m_knockedOutNetState;
-  NetElementString m_deathParticleBurstNetState;
-  NetElementString m_deathSoundNetState;
-  NetElementString m_activeSkillNameNetState;
+  NetElementData<std::optional<float>> m_monster_level_net_state;
+  NetElementBool m_damage_on_touch_net_state;
+  NetElementData<StringSet> m_animation_damage_parts;
+  NetElementData<List<DamageSource>> m_damage_sources;
+  NetElementData<Json> m_drop_pool_net_state;
+  NetElementBool m_aggressive_net_state;
+  NetElementBool m_knocked_out_net_state;
+  NetElementString m_death_particle_burst_net_state;
+  NetElementString m_death_sound_net_state;
+  NetElementString m_active_skill_name_net_state;
   NetElementData<std::optional<String>> m_name;
-  NetElementBool m_displayNametag;
+  NetElementBool m_display_nametag;
   NetElementBool m_interactive;
 
   List<ChatAction> m_pending_chat_actions;
@@ -295,9 +323,9 @@ private:
   NetElementString m_chat_message;
   NetElementString m_chat_portrait;
 
-  NetElementData<DamageBarType> m_damageBar;
+  NetElementData<DamageBarType> m_damage_bar;
 
-  NetElementHashMap<String, Json> m_scriptedAnimationParameters;
+  NetElementHashMap<String, Json> m_scripted_animation_parameters;
 };
 
 }

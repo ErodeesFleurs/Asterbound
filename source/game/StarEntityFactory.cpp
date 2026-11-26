@@ -147,7 +147,7 @@ std::expected<std::shared_ptr<EntityFactory>, StarException> EntityFactory::crea
   auto player = root.playerFactory();
   if (!player) return std::unexpected(std::move(player.error()));
   factory->m_player_factory = std::move(*player);
-  auto monster = root.monsterDatabase();
+  auto monster = root.monster_database();
   if (!monster) return std::unexpected(std::move(monster.error()));
   factory->m_monster_database = std::move(*monster);
   auto object = root.objectDatabase();
@@ -307,7 +307,7 @@ std::expected<std::shared_ptr<Entity>, StarException> EntityFactory::disk_load_e
     case EntityType::Player:
       return m_player_factory->diskLoadPlayer(disk_store);
     case EntityType::Monster:
-      return m_monster_database->diskLoadMonster(disk_store);
+      return m_monster_database->disk_load_monster(disk_store);
     case EntityType::Object:
       return m_object_database->diskLoadObject(disk_store);
     case EntityType::Plant:

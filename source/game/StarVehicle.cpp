@@ -1107,7 +1107,7 @@ std::expected<List<PhysicsForceRegion>, StarException> Vehicle::force_regions() 
   return forces;
 }
 
-std::expected<List<DamageSource>, StarException> Vehicle::damageSources() const {
+std::expected<List<DamageSource>, StarException> Vehicle::damage_sources() const {
   List<DamageSource> sources;
   for (auto const& p : m_damageSources) {
     if (p.second.enabled.get()) {

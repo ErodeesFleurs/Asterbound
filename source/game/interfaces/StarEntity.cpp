@@ -106,7 +106,7 @@ std::expected<List<LightSource>, StarException> Entity::light_sources() const {
   return List<LightSource>{};
 }
 
-std::expected<List<DamageSource>, StarException> Entity::damageSources() const {
+std::expected<List<DamageSource>, StarException> Entity::damage_sources() const {
   return List<DamageSource>{};
 }
 

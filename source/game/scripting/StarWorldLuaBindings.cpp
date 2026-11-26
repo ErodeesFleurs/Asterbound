@@ -1892,7 +1892,7 @@ namespace LuaBindings {
     if (auto result = callbacks.register_callback("entityTypeName", [&world](EntityId entityId) -> std::expected<std::optional<String>, StarException> {
         auto entity = world.entity(entityId);
         if (auto monster = as<Monster>(entity))
-          return monster->typeName();
+          return monster->type_name();
         if (auto npc = as<Npc>(entity))
           return npc->npcType();
         if (auto vehicle = as<Vehicle>(entity))
@@ -2608,44 +2608,40 @@ namespace LuaBindings {
   }
 
   std::expected<std::optional<EntityId>, StarException> WorldCallbacks::spawnMonster(
-      World& world, String const& arg1, Vec2F const& arg2, std::optional<JsonObject> const& arg3) {
-    auto monsterDatabaseResult = world.root().monsterDatabase();
-    if (!monsterDatabaseResult)
-      return std::unexpected(std::move(monsterDatabaseResult.error()));
-    auto monsterDatabase = std::move(*monsterDatabaseResult);
+      World& world, String const& type_name, Vec2F const& position, std::optional<JsonObject> const& overrides) {
+    auto database = world.root().monster_database();
+    if (!database)
+      return std::unexpected(std::move(database.error()));
     auto spawn = [&]() -> std::expected<std::optional<EntityId>, StarException> {
       JsonObject parameters;
       parameters["aggressive"] = world.root().random().next_bool();
-      if (arg3)
-        parameters.merge(*arg3, true);
+      if (overrides)
+        parameters.merge(*overrides, true);
       float level = 1;
       if (parameters.contains("level")) {
-        auto levelJsonResult = parameters.get("level");
-        if (!levelJsonResult)
-          return std::unexpected(std::move(levelJsonResult.error()));
-        auto levelJson = std::move(*levelJsonResult);
-        auto parsedLevelResult = levelJson.get().to_float();
-        if (!parsedLevelResult)
-          return std::unexpected(std::move(parsedLevelResult.error()));
-        auto parsedLevel = std::move(*parsedLevelResult);
-        level = parsedLevel;
+        auto level_config = parameters.get("level");
+        if (!level_config)
+          return std::unexpected(std::move(level_config.error()));
+        auto parsed_level = level_config->get().to_float();
+        if (!parsed_level)
+          return std::unexpected(std::move(parsed_level.error()));
+        level = *parsed_level;
       }
-      auto variantResult = monsterDatabase->randomMonster(arg1, parameters);
-      if (!variantResult)
-        return std::unexpected(std::move(variantResult.error()));
-      auto variant = std::move(*variantResult);
-      auto monsterResult = monsterDatabase->createMonster(variant, level);
-      if (!monsterResult)
-        return std::unexpected(std::move(monsterResult.error()));
-      auto monster = std::move(*monsterResult);
-      monster->setPosition(arg2);
+      auto variant = (*database)->random_monster(type_name, parameters);
+      if (!variant)
+        return std::unexpected(std::move(variant.error()));
+      auto created = (*database)->create_monster(std::move(*variant), level);
+      if (!created)
+        return std::unexpected(std::move(created.error()));
+      auto monster = std::move(*created);
+      monster->setPosition(position);
       if (auto operation = world.addEntity(monster); !operation)
         return std::unexpected(std::move(operation.error()));
       return monster->inWorld() ? std::optional<EntityId>(monster->entityId()) : std::nullopt;
     };
     auto result = spawn();
     if (!result) {
-      if (auto logged = world.root().logger().warn_exception(Star::format("Could not spawn Monster of type '{}'", arg1),
+      if (auto logged = world.root().logger().warn_exception(Star::format("Could not spawn Monster of type '{}'", type_name),
                                                              ExceptionDiagnostic(result.error()));
           !logged)
         return std::unexpected(std::move(logged.error()));
@@ -3907,7 +3903,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
 
   std::expected<std::optional<String>, StarException> WorldEntityCallbacks::monsterType(World& world, EntityId entityId) {
     if (auto monster = world.get<Monster>(entityId))
-      return monster->typeName();
+      return monster->type_name();
 
     return {};
   }

@@ -261,10 +261,10 @@ std::expected<void, StarException> Root::initialize() {
           }
         }
         {
-          std::unique_lock locker(m_monsterDatabaseMutex);
-          if (std::shared_ptr<MonsterDatabase> monsterDb = m_monsterDatabase) {
+          std::unique_lock locker(m_monster_database_mutex);
+          if (std::shared_ptr<MonsterDatabase> monster_db = m_monster_database) {
             locker.unlock();
-            monsterDb->cleanup();
+            monster_db->cleanup();
           }
         }
         {
@@ -366,7 +366,7 @@ std::expected<void, StarException> Root::reload() {
     std::lock_guard npcDatabaseLock(m_npcDatabaseMutex);
     std::lock_guard stagehandDatabaseLock(m_stagehandDatabaseMutex);
     std::lock_guard vehicleDatabaseLock(m_vehicleDatabaseMutex);
-    std::lock_guard monsterDatabaseLock(m_monsterDatabaseMutex);
+    std::lock_guard monster_database_lock(m_monster_database_mutex);
     std::lock_guard plantDatabaseLock(m_plantDatabaseMutex);
     std::lock_guard projectileDatabaseLock(m_projectileDatabaseMutex);
 
@@ -427,7 +427,7 @@ std::expected<void, StarException> Root::reload() {
     m_stagehandDatabase.reset();
     m_vehicleDatabase.reset();
     m_npcDatabase.reset();
-    m_monsterDatabase.reset();
+    m_monster_database.reset();
     m_plantDatabase.reset();
     m_projectileDatabase.reset();
     m_biome_database.reset();
@@ -528,7 +528,7 @@ std::expected<void, StarException> Root::fullyLoad() {
   add(&Root::npcDatabase);
   add(&Root::plantDatabase);
   add(&Root::itemDatabase);
-  add(&Root::monsterDatabase);
+  add(&Root::monster_database);
   add(&Root::vehicleDatabase);
   add(&Root::playerFactory);
   add(&Root::entityFactory);
@@ -752,8 +752,8 @@ std::expected<std::shared_ptr<ProjectileDatabase const>, StarException> Root::pr
   return loadMember(m_projectileDatabase, m_projectileDatabaseMutex, "ProjectileDatabase", *this);
 }
 
-std::expected<std::shared_ptr<MonsterDatabase const>, StarException> Root::monsterDatabase() {
-  return loadMember(m_monsterDatabase, m_monsterDatabaseMutex, "MonsterDatabase", *this);
+std::expected<std::shared_ptr<MonsterDatabase const>, StarException> Root::monster_database() {
+  return loadMember(m_monster_database, m_monster_database_mutex, "MonsterDatabase", *this);
 }
 
 std::expected<std::shared_ptr<NpcDatabase const>, StarException> Root::npcDatabase() {

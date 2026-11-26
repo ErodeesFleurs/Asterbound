@@ -2529,7 +2529,7 @@ std::expected<void, StarException> Npc::playEmote(HumanoidEmote emote) {
   return {};
 }
 
-std::expected<List<DamageSource>, StarException> Npc::damageSources() const {
+std::expected<List<DamageSource>, StarException> Npc::damage_sources() const {
   auto result515 = m_tools->damageSources();
 if (!result515) return std::unexpected(std::move(result515.error()));
 auto damageSources = std::move(*result515);

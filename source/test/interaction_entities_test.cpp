@@ -80,11 +80,11 @@ const GameTestRegistration entity_scripts("InteractionEntities", "ObjectNpcAndMo
   auto release_npc = make_scope_exit([&] { EXPECT_TRUE((*npc)->uninit()); });
   expect_actor_script(**npc, **npc, 2);
 
-  auto monsters = root.monsterDatabase();
+  auto monsters = root.monster_database();
   ASSERT_TRUE(monsters);
-  auto poptop = (*monsters)->monsterVariant("poptop", 1234, JsonObject{{"scripts", JsonArray{}}});
+  auto poptop = (*monsters)->monster_variant("poptop", 1234, JsonObject{{"scripts", JsonArray{}}});
   ASSERT_TRUE(poptop) << poptop.error().what();
-  auto monster = (*monsters)->createMonster(std::move(*poptop), 1);
+  auto monster = (*monsters)->create_monster(std::move(*poptop), 1);
   ASSERT_TRUE(monster) << monster.error().what();
   ASSERT_TRUE((*monster)->init(**world, 3, EntityMode::Master));
   auto release_monster = make_scope_exit([&] { EXPECT_TRUE((*monster)->uninit()); });

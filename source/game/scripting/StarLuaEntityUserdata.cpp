@@ -196,7 +196,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
                                  [&](std::shared_ptr<Entity> const& entity,
                                      LuaEngine&) -> std::expected<std::optional<String>, StarException> {
                                    if (auto monster = as_ref<Monster>(*entity))
-                                     return monster->get().typeName();
+                                     return monster->get().type_name();
                                    if (auto npc = as_ref<Npc>(*entity))
                                      return npc->get().npcType();
                                    if (auto vehicle = as_ref<Vehicle>(*entity))

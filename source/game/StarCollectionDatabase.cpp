@@ -181,13 +181,13 @@ std::expected<Collectable, StarException> CollectionDatabase::parse_monster(Stri
   auto monster_type = config.get_string("monsterType");
   if (!monster_type)
     return std::unexpected(std::move(monster_type.error()));
-  auto database = m_root.monsterDatabase();
+  auto database = m_root.monster_database();
   if (!database)
     return std::unexpected(std::move(database.error()));
-  auto variant = (*database)->monsterVariant(*monster_type, 0);
+  auto variant = (*database)->monster_variant(*monster_type, 0);
   if (!variant)
     return std::unexpected(std::move(variant.error()));
-  collectable->title = std::move(variant->shortDescription).value_or("");
+  collectable->title = std::move(variant->short_description).value_or("");
   collectable->description = std::move(variant->description).value_or("");
   return std::move(*collectable);
 }

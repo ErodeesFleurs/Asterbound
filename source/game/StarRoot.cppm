@@ -168,7 +168,7 @@ public:
   [[nodiscard]] std::expected<std::shared_ptr<ObjectDatabase const>, StarException> objectDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<PlantDatabase const>, StarException> plantDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<ProjectileDatabase const>, StarException> projectileDatabase();
-  [[nodiscard]] std::expected<std::shared_ptr<MonsterDatabase const>, StarException> monsterDatabase();
+  [[nodiscard]] std::expected<std::shared_ptr<MonsterDatabase const>, StarException> monster_database();
   [[nodiscard]] std::expected<std::shared_ptr<NpcDatabase const>, StarException> npcDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<StagehandDatabase const>, StarException> stagehandDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<VehicleDatabase const>, StarException> vehicleDatabase();
@@ -288,8 +288,8 @@ private:
   std::shared_ptr<ProjectileDatabase> m_projectileDatabase;
   std::mutex m_projectileDatabaseMutex;
 
-  std::shared_ptr<MonsterDatabase> m_monsterDatabase;
-  std::mutex m_monsterDatabaseMutex;
+  std::shared_ptr<MonsterDatabase> m_monster_database;
+  std::mutex m_monster_database_mutex;
 
   std::shared_ptr<NpcDatabase> m_npcDatabase;
   std::mutex m_npcDatabaseMutex;

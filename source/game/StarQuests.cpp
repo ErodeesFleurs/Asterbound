@@ -780,7 +780,7 @@ std::expected<std::optional<String>, StarException> Quest::customIndicator(std::
       matches = *result;
     } else if (std::holds_alternative<QuestMonsterType>(param.detail)) {
       if (auto monster = as<Monster>(entity)) {
-        if (monster->typeName() == std::get<QuestMonsterType>(param.detail).typeName) {
+        if (monster->type_name() == std::get<QuestMonsterType>(param.detail).typeName) {
           auto team = monster->getTeam().type;
           matches = team == TeamType::Enemy || team == TeamType::Passive;
         }

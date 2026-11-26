@@ -106,7 +106,7 @@ public:
   EntityType entity_type() const override;
   ClientEntityMode client_entity_mode() const override;
 
-  [[nodiscard]] std::expected<List<DamageSource>, StarException> damageSources() const override;
+  [[nodiscard]] std::expected<List<DamageSource>, StarException> damage_sources() const override;
   [[nodiscard]] std::expected<std::optional<HitType>, StarException> queryHit(DamageSource const& source) const override;
   [[nodiscard]] std::expected<std::optional<PolyF>, StarException> hitPoly() const override;
 

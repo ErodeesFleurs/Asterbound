@@ -126,7 +126,7 @@ std::expected<void, StarException> DamageManager::update(float dt) {
 std::expected<void, StarException> DamageManager::update_entity(Entity& causing_entity) {
   auto& world = m_world.get();
   auto const causing_id = causing_entity.entityId();
-  auto sources = causing_entity.damageSources();
+  auto sources = causing_entity.damage_sources();
   if (!sources) return std::unexpected(std::move(sources.error()));
   for (auto& source : *sources) {
     if (!still_in_world(causing_entity, causing_id, world))

@@ -432,7 +432,7 @@ if (!result934) return std::unexpected(std::move(result934.error()));
   return {};
 }
 
-std::expected<List<DamageSource>, StarException> Projectile::damageSources() const {
+std::expected<List<DamageSource>, StarException> Projectile::damage_sources() const {
   if (m_onlyHitTerrain)
     return {};
 
@@ -1404,14 +1404,16 @@ auto result841 = parameters.get_float("level", std::move(*result840));
 if (!result841) return std::unexpected(std::move(result841.error()));
 float level = std::move(*result841);
 
-      auto result842 = this->root().monsterDatabase();
-if (!result842) return std::unexpected(std::move(result842.error()));
-auto monsterDatabase = std::move(*result842);
-      auto result843 = monsterDatabase->randomMonster(type, arguments);
-if (!result843) return std::unexpected(std::move(result843.error()));
-auto result844 = monsterDatabase->createMonster(std::move(*result843), level);
-if (!result844) return std::unexpected(std::move(result844.error()));
-auto monster = std::move(*result844);
+      auto database = root().monster_database();
+      if (!database)
+        return std::unexpected(std::move(database.error()));
+      auto variant = (*database)->random_monster(type, arguments);
+      if (!variant)
+        return std::unexpected(std::move(variant.error()));
+      auto created = (*database)->create_monster(std::move(*variant), level);
+      if (!created)
+        return std::unexpected(std::move(created.error()));
+      auto monster = std::move(*created);
 
       auto spawnPosition = position();
       auto result845 = parameters.contains("offset");

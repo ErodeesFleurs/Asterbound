@@ -909,25 +909,21 @@ std::expected<void, StarException> DungeonGeneratorWorld::spawnNpc(Vec2F const& 
   }(); !condition84)
     return std::unexpected(std::move(condition84.error()));
   else if (*condition84) {
-    auto automonsterDatabaseResult1 = generationRoot.monsterDatabase();
-    if (!automonsterDatabaseResult1) return std::unexpected(std::move(automonsterDatabaseResult1.error()));
-    auto monsterDatabase = std::move((*automonsterDatabaseResult1));
-    auto stduint64_tseedResult1 = parameters.get_uint("seed", generationRoot.random().next_u64());
-    if (!stduint64_tseedResult1) return std::unexpected(std::move(stduint64_tseedResult1.error()));
-    std::uint64_t seed = std::move((*stduint64_tseedResult1));
-    auto StringtypeNameResult1 = parameters.get_string("typeName");
-    if (!StringtypeNameResult1) return std::unexpected(std::move(StringtypeNameResult1.error()));
-    String typeName = std::move((*StringtypeNameResult1));
-    auto JsonObjectuniqueParametersResult1 = parameters.get_object("parameters", {});
-    if (!JsonObjectuniqueParametersResult1) return std::unexpected(std::move(JsonObjectuniqueParametersResult1.error()));
-    JsonObject uniqueParameters = std::move((*JsonObjectuniqueParametersResult1));
-    if (!uniqueParameters.contains("persistent"))
-      uniqueParameters["persistent"] = true;
-    auto automonsterResult1 = monsterDatabase->monsterVariant(typeName, seed, uniqueParameters);
-    if (!automonsterResult1) return std::unexpected(std::move(automonsterResult1.error()));
-    auto automonsterResult2 = monsterDatabase->createMonster((*automonsterResult1));
-    if (!automonsterResult2) return std::unexpected(std::move(automonsterResult2.error()));
-    auto monster = std::move((*automonsterResult2));
+    auto database = generationRoot.monster_database();
+    if (!database) return std::unexpected(std::move(database.error()));
+    auto seed = parameters.get_uint("seed", generationRoot.random().next_u64());
+    if (!seed) return std::unexpected(std::move(seed.error()));
+    auto type_name = parameters.get_string("typeName");
+    if (!type_name) return std::unexpected(std::move(type_name.error()));
+    auto unique_parameters = parameters.get_object("parameters", {});
+    if (!unique_parameters) return std::unexpected(std::move(unique_parameters.error()));
+    if (!unique_parameters->contains("persistent"))
+      (*unique_parameters)["persistent"] = true;
+    auto variant = (*database)->monster_variant(*type_name, *seed, std::move(*unique_parameters));
+    if (!variant) return std::unexpected(std::move(variant.error()));
+    auto created = (*database)->create_monster(std::move(*variant));
+    if (!created) return std::unexpected(std::move(created.error()));
+    auto monster = std::move(*created);
     monster->setPosition(position);
     {
       auto operationResult1 = m_worldServer.addEntity(monster);
