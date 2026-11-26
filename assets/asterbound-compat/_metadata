@@ -71,7 +71,8 @@
     ],
     "postLoad" : [
       "/scripts/asterbound/compat/arcana.lua",
-      "/scripts/asterbound/compat/inventory_trays.lua"
+      "/scripts/asterbound/compat/inventory_trays.lua",
+      "/scripts/asterbound/compat/material_layers.lua"
     ]
   }
 }

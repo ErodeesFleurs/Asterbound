@@ -101,6 +101,10 @@ The main and compatibility bundles share `version.json`'s `assetVersion`, reset 
 
 A metadata-only legacy dependency marker is bundled alongside the real Asterbound sources. Its `name` is `opensb_base` and it requires `asterbound_base`, so external Mods' existing `requires` / `includes` retain their dependency ordering without engine changes. It contains no scripts, patches or artwork and does not restore old resource paths, source-name lookup behavior, APIs or `opensb_compat`. Remove any separately installed fake `opensb_base` marker when using this bundled source. Do not install actual old upstream bundles alongside Asterbound: they can override the marker and apply old assets or patches again. Migrate remaining old imports, patches and `opensb_compat` dependencies to the current names. Rebuild the engine and install its matching Asterbound bundles together.
 
+### Legacy material sort keys
+
+During `postLoad` the compatibility pack checks indexed `.material` and `.matmod` assets, including their inline or referenced render templates. If the effective `zLevel` is a negative signed 32-bit integer, it sets only that consumer's `renderParameters.zLevel` to its unsigned equivalent. For example, Extended Story's `supervoidblock` keeps the old sort order of `-1` as `4294967295`. A local override wins over the template. Shared templates, unrelated negative fields, fractional values and out-of-range integers are left alone. Assets introduced or changed by a later `postLoad` script are not rescanned.
+
 ### Guarded repairs
 
 These are provider/version/content-guarded compatibility fixes, not global suppression of invalid patches or Lua errors. Unknown versions, changed content and foreign providers are not blindly patched. No installed mod files or saves are rewritten; restart the game after installing the compatibility source.
