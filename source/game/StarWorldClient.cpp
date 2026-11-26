@@ -111,6 +111,7 @@ import star.uuid;
 import star.warping;
 import star.wiring;
 import star.plant;
+import star.plant_drop;
 import star.versioning_database;
 import star.world_storage;
 import star.player_types;
@@ -224,6 +225,14 @@ std::optional<std::reference_wrapper<Directives const>> select_directive(
   if (selected.empty())
     return {};
   return std::cref(selected);
+}
+
+bool has_pending_plant_effects(std::shared_ptr<Entity> const& entity) {
+  if (auto plant = as<Plant>(entity))
+    return plant->has_pending_render_events();
+  if (auto drop = as<PlantDrop>(entity))
+    return drop->has_pending_render_events();
+  return false;
 }
 }
 
@@ -608,12 +617,12 @@ std::expected<void, StarException> WorldClient::removeEntity(EntityId entityId, 
   if (!entity)
     return {};
 
+  std::optional<DetachedPlantEffects> detached_effects;
   if (andDie) {
     ClientRenderCallback render_callback(std::nullopt);
     NullRenderCallback hidden_events;
-    RenderCallback& events = m_startupHiddenEntities.contains(entityId)
-        ? static_cast<RenderCallback&>(hidden_events)
-        : static_cast<RenderCallback&>(render_callback);
+    bool hidden = m_startupHiddenEntities.contains(entityId);
+    RenderCallback& events = hidden ? static_cast<RenderCallback&>(hidden_events) : static_cast<RenderCallback&>(render_callback);
     // Removal packets can arrive before the next tick's event pass. Drain
     // pending live events before destroy() contributes its final death effects.
     auto collected = entity->collect_render_events(events);
@@ -631,9 +640,12 @@ std::expected<void, StarException> WorldClient::removeEntity(EntityId entityId, 
     if (!destroyed)
       return std::unexpected(std::move(destroyed.error()));
 
-    if (auto selected = select_directive(directive_parameters(), entity->entityId()))
+    auto directive = select_directive(directive_parameters(), entityId);
+    if (directive)
       for (auto& particle : render_callback.particles)
-        particle.directives.append(selected->get());
+        particle.directives.append(directive->get());
+    if (!m_headless && has_pending_plant_effects(entity))
+      detached_effects.emplace(DetachedPlantEffects{entity, entityId, m_currentStep, hidden, directive ? directive->get() : Directives{}});
 
     m_particles->add_particles(std::move(render_callback.particles));
     m_samples.append_range(std::move(render_callback.audios));
@@ -652,7 +664,38 @@ std::expected<void, StarException> WorldClient::removeEntity(EntityId entityId, 
   m_entityMap->remove_entity(entityId);
   m_entityPresentation.remove(entityId);
   m_hiddenEntityAudio.remove(entityId);
-  return entity->uninit();
+  if (auto uninitialized = entity->uninit(); !uninitialized)
+    return uninitialized;
+  if (detached_effects)
+    m_detached_plant_effects.push_back(std::move(*detached_effects));
+  return {};
+}
+
+std::expected<void, StarException> WorldClient::collect_detached_plant_effects() {
+  std::expected<void, StarException> result;
+  NullRenderCallback hidden;
+  std::erase_if(m_detached_plant_effects, [&](DetachedPlantEffects& events) {
+    if (!result || events.detached_step == m_currentStep)
+      return false;
+    m_event_render_callback.clear();
+    auto collected = events.source->collect_render_events(events.hidden
+        ? static_cast<RenderCallback&>(hidden)
+        : static_cast<RenderCallback&>(m_event_render_callback));
+    if (!events.hidden) {
+      if (!events.directive.empty())
+        for (auto& particle : m_event_render_callback.particles)
+          particle.directives.append(events.directive);
+      m_particles->add_particles(std::move(m_event_render_callback.particles));
+      m_samples.append_range(std::move(m_event_render_callback.audios));
+    }
+    if (!collected) {
+      auto issue = Star::print_exception(collected.error(), true);
+      if (m_entityExceptionsLogged.insert(hash_of(issue)).second)
+        result = this->root().logger().error("WorldClient: Exception caught collecting detached plant {} presentation events: {}", events.id, issue);
+    }
+    return !has_pending_plant_effects(events.source);
+  });
+  return result;
 }
 
 std::shared_ptr<WorldTemplate const> WorldClient::currentTemplate() const {
@@ -2320,6 +2363,10 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     });
     if (!events)
       return std::unexpected(std::move(events.error()));
+    if (!m_detached_plant_effects.empty()) {
+      if (auto detached = collect_detached_plant_effects(); !detached)
+        return detached;
+    }
     
     auto const track_position = environment_biome_track_position();
     bool const day_time = m_sky->isDayTime();
@@ -3429,6 +3476,7 @@ std::expected<void, StarException> WorldClient::clearWorld() {
   }
   resetPresentation();
   m_hiddenEntityAudio.clear();
+  m_detached_plant_effects.clear();
   m_broadcast_verifiers.clear();
   std::optional<StarException> error;
   auto remember = [&](auto result) {

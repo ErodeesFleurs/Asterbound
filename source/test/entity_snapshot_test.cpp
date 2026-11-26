@@ -251,7 +251,7 @@ const GameTestRegistration transient_snapshots("EntitySnapshot", "TransientState
   Plant::PlantPiece piece;
   piece.image = "/items/materials/dirt.png";
   piece.spaces.add(Vec2I(0, 0));
-  piece.structuralSegment = true;
+  piece.structural_segment = true;
   piece.kind = Plant::PlantPieceKind::Stem;
   auto plantDrop = PlantDrop::create(fixture.root(), {piece}, Vec2F(1028, 1024), Vec2F(1, 0), "Snapshot plant piece", false,
       JsonObject{}, JsonObject{}, JsonObject{}, true, 0.25f);

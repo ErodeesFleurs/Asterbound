@@ -100,17 +100,17 @@ struct StoreBiomeItem {
   using Result = std::expected<Json, StarException>;
 
   Result operator()(GrassVariant const& grass) const {
-    return grass.toJson().transform([](Json value) { return json_pair("grass", std::move(value)); });
+    return grass.to_json().transform([](Json value) { return json_pair("grass", std::move(value)); });
   }
 
   Result operator()(BushVariant const& bush) const {
-    return bush.toJson().transform([](Json value) { return json_pair("bush", std::move(value)); });
+    return bush.to_json().transform([](Json value) { return json_pair("bush", std::move(value)); });
   }
 
   Result operator()(TreePair const& trees) const {
-    auto first = trees.first.toJson();
+    auto first = trees.first.to_json();
     if (!first) return std::unexpected(std::move(first.error()));
-    auto second = trees.second.toJson();
+    auto second = trees.second.to_json();
     if (!second) return std::unexpected(std::move(second.error()));
     return json_pair("treePair", json_pair(std::move(*first), std::move(*second)));
   }
@@ -150,7 +150,7 @@ struct TreeCandidates {
 
   std::expected<std::reference_wrapper<PlantDatabase const>, StarException> plant_database(Root& root) {
     if (!plants) {
-      auto database = root.plantDatabase();
+      auto database = root.plant_database();
       if (!database) return std::unexpected(std::move(database.error()));
       plants = std::move(*database);
     }
@@ -186,12 +186,12 @@ std::expected<TreeCandidates, StarException> prepare_tree_candidates(Root& root,
         if (!stem_shape) {
           auto database = candidates.plant_database(root);
           if (!database) return std::unexpected(std::move(database.error()));
-          auto shape = database->get().treeStemShape(candidates.stems[i]);
+          auto shape = database->get().tree_stem_shape(candidates.stems[i]);
           if (!shape) return std::unexpected(std::move(shape.error()));
           stem_shape.emplace(std::move(*shape));
         }
         if (i == 0) {
-          auto shape = candidates.plants->treeFoliageShape(foliage);
+          auto shape = candidates.plants->tree_foliage_shape(foliage);
           if (!shape) return std::unexpected(std::move(shape.error()));
           bool matches = *stem_shape == *shape;
           if (candidates.stems.size() != 1)
@@ -250,8 +250,8 @@ std::expected<std::optional<BiomeItem>, StarException> create_tree_item(
   auto const& foliage = candidates.foliages[pair->second];
   float stem_hue = *stem_random * candidates.stem_hue_max;
   auto build = [&](float foliage_random_value) {
-    return foliage.empty() ? database->get().buildTreeVariant(stem, stem_hue)
-                           : database->get().buildTreeVariant(stem, stem_hue, foliage, foliage_random_value * candidates.foliage_hue_max);
+    return foliage.empty() ? database->get().build_tree_variant(stem, stem_hue)
+                           : database->get().build_tree_variant(stem, stem_hue, foliage, foliage_random_value * candidates.foliage_hue_max);
   };
   auto primary = build(*foliage_random);
   if (!primary) return std::unexpected(std::move(primary.error()));
@@ -272,11 +272,11 @@ std::expected<std::optional<BiomeItem>, StarException> create_item(
     if (!grass_config) return std::unexpected(std::move(grass_config.error()));
     auto grasses = json_to_string_list(*grass_config);
     if (!grasses) return std::unexpected(std::move(grasses.error()));
-    auto plants = root.plantDatabase();
+    auto plants = root.plant_database();
     if (!plants) return std::unexpected(std::move(plants.error()));
     auto grass = rand.sample_ref(*grasses);
     if (!grass) return std::unexpected(std::move(grass.error()));
-    auto variant = (*plants)->buildGrassVariant(grass->get(), biome_hue_shift);
+    auto variant = (*plants)->build_grass_variant(grass->get(), biome_hue_shift);
     if (!variant) return std::unexpected(std::move(variant.error()));
     return BiomeItem{std::move(*variant)};
   } else if (auto match = type->equals_ignore_case("bush"); !match) return std::unexpected(std::move(match.error()));
@@ -287,9 +287,9 @@ std::expected<std::optional<BiomeItem>, StarException> create_item(
     if (!settings) return std::unexpected(std::move(settings.error()));
     auto name = settings->get_string("name");
     if (!name) return std::unexpected(std::move(name.error()));
-    auto plants = root.plantDatabase();
+    auto plants = root.plant_database();
     if (!plants) return std::unexpected(std::move(plants.error()));
-    auto mods = (*plants)->bushMods(*name);
+    auto mods = (*plants)->bush_mods(*name);
     if (!mods) return std::unexpected(std::move(mods.error()));
     auto mod = rand.sample_value(*mods);
     if (!mod) return std::unexpected(std::move(mod.error()));
@@ -302,7 +302,7 @@ std::expected<std::optional<BiomeItem>, StarException> create_item(
     if (!mod_random) return std::unexpected(std::move(mod_random.error()));
     auto mod_max = settings->get_float("modHueShiftMax");
     if (!mod_max) return std::unexpected(std::move(mod_max.error()));
-    auto variant = (*plants)->buildBushVariant(*name, base_hue, *mod, *mod_random * *mod_max);
+    auto variant = (*plants)->build_bush_variant(*name, base_hue, *mod, *mod_random * *mod_max);
     if (!variant) return std::unexpected(std::move(variant.error()));
     return BiomeItem{std::move(*variant)};
   } else if (auto match = type->equals_ignore_case("tree"); !match) return std::unexpected(std::move(match.error()));

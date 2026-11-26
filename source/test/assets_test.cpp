@@ -38,6 +38,7 @@ import star.logging;
 import star.effect_source_database;
 import star.effect_emitter;
 import star.entity_rendering;
+import star.entity_rendering_types;
 import star.particle;
 import star.particle_database;
 import star.emote_processor;
@@ -52,6 +53,8 @@ import star.object;
 import star.object_database;
 import star.tile_damage;
 import star.tile_entity;
+import star.plant;
+import star.plant_database;
 import star.universe_client;
 import star.world_client;
 import star.world_server;
@@ -677,6 +680,242 @@ const GameTestRegistration drawable_gradient_wire("DrawableTest", "GradientJsonA
   EXPECT_EQ(*wire, legacy.data());
   ASSERT_TRUE(DataStreamBuffer::deserialize(gradient, legacy.span()));
   EXPECT_EQ(gradient, solid);
+});
+
+const GameTestRegistration plant_generation_legacy_order("PlantGenerationTest", "LegacyOrderAndIndependentRandomStreams",
+    [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto root_result = effect_test_root(fixture, *directory, {});
+  ASSERT_TRUE(root_result) << root_result.error().what();
+  auto& root = **root_result;
+  auto png = pngTestBytes(root.logger());
+  ASSERT_TRUE(png) << png.error().what();
+  auto overlay = File::relative_to(*directory, "assets");
+  for (auto const& file : {"a.png", "b.png", "c.png", "front.png", "back.png"})
+    ASSERT_TRUE(File::write_file(*png, File::relative_to(overlay, String(std::string_view(file)))));
+  auto assets = root.assets();
+  ASSERT_TRUE(assets) << assets.error().what();
+  auto metadata = root.image_metadata_database();
+  ASSERT_TRUE(metadata) << metadata.error().what();
+
+  JsonObject stems, leaves;
+  for (auto const& key : {String("c"), String("a"), String("b")}) {
+    stems[key] = JsonObject{
+      {"image", Star::format("{}.png", key)},
+      {"attachment", JsonObject{{"bx", 1}, {"by", 2}, {"x", 4}, {"y", 8}, {"h", 16}}},
+    };
+    leaves[key] = JsonObject{
+      {"image", Json(key == "b" ? std::string_view{} : std::string_view("front.png"))},
+      {"backimage", "back.png"},
+      {"attachment", JsonObject{{"bx", 4}, {"by", -2}}},
+    };
+  }
+  TreeVariant variant;
+  variant.stem_name = "fixed-stem";
+  variant.foliage_name = "fixed-foliage";
+  variant.stem_directory = variant.foliage_directory = "/";
+  variant.stem_hue_shift = 12.0f;
+  variant.foliage_hue_shift = 24.0f;
+  variant.ephemeral = true;
+  variant.stem_settings = JsonObject{
+    {"base", stems}, {"middle", stems}, {"branch", stems}, {"crown", stems},
+    {"middleMinSize", 3}, {"middleMaxSize", 6},
+  };
+  variant.foliage_settings = JsonObject{
+    {"baseLeaves", leaves}, {"trunkLeaves", leaves}, {"branchLeaves", leaves}, {"crownLeaves", leaves},
+  };
+
+  // Model the old ordered keys() sampling and attachment rules independently
+  // of the plant's cached candidate/leaf pools.
+  constexpr std::uint64_t root_seed = 0x54524545;
+  constexpr std::uint64_t tree_seed = 0x4c454146;
+  auto keys = stems.keys();
+  for (bool ceiling : {false, true}) {
+    for (bool has_leaves : {false, true}) {
+      auto config = variant;
+      config.ceiling = ceiling;
+      if (!has_leaves) {
+        config.foliage_name = {};
+        config.foliage_settings = JsonObject{};
+      }
+      root.random().seed(root_seed);
+      RandomSource wind(root_seed), local(tree_seed);
+      float initial_phase = wind.uniform_float() * 0.5f;
+      auto phase = [&] { return wind.uniform_float() + initial_phase; };
+      auto pick = [&]() -> String const& { return keys[local.uniform_uint(keys.size() - 1)]; };
+      List<Plant::PlantPiece> expected;
+      int segment = 0;
+      auto emit = [&](String const& image, Vec2F offset, bool structural, Plant::PlantPieceKind kind,
+                      float z, Plant::RotationType rotation, float rotation_phase) {
+        auto& piece = expected.emplace_back();
+        piece.image = Star::format("/{}?hueshift={}", image, kind == Plant::Stem ? 12.0f : 24.0f);
+        piece.offset = offset;
+        piece.segment_idx = segment;
+        piece.structural_segment = structural;
+        piece.kind = kind;
+        piece.z_level = z;
+        piece.rotation_type = ceiling ? Plant::DontRotate : rotation;
+        piece.rotation_offset = rotation_phase;
+      };
+      auto emit_leaves = [&](String const& key, Vec2F offset, Plant::RotationType rotation,
+                             std::optional<float> shared = {}) {
+        if (!has_leaves)
+          return;
+        offset += Vec2F(0.5f, -0.25f);
+        if (key != "b")
+          emit("front.png", offset, false, Plant::Foliage, 3.0f, rotation, shared ? *shared : phase());
+        emit("back.png", offset, false, Plant::Foliage, -1.0f, rotation, shared ? *shared : phase());
+      };
+      auto emit_stem = [&](String const& key, Vec2F offset, bool structural, float z,
+                           Plant::RotationType rotation, float rotation_phase) {
+        emit(Star::format("{}.png", key), offset, structural, Plant::Stem, z, rotation, rotation_phase);
+      };
+      auto const& base = pick();
+      Vec2F offset(0.125f, ceiling ? 0.75f : 0.25f);
+      emit_stem(base, offset, true, 0.0f, Plant::DontRotate, phase());
+      emit_leaves(base, offset, Plant::RotateLeaves);
+      offset += Vec2F(0.5f, 1.0f);
+      float branch_y = offset.y();
+      int height = static_cast<int>(3 + local.uniform_uint(3));
+      ++segment;
+      for (int i = 0; i < height; ++i, ++segment) {
+        auto const& stem = pick();
+        offset += Vec2F(0.125f, 0.25f);
+        emit_stem(stem, offset, true, 1.0f, Plant::DontRotate, phase());
+        emit_leaves(stem, offset, Plant::RotateLeaves);
+        offset += Vec2F(0.5f, 1.0f);
+        while (offset.y() >= branch_y) {
+          auto const& branch = pick();
+          if (offset.y() < branch_y + 1.0f)
+            break;
+          if (!local.uniform_uint(2 + i)) {
+            branch_y += 2.0 / static_cast<float>(1 + local.uniform_uint(4));
+            continue;
+          }
+          auto branch_offset = Vec2F(offset.x() + 0.125f, branch_y + 0.25f);
+          auto branch_phase = phase();
+          emit_stem(branch, branch_offset, false, 0.0f, Plant::RotateBranch, branch_phase);
+          branch_y += 2.0f;
+          emit_leaves(branch, branch_offset, Plant::RotateLeaves, branch_phase);
+        }
+      }
+      auto const& crown = pick();
+      offset += Vec2F(0.125f, 0.25f);
+      auto crown_phase = phase();
+      emit_stem(crown, offset, false, 0.0f, Plant::RotateCrownBranch, crown_phase);
+      emit_leaves(crown, offset, Plant::RotateCrownLeaves, crown_phase);
+      std::sort(expected.begin(), expected.end(), [](auto const& a, auto const& b) { return a.z_level < b.z_level; });
+      struct DrawSink final : NullRenderCallback {
+        List<Drawable> drawables;
+        std::expected<void, StarException> add_drawable(Drawable drawable, EntityRenderLayer layer) override {
+          EXPECT_EQ(layer, render_layer_plant);
+          drawables.push_back(std::move(drawable));
+          return {};
+        }
+      };
+
+      auto plant = Plant::create(root, config, tree_seed);
+      ASSERT_TRUE(plant) << plant.error().what();
+      auto pieces = (*plant)->pieces();
+      ASSERT_EQ(pieces.size(), expected.size());
+      for (std::size_t i = 0; i < pieces.size(); ++i) {
+        SCOPED_TRACE(i);
+        EXPECT_EQ(pieces[i].image, expected[i].image);
+        EXPECT_EQ(pieces[i].offset, expected[i].offset);
+        EXPECT_EQ(pieces[i].segment_idx, expected[i].segment_idx);
+        EXPECT_EQ(pieces[i].structural_segment, expected[i].structural_segment);
+        EXPECT_EQ(pieces[i].kind, expected[i].kind);
+        EXPECT_EQ(pieces[i].z_level, expected[i].z_level);
+        EXPECT_EQ(pieces[i].rotation_type, expected[i].rotation_type);
+        EXPECT_EQ(pieces[i].rotation_offset, expected[i].rotation_offset);
+      }
+      ASSERT_TRUE((*plant)->set_tile_position(Vec2I(11, 5)));
+      DrawSink first_frame, repeated_frame;
+      ASSERT_TRUE((*plant)->render(first_frame));
+      ASSERT_TRUE((*plant)->render(repeated_frame));
+      ASSERT_EQ(first_frame.drawables.size(), pieces.size());
+      EXPECT_EQ(first_frame.drawables, repeated_frame.drawables);
+      for (std::size_t i = 0; i < pieces.size(); ++i) {
+        auto const& piece = pieces[i];
+        auto drawable = Drawable::make_image(**metadata, piece.image_path, 1.0f / tile_pixels, false, piece.offset);
+        ASSERT_TRUE(drawable) << drawable.error().what();
+        auto size = Vec2F(piece.image_size) / tile_pixels;
+        if (piece.rotation_type == Plant::RotateCrownBranch || piece.rotation_type == Plant::RotateCrownLeaves) {
+          drawable->rotate(0.0f, piece.offset + Vec2F(size.x() / 2.0f, 0));
+          drawable->translate(Vec2F(0, -0.40f));
+        } else if (piece.rotation_type != Plant::DontRotate) {
+          drawable->rotate(0.0f, piece.offset + size / 2.0f);
+        }
+        drawable->translate(Vec2F(11, 5));
+        EXPECT_EQ(first_frame.drawables[i], *drawable);
+      }
+      EXPECT_EQ(root.random().next_u64(), wind.next_u64());
+      EXPECT_TRUE((*plant)->ephemeral());
+      EXPECT_EQ((*plant)->primary_root(), Vec2I(0, ceiling ? 1 : -1));
+      auto stored = (*plant)->disk_store();
+      ASSERT_TRUE(stored) << stored.error().what();
+      auto sapling = stored->get("saplingDropConfig");
+      ASSERT_TRUE(sapling);
+      EXPECT_EQ(*sapling, (Json(JsonObject{
+        {"stemName", config.stem_name}, {"foliageName", config.foliage_name},
+        {"stemHueShift", config.stem_hue_shift}, {"foliageHueShift", config.foliage_hue_shift},
+      })));
+    }
+  }
+
+  root.random().seed(root_seed);
+  GrassVariant grass;
+  grass.directory = "/";
+  grass.images = {"a.png", "c.png"};
+  grass.ceiling = true;
+  RandomSource grass_oracle(tree_seed);
+  auto grass_image = grass.images[grass_oracle.uniform_uint(grass.images.size() - 1)];
+  auto grass_plant = Plant::create(root, grass, tree_seed);
+  ASSERT_TRUE(grass_plant) << grass_plant.error().what();
+  auto grass_pieces = (*grass_plant)->pieces();
+  ASSERT_EQ(grass_pieces.size(), 1u);
+  EXPECT_EQ(grass_pieces.front().image, Star::format("/{}?hueshift=0", grass_image));
+  EXPECT_EQ(grass_pieces.front().offset, Vec2F(0.0f, 0.75f));
+  EXPECT_TRUE(grass_pieces.front().structural_segment);
+
+  BushVariant bush;
+  bush.directory = "/";
+  bush.shapes = {{"a.png", {"back.png", "front.png"}}, {"b.png", {"front.png", "back.png"}}};
+  bush.ceiling = true;
+  RandomSource bush_oracle(tree_seed);
+  auto const& shape = bush.shapes[bush_oracle.uniform_uint(bush.shapes.size() - 1)];
+  auto bush_plant = Plant::create(root, bush, tree_seed);
+  ASSERT_TRUE(bush_plant) << bush_plant.error().what();
+  auto bush_pieces = (*bush_plant)->pieces();
+  ASSERT_EQ(bush_pieces.size(), 2u);
+  EXPECT_EQ(bush_pieces.front().image, Star::format("/{}?hueshift=0", shape.image));
+  EXPECT_EQ(bush_pieces.front().offset, Vec2F(0.0f, 0.75f));
+  auto const& mod = shape.mods[bush_oracle.uniform_uint(shape.mods.size() - 1)];
+  EXPECT_EQ(bush_pieces.back().image, Star::format("/{}?hueshift=0", mod));
+  EXPECT_EQ(bush_pieces.back().offset, bush_pieces.front().offset);
+  EXPECT_FALSE(bush_pieces.back().structural_segment);
+  for (auto& shape : bush.shapes)
+    shape.mods.clear();
+  auto bare_bush = Plant::create(root, bush, tree_seed);
+  ASSERT_TRUE(bare_bush) << bare_bush.error().what();
+  EXPECT_EQ((*bare_bush)->pieces().size(), 1u);
+  EXPECT_EQ(root.random().next_u64(), RandomSource(root_seed).next_u64());
+
+  auto malformed = variant;
+  auto invalid_height = variant.stem_settings.set("middleMaxSize", std::numeric_limits<std::int64_t>::max());
+  ASSERT_TRUE(invalid_height);
+  malformed.stem_settings = *invalid_height;
+  EXPECT_FALSE(Plant::create(root, malformed, tree_seed));
+  for (double height : {0.0, -1.0, 1.0e-12}) {
+    auto invalid_branch = variant.stem_settings.set("branch", JsonObject{
+      {"bad", JsonObject{{"image", "a.png"}, {"attachment", JsonObject{{"h", height}, {"bx", 0}, {"by", 0}}}}},
+    });
+    ASSERT_TRUE(invalid_branch);
+    malformed.stem_settings = *invalid_branch;
+    EXPECT_FALSE(Plant::create(root, malformed, tree_seed));
+  }
 });
 
 const GameTestRegistration objectCursorPreviewRandomIsolation(

@@ -350,7 +350,7 @@ std::expected<std::shared_ptr<Parallax>, StarException> Parallax::create(Root& r
 std::expected<Json, StarException> Parallax::store() const {
   Json tree;
   if (m_parallax_tree_variant) {
-    auto stored = m_parallax_tree_variant->toJson();
+    auto stored = m_parallax_tree_variant->to_json();
     if (!stored) return std::unexpected(std::move(stored.error()));
     tree = std::move(*stored);
   }
@@ -388,19 +388,19 @@ std::expected<void, StarException> Parallax::build_layer(
   if (*is_foliage) {
     if (!m_parallax_tree_variant)
       return {};
-    auto enabled = m_parallax_tree_variant->foliageSettings.get_bool("parallaxFoliage", false);
+    auto enabled = m_parallax_tree_variant->foliage_settings.get_bool("parallaxFoliage", false);
     if (!enabled) return std::unexpected(std::move(enabled.error()));
     if (!*enabled)
       return {};
     auto subdirectory = kind.replace("foliage/", "");
     if (!subdirectory) return std::unexpected(std::move(subdirectory.error()));
-    texture_path = m_parallax_tree_variant->foliageDirectory + "parallax/" + *subdirectory + "/";
+    texture_path = m_parallax_tree_variant->foliage_directory + "parallax/" + *subdirectory + "/";
   } else if (*is_stem) {
     if (!m_parallax_tree_variant)
       return {};
     auto subdirectory = kind.replace("stem/", "");
     if (!subdirectory) return std::unexpected(std::move(subdirectory.error()));
-    texture_path = m_parallax_tree_variant->stemDirectory + "parallax/" + *subdirectory + "/";
+    texture_path = m_parallax_tree_variant->stem_directory + "parallax/" + *subdirectory + "/";
   } else {
     texture_path = m_image_directory + kind + "/";
   }
@@ -518,9 +518,9 @@ std::expected<void, StarException> Parallax::build_layer(
   if (!directives) return std::unexpected(std::move(directives.error()));
   layer.directives = std::move(*directives);
   if (*is_foliage) {
-    append_directive(layer.directives, String(Star::format("hueshift={}", m_parallax_tree_variant->foliageHueShift)));
+    append_directive(layer.directives, String(Star::format("hueshift={}", m_parallax_tree_variant->foliage_hue_shift)));
   } else if (*is_stem) {
-    append_directive(layer.directives, String(Star::format("hueshift={}", m_parallax_tree_variant->stemHueShift)));
+    append_directive(layer.directives, String(Star::format("hueshift={}", m_parallax_tree_variant->stem_hue_shift)));
   } else {
     auto no_hue_shift = settings.get_bool("nohueshift", false);
     if (!no_hue_shift) return std::unexpected(std::move(no_hue_shift.error()));

@@ -273,8 +273,11 @@ std::expected<Json, StarException> EntityFactory::disk_store_entity_locked(std::
       if (!object) return std::unexpected(std::move(object.error()));
       return object->get().disk_store();
     }
-    case EntityType::Plant:
-      return store.template operator()<Plant>();
+    case EntityType::Plant: {
+      auto plant = convert_ref<Plant>(*entity);
+      if (!plant) return std::unexpected(std::move(plant.error()));
+      return plant->get().disk_store();
+    }
     case EntityType::ItemDrop: {
       auto drop = convert_ref<ItemDrop>(*entity);
       if (!drop) return std::unexpected(std::move(drop.error()));

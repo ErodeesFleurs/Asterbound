@@ -1,340 +1,221 @@
-import star.json;
-import star.id_map;
-import star.list;
-import star.rect;
-import star.image_processing;
-import star.hash;
-import star.data_stream;
-import star.string_view;
-import star.thread;
-import star.directives;
-import star.asset_path;
-import star.casting;
-import star.strong_typedef;
-import star.rpc_promise;
-import star.data_stream_extra;
-import star.audio;
-import star.map;
-import star.set;
-import star.vector;
-import star.bi_map;
-import star.color;
-import star.string;
-import star.poly;
-import star.game_types;
-import star.random;
-import star.a_star;
-import star.ordered_set;
-import star.periodic_function;
-import star.ordered_map;
-import star.io_device;
-import star.ref_ptr;
-import star.logging;
-import star.listener;
 import std;
-import star.format;
-import star.lua;
-
-import star.damage_types;
-import star.world_geometry;
-import star.status_types;
-import star.damage;
-import star.entity;
-import star.tile_damage;
-import star.interaction_types;
-import star.item_descriptor;
-import star.celestial_coordinate;
-import star.quest_descriptor;
-import star.interactive_entity;
-import star.collision_block;
-import star.tile_entity;
-import star.tile_modification;
-import star.lua_root;
-import star.force_regions;
-import star.world;
-import star.physics_entity;
-import star.movement_controller;
-import star.mobile_entity;
-import star.inspectable_entity;
-import star.plant;
-
-import star.plant_drop;
-import star.uuid;
-import star.animated_part_set;
-import star.networked_animator;
-import star.humanoid;
-import star.anchorable_entity;
-import star.actor_entity;
-import star.tool_user_entity;
-import star.lounging_entities;
-import star.chat_action;
-import star.chatty_entity;
-import star.emote_entity;
-import star.portrait_entity;
-import star.damage_bar_entity;
-import star.nametag_entity;
-import star.inventory_types;
-import star.platformer_astar_types;
-import star.game_timers;
-import star.actor_movement_controller;
-import star.ai_types;
-import star.player_types;
-import star.lua_components;
-import star.lua_actor_movement_component;
-import star.lua_animation_component;
-import star.radio_message_database;
-import star.player;
-import star.asset_source;
+import star.asset_path;
 import star.assets;
-import star.root_base;
-import star.configuration;
-import star.root;
-import star.scripted_entity;
-import star.item_drop;
-import star.mixer;
-import star.drawable;
-import star.entity_rendering_types;
-import star.animation;
-import star.particle;
-
-import star.light_source;
-import star.entity_rendering;
-
-import star.particle_database;
-import star.image_metadata_database;
-
-
-import star.data_stream_devices;
-
-import star.net_compatibility;
+import star.audio;
 import star.byte_array;
+import star.data_stream;
+import star.data_stream_devices;
+import star.data_stream_extra;
+import star.directives;
+import star.drawable;
+import star.entity;
+import star.entity_rendering;
+import star.entity_rendering_types;
+import star.format;
+import star.game_types;
+import star.image_metadata_database;
+import star.item_descriptor;
+import star.item_drop;
+import star.json;
+import star.list;
 import star.math_common;
+import star.matrix3;
+import star.mixer;
+import star.movement_controller;
+import star.net_compatibility;
+import star.particle;
+import star.particle_database;
+import star.plant;
+import star.plant_drop;
+import star.poly;
+import star.random;
+import star.rect;
+import star.root;
+import star.set;
+import star.string;
+import star.vector;
+import star.world;
+
 namespace Star {
 
-PlantDrop::PlantDrop(Root& rootContext) : Entity(rootContext) {}
+namespace {
+// Account for misses as well as emissions, and share the budget between the
+// initial break and impact. An unfinished sample sequence resumes next tick.
+constexpr std::size_t particle_sample_budget = 256;
 
-
-PlantDrop::PlantDropPiece::PlantDropPiece() {
-  image = "";
-  offset = {};
-  segmentIdx = 0;
-  kind = Plant::PlantPieceKind::None;
-  flip = false;
+Vec2F particle_world_position(Vec2F const& local, Vec2F const& origin, float rotation) {
+  // Keep the legacy Release grouping when a burst stores its position
+  // across ticks. Adding the origin after the completed rotation rounds
+  // differently in world coordinates.
+#pragma clang fp reassociate(off)
+  float const cosine = std::cos(rotation);
+  float const sine = std::sin(rotation);
+  return {(origin.x() + local.x() * cosine) - local.y() * sine,
+      (origin.y() + local.x() * sine) + local.y() * cosine};
+}
 }
 
-std::expected<std::shared_ptr<PlantDrop>, StarException> PlantDrop::create(Root& rootContext, List<Plant::PlantPiece> pieces, Vec2F const& position, Vec2F const& strikeVector, String const& description,
-    bool upsideDown, Json stemConfig, Json foliageConfig, Json saplingConfig, bool master, float random) {
+PlantDrop::PlantDrop(Root& root) : Entity(root) {}
+
+std::expected<void, StarException> PlantDrop::initialize_net_elements(Root& root) {
+  auto controller = MovementController::create(root);
+  if (!controller)
+    return std::unexpected(std::move(controller.error()));
+  m_movement_controller = std::move(*controller);
+  if (auto added = m_net_group.add_net_element(*m_movement_controller); !added)
+    return added;
+  return m_net_group.add_net_element(m_spawned_drops);
+}
+
+std::expected<std::shared_ptr<PlantDrop>, StarException> PlantDrop::create(Root& root, List<Plant::PlantPiece> pieces,
+    Vec2F const& position, Vec2F const& strike_vector, String const& description, bool upside_down,
+    Json stem_config, Json foliage_config, Json sapling_config, bool master, float random) {
+  return create_fall<false>(root, std::as_const(pieces), Vec2F(), position, strike_vector, description, upside_down,
+      std::move(stem_config), std::move(foliage_config), std::move(sapling_config), master, random);
+}
+
+std::expected<std::shared_ptr<PlantDrop>, StarException> PlantDrop::create_segment(Root& root,
+    List<Plant::PlantPiece> const& pieces, std::span<std::size_t const> indices, Vec2F const& break_point,
+    Vec2F const& position, Vec2F const& strike_vector, String const& description, bool upside_down,
+    Json stem_config, Json foliage_config, Json sapling_config, bool master, float random) {
+  auto segment = indices | std::views::transform([&pieces](std::size_t index) -> Plant::PlantPiece const& {
+    return pieces[index];
+  });
+  return create_fall<true>(root, segment, break_point, position, strike_vector, description, upside_down,
+      std::move(stem_config), std::move(foliage_config), std::move(sapling_config), master, random);
+}
+
+template <bool prepared_paths, std::ranges::sized_range Pieces>
+  requires std::ranges::input_range<Pieces>
+    && std::same_as<std::ranges::range_reference_t<Pieces>, Plant::PlantPiece const&>
+std::expected<std::shared_ptr<PlantDrop>, StarException> PlantDrop::create_fall(Root& root, Pieces&& pieces,
+    Vec2F const& break_point, Vec2F const& position, Vec2F const& strike_vector, String const& description,
+    bool upside_down, Json stem_config, Json foliage_config, Json sapling_config, bool master, float random) {
   struct MakeShared final : PlantDrop {
     explicit MakeShared(Root& root) : Entity(root), PlantDrop(root) {}
   };
-  auto entity = std::make_shared<MakeShared>(rootContext);
-  auto controller = MovementController::create(rootContext);
-  if (!controller) return std::unexpected(std::move(controller.error()));
-  entity->m_movement_controller = std::move(*controller);
-  if (auto result = entity->initialize(std::move(pieces), position, strikeVector, description, upsideDown, std::move(stemConfig), std::move(foliageConfig), std::move(saplingConfig), master, random); !result) return std::unexpected(std::move(result.error()));
+  auto entity = std::make_shared<MakeShared>(root);
+  if (auto initialized = entity->initialize_net_elements(root); !initialized)
+    return std::unexpected(std::move(initialized.error()));
+
+  entity->m_stem_config = stem_config.is_null() ? Json(JsonObject()) : std::move(stem_config);
+  entity->m_foliage_config = foliage_config.is_null() ? Json(JsonObject()) : std::move(foliage_config);
+  entity->m_sapling_config = std::move(sapling_config);
+  entity->m_master = master;
+  entity->m_observed_live = true;
+  entity->m_break_pending = true;
+  entity->m_spawned_drops.set(false);
+  entity->m_description = description;
+  entity->m_movement_controller->set_position(position);
+  if (!upside_down) {
+    entity->m_rotation_rate = std::copysign(0.00001f, -strike_vector[0] + random);
+    entity->m_rotation_fall_threshold = std::numbers::pi / (3 + random);
+    entity->m_rotation_cap = std::numbers::pi - entity->m_rotation_fall_threshold;
+  }
+
+  auto tile_offset = Vec2I::round(break_point);
+  RectF stem_bounds = RectF::null();
+  RectF full_bounds = RectF::null();
+  entity->m_pieces.reserve(std::ranges::size(pieces));
+  for (auto const& piece : pieces) {
+    RectF bounds = RectF::null();
+    for (auto const& space : piece.spaces) {
+      auto min = Vec2F(space - tile_offset);
+      bounds.combine(min);
+      bounds.combine(min + Vec2F(1, 1));
+    }
+    if (!bounds.is_null()) {
+      full_bounds.combine(bounds);
+      if (piece.structural_segment)
+        stem_bounds.combine(bounds);
+    }
+    if constexpr (prepared_paths)
+      entity->m_pieces.push_back({piece.image_path, piece.offset - break_point, piece.kind, piece.flip});
+    else
+      entity->m_pieces.push_back({AssetPath(piece.image), piece.offset, piece.kind, piece.flip});
+  }
+
+  entity->m_bounding_box = full_bounds.is_null() ? RectF(position, position) : full_bounds;
+  entity->m_collision_rect = stem_bounds.is_null() ? entity->m_bounding_box : stem_bounds;
   return entity;
 }
 
-std::expected<void, StarException> PlantDrop::initialize(List<Plant::PlantPiece> pieces, Vec2F const& position, Vec2F const& strikeVector, String const& description,
-    bool upsideDown, Json stemConfig, Json foliageConfig, Json saplingConfig, bool master, float random) {
-  auto result361 = m_netGroup.add_net_element(*m_movement_controller);
-if (!result361) return std::unexpected(std::move(result361.error()));
-  auto result362 = m_netGroup.add_net_element(m_spawnedDrops);
-if (!result362) return std::unexpected(std::move(result362.error()));
-
-  m_stemConfig = std::move(stemConfig);
-  if (m_stemConfig.is_null())
-    m_stemConfig = JsonObject();
-  m_foliageConfig = std::move(foliageConfig);
-  if (m_foliageConfig.is_null())
-    m_foliageConfig = JsonObject();
-  m_saplingConfig = std::move(saplingConfig);
-
-  m_master = master;
-  m_firstTick = true;
-  m_spawnedDrops.set(false);
-  m_spawnedDropEffects = false;
-  m_time = 5000;
-  m_description = description;
-  m_movement_controller->set_position(position);
-  if (!upsideDown) {
-    m_rotationRate = std::copysign(0.00001f, -strikeVector[0] + random);
-    m_rotationFallThreshold = std::numbers::pi / (3 + random);
-    m_rotationCap = std::numbers::pi - m_rotationFallThreshold;
-  } else {
-    m_rotationRate = 0;
-    m_rotationFallThreshold = 0;
-    m_rotationCap = 0;
-  }
-
-  bool structuralFound = false;
-  RectF stemBounds = RectF::null();
-  RectF fullBounds = RectF::null();
-
-  // note structuralSegment is only available in the constructor
-  for (auto& piece : pieces) {
-    for (auto& pos : piece.spaces) {
-      fullBounds.combine(Vec2F(pos));
-      fullBounds.combine(Vec2F(pos) + Vec2F(1, 1));
-      if (piece.structuralSegment) {
-        structuralFound = true;
-        stemBounds.combine(Vec2F(pos));
-        stemBounds.combine(Vec2F(pos) + Vec2F(1, 1));
-      }
-    }
-    PlantDropPiece pdp;
-    pdp.image = piece.image;
-    pdp.offset = piece.offset;
-    pdp.segmentIdx = piece.segmentIdx;
-    pdp.kind = piece.kind;
-    pdp.flip = piece.flip;
-    m_pieces.push_back(pdp);
-  }
-
-  if (fullBounds.is_null())
-    fullBounds = RectF(position, position);
-  if (stemBounds.is_null())
-    stemBounds = RectF(position, position);
-
-  m_boundingBox = fullBounds;
-  if (structuralFound)
-    m_collisionRect = stemBounds;
-  else
-    m_collisionRect = fullBounds;
-  return {};
-}
-
-std::expected<std::shared_ptr<PlantDrop>, StarException> PlantDrop::create(Root& rootContext, ByteArray const& net_store, NetCompatibilityRules rules) {
+std::expected<std::shared_ptr<PlantDrop>, StarException> PlantDrop::create(Root& root, ByteArray const& net_store, NetCompatibilityRules rules) {
   struct MakeShared final : PlantDrop {
     explicit MakeShared(Root& root) : Entity(root), PlantDrop(root) {}
   };
-  auto entity = std::make_shared<MakeShared>(rootContext);
-  auto controller = MovementController::create(rootContext);
-  if (!controller) return std::unexpected(std::move(controller.error()));
-  entity->m_movement_controller = std::move(*controller);
-  if (auto result = entity->initialize(net_store, rules); !result) return std::unexpected(std::move(result.error()));
+  auto entity = std::make_shared<MakeShared>(root);
+  if (auto initialized = entity->initialize_net_elements(root); !initialized)
+    return std::unexpected(std::move(initialized.error()));
+  if (auto initialized = entity->initialize(net_store, rules); !initialized)
+    return std::unexpected(std::move(initialized.error()));
   return entity;
 }
 
 std::expected<void, StarException> PlantDrop::initialize(ByteArray const& net_store, NetCompatibilityRules rules) {
-  auto result349 = m_netGroup.add_net_element(*m_movement_controller);
-if (!result349) return std::unexpected(std::move(result349.error()));
-  auto result350 = m_netGroup.add_net_element(m_spawnedDrops);
-if (!result350) return std::unexpected(std::move(result350.error()));
-
-DataStreamReader ds(net_store.span());
-ds.set_stream_compatibility_version(rules);
-auto stream351 = (ds >> m_time);
-if (!stream351) return std::unexpected(std::move(stream351.error()));
-  auto stream352 = (ds >> m_master);
-if (!stream352) return std::unexpected(std::move(stream352.error()));
-  auto stream353 = (ds >> m_description);
-if (!stream353) return std::unexpected(std::move(stream353.error()));
-  auto stream354 = (ds >> m_boundingBox);
-if (!stream354) return std::unexpected(std::move(stream354.error()));
-  auto stream355 = (ds >> m_collisionRect);
-if (!stream355) return std::unexpected(std::move(stream355.error()));
-  auto stream356 = (ds >> m_rotationRate);
-if (!stream356) return std::unexpected(std::move(stream356.error()));
-auto result357 =
-  ds.read_container(m_pieces, [](DataStream& ds, PlantDropPiece& piece) -> std::expected<void, StarException> {
-    auto result275 = ds.read(piece.image);
-    if (!result275)
-      return std::unexpected(std::move(result275.error()));
-    auto result276 = ds.read(piece.offset[0]);
-    if (!result276)
-      return std::unexpected(std::move(result276.error()));
-    auto result277 = ds.read(piece.offset[1]);
-    if (!result277)
-      return std::unexpected(std::move(result277.error()));
-    auto result278 = ds.read(piece.flip);
-    if (!result278)
-      return std::unexpected(std::move(result278.error()));
-    auto result279 = ds.read(piece.kind);
-    if (!result279)
-      return std::unexpected(std::move(result279.error()));
-    return {};
+  DataStreamReader stream(net_store.span());
+  stream.set_stream_compatibility_version(rules);
+  if (auto read = stream.read(m_time); !read) return read;
+  if (auto read = stream.read(m_master); !read) return read;
+  if (auto read = stream.read(m_description); !read) return read;
+  if (auto read = stream.read(m_bounding_box); !read) return read;
+  if (auto read = stream.read(m_collision_rect); !read) return read;
+  if (auto read = stream.read(m_rotation_rate); !read) return read;
+  auto pieces = stream.read_container(m_pieces, [](DataStream& stream, PlantDropPiece& piece) -> std::expected<void, StarException> {
+    if (auto read = stream.read(piece.image); !read) return read;
+    if (auto read = stream.read(piece.offset[0]); !read) return read;
+    if (auto read = stream.read(piece.offset[1]); !read) return read;
+    if (auto read = stream.read(piece.flip); !read) return read;
+    return stream.read(piece.kind);
   });
-if (!result357) return std::unexpected(std::move(result357.error()));
-  auto stream358 = (ds >> m_stemConfig);
-if (!stream358) return std::unexpected(std::move(stream358.error()));
-  auto stream359 = (ds >> m_foliageConfig);
-if (!stream359) return std::unexpected(std::move(stream359.error()));
-  auto stream360 = (ds >> m_saplingConfig);
-if (!stream360) return std::unexpected(std::move(stream360.error()));
-
-  m_firstTick = true;
-  m_spawnedDropEffects = true;
-  return {};
+  if (!pieces) return pieces;
+  if (auto read = stream.read(m_stem_config); !read) return read;
+  if (auto read = stream.read(m_foliage_config); !read) return read;
+  return stream.read(m_sapling_config);
 }
 
 std::expected<ByteArray, StarException> PlantDrop::net_store(NetCompatibilityRules) {
-  DataStreamBuffer ds;
-  auto stream339 = (ds << m_time);
-if (!stream339) return std::unexpected(std::move(stream339.error()));
-  auto stream340 = (ds << m_master);
-if (!stream340) return std::unexpected(std::move(stream340.error()));
-  auto stream341 = (ds << m_description);
-if (!stream341) return std::unexpected(std::move(stream341.error()));
-  auto stream342 = (ds << m_boundingBox);
-if (!stream342) return std::unexpected(std::move(stream342.error()));
-  auto stream343 = (ds << m_collisionRect);
-if (!stream343) return std::unexpected(std::move(stream343.error()));
-  auto stream344 = (ds << m_rotationRate);
-if (!stream344) return std::unexpected(std::move(stream344.error()));
-auto result345 =
-  ds.write_container(m_pieces, [](DataStream& ds, PlantDropPiece const& piece) -> std::expected<void, StarException> {
-    auto result270 = ds.write(piece.image);
-    if (!result270)
-      return std::unexpected(std::move(result270.error()));
-    auto result271 = ds.write(piece.offset[0]);
-    if (!result271)
-      return std::unexpected(std::move(result271.error()));
-    auto result272 = ds.write(piece.offset[1]);
-    if (!result272)
-      return std::unexpected(std::move(result272.error()));
-    auto result273 = ds.write(piece.flip);
-    if (!result273)
-      return std::unexpected(std::move(result273.error()));
-    auto result274 = ds.write(piece.kind);
-    if (!result274)
-      return std::unexpected(std::move(result274.error()));
-    return {};
+  DataStreamBuffer stream;
+  if (auto written = stream.write(m_time); !written) return std::unexpected(std::move(written.error()));
+  if (auto written = stream.write(m_master); !written) return std::unexpected(std::move(written.error()));
+  if (auto written = stream.write(m_description); !written) return std::unexpected(std::move(written.error()));
+  if (auto written = stream.write(m_bounding_box); !written) return std::unexpected(std::move(written.error()));
+  if (auto written = stream.write(m_collision_rect); !written) return std::unexpected(std::move(written.error()));
+  if (auto written = stream.write(m_rotation_rate); !written) return std::unexpected(std::move(written.error()));
+  auto pieces = stream.write_container(m_pieces, [](DataStream& stream, PlantDropPiece const& piece) -> std::expected<void, StarException> {
+    if (auto written = stream.write(piece.image); !written) return written;
+    if (auto written = stream.write(piece.offset[0]); !written) return written;
+    if (auto written = stream.write(piece.offset[1]); !written) return written;
+    if (auto written = stream.write(piece.flip); !written) return written;
+    return stream.write(piece.kind);
   });
-if (!result345) return std::unexpected(std::move(result345.error()));
-  auto stream346 = (ds << m_stemConfig);
-if (!stream346) return std::unexpected(std::move(stream346.error()));
-  auto stream347 = (ds << m_foliageConfig);
-if (!stream347) return std::unexpected(std::move(stream347.error()));
-  auto stream348 = (ds << m_saplingConfig);
-if (!stream348) return std::unexpected(std::move(stream348.error()));
-
-return ds.take_data();
+  if (!pieces) return std::unexpected(std::move(pieces.error()));
+  if (auto written = stream.write(m_stem_config); !written) return std::unexpected(std::move(written.error()));
+  if (auto written = stream.write(m_foliage_config); !written) return std::unexpected(std::move(written.error()));
+  if (auto written = stream.write(m_sapling_config); !written) return std::unexpected(std::move(written.error()));
+  return stream.take_data();
 }
 
 EntityType PlantDrop::entity_type() const {
   return EntityType::PlantDrop;
 }
 
-std::expected<void, StarException> PlantDrop::init(World& world, EntityId entityId, EntityMode mode) {
-  auto result337 = Entity::init(world, entityId, mode);
-if (!result337) return std::unexpected(std::move(result337.error()));
+std::expected<void, StarException> PlantDrop::init(World& world, EntityId entity_id, EntityMode mode) {
+  if (auto initialized = Entity::init(world, entity_id, mode); !initialized)
+    return initialized;
   m_movement_controller->init(world);
 
-  PolyF collision_poly = PolyF(RectF::with_center(m_collisionRect.center(), m_collisionRect.size() / 2.0f));
   MovementParameters parameters;
-  parameters.collision_poly = collision_poly;
+  parameters.collision_poly = PolyF(RectF::with_center(m_collision_rect.center(), m_collision_rect.size() / 2.0f));
   parameters.ignore_platform_collision = true;
   parameters.gravity_multiplier = 0.2f;
   parameters.physics_effect_categories = StringSet({"plantdrop"});
-  auto result338 = m_movement_controller->apply_parameters(parameters);
-if (!result338) return std::unexpected(std::move(result338.error()));
-  return {};
+  return m_movement_controller->apply_parameters(parameters);
 }
 
 std::expected<void, StarException> PlantDrop::uninit() {
-  auto result336 = Entity::uninit();
-if (!result336) return std::unexpected(std::move(result336.error()));
+  if (auto uninitialized = Entity::uninit(); !uninitialized)
+    return uninitialized;
   m_movement_controller->uninit();
   return {};
 }
@@ -348,362 +229,394 @@ Vec2F PlantDrop::position() const {
 }
 
 RectF PlantDrop::meta_bound_box() const {
-  return m_boundingBox;
+  return m_bounding_box;
 }
 
-RectF PlantDrop::collisionRect() const {
-  PolyF shape = PolyF(m_collisionRect);
-  shape.rotate(m_movement_controller->rotation());
+RectF PlantDrop::collision_rect(float rotation) const {
+  PolyF shape(m_collision_rect);
+  shape.rotate(rotation);
   return shape.bounding_box();
 }
 
-std::expected<void, StarException> PlantDrop::update(float dt, std::uint64_t) {
-  capturePresentationRotation(m_movement_controller->rotation());
-  m_time -= dt;
-
-  m_movement_controller->set_timestep(dt);
-  if (isMaster()) {
-    if (m_spawnedDropEffects && !m_spawnedDrops.get())
-      m_spawnedDropEffects = false; // false positive assumption over already having done the effect
-    // to avoid effects for newly joining players.
-    if (m_spawnedDrops.get())
-      m_firstTick = false;
-
-    // think up a better curve then sin
-    auto result307 = world();
-if (!result307) return std::unexpected(std::move(result307.error()));
-auto result308 = result307->get().gravity(position());
-if (!result308) return std::unexpected(std::move(result308.error()));
-auto rotationAcceleration = 0.01f * std::move(*result308) * std::copysign(1.0f, m_rotationRate) * dt;
-    if (std::abs(m_movement_controller->rotation()) > m_rotationCap)
-      m_rotationRate -= rotationAcceleration;
-    else if (std::fabs(m_movement_controller->rotation()) < m_rotationFallThreshold)
-      m_rotationRate += rotationAcceleration;
-
-    m_presentationRotationTravel = m_rotationRate * dt;
-    m_movement_controller->rotate(m_rotationRate);
-
-    PolyF collision_poly = PolyF(RectF::with_center(m_collisionRect.center(), m_collisionRect.size() / 2.0f));
-
-    if (m_time > 0) {
-      MovementParameters parameters;
-      parameters.collision_poly = collision_poly;
-      parameters.gravity_enabled = std::fabs(m_movement_controller->rotation()) >= m_rotationFallThreshold;
-      auto result309 = m_movement_controller->apply_parameters(parameters);
-if (!result309) return std::unexpected(std::move(result309.error()));
-
-      auto result310 = m_movement_controller->tick_master(dt);
-if (!result310) return std::unexpected(std::move(result310.error()));
-      if (m_movement_controller->on_ground())
-        m_time = 0;
-    }
-
-    auto result311 = this->root().image_metadata_database();
-if (!result311) return std::unexpected(std::move(result311.error()));
-auto image_metadata = std::move(*result311);
-
-    bool condition314 = static_cast<bool>(m_time <= 0);
-if (!condition314) {
-auto result312 = world();
-if (!result312) return std::unexpected(std::move(result312.error()));
-auto result313 = result312->get().gravity(position());
-if (!result313) return std::unexpected(std::move(result313.error()));
-condition314 = static_cast<bool>(std::move(*result313) == 0);
-}
-if ((condition314) && !m_spawnedDrops.get()) {
-      m_spawnedDrops.set(true);
-      for (auto& plantPiece : m_pieces) {
-        JsonArray dropOptions;
-        if (plantPiece.kind == Plant::PlantPieceKind::Stem)
-          {
-auto result315 = m_stemConfig.get_array("drops", {});
-if (!result315) return std::unexpected(std::move(result315.error()));
-dropOptions = std::move(*result315);
-}
-        if (plantPiece.kind == Plant::PlantPieceKind::Foliage)
-          {
-auto result316 = m_foliageConfig.get_array("drops", {});
-if (!result316) return std::unexpected(std::move(result316.error()));
-dropOptions = std::move(*result316);
-}
-        if (dropOptions.size()) {
-          auto result317 = this->root().random().sample_ref(dropOptions);
-if (!result317) return std::unexpected(std::move(result317.error()));
-auto result318 = result317->get().to_array();
-if (!result318) return std::unexpected(std::move(result318.error()));
-auto option = std::move(*result318);
-for (auto const& drop : option) {
-  auto result319 = image_metadata->image_size(plantPiece.image);
-  if (!result319)
-    return std::unexpected(std::move(result319.error()));
-  auto size = std::move(*result319);
-  auto result320 = this->root().random().uniform_float(-0.2f, 0.2f);
-  if (!result320)
-    return std::unexpected(std::move(result320.error()));
-  auto result321 = this->root().random().uniform_float(-0.2f, 0.2f);
-  if (!result321)
-    return std::unexpected(std::move(result321.error()));
-  Vec2F pos = Vec2F(plantPiece.offset + Vec2F(size) * .5f / tile_pixels).rotate(m_movement_controller->rotation())
-    + Vec2F(std::move(*result320), std::move(*result321));
-  auto result322 = drop.get_string("item");
-  if (!result322)
-    return std::unexpected(std::move(result322.error()));
-  if (std::move(*result322) == "sapling") {
-    auto result323 = world();
-    if (!result323)
-      return std::unexpected(std::move(result323.error()));
-    auto result324 = drop.get_int("count", 1);
-    if (!result324)
-      return std::unexpected(std::move(result324.error()));
-    auto result325 =
-      ItemDescriptor::create("sapling", static_cast<std::size_t>(std::move(*result324)), m_saplingConfig);
-    if (!result325)
-      return std::unexpected(std::move(result325.error()));
-    auto result326 = ItemDrop::create_randomized_drop(this->root(), std::move(*result325), position() + pos);
-    if (!result326)
-      return std::unexpected(std::move(result326.error()));
-    auto result327 = result323->get().addEntity(std::move(*result326));
-    if (!result327)
-      return std::unexpected(std::move(result327.error()));
-  } else {
-    auto result328 = world();
-    if (!result328)
-      return std::unexpected(std::move(result328.error()));
-    auto result329 = drop.get_string("item");
-    if (!result329)
-      return std::unexpected(std::move(result329.error()));
-    auto result330 = drop.get_int("count", 1);
-    if (!result330)
-      return std::unexpected(std::move(result330.error()));
-    auto result331 = ItemDescriptor::create(std::move(*result329), static_cast<std::size_t>(std::move(*result330)));
-    if (!result331)
-      return std::unexpected(std::move(result331.error()));
-    auto result332 = ItemDrop::create_randomized_drop(this->root(), std::move(*result331), position() + pos);
-    if (!result332)
-      return std::unexpected(std::move(result332.error()));
-    auto result333 = result328->get().addEntity(std::move(*result332));
-    if (!result333)
-      return std::unexpected(std::move(result333.error()));
+std::optional<std::reference_wrapper<Json const>> PlantDrop::piece_config(Plant::PlantPieceKind kind) const {
+  switch (kind) {
+    case Plant::PlantPieceKind::Stem: return std::cref(m_stem_config);
+    case Plant::PlantPieceKind::Foliage: return std::cref(m_foliage_config);
+    default: return std::nullopt;
   }
 }
-        }
+
+std::expected<void, StarException> PlantDrop::deliver_items(World& world, ItemDelivery& delivery) {
+  std::shared_ptr<ImageMetadataDatabase const> metadata;
+  for (; delivery.piece_index < m_pieces.size(); ++delivery.piece_index) {
+    auto const& piece = m_pieces[delivery.piece_index];
+    if (!delivery.items) {
+      if (!delivery.selection) {
+        auto config = piece_config(piece.kind);
+        if (!config)
+          continue;
+        auto drops = config->get().find("drops");
+        if (!drops) return std::unexpected(std::move(drops.error()));
+        if (!*drops || (*drops)->get().is_null())
+          continue;
+        auto options = (*drops)->get().array_ptr();
+        if (!options) return std::unexpected(std::move(options.error()));
+        if ((*options)->empty())
+          continue;
+        auto selected = root().random().sample_ref(**options);
+        if (!selected) return std::unexpected(std::move(selected.error()));
+        delivery.selection = selected->get();
       }
+      auto items = delivery.selection->array_ptr();
+      if (!items) return std::unexpected(std::move(items.error()));
+      delivery.items = std::move(*items);
+      delivery.selection.reset();
     }
-  } else {
-    auto result334 = m_netGroup.tick_net_interpolation(dt);
-if (!result334) return std::unexpected(std::move(result334.error()));
 
-    if (m_spawnedDropEffects && !m_spawnedDrops.get())
-      m_spawnedDropEffects = false; // false positive assumption over already having done the effect
-    // to avoid effects for newly joining players.
-    if (m_spawnedDrops.get())
-      m_firstTick = false;
+    for (; delivery.item_index < delivery.items->size(); ++delivery.item_index) {
+      if (!delivery.pending_item) {
+        auto const& item = (*delivery.items)[delivery.item_index];
+        auto name = item.get_string("item");
+        if (!name) return std::unexpected(std::move(name.error()));
+        auto count = item.get_int("count", 1);
+        if (!count) return std::unexpected(std::move(count.error()));
+        if (*count < 0)
+          return std::unexpected(PlantException("Plant drop count must not be negative"));
+        bool sapling = *name == "sapling";
+        auto descriptor = ItemDescriptor::create(std::move(*name), static_cast<std::uint64_t>(*count), sapling ? m_sapling_config : Json());
+        if (!descriptor) return std::unexpected(std::move(descriptor.error()));
 
-    auto result335 = m_movement_controller->tick_slave(dt);
-if (!result335) return std::unexpected(std::move(result335.error()));
+        if (!delivery.center) {
+          if (!metadata) {
+            auto loaded = root().image_metadata_database();
+            if (!loaded) return std::unexpected(std::move(loaded.error()));
+            metadata = std::move(*loaded);
+          }
+          auto size = metadata->image_size(piece.image);
+          if (!size) return std::unexpected(std::move(size.error()));
+          delivery.center = (piece.offset + Vec2F(*size) * .5f / tile_pixels).rotate(delivery.rotation);
+        }
+        if (!delivery.position) {
+          auto x = root().random().uniform_float(-0.2f, 0.2f);
+          if (!x) return std::unexpected(std::move(x.error()));
+          auto y = root().random().uniform_float(-0.2f, 0.2f);
+          if (!y) return std::unexpected(std::move(y.error()));
+          delivery.position = delivery.origin + (*delivery.center + Vec2F(*x, *y));
+        }
+        auto drop = ItemDrop::create_randomized_drop(root(), *descriptor, *delivery.position);
+        if (!drop) return std::unexpected(std::move(drop.error()));
+        delivery.pending_item = std::move(*drop);
+      }
+      if (delivery.pending_item) {
+        if (auto published = world.addEntity(delivery.pending_item); !published)
+          return published;
+        delivery.pending_item.reset();
+      }
+      delivery.position.reset();
+    }
+    delivery.center.reset();
+    delivery.items.reset();
+    delivery.item_index = 0;
   }
   return {};
 }
 
+void PlantDrop::observe_replica_effects() {
+  if (m_observed_live || m_hit_finished)
+    return;
+  if (m_spawned_drops.get()) {
+    // The initial snapshot already acknowledges impact. Late joiners see
+    // neither the original break nor the completed impact.
+    m_hit_finished = true;
+  } else {
+    m_observed_live = true;
+    m_break_pending = true;
+  }
+}
 
-std::expected<void, StarException> PlantDrop::particleForPlantPart(PlantDropPiece const& piece, String const& mode, Json const& mainConfig, RenderCallback& render_callback) {
-  auto result295 = mainConfig.get("particles", JsonObject());
-if (!result295) return std::unexpected(std::move(result295.error()));
-auto result296 = std::move(*result295).get(mode, JsonObject());
-if (!result296) return std::unexpected(std::move(result296.error()));
-Json particleConfig = std::move(*result296);
-  auto result297 = particleConfig.get_array("options", {});
-if (!result297) return std::unexpected(std::move(result297.error()));
-JsonArray particleOptions = std::move(*result297);
-  if (!particleOptions.size())
-    return {};
+std::expected<void, StarException> PlantDrop::update(float dt, std::uint64_t) {
+  auto& controller = *m_movement_controller;
+  capturePresentationRotation(controller.rotation());
+  m_time -= dt;
+  controller.set_timestep(dt);
+  if (!isMaster()) {
+    if (auto advanced = m_net_group.tick_net_interpolation(dt); !advanced)
+      return advanced;
+    observe_replica_effects();
+    return controller.tick_slave(dt);
+  }
 
-  Particle particle;
+  auto owner = world();
+  if (!owner) return std::unexpected(std::move(owner.error()));
+  auto& world = owner->get();
+  if (!m_item_delivery) {
+    auto gravity = world.gravity(position());
+    if (!gravity) return std::unexpected(std::move(gravity.error()));
+    auto acceleration = 0.01f * *gravity * std::copysign(1.0f, m_rotation_rate) * dt;
+    auto rotation = std::abs(controller.rotation());
+    if (rotation > m_rotation_cap)
+      m_rotation_rate -= acceleration;
+    else if (rotation < m_rotation_fall_threshold)
+      m_rotation_rate += acceleration;
 
+    m_presentation_rotation_travel = m_rotation_rate * dt;
+    controller.rotate(m_rotation_rate);
+    if (m_time > 0) {
+      bool gravity_enabled = std::fabs(controller.rotation()) >= m_rotation_fall_threshold;
+      if (controller.parameters().gravity_enabled != gravity_enabled) {
+        MovementParameters parameters;
+        parameters.gravity_enabled = gravity_enabled;
+        if (auto applied = controller.apply_parameters(parameters); !applied)
+          return applied;
+      }
+      if (auto ticked = controller.tick_master(dt); !ticked)
+        return ticked;
+      if (controller.on_ground())
+        m_time = 0;
+    }
+    if (m_spawned_drops.get())
+      return {};
+    if (m_time > 0) {
+      // This is the post-movement position; its gravity may differ from the
+      // pre-movement gravity used to accelerate the falling spin.
+      auto gravity_at_impact = world.gravity(position());
+      if (!gravity_at_impact) return std::unexpected(std::move(gravity_at_impact.error()));
+      if (*gravity_at_impact != 0)
+        return {};
+    }
+    ItemDelivery delivery{position(), controller.rotation()};
+    if (auto delivered = deliver_items(world, delivery); !delivered) {
+      m_item_delivery = std::make_unique<ItemDelivery>(std::move(delivery));
+      return delivered;
+    }
+  } else {
+    m_presentation_rotation_travel = 0.0f;
+    if (auto delivered = deliver_items(world, *m_item_delivery); !delivered)
+      return delivered;
+    m_item_delivery.reset();
+  }
+  m_spawned_drops.set(true);
+  return {};
+}
+
+std::expected<PlantDrop::ParticleBurst, StarException> PlantDrop::prepare_particles(PlantDropPiece const& piece, Json const& config, String const& mode) {
+  ParticleBurst particles;
+  auto particle_config = config.get("particles", JsonObject()).and_then([&](Json const& effects) { return effects.get(mode, JsonObject()); });
+  if (!particle_config) return std::unexpected(std::move(particle_config.error()));
+  auto options = particle_config->find("options");
+  if (!options) return std::unexpected(std::move(options.error()));
+  if (!*options || (*options)->get().is_null())
+    return particles;
+  auto array = (*options)->get().array_ptr();
+  if (!array) return std::unexpected(std::move(array.error()));
+  if ((*array)->empty())
+    return particles;
+
+  auto density = particle_config->get_float("density", 1);
+  if (!density) return std::unexpected(std::move(density.error()));
+  if (!is_finite(*density) || *density <= 0)
+    return std::unexpected(PlantException("Plant drop particle density divisor must be positive and finite"));
   auto metadata = root().image_metadata_database();
   if (!metadata) return std::unexpected(std::move(metadata.error()));
   auto size = (*metadata)->image_size(piece.image);
   if (!size) return std::unexpected(std::move(size.error()));
-  auto image_size = Vec2F(*size) / tile_pixels;
-  auto result300 = particleConfig.get_float("density", 1);
-if (!result300) return std::unexpected(std::move(result300.error()));
-  float density = (image_size.x() * image_size.y()) / std::move(*result300);
+  particles.image_size = Vec2F(*size) / tile_pixels;
+  float count = (particles.image_size.x() * particles.image_size.y()) / *density;
+  double rounded_count = std::ceil(static_cast<double>(count));
+  if (!is_finite(count) || rounded_count > std::numeric_limits<std::uint32_t>::max())
+    return std::unexpected(PlantException("Plant drop particle count is out of range"));
+  if (rounded_count == 0)
+    return particles;
 
-  auto occupied = (*metadata)->image_spaces(piece.image, piece.offset * tile_pixels, Plant::PlantScanThreshold, piece.flip);
-  if (!occupied) return std::unexpected(std::move(occupied.error()));
-  auto spaces = Set<Vec2I>::from(std::move(*occupied));
-  if (spaces.empty())
-    return {};
+  auto spaces = (*metadata)->image_spaces(piece.image, piece.offset * tile_pixels, Plant::plant_scan_threshold, piece.flip);
+  if (!spaces) return std::unexpected(std::move(spaces.error()));
+  if (spaces->empty())
+    return particles;
+  auto hue_shift = config.get_float("hueshift", 0);
+  if (!hue_shift) return std::unexpected(std::move(hue_shift.error()));
+  if (!is_finite(*hue_shift))
+    return std::unexpected(PlantException("Plant drop particle hue shift must be finite"));
+  particles.remaining = static_cast<std::uint32_t>(rounded_count);
+  particles.options = std::move(*array);
+  particles.spaces = Set<Vec2I>::from(std::move(*spaces));
+  particles.hue_shift = *hue_shift / 360.0f;
+  return particles;
+}
 
-  while (density > 0) {
-    auto offsetX = this->root().random().normal_float(image_size.x() / 8.0f, 0);
-    if (!offsetX)
-      return std::unexpected(std::move(offsetX.error()));
-    auto offsetY = this->root().random().normal_float(image_size.y() / 8.0f, 0);
-    if (!offsetY)
-      return std::unexpected(std::move(offsetY.error()));
-    Vec2F particlePos = piece.offset + Vec2F(image_size) / 2.0f + Vec2F(*offsetX, *offsetY);
-
-    if (!spaces.contains(Vec2I(particlePos.floor())))
-      continue;
-
-    auto configResult = this->root().random().sample_value(particleOptions, {});
-    if (!configResult)
-      return std::unexpected(std::move(configResult.error()));
-    auto config = std::move(*configResult);
-
-    auto result302 = this->root().particle_database();
-if (!result302) return std::unexpected(std::move(result302.error()));
-auto result303 = std::move(*result302)->particle(config);
-if (!result303) return std::unexpected(std::move(result303.error()));
-particle = std::move(*result303);
-    auto result304 = mainConfig.get_float("hueshift", 0);
-if (!result304) return std::unexpected(std::move(result304.error()));
-particle.color.hue_shift(std::move(*result304) / 360.0f);
-for (Directives const& directives : piece.image.directives.list())
-  particle.directives.append(directives);
-
-density--;
-
-particle.position = position() + particlePos.rotate(m_movement_controller->rotation());
-
-auto result305 = render_callback.add_particle(std::move(particle));
-if (!result305) return std::unexpected(std::move(result305.error()));
+std::expected<void, StarException> PlantDrop::submit_particles(RenderCallback& callback, RenderBurst const& burst,
+    PlantDropPiece const& piece, ParticleBurst& particles, std::size_t& budget) {
+  std::shared_ptr<ParticleDatabase const> database;
+  while (particles.remaining != 0) {
+    if (!particles.pending_particle) {
+      if (!particles.sampled_position) {
+        if (budget == 0)
+          break;
+        --budget;
+        auto x = root().random().normal_float(particles.image_size.x() / 8.0f, 0);
+        if (!x) return std::unexpected(std::move(x.error()));
+        auto y = root().random().normal_float(particles.image_size.y() / 8.0f, 0);
+        if (!y) return std::unexpected(std::move(y.error()));
+        Vec2F position = piece.offset + particles.image_size / 2.0f + Vec2F(*x, *y);
+        Vec2F tile = position.floor();
+        auto representable = [](float coord) {
+          return is_finite(coord) && static_cast<double>(coord) >= std::numeric_limits<int>::min()
+              && static_cast<double>(coord) <= std::numeric_limits<int>::max();
+        };
+        if (!representable(tile.x()) || !representable(tile.y()) || !particles.spaces.contains(Vec2I(tile)))
+          continue;
+        particles.sampled_position = particle_world_position(position, burst.origin, burst.rotation);
+      }
+      if (!particles.sampled_config) {
+        auto selected = root().random().sample_ref(*particles.options);
+        if (!selected) return std::unexpected(std::move(selected.error()));
+        particles.sampled_config = selected->get();
+      }
+      if (!database) {
+        auto loaded = root().particle_database();
+        if (!loaded) return std::unexpected(std::move(loaded.error()));
+        database = std::move(*loaded);
+      }
+      auto particle = database->particle(*particles.sampled_config);
+      if (!particle) return std::unexpected(std::move(particle.error()));
+      particle->color.hue_shift(particles.hue_shift);
+      for (Directives const& directives : piece.image.directives.list())
+        particle->directives.append(directives);
+      particle->position = *particles.sampled_position;
+      particles.pending_particle = std::move(*particle);
+    }
+    if (auto added = callback.add_particle(std::move(*particles.pending_particle)); !added)
+      return added;
+    particles.pending_particle.reset();
+    particles.sampled_position.reset();
+    particles.sampled_config.reset();
+    --particles.remaining;
   }
   return {};
+}
+
+std::expected<bool, StarException> PlantDrop::submit_render_burst(RenderCallback& callback, RenderBurst& burst,
+    String const& mode, std::size_t& budget) {
+  for (; burst.sound_index < 2; ++burst.sound_index) {
+    if (!burst.pending_audio) {
+      if (!burst.selected_sound) {
+        auto const& config = burst.sound_index == 0 ? m_stem_config : m_foliage_config;
+        auto sounds = config.get("sounds", JsonObject());
+        if (!sounds) return std::unexpected(std::move(sounds.error()));
+        auto options = sounds->find(mode);
+        if (!options) return std::unexpected(std::move(options.error()));
+        if (!*options || (*options)->get().is_null())
+          continue;
+        auto array = (*options)->get().array_ptr();
+        if (!array) return std::unexpected(std::move(array.error()));
+        if ((*array)->empty())
+          continue;
+        auto selected = root().random().sample_ref(**array);
+        if (!selected) return std::unexpected(std::move(selected.error()));
+        burst.selected_sound = selected->get();
+      }
+      auto file = burst.selected_sound->get_string("file");
+      if (!file) return std::unexpected(std::move(file.error()));
+      auto volume = burst.selected_sound->get_float("volume", 1.0f);
+      if (!volume) return std::unexpected(std::move(volume.error()));
+      auto assets = root().assets();
+      if (!assets) return std::unexpected(std::move(assets.error()));
+      auto audio = (*assets)->audio(*file);
+      if (!audio) return std::unexpected(std::move(audio.error()));
+      auto instance = AudioInstance::create(**audio);
+      if (!instance) return std::unexpected(std::move(instance.error()));
+      (*instance)->set_position(collision_rect(burst.rotation).center() + burst.origin);
+      (*instance)->set_volume(*volume);
+      burst.pending_audio = std::move(*instance);
+    }
+    if (auto added = callback.add_audio(burst.pending_audio); !added)
+      return std::unexpected(std::move(added.error()));
+    burst.pending_audio.reset();
+    burst.selected_sound.reset();
+  }
+
+  for (; burst.piece_index < m_pieces.size(); ++burst.piece_index) {
+    auto const& piece = m_pieces[burst.piece_index];
+    if (!burst.particles) {
+      auto config = piece_config(piece.kind);
+      if (!config)
+        continue;
+      auto prepared = prepare_particles(piece, config->get(), mode);
+      if (!prepared) return std::unexpected(std::move(prepared.error()));
+      burst.particles = std::move(*prepared);
+    }
+    if (auto submitted = submit_particles(callback, burst, piece, *burst.particles, budget); !submitted)
+      return std::unexpected(std::move(submitted.error()));
+    if (burst.particles->remaining != 0)
+      return false;
+    burst.particles.reset();
+  }
+  return true;
 }
 
 std::uint64_t PlantDrop::presentation_epoch() const {
   return Entity::presentation_epoch() + m_movement_controller->presentation_epoch();
 }
 
-std::expected<void, StarException> PlantDrop::collect_render_events(RenderCallback& render_callback) {
-  auto result284 = this->root().assets();
-if (!result284) return std::unexpected(std::move(result284.error()));
-auto assets = std::move(*result284);
-
-  if (m_firstTick) {
-    m_firstTick = false;
-    // smoke, particles
-
-    if (m_master) {
-      auto playBreakSound = [&self = *this, &assets, &render_callback](Json const& config)  -> std::expected<void, StarException> {
-        auto result263 = config.get("sounds", JsonObject());
-if (!result263) return std::unexpected(std::move(result263.error()));
-auto result264 = std::move(*result263).get_array("breakTree", JsonArray());
-if (!result264) return std::unexpected(std::move(result264.error()));
-JsonArray breakTreeOptions = std::move(*result264);
-        if (breakTreeOptions.size()) {
-          auto result265 = self.root().random().sample_ref(breakTreeOptions);
-if (!result265) return std::unexpected(std::move(result265.error()));
-auto sound = result265->get();
-          auto result266 = sound.get_string("file");
-if (!result266) return std::unexpected(std::move(result266.error()));
-auto result267 = assets->audio(std::move(*result266));
-if (!result267) return std::unexpected(std::move(result267.error()));
-auto result1279 = AudioInstance::create(*std::move(*result267));
-if (!result1279) return std::unexpected(std::move(result1279.error()));
-auto audioInstance = std::move(*result1279);
-audioInstance->set_position(self.collisionRect().center() + self.position());
-auto result268 = sound.get_float("volume", 1.0f);
-if (!result268) return std::unexpected(std::move(result268.error()));
-audioInstance->set_volume(std::move(*result268));
-auto result269 = render_callback.add_audio(std::move(audioInstance));
-if (!result269) return std::unexpected(std::move(result269.error()));
-        }
-        return {};
-};
-      auto result285 = playBreakSound(m_stemConfig);
-if (!result285) return std::unexpected(std::move(result285.error()));
-      auto result286 = playBreakSound(m_foliageConfig);
-if (!result286) return std::unexpected(std::move(result286.error()));
-    }
-
-    for (auto const& plantPiece : m_pieces) {
-      if (plantPiece.kind == Plant::PlantPieceKind::Stem)
-        {
-auto result287 = particleForPlantPart(plantPiece, "breakTree", m_stemConfig, render_callback);
-if (!result287) return std::unexpected(std::move(result287.error()));
+bool PlantDrop::has_pending_render_events() const {
+  return m_break_pending || (m_spawned_drops.get() && !m_hit_finished);
 }
-      if (plantPiece.kind == Plant::PlantPieceKind::Foliage)
-        {
-auto result288 = particleForPlantPart(plantPiece, "breakTree", m_foliageConfig, render_callback);
-if (!result288) return std::unexpected(std::move(result288.error()));
-}
+
+std::expected<void, StarException> PlantDrop::collect_render_events(RenderCallback& callback) {
+  observe_replica_effects();
+  if (m_spawned_drops.get() && !m_hit_finished && !m_impact_pose)
+    m_impact_pose.emplace(position(), m_movement_controller->rotation());
+  std::size_t budget = particle_sample_budget;
+  auto submit = [&](Vec2F origin, float rotation, std::size_t sound_index, String const& mode) {
+    if (m_render_burst) {
+      auto completed = submit_render_burst(callback, *m_render_burst, mode, budget);
+      if (completed && *completed)
+        m_render_burst.reset();
+      return completed;
     }
-  }
-
-  if (m_spawnedDrops.get() && !m_spawnedDropEffects) {
-    m_spawnedDropEffects = true;
-    // smoke, particles
-
-    auto playHitSound = [&self = *this, &assets, &render_callback](Json const& config)  -> std::expected<void, StarException> {
-      auto result256 = config.get("sounds", JsonObject());
-if (!result256) return std::unexpected(std::move(result256.error()));
-auto result257 = std::move(*result256).get_array("hitGround", JsonArray());
-if (!result257) return std::unexpected(std::move(result257.error()));
-JsonArray hitGroundOptions = std::move(*result257);
-      if (hitGroundOptions.size()) {
-        auto result258 = self.root().random().sample_ref(hitGroundOptions);
-if (!result258) return std::unexpected(std::move(result258.error()));
-auto sound = result258->get();
-        auto result259 = sound.get_string("file");
-if (!result259) return std::unexpected(std::move(result259.error()));
-auto result260 = assets->audio(std::move(*result259));
-if (!result260) return std::unexpected(std::move(result260.error()));
-auto result1278 = AudioInstance::create(*std::move(*result260));
-if (!result1278) return std::unexpected(std::move(result1278.error()));
-auto audioInstance = std::move(*result1278);
-audioInstance->set_position(self.collisionRect().center() + self.position());
-auto result261 = sound.get_float("volume", 1.0f);
-if (!result261) return std::unexpected(std::move(result261.error()));
-audioInstance->set_volume(std::move(*result261));
-auto result262 = render_callback.add_audio(std::move(audioInstance));
-if (!result262) return std::unexpected(std::move(result262.error()));
-      }
+    RenderBurst burst{origin, rotation, sound_index};
+    auto completed = submit_render_burst(callback, burst, mode, budget);
+    if (!completed || !*completed)
+      m_render_burst = std::make_unique<RenderBurst>(std::move(burst));
+    return completed;
+  };
+  if (m_break_pending) {
+    auto completed = submit(position(), m_movement_controller->rotation(), m_master ? 0u : 2u, "breakTree");
+    if (!completed) return std::unexpected(std::move(completed.error()));
+    if (!*completed)
       return {};
-};
-    auto result289 = playHitSound(m_stemConfig);
-if (!result289) return std::unexpected(std::move(result289.error()));
-    auto result290 = playHitSound(m_foliageConfig);
-if (!result290) return std::unexpected(std::move(result290.error()));
-
-    for (auto const& plantPiece : m_pieces) {
-      if (plantPiece.kind == Plant::PlantPieceKind::Stem)
-        {
-auto result291 = particleForPlantPart(plantPiece, "hitGround", m_stemConfig, render_callback);
-if (!result291) return std::unexpected(std::move(result291.error()));
-}
-      if (plantPiece.kind == Plant::PlantPieceKind::Foliage)
-        {
-auto result292 = particleForPlantPart(plantPiece, "hitGround", m_foliageConfig, render_callback);
-if (!result292) return std::unexpected(std::move(result292.error()));
-}
+    m_break_pending = false;
+  }
+  if (m_impact_pose) {
+    auto completed = submit(m_impact_pose->first, m_impact_pose->second, 0, "hitGround");
+    if (!completed) return std::unexpected(std::move(completed.error()));
+    if (*completed) {
+      m_hit_finished = true;
+      m_impact_pose.reset();
     }
   }
-
   return {};
 }
 
-std::expected<void, StarException> PlantDrop::render(RenderCallback& render_callback) {
-  float alpha = render_callback.presentation().interpolation();
+std::expected<void, StarException> PlantDrop::render(RenderCallback& callback) {
+  if (m_time <= 0 || m_spawned_drops.get() || m_pieces.empty())
+    return {};
+  float alpha = callback.presentation().interpolation();
+  float current_rotation = m_movement_controller->rotation();
   float rotation = isMaster()
-    ? m_movement_controller->rotation() - m_presentationRotationTravel * (1.0f - alpha)
-    : samplePresentationRotation(m_movement_controller->rotation(), alpha);
-  if (m_time > 0 && !m_spawnedDrops.get()) {
-    for (auto const& plantPiece : m_pieces) {
-      auto result293 = this->root().image_metadata_database();
-if (!result293) return std::unexpected(std::move(result293.error()));
-auto result1284 = Drawable::make_image(*std::move(*result293), plantPiece.image, 1.0f / tile_pixels, false, plantPiece.offset);
-if (!result1284) return std::unexpected(std::move(result1284.error()));
-auto drawable = std::move(*result1284);
-      if (plantPiece.flip)
-        drawable.scale(Vec2F(-1, 1));
-      drawable.rotate(rotation);
-      drawable.translate(position());
-      auto result294 = render_callback.add_drawable(std::move(drawable), render_layer_plant_drop);
-if (!result294) return std::unexpected(std::move(result294.error()));
-    }
+      ? current_rotation - m_presentation_rotation_travel * (1.0f - alpha)
+      : samplePresentationRotation(current_rotation, alpha);
+  Vec2F origin = position();
+  auto base_transform = Mat3F::scaling(1.0f / tile_pixels);
+  for (auto const& piece : m_pieces) {
+    Drawable drawable;
+    drawable.part = Drawable::ImagePart{piece.image, base_transform};
+    drawable.position = piece.offset;
+    if (piece.flip)
+      drawable.scale(Vec2F(-1, 1));
+    drawable.rotate(rotation);
+    drawable.translate(origin);
+    if (auto submitted = callback.add_drawable(std::move(drawable), render_layer_plant_drop); !submitted)
+      return submitted;
   }
   return {};
 }
@@ -712,34 +625,33 @@ MovementController& PlantDrop::movement_controller() {
   return *m_movement_controller;
 }
 
-std::expected<std::pair<ByteArray, std::uint64_t>, StarException> PlantDrop::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
-  auto result283 = m_netGroup.write_net_state(fromVersion, rules);
-if (!result283) return std::unexpected(std::move(result283.error()));
-return std::move(*result283);
+std::expected<std::pair<ByteArray, std::uint64_t>, StarException> PlantDrop::write_net_state(std::uint64_t from_version, NetCompatibilityRules rules) {
+  return m_net_group.write_net_state(from_version, rules);
 }
 
 std::expected<std::pair<ByteArray, std::uint64_t>, StarException> PlantDrop::snapshot_net_state(NetCompatibilityRules rules) const {
-  return m_netGroup.snapshot_net_state(rules);
+  return m_net_group.snapshot_net_state(rules);
 }
 
 std::expected<void, StarException> PlantDrop::read_net_state(ByteArray const& data, float interpolation_time, NetCompatibilityRules rules) {
-  return m_netGroup.read_net_state(data, interpolation_time, rules);
+  if (auto read = m_net_group.read_net_state(data, interpolation_time, rules); !read)
+    return read;
+  observe_replica_effects();
+  return {};
 }
 
 std::expected<void, StarException> PlantDrop::enable_interpolation(float extrapolation_hint) {
-  auto result281 = m_netGroup.enable_net_interpolation(extrapolation_hint);
-if (!result281) return std::unexpected(std::move(result281.error()));
-  return {};
+  return m_net_group.enable_net_interpolation(extrapolation_hint);
 }
 
 std::expected<void, StarException> PlantDrop::disable_interpolation() {
-  auto result280 = m_netGroup.disable_net_interpolation();
-if (!result280) return std::unexpected(std::move(result280.error()));
-  return {};
+  return m_net_group.disable_net_interpolation();
 }
 
 std::expected<bool, StarException> PlantDrop::should_destroy() const {
-  return m_time <= 0.0f;
+  // Servers never collect presentation events; their destruction gate is
+  // authoritative item publication, not local sound or particle delivery.
+  return m_time <= 0.0f && m_spawned_drops.get();
 }
 
 }

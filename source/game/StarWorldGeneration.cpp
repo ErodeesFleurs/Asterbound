@@ -636,9 +636,9 @@ std::expected<void, StarException> DungeonGeneratorWorld::placeBiomeTree(Vec2I c
     if (!signalled) return std::unexpected(std::move(signalled.error()));
     auto seed = world_template->seedFor(pos[0], pos[1]);
     if (auto tree = (*biome)->surface_placeables.first_tree()) {
-      auto plants = m_worldServer.root().plantDatabase();
+      auto plants = m_worldServer.root().plant_database();
       if (!plants) return std::unexpected(std::move(plants.error()));
-      auto plant = (*plants)->createPlant(tree->get(), seed);
+      auto plant = (*plants)->create_plant(tree->get(), seed);
       if (!plant) return std::unexpected(std::move(plant.error()));
       return placePlant(*plant, pos);
     }
@@ -654,7 +654,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::placePlant(std::shared
 
   auto spaces = plant->spaces();
   auto roots = plant->roots();
-  auto const& primaryRoot = plant->primaryRoot();
+  auto primary_root = plant->primary_root();
   auto autobackgroundResult1 = m_worldServer.getServerTile(position);
   if (!autobackgroundResult1) return std::unexpected(std::move(autobackgroundResult1.error()));
   auto background = std::move(autobackgroundResult1->get().background);
@@ -669,7 +669,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::placePlant(std::shared
   auto autoprimaryTileResult1 = m_worldServer.getServerTile(position);
   if (!autoprimaryTileResult1) return std::unexpected(std::move(autoprimaryTileResult1.error()));
   auto primaryTile = std::move(autoprimaryTileResult1->get());
-  auto autorootTileResult1 = m_worldServer.getServerTile(position + primaryRoot);
+  auto autorootTileResult1 = m_worldServer.getServerTile(position + primary_root);
   if (!autorootTileResult1) return std::unexpected(std::move(autorootTileResult1.error()));
   auto rootTile = std::move(autorootTileResult1->get());
   if (is_connectable_material(primaryTile.foreground) || !is_connectable_material(rootTile.foreground))
@@ -788,36 +788,28 @@ std::expected<void, StarException> DungeonGeneratorWorld::place_biome_items(Vec2
   for (auto const& placement : potential_items) {
     auto seed = world_template->seedFor(placement.position[0], placement.position[1]);
     if (std::holds_alternative<GrassVariant>(placement.item)) {
-      auto& grass = std::get<GrassVariant>(placement.item);
-      {
-        auto operation_result1 = generation_root.plantDatabase();
-        if (!operation_result1) return std::unexpected(std::move(operation_result1.error()));
-        auto operation_result2 = (*operation_result1)->createPlant(grass, seed);
-        if (!operation_result2) return std::unexpected(std::move(operation_result2.error()));
-        auto operation_result3 = placePlant((*operation_result2), placement.position);
-        if (!operation_result3) return std::unexpected(std::move(operation_result3.error()));
-      }
+      auto plants = generation_root.plant_database();
+      if (!plants) return std::unexpected(std::move(plants.error()));
+      auto plant = (*plants)->create_plant(std::get<GrassVariant>(placement.item), seed);
+      if (!plant) return std::unexpected(std::move(plant.error()));
+      if (auto placed = placePlant(*plant, placement.position); !placed)
+        return std::unexpected(std::move(placed.error()));
     } else if (std::holds_alternative<BushVariant>(placement.item)) {
-      auto& bush = std::get<BushVariant>(placement.item);
-      {
-        auto operation_result1 = generation_root.plantDatabase();
-        if (!operation_result1) return std::unexpected(std::move(operation_result1.error()));
-        auto operation_result2 = (*operation_result1)->createPlant(bush, seed);
-        if (!operation_result2) return std::unexpected(std::move(operation_result2.error()));
-        auto operation_result3 = placePlant((*operation_result2), placement.position);
-        if (!operation_result3) return std::unexpected(std::move(operation_result3.error()));
-      }
+      auto plants = generation_root.plant_database();
+      if (!plants) return std::unexpected(std::move(plants.error()));
+      auto plant = (*plants)->create_plant(std::get<BushVariant>(placement.item), seed);
+      if (!plant) return std::unexpected(std::move(plant.error()));
+      if (auto placed = placePlant(*plant, placement.position); !placed)
+        return std::unexpected(std::move(placed.error()));
     } else if (std::holds_alternative<TreePair>(placement.item)) {
       auto const& tree_pair = std::get<TreePair>(placement.item);
       auto const& tree_variant = seed % 2 == 0 ? tree_pair.first : tree_pair.second;
-      {
-        auto operation_result1 = generation_root.plantDatabase();
-        if (!operation_result1) return std::unexpected(std::move(operation_result1.error()));
-        auto operation_result2 = (*operation_result1)->createPlant(tree_variant, seed);
-        if (!operation_result2) return std::unexpected(std::move(operation_result2.error()));
-        auto operation_result3 = placePlant((*operation_result2), placement.position);
-        if (!operation_result3) return std::unexpected(std::move(operation_result3.error()));
-      }
+      auto plants = generation_root.plant_database();
+      if (!plants) return std::unexpected(std::move(plants.error()));
+      auto plant = (*plants)->create_plant(tree_variant, seed);
+      if (!plant) return std::unexpected(std::move(plant.error()));
+      if (auto placed = placePlant(*plant, placement.position); !placed)
+        return std::unexpected(std::move(placed.error()));
     } else if (std::holds_alternative<ObjectPool>(placement.item)) {
       auto object = create_biome_object(m_worldServer, std::get<ObjectPool>(placement.item), placement.position, seed);
       if (!object) return std::unexpected(std::move(object.error()));
@@ -1886,36 +1878,28 @@ std::expected<void, StarException> WorldGenerator::prepareSector(WorldStorage& w
   for (auto const& placement : placement_queue) {
     auto seed = world_template->seedFor(placement.position[0], placement.position[1]);
     if (std::holds_alternative<GrassVariant>(placement.item)) {
-      auto& grass = std::get<GrassVariant>(placement.item);
-      {
-        auto operationResult1 = generation_root.plantDatabase();
-        if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-        auto operationResult2 = (*operationResult1)->createPlant(grass, seed);
-        if (!operationResult2) return std::unexpected(std::move(operationResult2.error()));
-        auto operationResult3 = placePlant(worldStorage, (*operationResult2), placement.position);
-        if (!operationResult3) return std::unexpected(std::move(operationResult3.error()));
-      }
+      auto plants = generation_root.plant_database();
+      if (!plants) return std::unexpected(std::move(plants.error()));
+      auto plant = (*plants)->create_plant(std::get<GrassVariant>(placement.item), seed);
+      if (!plant) return std::unexpected(std::move(plant.error()));
+      if (auto placed = placePlant(worldStorage, *plant, placement.position); !placed)
+        return std::unexpected(std::move(placed.error()));
     } else if (std::holds_alternative<BushVariant>(placement.item)) {
-      auto& bush = std::get<BushVariant>(placement.item);
-      {
-        auto operationResult1 = generation_root.plantDatabase();
-        if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-        auto operationResult2 = (*operationResult1)->createPlant(bush, seed);
-        if (!operationResult2) return std::unexpected(std::move(operationResult2.error()));
-        auto operationResult3 = placePlant(worldStorage, (*operationResult2), placement.position);
-        if (!operationResult3) return std::unexpected(std::move(operationResult3.error()));
-      }
+      auto plants = generation_root.plant_database();
+      if (!plants) return std::unexpected(std::move(plants.error()));
+      auto plant = (*plants)->create_plant(std::get<BushVariant>(placement.item), seed);
+      if (!plant) return std::unexpected(std::move(plant.error()));
+      if (auto placed = placePlant(worldStorage, *plant, placement.position); !placed)
+        return std::unexpected(std::move(placed.error()));
     } else if (std::holds_alternative<TreePair>(placement.item)) {
       auto const& tree_pair = std::get<TreePair>(placement.item);
       auto const& tree_variant = seed % 2 == 0 ? tree_pair.first : tree_pair.second;
-      {
-        auto operation_result1 = generation_root.plantDatabase();
-        if (!operation_result1) return std::unexpected(std::move(operation_result1.error()));
-        auto operation_result2 = (*operation_result1)->createPlant(tree_variant, seed);
-        if (!operation_result2) return std::unexpected(std::move(operation_result2.error()));
-        auto operation_result3 = placePlant(worldStorage, (*operation_result2), placement.position);
-        if (!operation_result3) return std::unexpected(std::move(operation_result3.error()));
-      }
+      auto plants = generation_root.plant_database();
+      if (!plants) return std::unexpected(std::move(plants.error()));
+      auto plant = (*plants)->create_plant(tree_variant, seed);
+      if (!plant) return std::unexpected(std::move(plant.error()));
+      if (auto placed = placePlant(worldStorage, *plant, placement.position); !placed)
+        return std::unexpected(std::move(placed.error()));
     } else if (std::holds_alternative<ObjectPool>(placement.item)) {
       auto object = create_biome_object(m_worldServer, std::get<ObjectPool>(placement.item), placement.position, seed);
       if (!object) return std::unexpected(std::move(object.error()));
@@ -2220,7 +2204,7 @@ std::expected<void, StarException> WorldGenerator::reapply_biome(WorldStorage& w
     if (!plant) return false;
     auto spaces = plant->spaces();
     auto roots = plant->roots();
-    auto primary_root = plant->primaryRoot();
+    auto primary_root = plant->primary_root();
     auto biome = world_layout->getBiome(world_storage.tileArray()->tile(position).blockBiomeIndex);
     if (!biome) return std::unexpected(std::move(biome.error()));
     auto block_biome = biome->get();
@@ -2267,10 +2251,10 @@ std::expected<void, StarException> WorldGenerator::reapply_biome(WorldStorage& w
   auto place_biome_item = [&](BiomeItem const& item, Vec2I const& position) -> std::expected<void, StarException> {
     auto seed = world_template->seedFor(position[0], position[1]);
     auto place_plant = [&](auto const& variant) -> std::expected<void, StarException>
-        requires requires(PlantDatabase const& database) { database.createPlant(variant, seed); } {
-      auto plants = generation_root.plantDatabase();
+        requires requires(PlantDatabase const& database) { database.create_plant(variant, seed); } {
+      auto plants = generation_root.plant_database();
       if (!plants) return std::unexpected(std::move(plants.error()));
-      auto plant = (*plants)->createPlant(variant, seed);
+      auto plant = (*plants)->create_plant(variant, seed);
       if (!plant) return std::unexpected(std::move(plant.error()));
       auto placed = simple_place_plant(*plant, position);
       if (!placed) return std::unexpected(std::move(placed.error()));
@@ -2423,7 +2407,7 @@ std::expected<bool, StarException> WorldGenerator::placePlant(WorldStorage& worl
 
   auto spaces = plant->spaces();
   auto roots = plant->roots();
-  auto const& primaryRoot = plant->primaryRoot();
+  auto primary_root = plant->primary_root();
   auto autobackgroundResult1 = m_worldServer.getServerTile(position);
   if (!autobackgroundResult1) return std::unexpected(std::move(autobackgroundResult1.error()));
   auto background = std::move(autobackgroundResult1->get().background);
@@ -2436,7 +2420,7 @@ std::expected<bool, StarException> WorldGenerator::placePlant(WorldStorage& worl
   // Bail out if we don't have at least one free space, and root in the primary
   // root position, or if we're in a dungeon region.
   auto primaryTile = worldStorage.tileArray()->tile(position);
-  auto rootTile = worldStorage.tileArray()->tile(position + primaryRoot);
+  auto rootTile = worldStorage.tileArray()->tile(position + primary_root);
   if (primaryTile.dungeonId != no_dungeon_id || rootTile.dungeonId != no_dungeon_id)
     return false;
   if (is_connectable_material(primaryTile.foreground) || !is_connectable_material(rootTile.foreground))

@@ -63,6 +63,7 @@ import star.drawable;
 import star.entity_rendering_types;
 import star.animation;
 import star.particle;
+import star.matrix3;
 
 import star.light_source;
 import star.entity_rendering;
@@ -84,9 +85,7 @@ import star.math_common;
 import star.algorithm;
 namespace Star {
 
-float const Plant::PlantScanThreshold = 0.1f;
-
-std::expected<EnumMap<Plant::RotationType>, StarException> const Plant::RotationTypeNames = EnumMap<Plant::RotationType>::create({
+std::expected<EnumMap<Plant::RotationType>, StarException> const Plant::rotation_type_names = EnumMap<Plant::RotationType>::create({
   {Plant::RotationType::DontRotate, "dontRotate"},
   {Plant::RotationType::RotateBranch, "rotateBranch"},
   {Plant::RotationType::RotateLeaves, "rotateLeaves"},
@@ -94,1050 +93,638 @@ std::expected<EnumMap<Plant::RotationType>, StarException> const Plant::Rotation
   {Plant::RotationType::RotateCrownLeaves, "rotateCrownLeaves"},
 });
 
-Plant::PlantPiece::PlantPiece() {
-  image = "";
-  imagePath = AssetPath();
-  offset = {};
-  segmentIdx = 0;
-  structuralSegment = 0;
-  kind = PlantPieceKind::None;
-  zLevel = 0;
-  rotationType = RotationType::DontRotate;
-  rotationOffset = 0;
-  spaces = {};
-  flip = false;
+namespace {
+
+// The object owner stays alive in the caller. Keep the iteration order used
+// by JsonObject::keys(), without copying the keys or looking each one up again.
+using TreeCandidate = std::pair<String const&, Json const&>;
+using TreeCandidatePool = std::vector<TreeCandidate>;
+
+TreeCandidatePool tree_candidate_pool(JsonObject const& object) {
+  TreeCandidatePool pool;
+  pool.reserve(object.size());
+  for (auto [key, part] : object)
+    pool.emplace_back(key, part);
+  return pool;
 }
 
-std::expected<std::shared_ptr<Plant>, StarException> Plant::create(Root& rootContext, TreeVariant const& config, std::uint64_t seed) {
+// Base and crown only draw once, so they don't need an index allocation.
+TreeCandidate pick_tree_candidate(JsonObject const& nonempty, RandomSource& random) {
+  auto candidate = nonempty.begin();
+  for (auto index = random.uniform_uint(nonempty.size() - 1); index != 0; --index)
+    ++candidate;
+  return *candidate;
+}
+
+std::expected<std::shared_ptr<JsonObject const>, StarException> optional_tree_object(Json const& settings, String const& key) {
+  auto value = settings.find(key);
+  if (!value)
+    return std::unexpected(std::move(value.error()));
+  if (!*value || (*value)->get().is_null())
+    return nullptr;
+  return (*value)->get().object_ptr();
+}
+
+std::expected<double, StarException> tree_attachment_number(Json const& attachment, String const& key) {
+  auto value = attachment.get_double(key);
+  if (!value)
+    return std::unexpected(std::move(value.error()));
+  if (!is_finite(*value))
+    return std::unexpected(PlantException::format("Tree attachment '{}' must be finite", key));
+  return *value;
+}
+
+std::expected<Vec2F, StarException> tree_attachment_offset(
+    Json const& attachment, Vec2F origin, String const& x_key, String const& y_key) {
+  auto x = tree_attachment_number(attachment, x_key);
+  if (!x)
+    return std::unexpected(std::move(x.error()));
+  auto y = tree_attachment_number(attachment, y_key);
+  if (!y)
+    return std::unexpected(std::move(y.error()));
+  // Retain the original double addition followed by float rounding.
+  double next_x = origin.x() + *x / tile_pixels;
+  double next_y = origin.y() + *y / tile_pixels;
+  constexpr double limit = std::numeric_limits<float>::max();
+  if (next_x < -limit || next_x > limit || next_y < -limit || next_y > limit)
+    return std::unexpected(PlantException::format("Tree attachment offset exceeds the float range"));
+  return Vec2F(static_cast<float>(next_x), static_cast<float>(next_y));
+}
+
+}
+
+std::expected<std::shared_ptr<Plant>, StarException> Plant::create_uninitialized(Root& root) {
   struct MakeShared final : Plant {
     explicit MakeShared(Root& root) : Entity(root), Plant(root) {}
   };
-  auto entity = std::make_shared<MakeShared>(rootContext);
-  auto damageStatus = EntityTileDamageStatus::create();
-  if (!damageStatus) return std::unexpected(std::move(damageStatus.error()));
-  entity->m_tileDamageStatus = std::move(*damageStatus);
-  if (auto result = entity->initialize(config, seed); !result) return std::unexpected(std::move(result.error()));
+  auto entity = std::make_shared<MakeShared>(root);
+  auto damage_status = EntityTileDamageStatus::create();
+  if (!damage_status)
+    return std::unexpected(std::move(damage_status.error()));
+  entity->m_tile_damage_status = std::move(*damage_status);
+  return entity;
+}
+
+std::expected<std::shared_ptr<Plant>, StarException> Plant::create(Root& root, TreeVariant const& config, std::uint64_t seed) {
+  auto entity = create_uninitialized(root);
+  if (!entity)
+    return entity;
+  if (auto result = (*entity)->initialize(config, seed); !result)
+    return std::unexpected(std::move(result.error()));
   return entity;
 }
 
 std::expected<void, StarException> Plant::initialize(TreeVariant const& config, std::uint64_t seed) {
-  m_broken = false;
-  m_tilePosition = Vec2I();
-  m_windTime = 0.0f;
-  m_windLevel = 0.0f;
+  if (!is_finite(config.stem_hue_shift) || !is_finite(config.foliage_hue_shift))
+    return std::unexpected(PlantException::format("Tree hue shifts must be finite"));
+
   m_ceiling = config.ceiling;
-  m_piecesScanned = false;
-  m_fallsWhenDead = true;
-  m_piecesUpdated = true;
-  m_tileDamageEvent = false;
-
-  m_stemDropConfig = config.stemDropConfig;
-  m_foliageDropConfig = config.foliageDropConfig;
-  if (m_stemDropConfig.is_null())
-    m_stemDropConfig = JsonObject();
-  if (m_foliageDropConfig.is_null())
-    m_foliageDropConfig = JsonObject();
-
-  auto result429 = m_stemDropConfig.set("hueshift", config.stemHueShift);
-if (!result429) return std::unexpected(std::move(result429.error()));
-m_stemDropConfig = std::move(*result429);
-  auto result430 = m_foliageDropConfig.set("hueshift", config.foliageHueShift);
-if (!result430) return std::unexpected(std::move(result430.error()));
-m_foliageDropConfig = std::move(*result430);
-
-  JsonObject saplingDropConfig;
-  saplingDropConfig["stemName"] = config.stemName;
-  saplingDropConfig["stemHueShift"] = config.stemHueShift;
-  if (!m_foliageDropConfig.is_null()) {
-    saplingDropConfig["foliageName"] = config.foliageName;
-    saplingDropConfig["foliageHueShift"] = config.foliageHueShift;
-  }
-  m_saplingDropConfig = saplingDropConfig;
-
-  RandomSource rnd(seed);
-
-  float xOffset = 0;
-  float yOffset = 0;
-
-  float roffset = this->root().random().uniform_float() * 0.5f;
-
+  m_falls_when_dead = true;
   m_descriptions = config.descriptions;
   m_ephemeral = config.ephemeral;
-  m_tileDamageParameters = config.tileDamageParameters;
+  m_tile_damage_parameters = config.tile_damage_parameters;
 
+  auto stem_drops = (config.stem_drop_config.is_null() ? Json(JsonObject{}) : config.stem_drop_config)
+    .set("hueshift", config.stem_hue_shift);
+  if (!stem_drops)
+    return std::unexpected(std::move(stem_drops.error()));
+  m_stem_drop_config = std::move(*stem_drops);
+  auto foliage_drops = (config.foliage_drop_config.is_null() ? Json(JsonObject{}) : config.foliage_drop_config)
+    .set("hueshift", config.foliage_hue_shift);
+  if (!foliage_drops)
+    return std::unexpected(std::move(foliage_drops.error()));
+  m_foliage_drop_config = std::move(*foliage_drops);
+  m_sapling_drop_config = JsonObject{
+    {"stemName", config.stem_name},
+    {"stemHueShift", config.stem_hue_shift},
+    {"foliageName", config.foliage_name},
+    {"foliageHueShift", config.foliage_hue_shift},
+  };
+
+  RandomSource random(seed);
+  auto& wind_random = root().random();
+  float rotation_base = wind_random.uniform_float() * 0.5f;
+  auto next_rotation = [&] { return wind_random.uniform_float() + rotation_base; };
+
+  Vec2F offset;
   int segment = 0;
+  auto add_piece = [&](String const& file, float hue, Vec2F position, bool structural,
+                       PlantPieceKind kind, float z_level, RotationType rotation, float phase) {
+    auto& piece = m_pieces.emplace_back();
+    piece.image = Star::format("{}?hueshift={}", file, hue);
+    piece.offset = position;
+    piece.segment_idx = segment;
+    piece.structural_segment = structural;
+    piece.kind = kind;
+    piece.z_level = z_level;
+    piece.rotation_type = rotation;
+    piece.rotation_offset = phase;
+  };
 
-  auto result431 = this->root().assets();
-if (!result431) return std::unexpected(std::move(result431.error()));
-auto assets = std::move(*result431);
+  using LeafPool = std::optional<std::shared_ptr<JsonObject const>>;
+  auto add_leaves = [&](LeafPool& pool, String const& pool_key, String const& candidate_key,
+                        Vec2F position, RotationType rotation, std::optional<float> shared_phase = {})
+      -> std::expected<void, StarException> {
+    if (!pool) {
+      auto object = optional_tree_object(config.foliage_settings, pool_key);
+      if (!object)
+        return std::unexpected(std::move(object.error()));
+      pool.emplace(std::move(*object));
+    }
+    if (!*pool)
+      return {};
+    auto const& object = **pool;
+    auto leaf = object.find(candidate_key);
+    if (leaf == object.end())
+      return {};
 
-  // base
+    auto attachment = leaf->second.get("attachment");
+    if (!attachment)
+      return std::unexpected(std::move(attachment.error()));
+    auto leaf_position = tree_attachment_offset(*attachment, position, "bx", "by");
+    if (!leaf_position)
+      return std::unexpected(std::move(leaf_position.error()));
+
+    // Front before back. Base/trunk leaves draw independently; branch/crown
+    // leaves share their stem's phase and must not advance the Root RNG.
+    for (auto const& [image_key, z_level] : {
+      std::pair{std::string_view("image"), 3.0f}, std::pair{std::string_view("backimage"), -1.0f}}) {
+      auto image = leaf->second.find(String(image_key));
+      if (!image)
+        return std::unexpected(std::move(image.error()));
+      if (!*image)
+        continue;
+      auto name = (*image)->get().string_ptr();
+      if (!name)
+        return std::unexpected(std::move(name.error()));
+      if ((*name)->empty())
+        continue;
+      add_piece(AssetPath::relative_to(config.foliage_directory, **name), config.foliage_hue_shift,
+        *leaf_position, false, Foliage, z_level, m_ceiling ? DontRotate : rotation,
+        shared_phase ? *shared_phase : next_rotation());
+    }
+    return {};
+  };
+
+  auto stem_file = [&](Json const& part) -> std::expected<String, StarException> {
+    auto name = part.get_string("image");
+    if (!name)
+      return std::unexpected(std::move(name.error()));
+    return AssetPath::relative_to(config.stem_directory, *name);
+  };
+  auto apply_attachment = [&](Json const& attachment, String const& x, String const& y) -> std::expected<void, StarException> {
+    auto next_offset = tree_attachment_offset(attachment, offset, x, y);
+    if (!next_offset)
+      return std::unexpected(std::move(next_offset.error()));
+    offset = *next_offset;
+    return {};
+  };
+
   {
-    auto result432 = config.stemSettings.get("base");
-if (!result432) return std::unexpected(std::move(result432.error()));
-auto result433 = std::move(*result432).to_object();
-if (!result433) return std::unexpected(std::move(result433.error()));
-JsonObject bases = std::move(*result433);
-    auto result434 = rnd.uniform_int(bases.size() - 1);
-if (!result434) return std::unexpected(std::move(result434.error()));
-String baseKey = bases.keys()[*result434];
-    auto result435 = bases[baseKey].to_object();
-if (!result435) return std::unexpected(std::move(result435.error()));
-JsonObject baseSettings = std::move(*result435);
-
-    auto result436 = baseSettings["attachment"].to_object();
-if (!result436) return std::unexpected(std::move(result436.error()));
-JsonObject attachmentSettings = std::move(*result436);
-
-    auto result437 = attachmentSettings.get("bx");
-if (!result437) return std::unexpected(std::move(result437.error()));
-auto result438 = result437->get().to_double();
-if (!result438) return std::unexpected(std::move(result438.error()));
-xOffset += std::move(*result438) / tile_pixels;
-    auto result439 = attachmentSettings.get("by");
-if (!result439) return std::unexpected(std::move(result439.error()));
-auto result440 = result439->get().to_double();
-if (!result440) return std::unexpected(std::move(result440.error()));
-yOffset += std::move(*result440) / tile_pixels;
-
-    auto result441 = baseSettings.get("image");
-if (!result441) return std::unexpected(std::move(result441.error()));
-auto result442 = result441->get().to_string();
-if (!result442) return std::unexpected(std::move(result442.error()));
-String baseFile = AssetPath::relative_to(config.stemDirectory, std::move(*result442));
-auto result443 = assets->image(baseFile);
-if (!result443) return std::unexpected(std::move(result443.error()));
-float baseImageHeight = std::move(*result443)->height();
-    if (config.ceiling)
-      yOffset = 1.0 - baseImageHeight / tile_pixels;
-
-    {
-      PlantPiece piece;
-      piece.image = Star::format("{}?hueshift={}", baseFile, config.stemHueShift);
-      piece.offset = Vec2F(xOffset, yOffset);
-      piece.segmentIdx = segment;
-      piece.structuralSegment = true;
-      piece.kind = PlantPieceKind::Stem;
-      piece.zLevel = 0.0f;
-      piece.rotationType = DontRotate;
-      piece.rotationOffset = this->root().random().uniform_float() + roffset;
-      m_pieces.push_back(piece);
+    auto base_settings = config.stem_settings.get("base");
+    if (!base_settings)
+      return std::unexpected(std::move(base_settings.error()));
+    auto bases = base_settings->object_ptr();
+    if (!bases)
+      return std::unexpected(std::move(bases.error()));
+    if ((*bases)->empty())
+      return std::unexpected(PlantException("Tree base candidate pool is empty"));
+    auto [key, part] = pick_tree_candidate(**bases, random);
+    auto attachment = part.get("attachment");
+    if (!attachment)
+      return std::unexpected(std::move(attachment.error()));
+    if (auto result = apply_attachment(*attachment, "bx", "by"); !result)
+      return std::unexpected(std::move(result.error()));
+    auto file = stem_file(part);
+    if (!file)
+      return std::unexpected(std::move(file.error()));
+    if (m_ceiling) {
+      auto assets = root().assets();
+      if (!assets)
+        return std::unexpected(std::move(assets.error()));
+      auto image = (*assets)->image(*file);
+      if (!image)
+        return std::unexpected(std::move(image.error()));
+      offset[1] = 1.0f - static_cast<float>((*image)->height()) / tile_pixels;
     }
-
-    // base leaves
-    auto result444 = config.foliageSettings.get_object("baseLeaves", {});
-if (!result444) return std::unexpected(std::move(result444.error()));
-JsonObject baseLeaves = std::move(*result444);
-    if (baseLeaves.contains(baseKey)) {
-      auto result445 = baseLeaves.get(baseKey);
-if (!result445) return std::unexpected(std::move(result445.error()));
-auto result446 = result445->get().to_object();
-if (!result446) return std::unexpected(std::move(result446.error()));
-JsonObject baseLeavesSettings = std::move(*result446);
-      auto result447 = baseLeavesSettings["attachment"].to_object();
-if (!result447) return std::unexpected(std::move(result447.error()));
-JsonObject attachmentSettings = std::move(*result447);
-
-      auto result448 = attachmentSettings.get("bx");
-if (!result448) return std::unexpected(std::move(result448.error()));
-auto result449 = result448->get().to_double();
-if (!result449) return std::unexpected(std::move(result449.error()));
-float xOf = xOffset + std::move(*result449) / tile_pixels;
-      auto result450 = attachmentSettings.get("by");
-if (!result450) return std::unexpected(std::move(result450.error()));
-auto result451 = result450->get().to_double();
-if (!result451) return std::unexpected(std::move(result451.error()));
-float yOf = yOffset + std::move(*result451) / tile_pixels;
-
-      bool condition454 = static_cast<bool>(baseLeavesSettings.contains("image"));
-if (condition454) {
-auto result452 = baseLeavesSettings.get("image");
-if (!result452) return std::unexpected(std::move(result452.error()));
-auto result453 = result452->get().to_string();
-if (!result453) return std::unexpected(std::move(result453.error()));
-condition454 = static_cast<bool>(!std::move(*result453).empty());
-}
-if (condition454) {
-        auto result455 = baseLeavesSettings.get("image");
-if (!result455) return std::unexpected(std::move(result455.error()));
-auto result456 = result455->get().to_string();
-if (!result456) return std::unexpected(std::move(result456.error()));
-String baseLeavesFile = AssetPath::relative_to(config.foliageDirectory, std::move(*result456));
-
-PlantPiece piece;
-piece.image = Star::format("{}?hueshift={}", baseLeavesFile, config.foliageHueShift);
-piece.offset = Vec2F{xOf, yOf};
-piece.segmentIdx = segment;
-piece.structuralSegment = false;
-piece.kind = PlantPieceKind::Foliage;
-piece.zLevel = 3.0f;
-piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
-piece.rotationOffset = this->root().random().uniform_float() + roffset;
-m_pieces.push_back(piece);
-      }
-
-      bool condition459 = static_cast<bool>(baseLeavesSettings.contains("backimage"));
-if (condition459) {
-auto result457 = baseLeavesSettings.get("backimage");
-if (!result457) return std::unexpected(std::move(result457.error()));
-auto result458 = result457->get().to_string();
-if (!result458) return std::unexpected(std::move(result458.error()));
-condition459 = static_cast<bool>(!std::move(*result458).empty());
-}
-if (condition459) {
-        auto result460 = baseLeavesSettings.get("backimage");
-if (!result460) return std::unexpected(std::move(result460.error()));
-auto result461 = result460->get().to_string();
-if (!result461) return std::unexpected(std::move(result461.error()));
-String baseLeavesBackFile = AssetPath::relative_to(config.foliageDirectory, std::move(*result461));
-PlantPiece piece;
-piece.image = Star::format("{}?hueshift={}", baseLeavesBackFile, config.foliageHueShift);
-piece.offset = Vec2F{xOf, yOf};
-piece.segmentIdx = segment;
-piece.structuralSegment = false;
-piece.kind = PlantPieceKind::Foliage;
-piece.zLevel = -1.0f;
-piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
-piece.rotationOffset = this->root().random().uniform_float() + roffset;
-m_pieces.push_back(piece);
-      }
-    }
-
-    auto result462 = attachmentSettings.get("x");
-if (!result462) return std::unexpected(std::move(result462.error()));
-auto result463 = result462->get().to_double();
-if (!result463) return std::unexpected(std::move(result463.error()));
-xOffset += std::move(*result463) / tile_pixels;
-    auto result464 = attachmentSettings.get("y");
-if (!result464) return std::unexpected(std::move(result464.error()));
-auto result465 = result464->get().to_double();
-if (!result465) return std::unexpected(std::move(result465.error()));
-yOffset += std::move(*result465) / tile_pixels; // trunk height
-
-    segment++;
+    add_piece(*file, config.stem_hue_shift, offset, true, Stem, 0.0f, DontRotate, next_rotation());
+    LeafPool leaves;
+    if (auto result = add_leaves(leaves, "baseLeaves", key, offset, RotateLeaves); !result)
+      return std::unexpected(std::move(result.error()));
+    if (auto result = apply_attachment(*attachment, "x", "y"); !result)
+      return std::unexpected(std::move(result.error()));
+    ++segment;
   }
 
-  float branchYOffset = yOffset;
-
-  // trunk
   {
-    auto result466 = config.stemSettings.get("middle");
-if (!result466) return std::unexpected(std::move(result466.error()));
-auto result467 = std::move(*result466).to_object();
-if (!result467) return std::unexpected(std::move(result467.error()));
-JsonObject middles = std::move(*result467);
+    auto middle_settings = config.stem_settings.get("middle");
+    if (!middle_settings)
+      return std::unexpected(std::move(middle_settings.error()));
+    auto middles = middle_settings->object_ptr();
+    if (!middles)
+      return std::unexpected(std::move(middles.error()));
+    auto min_height = config.stem_settings.get_int("middleMinSize", 1);
+    if (!min_height)
+      return std::unexpected(std::move(min_height.error()));
+    auto max_height = config.stem_settings.get_int("middleMaxSize", 6);
+    if (!max_height)
+      return std::unexpected(std::move(max_height.error()));
+    if (*min_height < 0 || *min_height > *max_height || *max_height >= std::numeric_limits<int>::max())
+      return std::unexpected(PlantException::format("Invalid tree middle size range [{}, {}]", *min_height, *max_height));
+    int middle_height = static_cast<int>(*min_height + random.uniform_uint(*max_height - *min_height));
+    auto middle_pool = middle_height != 0 ? tree_candidate_pool(**middles) : TreeCandidatePool{};
+    if (middle_height != 0 && middle_pool.empty())
+      return std::unexpected(PlantException::format("Tree middle candidate pool is empty"));
 
-    auto result468 = config.stemSettings.get_int("middleMinSize", 1);
-if (!result468) return std::unexpected(std::move(result468.error()));
-auto result469 = config.stemSettings.get_int("middleMaxSize", 6);
-if (!result469) return std::unexpected(std::move(result469.error()));
-auto result470 = config.stemSettings.get_int("middleMinSize", 1);
-if (!result470) return std::unexpected(std::move(result470.error()));
-auto result471 = rnd.uniform_int(std::move(*result469) - std::move(*result470));
-if (!result471) return std::unexpected(std::move(result471.error()));
-int middleHeight = std::move(*result468) + *result471;
-
-    auto result472 = config.stemSettings.contains("branch");
-if (!result472) return std::unexpected(std::move(result472.error()));
-bool hasBranches = std::move(*result472);
-    JsonObject branches;
-    if (hasBranches) {
-      auto result473 = config.stemSettings.get("branch");
-if (!result473) return std::unexpected(std::move(result473.error()));
-auto result474 = std::move(*result473).to_object();
-if (!result474) return std::unexpected(std::move(result474.error()));
-branches = std::move(*result474);
-      if (branches.size() == 0)
-        hasBranches = false;
+    auto branch_settings = config.stem_settings.find("branch");
+    if (!branch_settings)
+      return std::unexpected(std::move(branch_settings.error()));
+    std::shared_ptr<JsonObject const> branches;
+    if (*branch_settings) {
+      auto object = (*branch_settings)->get().object_ptr();
+      if (!object)
+        return std::unexpected(std::move(object.error()));
+      branches = std::move(*object);
     }
 
-    for (int i = 0; i < middleHeight; i++) {
-      auto result475 = rnd.uniform_int(middles.size() - 1);
-if (!result475) return std::unexpected(std::move(result475.error()));
-String middleKey = middles.keys()[*result475];
-      auto result476 = middles[middleKey].to_object();
-if (!result476) return std::unexpected(std::move(result476.error()));
-JsonObject middleSettings = std::move(*result476);
-      auto result477 = middleSettings["attachment"].to_object();
-if (!result477) return std::unexpected(std::move(result477.error()));
-JsonObject attachmentSettings = std::move(*result477);
+    // Build the branch index only when the first branch is attempted.
+    TreeCandidatePool branch_pool;
+    float branch_y = offset.y();
+    std::optional<bool> always_branch;
+    LeafPool trunk_leaves, branch_leaves;
+    for (int i = 0; i < middle_height; ++i, ++segment) {
+      auto const& [key, part] = middle_pool[random.uniform_uint(middle_pool.size() - 1)];
+      auto attachment = part.get("attachment");
+      if (!attachment)
+        return std::unexpected(std::move(attachment.error()));
+      if (auto result = apply_attachment(*attachment, "bx", "by"); !result)
+        return std::unexpected(std::move(result.error()));
+      auto file = stem_file(part);
+      if (!file)
+        return std::unexpected(std::move(file.error()));
+      add_piece(*file, config.stem_hue_shift, offset, true, Stem, 1.0f, DontRotate, next_rotation());
+      if (auto result = add_leaves(trunk_leaves, "trunkLeaves", key, offset, RotateLeaves); !result)
+        return std::unexpected(std::move(result.error()));
+      if (auto result = apply_attachment(*attachment, "x", "y"); !result)
+        return std::unexpected(std::move(result.error()));
 
-      auto result478 = attachmentSettings.get("bx");
-if (!result478) return std::unexpected(std::move(result478.error()));
-auto result479 = result478->get().to_double();
-if (!result479) return std::unexpected(std::move(result479.error()));
-xOffset += std::move(*result479) / tile_pixels;
-      auto result480 = attachmentSettings.get("by");
-if (!result480) return std::unexpected(std::move(result480.error()));
-auto result481 = result480->get().to_double();
-if (!result481) return std::unexpected(std::move(result481.error()));
-yOffset += std::move(*result481) / tile_pixels;
-
-      auto result482 = middleSettings.get("image");
-if (!result482) return std::unexpected(std::move(result482.error()));
-auto result483 = result482->get().to_string();
-if (!result483) return std::unexpected(std::move(result483.error()));
-String middleFile = AssetPath::relative_to(config.stemDirectory, std::move(*result483));
-
-{
-  PlantPiece piece;
-  piece.image = Star::format("{}?hueshift={}", middleFile, config.stemHueShift);
-  piece.offset = Vec2F(xOffset, yOffset);
-  piece.segmentIdx = segment;
-  piece.structuralSegment = true;
-  piece.kind = PlantPieceKind::Stem;
-  piece.zLevel = 1.0f;
-  piece.rotationType = DontRotate;
-  piece.rotationOffset = this->root().random().uniform_float() + roffset;
-  m_pieces.push_back(piece);
-}
-
-      // trunk leaves
-      auto result484 = config.foliageSettings.get_object("trunkLeaves", {});
-if (!result484) return std::unexpected(std::move(result484.error()));
-JsonObject trunkLeaves = std::move(*result484);
-      if (trunkLeaves.contains(middleKey)) {
-        auto result485 = trunkLeaves.get(middleKey);
-if (!result485) return std::unexpected(std::move(result485.error()));
-auto result486 = result485->get().to_object();
-if (!result486) return std::unexpected(std::move(result486.error()));
-JsonObject trunkLeavesSettings = std::move(*result486);
-        auto result487 = trunkLeavesSettings["attachment"].to_object();
-if (!result487) return std::unexpected(std::move(result487.error()));
-JsonObject attachmentSettings = std::move(*result487);
-
-        auto result488 = attachmentSettings.get("bx");
-if (!result488) return std::unexpected(std::move(result488.error()));
-auto result489 = result488->get().to_double();
-if (!result489) return std::unexpected(std::move(result489.error()));
-float xOf = xOffset + std::move(*result489) / tile_pixels;
-        auto result490 = attachmentSettings.get("by");
-if (!result490) return std::unexpected(std::move(result490.error()));
-auto result491 = result490->get().to_double();
-if (!result491) return std::unexpected(std::move(result491.error()));
-float yOf = yOffset + std::move(*result491) / tile_pixels;
-
-        bool condition494 = static_cast<bool>(trunkLeavesSettings.contains("image"));
-if (condition494) {
-auto result492 = trunkLeavesSettings.get("image");
-if (!result492) return std::unexpected(std::move(result492.error()));
-auto result493 = result492->get().to_string();
-if (!result493) return std::unexpected(std::move(result493.error()));
-condition494 = static_cast<bool>(!std::move(*result493).empty());
-}
-if (condition494) {
-          auto result495 = trunkLeavesSettings.get("image");
-if (!result495) return std::unexpected(std::move(result495.error()));
-auto result496 = result495->get().to_string();
-if (!result496) return std::unexpected(std::move(result496.error()));
-String trunkLeavesFile = AssetPath::relative_to(config.foliageDirectory, std::move(*result496));
-PlantPiece piece;
-piece.image = Star::format("{}?hueshift={}", trunkLeavesFile, config.foliageHueShift);
-piece.offset = Vec2F{xOf, yOf};
-piece.segmentIdx = segment;
-piece.structuralSegment = false;
-piece.kind = PlantPieceKind::Foliage;
-piece.zLevel = 3.0f;
-piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
-piece.rotationOffset = this->root().random().uniform_float() + roffset;
-m_pieces.push_back(piece);
-        }
-
-        bool condition499 = static_cast<bool>(trunkLeavesSettings.contains("backimage"));
-if (condition499) {
-auto result497 = trunkLeavesSettings.get("backimage");
-if (!result497) return std::unexpected(std::move(result497.error()));
-auto result498 = result497->get().to_string();
-if (!result498) return std::unexpected(std::move(result498.error()));
-condition499 = static_cast<bool>(!std::move(*result498).empty());
-}
-if (condition499) {
-          auto result500 = trunkLeavesSettings.get("backimage");
-if (!result500) return std::unexpected(std::move(result500.error()));
-auto result501 = result500->get().to_string();
-if (!result501) return std::unexpected(std::move(result501.error()));
-String trunkLeavesBackFile = AssetPath::relative_to(config.foliageDirectory, std::move(*result501));
-PlantPiece piece;
-piece.image = Star::format("{}?hueshift={}", trunkLeavesBackFile, config.foliageHueShift);
-piece.offset = Vec2F{xOf, yOf};
-piece.segmentIdx = segment;
-piece.structuralSegment = false;
-piece.kind = PlantPieceKind::Foliage;
-piece.zLevel = -1.0f;
-piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
-piece.rotationOffset = this->root().random().uniform_float() + roffset;
-m_pieces.push_back(piece);
-        }
-      }
-
-      auto result502 = attachmentSettings.get("x");
-if (!result502) return std::unexpected(std::move(result502.error()));
-auto result503 = result502->get().to_double();
-if (!result503) return std::unexpected(std::move(result503.error()));
-xOffset += std::move(*result503) / tile_pixels;
-      auto result504 = attachmentSettings.get("y");
-if (!result504) return std::unexpected(std::move(result504.error()));
-auto result505 = result504->get().to_double();
-if (!result505) return std::unexpected(std::move(result505.error()));
-yOffset += std::move(*result505) / tile_pixels;
-
-      // branch
-      while (hasBranches && (yOffset >= branchYOffset) && ((middleHeight - i) > 0)) {
-        auto result506 = rnd.uniform_int(branches.size() - 1);
-if (!result506) return std::unexpected(std::move(result506.error()));
-String branchKey = branches.keys()[*result506];
-        auto result507 = branches[branchKey].to_object();
-if (!result507) return std::unexpected(std::move(result507.error()));
-JsonObject branchSettings = std::move(*result507);
-        auto result508 = branchSettings["attachment"].to_object();
-if (!result508) return std::unexpected(std::move(result508.error()));
-JsonObject attachmentSettings = std::move(*result508);
-
-        auto result509 = attachmentSettings.get("h");
-if (!result509) return std::unexpected(std::move(result509.error()));
-auto result510 = result509->get().to_double();
-if (!result510) return std::unexpected(std::move(result510.error()));
-float h = std::move(*result510) / tile_pixels;
-        if (yOffset < branchYOffset + (h / 2.0f))
+      while (branches && !branches->empty() && offset.y() >= branch_y) {
+        if (branch_pool.empty())
+          branch_pool = tree_candidate_pool(*branches);
+        auto const& [branch_key, branch] = branch_pool[random.uniform_uint(branch_pool.size() - 1)];
+        auto branch_attachment = branch.get("attachment");
+        if (!branch_attachment)
+          return std::unexpected(std::move(branch_attachment.error()));
+        auto height = tree_attachment_number(*branch_attachment, "h");
+        if (!height)
+          return std::unexpected(std::move(height.error()));
+        double step = *height / tile_pixels;
+        if (step <= 0.0 || step > std::numeric_limits<float>::max())
+          return std::unexpected(PlantException::format("Tree branch height must be positive and fit in a float"));
+        float h = static_cast<float>(step);
+        if (h == 0.0f)
+          return std::unexpected(PlantException::format("Tree branch height rounds to zero"));
+        if (offset.y() < branch_y + h / 2.0f)
           break;
 
-        auto result511 = attachmentSettings.get("bx");
-if (!result511) return std::unexpected(std::move(result511.error()));
-auto result512 = result511->get().to_double();
-if (!result512) return std::unexpected(std::move(result512.error()));
-float xO = xOffset + std::move(*result512) / tile_pixels;
-        auto result513 = attachmentSettings.get("by");
-if (!result513) return std::unexpected(std::move(result513.error()));
-auto result514 = result513->get().to_double();
-if (!result514) return std::unexpected(std::move(result514.error()));
-float yO = branchYOffset + std::move(*result514) / tile_pixels;
-
-        auto result515 = config.stemSettings.get_bool("alwaysBranch", false);
-if (!result515) return std::unexpected(std::move(result515.error()));
-bool condition517 = static_cast<bool>(std::move(*result515));
-if (!condition517) {
-auto result516 = rnd.uniform_int(2 + i);
-if (!result516) return std::unexpected(std::move(result516.error()));
-condition517 = static_cast<bool>(*result516 != 0);
-}
-if (condition517) {
-          float boffset = this->root().random().uniform_float() + roffset;
-          auto result518 = branchSettings.get("image");
-if (!result518) return std::unexpected(std::move(result518.error()));
-auto result519 = result518->get().to_string();
-if (!result519) return std::unexpected(std::move(result519.error()));
-String branchFile = AssetPath::relative_to(config.stemDirectory, std::move(*result519));
-{
-  PlantPiece piece;
-  piece.image = Star::format("{}?hueshift={}", branchFile, config.stemHueShift);
-  piece.offset = Vec2F{xO, yO};
-  piece.segmentIdx = segment;
-  piece.structuralSegment = false;
-  piece.kind = PlantPieceKind::Stem;
-  piece.zLevel = 0.0f;
-  piece.rotationType = m_ceiling ? DontRotate : RotateBranch;
-  piece.rotationOffset = boffset;
-  m_pieces.push_back(piece);
-}
-          branchYOffset += h;
-
-          // branch leaves
-          auto result520 = config.foliageSettings.get_object("branchLeaves", {});
-if (!result520) return std::unexpected(std::move(result520.error()));
-JsonObject branchLeaves = std::move(*result520);
-          if (branchLeaves.contains(branchKey)) {
-            auto result521 = branchLeaves.get(branchKey);
-if (!result521) return std::unexpected(std::move(result521.error()));
-auto result522 = result521->get().to_object();
-if (!result522) return std::unexpected(std::move(result522.error()));
-JsonObject branchLeavesSettings = std::move(*result522);
-            auto result523 = branchLeavesSettings["attachment"].to_object();
-if (!result523) return std::unexpected(std::move(result523.error()));
-JsonObject attachmentSettings = std::move(*result523);
-
-            auto result524 = attachmentSettings.get("bx");
-if (!result524) return std::unexpected(std::move(result524.error()));
-auto result525 = result524->get().to_double();
-if (!result525) return std::unexpected(std::move(result525.error()));
-float xOf = xO + std::move(*result525) / tile_pixels;
-            auto result526 = attachmentSettings.get("by");
-if (!result526) return std::unexpected(std::move(result526.error()));
-auto result527 = result526->get().to_double();
-if (!result527) return std::unexpected(std::move(result527.error()));
-float yOf = yO + std::move(*result527) / tile_pixels;
-
-            bool condition530 = static_cast<bool>(branchLeavesSettings.contains("image"));
-if (condition530) {
-auto result528 = branchLeavesSettings.get("image");
-if (!result528) return std::unexpected(std::move(result528.error()));
-auto result529 = result528->get().to_string();
-if (!result529) return std::unexpected(std::move(result529.error()));
-condition530 = static_cast<bool>(!std::move(*result529).empty());
-}
-if (condition530) {
-              auto result531 = branchLeavesSettings.get("image");
-if (!result531) return std::unexpected(std::move(result531.error()));
-auto result532 = result531->get().to_string();
-if (!result532) return std::unexpected(std::move(result532.error()));
-String branchLeavesFile = AssetPath::relative_to(config.foliageDirectory, std::move(*result532));
-PlantPiece piece;
-piece.image = Star::format("{}?hueshift={}", branchLeavesFile, config.foliageHueShift);
-piece.offset = Vec2F{xOf, yOf};
-piece.segmentIdx = segment;
-piece.structuralSegment = false;
-piece.kind = PlantPieceKind::Foliage;
-piece.zLevel = 3.0f;
-piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
-piece.rotationOffset = boffset;
-m_pieces.push_back(piece);
-            }
-
-            bool condition535 = static_cast<bool>(branchLeavesSettings.contains("backimage"));
-if (condition535) {
-auto result533 = branchLeavesSettings.get("backimage");
-if (!result533) return std::unexpected(std::move(result533.error()));
-auto result534 = result533->get().to_string();
-if (!result534) return std::unexpected(std::move(result534.error()));
-condition535 = static_cast<bool>(!std::move(*result534).empty());
-}
-if (condition535) {
-              auto result536 = branchLeavesSettings.get("backimage");
-if (!result536) return std::unexpected(std::move(result536.error()));
-auto result537 = result536->get().to_string();
-if (!result537) return std::unexpected(std::move(result537.error()));
-String branchLeavesBackFile = AssetPath::relative_to(config.foliageDirectory, std::move(*result537));
-PlantPiece piece;
-piece.image = Star::format("{}?hueshift={}", branchLeavesBackFile, config.foliageHueShift);
-piece.offset = Vec2F{xOf, yOf};
-piece.segmentIdx = segment;
-piece.structuralSegment = false;
-piece.kind = PlantPieceKind::Foliage;
-piece.zLevel = -1.0f;
-piece.rotationType = m_ceiling ? DontRotate : RotateLeaves;
-piece.rotationOffset = boffset;
-m_pieces.push_back(piece);
-            }
-          }
-
-        } else {
-          auto result538 = attachmentSettings.get("h");
-if (!result538) return std::unexpected(std::move(result538.error()));
-auto result539 = result538->get().to_double();
-if (!result539) return std::unexpected(std::move(result539.error()));
-auto result540 = rnd.uniform_int(4);
-if (!result540) return std::unexpected(std::move(result540.error()));
-branchYOffset += (std::move(*result539) / tile_pixels) / static_cast<float>(1 + *result540);
+        auto branch_position = tree_attachment_offset(*branch_attachment, Vec2F(offset.x(), branch_y), "bx", "by");
+        if (!branch_position)
+          return std::unexpected(std::move(branch_position.error()));
+        if (!always_branch) {
+          auto value = config.stem_settings.get_bool("alwaysBranch", false);
+          if (!value)
+            return std::unexpected(std::move(value.error()));
+          always_branch = *value;
         }
-      }
-      segment++;
-    }
-  }
-
-  // crown
-  {
-    auto result541 = config.stemSettings.get_object("crown", {});
-if (!result541) return std::unexpected(std::move(result541.error()));
-JsonObject crowns = std::move(*result541);
-    bool hasCrown = crowns.size() > 0;
-    if (hasCrown) {
-      auto result542 = rnd.uniform_int(crowns.size() - 1);
-if (!result542) return std::unexpected(std::move(result542.error()));
-String crownKey = crowns.keys()[*result542];
-      auto result543 = crowns[crownKey].to_object();
-if (!result543) return std::unexpected(std::move(result543.error()));
-JsonObject crownSettings = std::move(*result543);
-
-      auto result544 = crownSettings["attachment"].to_object();
-if (!result544) return std::unexpected(std::move(result544.error()));
-JsonObject attachmentSettings = std::move(*result544);
-
-      auto result545 = attachmentSettings.get("bx");
-if (!result545) return std::unexpected(std::move(result545.error()));
-auto result546 = result545->get().to_double();
-if (!result546) return std::unexpected(std::move(result546.error()));
-xOffset += std::move(*result546) / tile_pixels;
-      auto result547 = attachmentSettings.get("by");
-if (!result547) return std::unexpected(std::move(result547.error()));
-auto result548 = result547->get().to_double();
-if (!result548) return std::unexpected(std::move(result548.error()));
-yOffset += std::move(*result548) / tile_pixels;
-
-      float coffset = roffset + this->root().random().uniform_float();
-
-      auto result549 = crownSettings.get("image");
-if (!result549) return std::unexpected(std::move(result549.error()));
-auto result550 = result549->get().to_string();
-if (!result550) return std::unexpected(std::move(result550.error()));
-String crownFile = AssetPath::relative_to(config.stemDirectory, std::move(*result550));
-{
-  PlantPiece piece;
-  piece.image = Star::format("{}?hueshift={}", crownFile, config.stemHueShift);
-  piece.offset = Vec2F{xOffset, yOffset};
-  piece.segmentIdx = segment;
-  piece.structuralSegment = false;
-  piece.kind = PlantPieceKind::Stem;
-  piece.zLevel = 0.0f;
-  piece.rotationType = m_ceiling ? DontRotate : RotateCrownBranch;
-  piece.rotationOffset = coffset;
-  m_pieces.push_back(piece);
-}
-      // crown leaves
-      auto result551 = config.foliageSettings.get_object("crownLeaves", {});
-if (!result551) return std::unexpected(std::move(result551.error()));
-JsonObject crownLeaves = std::move(*result551);
-      if (crownLeaves.contains(crownKey)) {
-        auto result552 = crownLeaves.get(crownKey);
-if (!result552) return std::unexpected(std::move(result552.error()));
-auto result553 = result552->get().to_object();
-if (!result553) return std::unexpected(std::move(result553.error()));
-JsonObject crownLeavesSettings = std::move(*result553);
-
-        auto result554 = crownLeavesSettings["attachment"].to_object();
-if (!result554) return std::unexpected(std::move(result554.error()));
-JsonObject attachmentSettings = std::move(*result554);
-
-        auto result555 = attachmentSettings.get("bx");
-if (!result555) return std::unexpected(std::move(result555.error()));
-auto result556 = result555->get().to_double();
-if (!result556) return std::unexpected(std::move(result556.error()));
-float xO = xOffset + std::move(*result556) / tile_pixels;
-        auto result557 = attachmentSettings.get("by");
-if (!result557) return std::unexpected(std::move(result557.error()));
-auto result558 = result557->get().to_double();
-if (!result558) return std::unexpected(std::move(result558.error()));
-float yO = yOffset + std::move(*result558) / tile_pixels;
-
-        bool condition561 = static_cast<bool>(crownLeavesSettings.contains("image"));
-if (condition561) {
-auto result559 = crownLeavesSettings.get("image");
-if (!result559) return std::unexpected(std::move(result559.error()));
-auto result560 = result559->get().to_string();
-if (!result560) return std::unexpected(std::move(result560.error()));
-condition561 = static_cast<bool>(!std::move(*result560).empty());
-}
-if (condition561) {
-          auto result562 = crownLeavesSettings.get("image");
-if (!result562) return std::unexpected(std::move(result562.error()));
-auto result563 = result562->get().to_string();
-if (!result563) return std::unexpected(std::move(result563.error()));
-String crownLeavesFile = AssetPath::relative_to(config.foliageDirectory, std::move(*result563));
-
-PlantPiece piece;
-piece.image = Star::format("{}?hueshift={}", crownLeavesFile, config.foliageHueShift);
-piece.offset = Vec2F{xO, yO};
-piece.segmentIdx = segment;
-piece.structuralSegment = false;
-piece.kind = PlantPieceKind::Foliage;
-piece.zLevel = 3.0f;
-piece.rotationType = m_ceiling ? DontRotate : RotateCrownLeaves;
-piece.rotationOffset = coffset;
-m_pieces.push_back(piece);
-        }
-
-        bool condition566 = static_cast<bool>(crownLeavesSettings.contains("backimage"));
-if (condition566) {
-auto result564 = crownLeavesSettings.get("backimage");
-if (!result564) return std::unexpected(std::move(result564.error()));
-auto result565 = result564->get().to_string();
-if (!result565) return std::unexpected(std::move(result565.error()));
-condition566 = static_cast<bool>(!std::move(*result565).empty());
-}
-if (condition566) {
-          auto result567 = crownLeavesSettings.get("backimage");
-if (!result567) return std::unexpected(std::move(result567.error()));
-auto result568 = result567->get().to_string();
-if (!result568) return std::unexpected(std::move(result568.error()));
-String crownLeavesBackFile = AssetPath::relative_to(config.foliageDirectory, std::move(*result568));
-
-PlantPiece piece;
-piece.image = Star::format("{}?hueshift={}", crownLeavesBackFile, config.foliageHueShift);
-piece.offset = Vec2F{xO, yO};
-piece.segmentIdx = segment;
-piece.structuralSegment = false;
-piece.kind = PlantPieceKind::Foliage;
-piece.zLevel = -1.0f;
-piece.rotationType = m_ceiling ? DontRotate : RotateCrownLeaves;
-piece.rotationOffset = coffset;
-m_pieces.push_back(piece);
+        bool add_branch = *always_branch || random.uniform_uint(2 + i) != 0;
+        // The skipped-branch step historically kept double precision.
+        double next = add_branch ? static_cast<double>(branch_y) + h
+          : branch_y + step / static_cast<float>(1 + random.uniform_uint(4));
+        if (next > std::numeric_limits<float>::max())
+          return std::unexpected(PlantException::format("Tree branch position exceeds the float range"));
+        float next_y = static_cast<float>(next);
+        if (next_y <= branch_y)
+          return std::unexpected(PlantException::format("Tree branch height cannot advance the branch position"));
+        branch_y = next_y;
+        if (add_branch) {
+          float phase = next_rotation();
+          auto branch_file = stem_file(branch);
+          if (!branch_file)
+            return std::unexpected(std::move(branch_file.error()));
+          add_piece(*branch_file, config.stem_hue_shift, *branch_position, false, Stem, 0.0f,
+            m_ceiling ? DontRotate : RotateBranch, phase);
+          if (auto result = add_leaves(branch_leaves, "branchLeaves", branch_key, *branch_position, RotateLeaves, phase); !result)
+            return std::unexpected(std::move(result.error()));
         }
       }
     }
   }
 
-  std::sort(m_pieces.begin(), m_pieces.end(), [](PlantPiece const& a, PlantPiece const& b) { return a.zLevel < b.zLevel; });
-  auto result569 = validatePieces();
-if (!result569) return std::unexpected(std::move(result569.error()));
-  auto result570 = setupNetStates();
-if (!result570) return std::unexpected(std::move(result570.error()));
-  return {};
+  auto crowns = optional_tree_object(config.stem_settings, "crown");
+  if (!crowns)
+    return std::unexpected(std::move(crowns.error()));
+  if (*crowns && !(*crowns)->empty()) {
+    auto [key, part] = pick_tree_candidate(**crowns, random);
+    auto attachment = part.get("attachment");
+    if (!attachment)
+      return std::unexpected(std::move(attachment.error()));
+    if (auto result = apply_attachment(*attachment, "bx", "by"); !result)
+      return std::unexpected(std::move(result.error()));
+    float phase = next_rotation();
+    auto file = stem_file(part);
+    if (!file)
+      return std::unexpected(std::move(file.error()));
+    add_piece(*file, config.stem_hue_shift, offset, false, Stem, 0.0f, m_ceiling ? DontRotate : RotateCrownBranch, phase);
+    LeafPool leaves;
+    if (auto result = add_leaves(leaves, "crownLeaves", key, offset, RotateCrownLeaves, phase); !result)
+      return std::unexpected(std::move(result.error()));
+  }
+
+  // Preserve the original sort (including its order for equal z levels).
+  std::sort(m_pieces.begin(), m_pieces.end(), [](PlantPiece const& a, PlantPiece const& b) { return a.z_level < b.z_level; });
+  if (auto result = initialize_piece_geometry(); !result)
+    return std::unexpected(std::move(result.error()));
+  return setup_net_states();
 }
 
-std::expected<Json, StarException> Plant::diskStore() const {
-  auto result651 = m_tileDamageParameters.to_json();
-if (!result651) return std::unexpected(std::move(result651.error()));
-auto result652 = writePiecesToJson();
-if (!result652) return std::unexpected(std::move(result652.error()));
-return JsonObject{
-    {"tilePosition", json_from_vec2i(m_tilePosition)},
+std::expected<Json, StarException> Plant::disk_store() const {
+  auto damage = m_tile_damage_parameters.to_json();
+  if (!damage)
+    return std::unexpected(std::move(damage.error()));
+  auto pieces = write_pieces_to_json();
+  if (!pieces)
+    return std::unexpected(std::move(pieces.error()));
+  return JsonObject{
+    {"tilePosition", json_from_vec2i(m_tile_position)},
     {"ceiling", m_ceiling},
-    {"stemDropConfig", m_stemDropConfig},
-    {"foliageDropConfig", m_foliageDropConfig},
-    {"saplingDropConfig", m_saplingDropConfig},
+    {"stemDropConfig", m_stem_drop_config},
+    {"foliageDropConfig", m_foliage_drop_config},
+    {"saplingDropConfig", m_sapling_drop_config},
     {"descriptions", m_descriptions},
     {"ephemeral", m_ephemeral},
-    {"tileDamageParameters", std::move(*result651)},
-    {"fallsWhenDead", m_fallsWhenDead},
-    {"pieces", std::move(*result652)},
+    {"tileDamageParameters", std::move(*damage)},
+    {"fallsWhenDead", m_falls_when_dead},
+    {"pieces", std::move(*pieces)},
   };
 }
 
 std::expected<ByteArray, StarException> Plant::net_store(NetCompatibilityRules rules) const {
   DataStreamBuffer ds;
   ds.set_stream_compatibility_version(rules);
-  auto result638 = ds.viwrite(m_tilePosition[0]);
-if (!result638) return std::unexpected(std::move(result638.error()));
-  auto result639 = ds.viwrite(m_tilePosition[1]);
-if (!result639) return std::unexpected(std::move(result639.error()));
-  auto result640 = ds.write(m_ceiling);
-if (!result640) return std::unexpected(std::move(result640.error()));
-  auto result641 = ds.write(m_stemDropConfig);
-if (!result641) return std::unexpected(std::move(result641.error()));
-  auto result642 = ds.write(m_foliageDropConfig);
-if (!result642) return std::unexpected(std::move(result642.error()));
-  auto result643 = ds.write(m_saplingDropConfig);
-if (!result643) return std::unexpected(std::move(result643.error()));
-  auto result644 = ds.write(m_descriptions);
-if (!result644) return std::unexpected(std::move(result644.error()));
-  auto result645 = ds.write(m_ephemeral);
-if (!result645) return std::unexpected(std::move(result645.error()));
-  auto result646 = ds.write(m_tileDamageParameters);
-if (!result646) return std::unexpected(std::move(result646.error()));
-  auto result647 = ds.write(m_fallsWhenDead);
-if (!result647) return std::unexpected(std::move(result647.error()));
-  auto result648 = m_tileDamageStatus->net_store(ds, rules);
-if (!result648) return std::unexpected(std::move(result648.error()));
-  auto result649 = writePieces();
-if (!result649) return std::unexpected(std::move(result649.error()));
-auto result650 = ds.write(std::move(*result649));
-if (!result650) return std::unexpected(std::move(result650.error()));
-
-return ds.take_data();
+  if (auto result = ds.viwrite(m_tile_position[0]); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = ds.viwrite(m_tile_position[1]); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = ds << m_ceiling << m_stem_drop_config << m_foliage_drop_config << m_sapling_drop_config
+      << m_descriptions << m_ephemeral << m_tile_damage_parameters << m_falls_when_dead; !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = m_tile_damage_status->net_store(ds, rules); !result)
+    return std::unexpected(std::move(result.error()));
+  auto pieces = write_pieces();
+  if (!pieces)
+    return std::unexpected(std::move(pieces.error()));
+  if (auto result = ds.write(*pieces); !result)
+    return std::unexpected(std::move(result.error()));
+  return ds.take_data();
 }
 
-std::expected<std::shared_ptr<Plant>, StarException> Plant::create(Root& rootContext, GrassVariant const& config, std::uint64_t seed) {
-  struct MakeShared final : Plant {
-    explicit MakeShared(Root& root) : Entity(root), Plant(root) {}
-  };
-  auto entity = std::make_shared<MakeShared>(rootContext);
-  auto damageStatus = EntityTileDamageStatus::create();
-  if (!damageStatus) return std::unexpected(std::move(damageStatus.error()));
-  entity->m_tileDamageStatus = std::move(*damageStatus);
-  if (auto result = entity->initialize(config, seed); !result) return std::unexpected(std::move(result.error()));
+std::expected<std::shared_ptr<Plant>, StarException> Plant::create(Root& root, GrassVariant const& config, std::uint64_t seed) {
+  auto entity = create_uninitialized(root);
+  if (!entity)
+    return entity;
+  if (auto result = (*entity)->initialize(config, seed); !result)
+    return std::unexpected(std::move(result.error()));
   return entity;
 }
 
 std::expected<void, StarException> Plant::initialize(GrassVariant const& config, std::uint64_t seed) {
-  m_broken = false;
-  m_tilePosition = Vec2I();
-  m_ceiling = false;
-  m_windTime = 0.0f;
-  m_windLevel = 0.0f;
-  m_piecesScanned = false;
-  m_fallsWhenDead = false;
+  if (!is_finite(config.hue_shift))
+    return std::unexpected(PlantException::format("Grass hue shift must be finite"));
+  m_ceiling = config.ceiling;
   m_descriptions = config.descriptions;
   m_ephemeral = config.ephemeral;
-  m_tileDamageParameters = config.tileDamageParameters;
-  m_piecesUpdated = true;
+  m_tile_damage_parameters = config.tile_damage_parameters;
 
-  RandomSource rand(seed);
-
-  auto image = rand.sample_value(config.images);
+  RandomSource random(seed);
+  auto image = random.sample_ref(config.images);
   if (!image)
     return std::unexpected(std::move(image.error()));
-  String imageName = AssetPath::relative_to(config.directory, *image);
+  auto image_name = AssetPath::relative_to(config.directory, image->get());
 
-  Vec2F offset = Vec2F();
-  // If this is a ceiling plant, offset the image so that the [0, 0] space is
-  // at the top
-  if (config.ceiling) {
+  Vec2F offset;
+  if (m_ceiling) {
     auto metadata = root().image_metadata_database();
-    if (!metadata) return std::unexpected(std::move(metadata.error()));
-    auto size = (*metadata)->image_size(imageName);
-    if (!size) return std::unexpected(std::move(size.error()));
-    offset = Vec2F(0.0f, 1.0f - static_cast<float>(size->y()) / tile_pixels);
+    if (!metadata)
+      return std::unexpected(std::move(metadata.error()));
+    auto size = (*metadata)->image_size(image_name);
+    if (!size)
+      return std::unexpected(std::move(size.error()));
+    offset[1] = 1.0f - static_cast<float>(size->y()) / tile_pixels;
   }
 
-  PlantPiece piece;
-  piece.image = Star::format("{}?hueshift={}", imageName, config.hueShift);
+  auto& piece = m_pieces.emplace_back();
+  piece.image = Star::format("{}?hueshift={}", image_name, config.hue_shift);
   piece.offset = offset;
-  piece.segmentIdx = 0;
-  piece.structuralSegment = true;
-  piece.kind = PlantPieceKind::None;
-  m_pieces = {piece};
-
-  m_ceiling = config.ceiling;
-  auto result427 = validatePieces();
-if (!result427) return std::unexpected(std::move(result427.error()));
-  auto result428 = setupNetStates();
-if (!result428) return std::unexpected(std::move(result428.error()));
-  return {};
+  piece.structural_segment = true;
+  if (auto result = initialize_piece_geometry(); !result)
+    return std::unexpected(std::move(result.error()));
+  return setup_net_states();
 }
 
-std::expected<std::shared_ptr<Plant>, StarException> Plant::create(Root& rootContext, BushVariant const& config, std::uint64_t seed) {
-  struct MakeShared final : Plant {
-    explicit MakeShared(Root& root) : Entity(root), Plant(root) {}
-  };
-  auto entity = std::make_shared<MakeShared>(rootContext);
-  auto damageStatus = EntityTileDamageStatus::create();
-  if (!damageStatus) return std::unexpected(std::move(damageStatus.error()));
-  entity->m_tileDamageStatus = std::move(*damageStatus);
-  if (auto result = entity->initialize(config, seed); !result) return std::unexpected(std::move(result.error()));
+std::expected<std::shared_ptr<Plant>, StarException> Plant::create(Root& root, BushVariant const& config, std::uint64_t seed) {
+  auto entity = create_uninitialized(root);
+  if (!entity)
+    return entity;
+  if (auto result = (*entity)->initialize(config, seed); !result)
+    return std::unexpected(std::move(result.error()));
   return entity;
 }
 
 std::expected<void, StarException> Plant::initialize(BushVariant const& config, std::uint64_t seed) {
-  m_broken = false;
-  m_tilePosition = Vec2I();
-  m_ceiling = false;
-  m_windTime = 0.0f;
-  m_windLevel = 0.0f;
-  m_piecesScanned = false;
-  m_fallsWhenDead = false;
+  if (!is_finite(config.base_hue_shift) || !is_finite(config.mod_hue_shift))
+    return std::unexpected(PlantException::format("Bush hue shifts must be finite"));
+  m_ceiling = config.ceiling;
   m_descriptions = config.descriptions;
   m_ephemeral = config.ephemeral;
-  m_tileDamageParameters = config.tileDamageParameters;
-  m_piecesUpdated = true;
+  m_tile_damage_parameters = config.tile_damage_parameters;
 
-  RandomSource rand(seed);
-  auto result421 = this->root().assets();
-if (!result421) return std::unexpected(std::move(result421.error()));
-auto assets = std::move(*result421);
+  RandomSource random(seed);
+  auto selected = random.sample_ref(config.shapes);
+  if (!selected)
+    return std::unexpected(std::move(selected.error()));
+  auto const& shape = selected->get();
+  auto image_name = AssetPath::relative_to(config.directory, shape.image);
 
-  auto shapeResult = rand.sample_value(config.shapes);
-  if (!shapeResult)
-    return std::unexpected(std::move(shapeResult.error()));
-  auto shape = std::move(*shapeResult);
-  String shapeImageName = AssetPath::relative_to(config.directory, shape.image);
-  auto result422 = assets->image(shapeImageName);
-if (!result422) return std::unexpected(std::move(result422.error()));
-float shapeImageHeight = std::move(*result422)->height();
-  Vec2F offset = Vec2F();
-  // If this is a ceiling plant, offset the image so that the [0, 0] space is
-  // at the top
-  if (config.ceiling)
-    offset = Vec2F(0.0f, 1.0f - shapeImageHeight / tile_pixels);
-
+  Vec2F offset;
+  if (m_ceiling) {
+    auto assets = root().assets();
+    if (!assets)
+      return std::unexpected(std::move(assets.error()));
+    auto image = (*assets)->image(image_name);
+    if (!image)
+      return std::unexpected(std::move(image.error()));
+    offset[1] = 1.0f - static_cast<float>((*image)->height()) / tile_pixels;
+  }
   {
-    PlantPiece piece;
-    piece.image = Star::format("{}?hueshift={}", shapeImageName, config.baseHueShift);
+    auto& piece = m_pieces.emplace_back();
+    piece.image = Star::format("{}?hueshift={}", image_name, config.base_hue_shift);
     piece.offset = offset;
-    piece.segmentIdx = 0;
-    piece.structuralSegment = true;
-    piece.kind = PlantPieceKind::None;
-    m_pieces.push_back(piece);
+    piece.structural_segment = true;
   }
-
-  auto modResult = rand.sample_value(shape.mods);
-  if (!modResult)
-    return std::unexpected(std::move(modResult.error()));
-  auto mod = std::move(*modResult);
-  if (!mod.empty()) {
-    PlantPiece piece;
-    piece.image = Star::format("{}?hueshift={}", AssetPath::relative_to(config.directory, mod), config.modHueShift);
-    piece.offset = offset;
-    piece.segmentIdx = 0;
-    piece.structuralSegment = false;
-    piece.kind = PlantPieceKind::None;
-    m_pieces.push_back(piece);
+  if (!shape.mods.empty()) {
+    auto mod = random.sample_ref(shape.mods);
+    if (!mod)
+      return std::unexpected(std::move(mod.error()));
+    if (!mod->get().empty()) {
+      auto& piece = m_pieces.emplace_back();
+      piece.image = Star::format("{}?hueshift={}", AssetPath::relative_to(config.directory, mod->get()), config.mod_hue_shift);
+      piece.offset = offset;
+    }
   }
-
-  m_ceiling = config.ceiling;
-  auto result423 = validatePieces();
-if (!result423) return std::unexpected(std::move(result423.error()));
-  auto result424 = setupNetStates();
-if (!result424) return std::unexpected(std::move(result424.error()));
-  return {};
+  if (auto result = initialize_piece_geometry(); !result)
+    return std::unexpected(std::move(result.error()));
+  return setup_net_states();
 }
 
-std::expected<std::shared_ptr<Plant>, StarException> Plant::create(Root& rootContext, Json const& diskStore) {
-  struct MakeShared final : Plant {
-    explicit MakeShared(Root& root) : Entity(root), Plant(root) {}
-  };
-  auto entity = std::make_shared<MakeShared>(rootContext);
-  auto damageStatus = EntityTileDamageStatus::create();
-  if (!damageStatus) return std::unexpected(std::move(damageStatus.error()));
-  entity->m_tileDamageStatus = std::move(*damageStatus);
-  if (auto result = entity->initialize(diskStore); !result) return std::unexpected(std::move(result.error()));
+std::expected<std::shared_ptr<Plant>, StarException> Plant::create(Root& root, Json const& disk_store) {
+  auto entity = create_uninitialized(root);
+  if (!entity)
+    return entity;
+  if (auto result = (*entity)->initialize(disk_store); !result)
+    return std::unexpected(std::move(result.error()));
   return entity;
 }
 
-std::expected<void, StarException> Plant::initialize(Json const& diskStore) {
-  auto result406 = diskStore.get("tilePosition");
-if (!result406) return std::unexpected(std::move(result406.error()));
-auto result407 = json_to_vec2i(std::move(*result406));
-if (!result407) return std::unexpected(std::move(result407.error()));
-m_tilePosition = std::move(*result407);
-  auto result408 = diskStore.get_bool("ceiling");
-if (!result408) return std::unexpected(std::move(result408.error()));
-m_ceiling = std::move(*result408);
-  auto result409 = diskStore.get("stemDropConfig");
-if (!result409) return std::unexpected(std::move(result409.error()));
-m_stemDropConfig = std::move(*result409);
-  auto result410 = diskStore.get("foliageDropConfig");
-if (!result410) return std::unexpected(std::move(result410.error()));
-m_foliageDropConfig = std::move(*result410);
-  auto result411 = diskStore.get("saplingDropConfig");
-if (!result411) return std::unexpected(std::move(result411.error()));
-m_saplingDropConfig = std::move(*result411);
-  auto result412 = diskStore.get("descriptions");
-if (!result412) return std::unexpected(std::move(result412.error()));
-m_descriptions = std::move(*result412);
-  auto result413 = diskStore.get_bool("ephemeral");
-if (!result413) return std::unexpected(std::move(result413.error()));
-m_ephemeral = std::move(*result413);
-  auto result414 = root().assets();
-if (!result414) return std::unexpected(std::move(result414.error()));
-auto result415 = diskStore.get("tileDamageParameters");
-if (!result415) return std::unexpected(std::move(result415.error()));
-auto result416 = TileDamageParameters::create(*std::move(*result414), std::move(*result415));
-if (!result416) return std::unexpected(std::move(result416.error()));
-m_tileDamageParameters = std::move(*result416);
-  auto result417 = diskStore.get_bool("fallsWhenDead");
-if (!result417) return std::unexpected(std::move(result417.error()));
-m_fallsWhenDead = std::move(*result417);
-  auto result418 = diskStore.get("pieces");
-if (!result418) return std::unexpected(std::move(result418.error()));
-auto result419 = readPiecesFromJson(std::move(*result418));
-if (!result419) return std::unexpected(std::move(result419.error()));
-
-  auto result420 = setupNetStates();
-if (!result420) return std::unexpected(std::move(result420.error()));
-  return {};
+std::expected<void, StarException> Plant::initialize(Json const& disk_store) {
+  auto position = disk_store.get("tilePosition");
+  if (!position)
+    return std::unexpected(std::move(position.error()));
+  auto tile_position = json_to_vec2i(*position);
+  if (!tile_position)
+    return std::unexpected(std::move(tile_position.error()));
+  m_tile_position = *tile_position;
+  auto ceiling = disk_store.get_bool("ceiling");
+  if (!ceiling)
+    return std::unexpected(std::move(ceiling.error()));
+  m_ceiling = *ceiling;
+  auto stem_drop = disk_store.get("stemDropConfig");
+  if (!stem_drop)
+    return std::unexpected(std::move(stem_drop.error()));
+  m_stem_drop_config = std::move(*stem_drop);
+  auto foliage_drop = disk_store.get("foliageDropConfig");
+  if (!foliage_drop)
+    return std::unexpected(std::move(foliage_drop.error()));
+  m_foliage_drop_config = std::move(*foliage_drop);
+  auto sapling_drop = disk_store.get("saplingDropConfig");
+  if (!sapling_drop)
+    return std::unexpected(std::move(sapling_drop.error()));
+  m_sapling_drop_config = std::move(*sapling_drop);
+  auto descriptions = disk_store.get("descriptions");
+  if (!descriptions)
+    return std::unexpected(std::move(descriptions.error()));
+  m_descriptions = std::move(*descriptions);
+  auto ephemeral = disk_store.get_bool("ephemeral");
+  if (!ephemeral)
+    return std::unexpected(std::move(ephemeral.error()));
+  m_ephemeral = *ephemeral;
+  auto assets = root().assets();
+  if (!assets)
+    return std::unexpected(std::move(assets.error()));
+  auto damage_json = disk_store.get("tileDamageParameters");
+  if (!damage_json)
+    return std::unexpected(std::move(damage_json.error()));
+  auto damage = TileDamageParameters::create(*std::move(*assets), std::move(*damage_json));
+  if (!damage)
+    return std::unexpected(std::move(damage.error()));
+  m_tile_damage_parameters = std::move(*damage);
+  auto falls = disk_store.get_bool("fallsWhenDead");
+  if (!falls)
+    return std::unexpected(std::move(falls.error()));
+  m_falls_when_dead = *falls;
+  auto pieces = disk_store.get("pieces");
+  if (!pieces)
+    return std::unexpected(std::move(pieces.error()));
+  if (auto result = read_pieces_from_json(*pieces); !result)
+    return std::unexpected(std::move(result.error()));
+  return setup_net_states();
 }
 
-std::expected<std::shared_ptr<Plant>, StarException> Plant::create(Root& rootContext, ByteArray const& net_store, NetCompatibilityRules rules) {
-  struct MakeShared final : Plant {
-    explicit MakeShared(Root& root) : Entity(root), Plant(root) {}
-  };
-  auto entity = std::make_shared<MakeShared>(rootContext);
-  auto damageStatus = EntityTileDamageStatus::create();
-  if (!damageStatus) return std::unexpected(std::move(damageStatus.error()));
-  entity->m_tileDamageStatus = std::move(*damageStatus);
-  if (auto result = entity->initialize(net_store, rules); !result) return std::unexpected(std::move(result.error()));
+std::expected<std::shared_ptr<Plant>, StarException> Plant::create(Root& root, ByteArray const& net_store, NetCompatibilityRules rules) {
+  auto entity = create_uninitialized(root);
+  if (!entity)
+    return entity;
+  if (auto result = (*entity)->initialize(net_store, rules); !result)
+    return std::unexpected(std::move(result.error()));
   return entity;
 }
 
 std::expected<void, StarException> Plant::initialize(ByteArray const& net_store, NetCompatibilityRules rules) {
-  m_broken = false;
-  m_tilePosition = Vec2I();
-  m_ceiling = false;
-  m_windTime = 0.0f;
-  m_windLevel = 0.0f;
-  m_piecesScanned = false;
-  m_fallsWhenDead = false;
-  m_piecesUpdated = true;
-
   DataStreamReader ds(net_store.span());
   ds.set_stream_compatibility_version(rules);
-  auto result392 = ds.viread(m_tilePosition[0]);
-if (!result392) return std::unexpected(std::move(result392.error()));
-  auto result393 = ds.viread(m_tilePosition[1]);
-if (!result393) return std::unexpected(std::move(result393.error()));
-  auto result394 = ds.read(m_ceiling);
-if (!result394) return std::unexpected(std::move(result394.error()));
-  auto result395 = ds.read(m_stemDropConfig);
-if (!result395) return std::unexpected(std::move(result395.error()));
-  auto result396 = ds.read(m_foliageDropConfig);
-if (!result396) return std::unexpected(std::move(result396.error()));
-  auto result397 = ds.read(m_saplingDropConfig);
-if (!result397) return std::unexpected(std::move(result397.error()));
-  auto result398 = ds.read(m_descriptions);
-if (!result398) return std::unexpected(std::move(result398.error()));
-  auto result399 = ds.read(m_ephemeral);
-if (!result399) return std::unexpected(std::move(result399.error()));
-  auto result400 = ds.read(m_tileDamageParameters);
-if (!result400) return std::unexpected(std::move(result400.error()));
-  auto result401 = ds.read(m_fallsWhenDead);
-if (!result401) return std::unexpected(std::move(result401.error()));
-  auto result402 = m_tileDamageStatus->net_load(ds, rules);
-if (!result402) return std::unexpected(std::move(result402.error()));
-  auto result403 = ds.read<ByteArray>();
-if (!result403) return std::unexpected(std::move(result403.error()));
-auto result404 = readPieces(std::move(*result403));
-if (!result404) return std::unexpected(std::move(result404.error()));
-
-  auto result405 = setupNetStates();
-if (!result405) return std::unexpected(std::move(result405.error()));
-  return {};
+  if (auto result = ds.viread(m_tile_position[0]); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = ds.viread(m_tile_position[1]); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = ds >> m_ceiling >> m_stem_drop_config >> m_foliage_drop_config >> m_sapling_drop_config
+      >> m_descriptions >> m_ephemeral >> m_tile_damage_parameters >> m_falls_when_dead; !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = m_tile_damage_status->net_load(ds, rules); !result)
+    return std::unexpected(std::move(result.error()));
+  auto pieces = ds.read<ByteArray>();
+  if (!pieces)
+    return std::unexpected(std::move(pieces.error()));
+  if (auto result = pieces->empty() ? initialize_piece_geometry() : read_pieces(*pieces); !result)
+    return std::unexpected(std::move(result.error()));
+  return setup_net_states();
 }
 
-Plant::Plant(Root& rootContext) : Entity(rootContext) {
-  m_ephemeral = false;
-  m_piecesUpdated = true;
-  m_ceiling = false;
-  m_broken = false;
-  m_fallsWhenDead = false;
-  m_windTime = 0.0f;
-  m_windLevel = 0.0f;
-  m_piecesScanned = false;
-  m_tileDamageX = 0.0f;
-  m_tileDamageY = 0.0f;
-  m_tileDamageEventTrigger = false;
-  m_tileDamageEvent = false;
-}
+Plant::Plant(Root& root) : Entity(root) {}
 
 EntityType Plant::entity_type() const {
   return EntityType::Plant;
 }
 
-std::expected<void, StarException> Plant::init(World& world, EntityId entityId, EntityMode mode) {
-  auto result635 = Entity::init(world, entityId, mode);
-if (!result635) return std::unexpected(std::move(result635.error()));
-  auto result636 = validatePieces();
-if (!result636) return std::unexpected(std::move(result636.error()));
-  m_tilePosition = world.geometry().xwrap(m_tilePosition);
+std::expected<void, StarException> Plant::init(World& world, EntityId entity_id, EntityMode mode) {
+  if (auto initialized = Entity::init(world, entity_id, mode); !initialized)
+    return std::unexpected(std::move(initialized.error()));
+  m_tile_position = world.geometry().xwrap(m_tile_position);
   return {};
 }
 
-std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Plant::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
-  auto result634 = m_netGroup.write_net_state(fromVersion, rules);
-if (!result634) return std::unexpected(std::move(result634.error()));
-return std::move(*result634);
+std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Plant::write_net_state(std::uint64_t from_version, NetCompatibilityRules rules) {
+  return m_net_group.write_net_state(from_version, rules);
 }
 
 std::expected<void, StarException> Plant::read_net_state(ByteArray const& data, float interpolation_time, NetCompatibilityRules rules) {
-  return m_netGroup.read_net_state(data, interpolation_time, rules);
+  if (auto read = m_net_group.read_net_state(data, interpolation_time, rules); !read)
+    return std::unexpected(std::move(read.error()));
+  if (m_pieces_update_pending)
+    return load_net_states();
+  return {};
 }
 
 std::expected<void, StarException> Plant::enable_interpolation(float extrapolation_hint) {
   // Only enable plant interpolation when it actually matters, for things that
   // generate PlantDrops so that they match when the PlantDrops appear.
-  if (m_fallsWhenDead)
-    {
-auto result632 = m_netGroup.enable_net_interpolation(extrapolation_hint);
-if (!result632) return std::unexpected(std::move(result632.error()));
-}
+  if (m_falls_when_dead)
+    return m_net_group.enable_net_interpolation(extrapolation_hint);
   return {};
 }
 
 std::expected<void, StarException> Plant::disable_interpolation() {
-  auto result631 = m_netGroup.disable_net_interpolation();
-if (!result631) return std::unexpected(std::move(result631.error()));
-  return {};
+  return m_net_group.disable_net_interpolation();
 }
 
 std::expected<String, StarException> Plant::description() const {
-  auto result630 = m_descriptions.get_string("description");
-if (!result630) return std::unexpected(std::move(result630.error()));
-return std::move(*result630);
+  return m_descriptions.get_string("description");
 }
 
 Vec2F Plant::position() const {
-  return Vec2F(m_tilePosition);
+  return Vec2F(m_tile_position);
 }
 
 RectF Plant::meta_bound_box() const {
-  return m_meta_bound_box;
+  return m_piece_geometry.meta_bound_box;
 }
 
 bool Plant::ephemeral() const {
@@ -1145,23 +732,23 @@ bool Plant::ephemeral() const {
 }
 
 Vec2I Plant::tile_position() const {
-  return m_tilePosition;
+  return m_tile_position;
 }
 
-std::expected<void, StarException> Plant::set_tile_position(Vec2I const& tilePosition) {
-  m_tilePosition = tilePosition;
+std::expected<void, StarException> Plant::set_tile_position(Vec2I const& tile_position) {
+  m_tile_position = tile_position;
   return {};
 }
 
 List<Vec2I> Plant::spaces() const {
-  return m_spaces;
+  return m_piece_geometry.spaces;
 }
 
 List<Vec2I> Plant::roots() const {
-  return m_roots;
+  return m_piece_geometry.roots;
 }
 
-Vec2I Plant::primaryRoot() const {
+Vec2I Plant::primary_root() const {
   return m_ceiling ? Vec2I(0, 1) : Vec2I(0, -1);
 }
 
@@ -1170,28 +757,42 @@ bool Plant::ceiling() const {
 }
 
 std::expected<bool, StarException> Plant::should_destroy() const {
-  return m_broken || m_pieces.size() == 0;
+  return m_broken || m_pieces.empty();
 }
 
 std::expected<bool, StarException> Plant::check_broken() {
-  if (!m_broken) {
-    auto result627 = allSpacesOccupied(m_roots);
-if (!result627) return std::unexpected(std::move(result627.error()));
-if (!std::move(*result627)) {
-      if (m_fallsWhenDead) {
-        auto result628 = breakAtPosition(m_tilePosition, Vec2F(m_tilePosition));
-if (!result628) return std::unexpected(std::move(result628.error()));
-        return false;
-      } else
-        m_broken = true;
-    } else {
-auto result629 = anySpacesOccupied(m_spaces);
-if (!result629) return std::unexpected(std::move(result629.error()));
-if (std::move(*result629))
-      m_broken = true;
-}
+  if (m_broken)
+    return true;
+
+  if (m_pending_fall) {
+    auto current_world = world();
+    if (!current_world)
+      return std::unexpected(std::move(current_world.error()));
+    if (auto resumed = resume_felling(current_world->get()); !resumed)
+      return std::unexpected(std::move(resumed.error()));
+    return false;
   }
 
+  auto supported = allSpacesOccupied(m_piece_geometry.roots);
+  if (!supported)
+    return std::unexpected(std::move(supported.error()));
+  if (!*supported && m_falls_when_dead) {
+    auto current_world = world();
+    if (!current_world)
+      return std::unexpected(std::move(current_world.error()));
+    if (auto fallen = break_at_position(current_world->get(), m_tile_position, Vec2F(m_tile_position)); !fallen)
+      return std::unexpected(std::move(fallen.error()));
+    return false;
+  }
+
+  if (*supported) {
+    auto obstructed = anySpacesOccupied(m_piece_geometry.spaces);
+    if (!obstructed)
+      return std::unexpected(std::move(obstructed.error()));
+    m_broken = *obstructed;
+  } else {
+    m_broken = true;
+  }
   return m_broken;
 }
 
@@ -1200,606 +801,679 @@ List<Plant::PlantPiece> Plant::pieces() const {
 }
 
 RectF Plant::interactive_bound_box() const {
-  return RectF(m_boundBox);
+  return m_piece_geometry.bound_box;
 }
 
-std::expected<void, StarException> Plant::scanSpacesAndRoots() {
-  auto metadata = root().image_metadata_database();
-  if (!metadata) return std::unexpected(std::move(metadata.error()));
+std::expected<Plant::PieceGeometry, StarException> Plant::prepare_piece_geometry(List<PlantPiece>& pieces) const {
+  if (!pieces.empty()) {
+    auto metadata = root().image_metadata_database();
+    if (!metadata)
+      return std::unexpected(std::move(metadata.error()));
 
-  // build spaces
-  Set<Vec2I> spaces;
-
-  // always include the base position in spaces, it causes all kinds of problems if you don't
-  spaces.add({0, 0});
-
-  for (auto& piece : m_pieces) {
-    auto size = (*metadata)->image_size(piece.image);
-    if (!size) return std::unexpected(std::move(size.error()));
-    piece.imageSize = *size;
-    auto occupied = (*metadata)->image_spaces(piece.image, piece.offset * tile_pixels, PlantScanThreshold, piece.flip);
-    if (!occupied) return std::unexpected(std::move(occupied.error()));
-    piece.spaces = Set<Vec2I>::from(std::move(*occupied));
-    spaces.insert_range(piece.spaces);
-  }
-
-  m_spaces = spaces.values();
-
-  m_boundBox = RectI::bound_box_of_points(m_spaces);
-
-  for (auto space : m_spaces) {
-    if (space[1] == 0) {
-      if (m_ceiling)
-        m_roots.push_back({space[0], 1});
-      else
-        m_roots.push_back({space[0], -1});
+    for (auto& piece : pieces) {
+      piece.image_path = piece.image;
+      auto size = (*metadata)->image_size(piece.image_path);
+      if (!size)
+        return std::unexpected(std::move(size.error()));
+      auto occupied = (*metadata)->image_spaces(piece.image_path, piece.offset * tile_pixels, plant_scan_threshold, piece.flip);
+      if (!occupied)
+        return std::unexpected(std::move(occupied.error()));
+      piece.image_size = *size;
+      piece.spaces = Set<Vec2I>::from(std::move(*occupied));
     }
   }
+  return derive_piece_geometry(pieces);
+}
+
+Plant::PieceGeometry Plant::derive_piece_geometry(List<PlantPiece> const& pieces) const {
+  Set<Vec2I> spaces;
+  // The origin remains occupied even when the base image contributes no tiles.
+  spaces.add({0, 0});
+  for (auto const& piece : pieces)
+    spaces.insert_range(piece.spaces);
+
+  PieceGeometry geometry;
+  geometry.spaces.reserve(spaces.size());
+  RectI bounds = RectI::null();
+  int const root_y = primary_root()[1];
+  for (auto const& space : spaces) {
+    geometry.spaces.push_back(space);
+    bounds.combine(space);
+    if (space[1] == 0)
+      geometry.roots.emplace_back(space[0], root_y);
+  }
+  geometry.bound_box = RectF(bounds);
+  // The visual box includes the last occupied tile and a one-tile margin.
+  geometry.meta_bound_box = RectF(geometry.bound_box.min() - Vec2F(1, 1), geometry.bound_box.max() + Vec2F(2, 2));
+  return geometry;
+}
+
+void Plant::commit_piece_geometry(PieceGeometry&& geometry) {
+  m_piece_geometry = std::move(geometry);
+}
+
+std::expected<void, StarException> Plant::initialize_piece_geometry() {
+  auto geometry = prepare_piece_geometry(m_pieces);
+  if (!geometry)
+    return std::unexpected(std::move(geometry.error()));
+  commit_piece_geometry(std::move(*geometry));
   return {};
 }
 
-void Plant::calcBoundBox() {
-  RectF boundBox = RectF::bound_box_of_points(m_spaces);
-  // Plants are allowed to visibly occupy one outside space from the spaces
-  // they take up.
-  m_meta_bound_box = RectF(boundBox.min() - Vec2F(1, 1), boundBox.max() + Vec2F(2, 2));
+std::expected<void, StarException> Plant::replace_pieces(List<PlantPiece>&& pieces) {
+  auto geometry = prepare_piece_geometry(pieces);
+  if (!geometry)
+    return std::unexpected(std::move(geometry.error()));
+
+  m_pieces = std::move(pieces);
+  commit_piece_geometry(std::move(*geometry));
+  m_pieces_updated = true;
+  return {};
 }
 
-float Plant::branchRotation(float xPos, float rotoffset, float interpolation) const {
-  if (!inWorld() || (m_windLevel == 0.0f && m_previousWindLevel == 0.0f))
-    return 0.0f;
-
-  float windLevel = std::lerp(m_previousWindLevel, m_windLevel, std::clamp(interpolation, 0.0f, 1.0f));
-  float intensity = std::fabs(windLevel);
-
-  float windTime = m_windTime + std::remainder(m_previousWindTime - m_windTime, 628.32f) * (1.0f - std::clamp(interpolation, 0.0f, 1.0f));
-  return std::copysign(0.00117f, windLevel) * (std::sin(windTime + rotoffset + xPos / 10.0f) * intensity - intensity / 300.0f);
+namespace {
+constexpr float plant_wind_period = 628.32f;
 }
 
 std::expected<void, StarException> Plant::update(float dt, std::uint64_t) {
-  m_previousWindTime = m_windTime;
-  m_previousWindLevel = m_windLevel;
-  m_windTime += dt;
-  m_windTime = std::fmod(m_windTime, 628.32f);
-  auto result621 = world();
-if (!result621) return std::unexpected(std::move(result621.error()));
-auto result622 = result621->get().windLevel(Vec2F(m_tilePosition));
-if (!result622) return std::unexpected(std::move(result622.error()));
-m_windLevel = std::move(*result622);
+  m_previous_wind_time = m_wind_time;
+  m_previous_wind_level = m_wind_level;
+  m_wind_time = std::fmod(m_wind_time + dt, plant_wind_period);
+  auto active_world = world();
+  if (!active_world)
+    return std::unexpected(std::move(active_world.error()));
+  // A failed world publication need not be followed by another hit or a break check.
+  if (m_pending_fall) {
+    if (auto resumed = resume_felling(active_world->get()); !resumed)
+      return resumed;
+  }
+  auto wind = active_world->get().windLevel(Vec2F(m_tile_position));
+  if (!wind)
+    return std::unexpected(std::move(wind.error()));
+  m_wind_level = *wind;
 
   if (isMaster()) {
-    if (m_tileDamageStatus->damaged())
-      m_tileDamageStatus->recover(m_tileDamageParameters, dt);
+    if (m_tile_damage_status->damaged())
+      m_tile_damage_status->recover(m_tile_damage_parameters, dt);
   } else {
-    if (m_tileDamageStatus->damaged() && !m_tileDamageStatus->damage_protected()) {
-      float damageEffectPercentage = m_tileDamageStatus->damage_effect_percentage();
-      m_windTime += damageEffectPercentage * 10 * dt;
-      m_windLevel += damageEffectPercentage * 20;
+    if (m_tile_damage_status->damaged() && !m_tile_damage_status->damage_protected()) {
+      float damage_effect = m_tile_damage_status->damage_effect_percentage();
+      m_wind_time += damage_effect * 10 * dt;
+      m_wind_level += damage_effect * 20;
     }
 
-    auto result623 = m_netGroup.tick_net_interpolation(dt);
-if (!result623) return std::unexpected(std::move(result623.error()));
+    if (auto ticked = m_net_group.tick_net_interpolation(dt); !ticked)
+      return std::unexpected(std::move(ticked.error()));
+    if (m_pieces_update_pending)
+      return load_net_states();
   }
   return {};
 }
 
-std::expected<void, StarException> Plant::collect_render_events(RenderCallback& render_callback) {
-  auto damageOffset = this->root().random().uniform_float(-0.1f, 0.1f);
-  if (!damageOffset)
-    return std::unexpected(std::move(damageOffset.error()));
-  m_presentationDamageXOffset = *damageOffset * m_tileDamageStatus->damage_effect_percentage();
-  if (m_tileDamageEvent) {
-    m_tileDamageEvent = false;
-    if (m_stemDropConfig.type() == Json::Type::Object) {
-      auto result605 = m_stemDropConfig.get("particles", JsonObject());
-if (!result605) return std::unexpected(std::move(result605.error()));
-auto result606 = std::move(*result605).get("damageTree", JsonObject());
-if (!result606) return std::unexpected(std::move(result606.error()));
-Json particleConfig = std::move(*result606);
-      auto result607 = particleConfig.get_array("options", {});
-if (!result607) return std::unexpected(std::move(result607.error()));
-JsonArray particleOptions = std::move(*result607);
-      auto result608 = m_stemDropConfig.get_float("hueshift", 0);
-if (!result608) return std::unexpected(std::move(result608.error()));
-auto hueshift = std::move(*result608) / 360.0f;
-      auto result609 = particleConfig.get_float("density", 1);
-if (!result609) return std::unexpected(std::move(result609.error()));
-auto density = std::move(*result609);
-      while (density-- > 0) {
-        auto configResult = this->root().random().sample_value(particleOptions, {});
-        if (!configResult)
-          return std::unexpected(std::move(configResult.error()));
-        auto config = std::move(*configResult);
-        bool condition1282 = static_cast<bool>(config.is_null());
-if (!condition1282) {
-auto result1281 = config.size();
-if (!result1281) return std::unexpected(std::move(result1281.error()));
-condition1282 = static_cast<bool>(std::move(*result1281) == 0);
-}
-if (condition1282)
-          continue;
-        auto result610 = this->root().particle_database();
-if (!result610) return std::unexpected(std::move(result610.error()));
-auto result611 = std::move(*result610)->particle(config);
-if (!result611) return std::unexpected(std::move(result611.error()));
-auto particle = std::move(*result611);
-        particle.color.hue_shift(hueshift);
-        if (!particle.string.empty()) {
-          particle.string = Star::format("{}?hueshift={}", particle.string, hueshift);
-          particle.image = particle.string;
-        }
-        particle.position = {m_tileDamageX + this->root().random().uniform_float(), m_tileDamageY + this->root().random().uniform_float()};
-        particle.translate(position());
-        auto result612 = render_callback.add_particle(std::move(particle));
-if (!result612) return std::unexpected(std::move(result612.error()));
-      }
-      auto result613 = m_stemDropConfig.get("sounds", JsonObject());
-if (!result613) return std::unexpected(std::move(result613.error()));
-auto result614 = std::move(*result613).get_array("damageTree", JsonArray());
-if (!result614) return std::unexpected(std::move(result614.error()));
-JsonArray damageTreeSoundOptions = std::move(*result614);
-      if (damageTreeSoundOptions.size()) {
-        auto result615 = this->root().random().sample_ref(damageTreeSoundOptions);
-if (!result615) return std::unexpected(std::move(result615.error()));
-auto sound = result615->get();
-        Vec2F pos = position() + Vec2F(m_tileDamageX + this->root().random().uniform_float(), m_tileDamageY + this->root().random().uniform_float());
-        auto result616 = this->root().assets();
-if (!result616) return std::unexpected(std::move(result616.error()));
-auto assets = std::move(*result616);
-        auto result617 = sound.get_string("file");
-if (!result617) return std::unexpected(std::move(result617.error()));
-auto result618 = assets->audio(std::move(*result617));
-if (!result618) return std::unexpected(std::move(result618.error()));
-auto result1277 = AudioInstance::create(*std::move(*result618));
-if (!result1277) return std::unexpected(std::move(result1277.error()));
-auto audioInstance = std::move(*result1277);
-audioInstance->set_position(pos);
-auto result619 = sound.get_float("volume", 1.0f);
-if (!result619) return std::unexpected(std::move(result619.error()));
-audioInstance->set_volume(std::move(*result619));
-auto result620 = render_callback.add_audio(std::move(audioInstance));
-if (!result620) return std::unexpected(std::move(result620.error()));
+std::expected<bool, StarException> Plant::submit_damage_effect(RenderCallback& callback, DamageEffect& effect) {
+  if (!effect.particles_prepared) {
+    auto config = m_stem_drop_config.get("particles", JsonObject()).and_then([](Json const& particles) {
+      return particles.get("damageTree", JsonObject());
+    });
+    if (!config) return std::unexpected(std::move(config.error()));
+    auto options = config->find("options");
+    if (!options) return std::unexpected(std::move(options.error()));
+    auto hue = m_stem_drop_config.get_float("hueshift", 0);
+    if (!hue) return std::unexpected(std::move(hue.error()));
+    if (!is_finite(*hue))
+      return std::unexpected(PlantException("Plant damage particle hue shift must be finite"));
+    auto density = config->get_float("density", 1);
+    if (!density) return std::unexpected(std::move(density.error()));
+    double rounded_count = std::ceil(static_cast<double>(*density));
+    if (!is_finite(*density) || *density < 0 || rounded_count > std::numeric_limits<std::uint32_t>::max())
+      return std::unexpected(PlantException("Plant damage particle count is out of range"));
+    if (*options && !(*options)->get().is_null()) {
+      auto array = (*options)->get().array_ptr();
+      if (!array) return std::unexpected(std::move(array.error()));
+      if (!(*array)->empty()) {
+        effect.remaining = static_cast<std::uint32_t>(rounded_count);
+        effect.particle_options = std::move(*array);
       }
     }
+    effect.hue_shift = *hue / 360.0f;
+    effect.particles_prepared = true;
   }
+
+  auto& random = root().random();
+  std::shared_ptr<ParticleDatabase const> database;
+  constexpr std::size_t particle_sample_budget = 256;
+  for (std::size_t budget = particle_sample_budget; effect.remaining != 0 && budget != 0; --budget, --effect.remaining) {
+    if (!effect.pending_particle) {
+      if (!effect.selected_particle) {
+        auto selected = random.sample_ref(*effect.particle_options);
+        if (!selected) return std::unexpected(std::move(selected.error()));
+        effect.selected_particle = selected->get();
+      }
+      auto const& spec = *effect.selected_particle;
+      if (!spec.is_null()) {
+        auto size = spec.size();
+        if (!size) return std::unexpected(std::move(size.error()));
+        if (*size != 0) {
+          if (!database) {
+            auto loaded = root().particle_database();
+            if (!loaded) return std::unexpected(std::move(loaded.error()));
+            database = std::move(*loaded);
+          }
+          auto particle = database->particle(spec);
+          if (!particle) return std::unexpected(std::move(particle.error()));
+          particle->color.hue_shift(effect.hue_shift);
+          if (!particle->string.empty()) {
+            particle->string = Star::format("{}?hueshift={}", particle->string, effect.hue_shift);
+            particle->image = particle->string;
+          }
+          particle->position = {effect.offset.x() + random.uniform_float(), effect.offset.y() + random.uniform_float()};
+          particle->translate(effect.origin);
+          effect.pending_particle = std::move(*particle);
+        }
+      }
+    }
+    if (effect.pending_particle) {
+      if (auto added = callback.add_particle(std::move(*effect.pending_particle)); !added)
+        return std::unexpected(std::move(added.error()));
+      effect.pending_particle.reset();
+    }
+    effect.selected_particle.reset();
+  }
+  if (effect.remaining != 0)
+    return false;
+
+  if (!effect.pending_audio) {
+    if (!effect.selected_sound) {
+      auto sounds = m_stem_drop_config.get("sounds", JsonObject());
+      if (!sounds) return std::unexpected(std::move(sounds.error()));
+      auto options = sounds->find("damageTree");
+      if (!options) return std::unexpected(std::move(options.error()));
+      if (!*options || (*options)->get().is_null())
+        return true;
+      auto array = (*options)->get().array_ptr();
+      if (!array) return std::unexpected(std::move(array.error()));
+      if ((*array)->empty())
+        return true;
+      auto sound = random.sample_ref(**array);
+      if (!sound) return std::unexpected(std::move(sound.error()));
+      effect.selected_sound = sound->get();
+      effect.sound_position = effect.origin + Vec2F(effect.offset.x() + random.uniform_float(), effect.offset.y() + random.uniform_float());
+    }
+    auto file = effect.selected_sound->get_string("file");
+    if (!file) return std::unexpected(std::move(file.error()));
+    auto volume = effect.selected_sound->get_float("volume", 1.0f);
+    if (!volume) return std::unexpected(std::move(volume.error()));
+    auto assets = root().assets();
+    if (!assets) return std::unexpected(std::move(assets.error()));
+    auto audio = (*assets)->audio(*file);
+    if (!audio) return std::unexpected(std::move(audio.error()));
+    auto instance = AudioInstance::create(**audio);
+    if (!instance) return std::unexpected(std::move(instance.error()));
+    (*instance)->set_position(effect.sound_position);
+    (*instance)->set_volume(*volume);
+    effect.pending_audio = std::move(*instance);
+  }
+  if (auto added = callback.add_audio(effect.pending_audio); !added)
+    return std::unexpected(std::move(added.error()));
+  return true;
+}
+
+bool Plant::has_pending_render_events() const {
+  return m_damage_effect || (m_tile_damage_event && m_stem_drop_config.type() == Json::Type::Object);
+}
+
+std::expected<void, StarException> Plant::collect_render_events(RenderCallback& callback) {
+  if (m_damage_effect) {
+    auto completed = submit_damage_effect(callback, *m_damage_effect);
+    if (!completed) return std::unexpected(std::move(completed.error()));
+    if (*completed)
+      m_damage_effect.reset();
+    return {};
+  }
+
+  auto damage_offset = root().random().uniform_float(-0.1f, 0.1f);
+  if (!damage_offset) return std::unexpected(std::move(damage_offset.error()));
+  m_presentation_damage_x_offset = *damage_offset * m_tile_damage_status->damage_effect_percentage();
+  if (!std::exchange(m_tile_damage_event, false) || m_stem_drop_config.type() != Json::Type::Object)
+    return {};
+
+  DamageEffect effect{position(), {m_tile_damage_x, m_tile_damage_y}};
+  auto completed = submit_damage_effect(callback, effect);
+  if (!completed || !*completed)
+    m_damage_effect = std::make_unique<DamageEffect>(std::move(effect));
+  if (!completed) return std::unexpected(std::move(completed.error()));
   return {};
 }
 
 std::expected<void, StarException> Plant::render(RenderCallback& render_callback) {
-  float damageXOffset = m_presentationDamageXOffset;
+  constexpr float pixel_size = 1.0f / tile_pixels;
+  auto world_position = position();
+  auto base_transform = Mat3F::scaling(pixel_size);
+  bool sway = inWorld() && (m_wind_level != 0.0f || m_previous_wind_level != 0.0f);
+  // Grass and ceiling plants need no wind sample; rotating pieces share one.
+  struct WindSample {
+    float phase;
+    float position_phase;
+    float sign;
+    float intensity;
+    float bias;
+  };
+  std::optional<WindSample> wind;
 
-  for (auto const& plantPiece : m_pieces) {
-    auto size = Vec2F(plantPiece.imageSize) / tile_pixels;
+  for (auto const& piece : m_pieces) {
+    auto size = Vec2F(piece.image_size) / tile_pixels;
+    Vec2F offset = piece.offset;
+    if (m_ceiling ? offset.y() <= m_tile_damage_y : offset.y() + size.y() >= m_tile_damage_y)
+      offset[0] += m_presentation_damage_x_offset;
 
-    Vec2F offset = plantPiece.offset;
-    if ((m_ceiling && offset[1] <= m_tileDamageY) || (!m_ceiling && offset[1] + size[1] >= m_tileDamageY))
-      offset[0] += damageXOffset;
-
-    auto result603 = this->root().image_metadata_database();
-if (!result603) return std::unexpected(std::move(result603.error()));
-auto result1283 = Drawable::make_image(*std::move(*result603), plantPiece.imagePath, 1.0f / tile_pixels, false, offset);
-if (!result1283) return std::unexpected(std::move(result1283.error()));
-auto drawable = std::move(*result1283);
-    if (plantPiece.flip)
+    // The plant image is already validated and does not need centering.
+    Drawable drawable;
+    drawable.part = Drawable::ImagePart{piece.image_path, base_transform};
+    drawable.position = offset;
+    if (piece.flip)
       drawable.scale(Vec2F(-1, 1));
 
-    if (plantPiece.rotationType == RotateCrownBranch || plantPiece.rotationType == RotateCrownLeaves) {
-      drawable.rotate(branchRotation(m_tilePosition[0], plantPiece.rotationOffset * 1.4f, render_callback.presentation().interpolation()) * 0.7f, plantPiece.offset + Vec2F(size[0] / 2.0f, 0));
-      drawable.translate(Vec2F(0, -0.40f));
-    } else if (plantPiece.rotationType == RotateBranch || plantPiece.rotationType == RotateLeaves) {
-      drawable.rotate(branchRotation(m_tilePosition[0], plantPiece.rotationOffset * 1.4f, render_callback.presentation().interpolation()), plantPiece.offset + Vec2F(size) / 2.0f);
-    }
-    drawable.translate(position());
-    auto result604 = render_callback.add_drawable(std::move(drawable), render_layer_plant);
-if (!result604) return std::unexpected(std::move(result604.error()));
-  }
-
-  return {};
-}
-
-std::expected<void, StarException> Plant::readPieces(ByteArray pieces) {
-  if (!pieces.empty()) {
-    DataStreamBuffer ds(std::move(pieces));
-    auto result600 =
-      ds.read_container(m_pieces, [](DataStream& ds, PlantPiece& piece) -> std::expected<void, StarException> {
-        auto result383 = ds.read(piece.image);
-        if (!result383)
-          return std::unexpected(std::move(result383.error()));
-        auto result384 = ds.read(piece.offset[0]);
-        if (!result384)
-          return std::unexpected(std::move(result384.error()));
-        auto result385 = ds.read(piece.offset[1]);
-        if (!result385)
-          return std::unexpected(std::move(result385.error()));
-        auto result386 = ds.read(piece.rotationType);
-        if (!result386)
-          return std::unexpected(std::move(result386.error()));
-        auto result387 = ds.read(piece.rotationOffset);
-        if (!result387)
-          return std::unexpected(std::move(result387.error()));
-        auto result388 = ds.read(piece.structuralSegment);
-        if (!result388)
-          return std::unexpected(std::move(result388.error()));
-        auto result389 = ds.read(piece.kind);
-        if (!result389)
-          return std::unexpected(std::move(result389.error()));
-        auto result390 = ds.read(piece.segmentIdx);
-        if (!result390)
-          return std::unexpected(std::move(result390.error()));
-        auto result391 = ds.read(piece.flip);
-        if (!result391)
-          return std::unexpected(std::move(result391.error()));
-        return {};
-      });
-    if (!result600)
-      return std::unexpected(std::move(result600.error()));
-    m_piecesScanned = false;
-    if (inWorld())
-      {
-auto result601 = validatePieces();
-if (!result601) return std::unexpected(std::move(result601.error()));
-}
-  }
-  return {};
-}
-
-std::expected<ByteArray, StarException> Plant::writePieces() const {
-  auto result599 = DataStreamBuffer::serialize_container(
-    m_pieces, [](DataStream& ds, PlantPiece const& piece) -> std::expected<void, StarException> {
-      auto result374 = ds.write(piece.image);
-      if (!result374)
-        return std::unexpected(std::move(result374.error()));
-      auto result375 = ds.write(piece.offset[0]);
-      if (!result375)
-        return std::unexpected(std::move(result375.error()));
-      auto result376 = ds.write(piece.offset[1]);
-      if (!result376)
-        return std::unexpected(std::move(result376.error()));
-      auto result377 = ds.write(piece.rotationType);
-      if (!result377)
-        return std::unexpected(std::move(result377.error()));
-      auto result378 = ds.write(piece.rotationOffset);
-      if (!result378)
-        return std::unexpected(std::move(result378.error()));
-      auto result379 = ds.write(piece.structuralSegment);
-      if (!result379)
-        return std::unexpected(std::move(result379.error()));
-      auto result380 = ds.write(piece.kind);
-      if (!result380)
-        return std::unexpected(std::move(result380.error()));
-      auto result381 = ds.write(piece.segmentIdx);
-      if (!result381)
-        return std::unexpected(std::move(result381.error()));
-      auto result382 = ds.write(piece.flip);
-      if (!result382)
-        return std::unexpected(std::move(result382.error()));
-      return {};
-    });
-  if (!result599)
-    return std::unexpected(std::move(result599.error()));
-  return std::move(*result599);
-}
-
-std::expected<void, StarException> Plant::readPiecesFromJson(Json const& pieces) {
-  auto result597 = json_to_list<PlantPiece>(pieces, [](Json const& v) -> std::expected<PlantPiece, StarException> {
-      PlantPiece res;
-      auto result364 = v.get_string("image");
-if (!result364) return std::unexpected(std::move(result364.error()));
-res.image = std::move(*result364);
-      auto result365 = v.get("offset");
-if (!result365) return std::unexpected(std::move(result365.error()));
-auto result366 = json_to_vec2f(std::move(*result365));
-if (!result366) return std::unexpected(std::move(result366.error()));
-res.offset = std::move(*result366);
-      auto result367 = v.get_string("rotationType");
-if (!result367) return std::unexpected(std::move(result367.error()));
-if (!RotationTypeNames) return std::unexpected(RotationTypeNames.error());
-auto result368 = RotationTypeNames->get_left(std::move(*result367));
-if (!result368) return std::unexpected(std::move(result368.error()));
-res.rotationType = result368->get();
-      auto result369 = v.get_float("rotationOffset");
-if (!result369) return std::unexpected(std::move(result369.error()));
-res.rotationOffset = std::move(*result369);
-      auto result370 = v.get_bool("structuralSegment");
-if (!result370) return std::unexpected(std::move(result370.error()));
-res.structuralSegment = std::move(*result370);
-      auto result371 = v.get_int("kind");
-if (!result371) return std::unexpected(std::move(result371.error()));
-res.kind = static_cast<PlantPieceKind>(std::move(*result371));
-auto result372 = v.get_int("segmentIdx");
-if (!result372) return std::unexpected(std::move(result372.error()));
-res.segmentIdx = std::move(*result372);
-      auto result373 = v.get_bool("flip");
-if (!result373) return std::unexpected(std::move(result373.error()));
-res.flip = std::move(*result373);
-
-      return res;
-    });
-if (!result597) return std::unexpected(std::move(result597.error()));
-m_pieces = std::move(*result597);
-  m_piecesScanned = false;
-  if (inWorld())
-    {
-auto result598 = validatePieces();
-if (!result598) return std::unexpected(std::move(result598.error()));
-}
-  return {};
-}
-
-std::expected<Json, StarException> Plant::writePiecesToJson() const {
-  auto result596 = json_from_list<PlantPiece>(m_pieces, [](PlantPiece const& piece) -> std::expected<Json, StarException> {
-      if (!RotationTypeNames) return std::unexpected(RotationTypeNames.error());
-      auto result363 = RotationTypeNames->get_right(piece.rotationType);
-      if (!result363)
-        return std::unexpected(std::move(result363.error()));
-      return JsonObject{
-        {"image", piece.image},
-        {"offset", json_from_vec2f(piece.offset)},
-        {"rotationType", result363->get()},
-        {"rotationOffset", piece.rotationOffset},
-        {"structuralSegment", piece.structuralSegment},
-        {"kind", piece.kind},
-        {"segmentIdx", piece.segmentIdx},
-        {"flip", piece.flip},
-      };
-    });
-if (!result596) return std::unexpected(std::move(result596.error()));
-return std::move(*result596);
-}
-
-std::expected<void, StarException> Plant::validatePieces() {
-  for (auto& piece : m_pieces)
-    piece.imagePath = piece.image;
-  if (!m_piecesScanned) {
-    auto result595 = scanSpacesAndRoots();
-if (!result595) return std::unexpected(std::move(result595.error()));
-    calcBoundBox();
-    m_piecesScanned = true;
-  }
-  return {};
-}
-
-std::expected<void, StarException> Plant::setupNetStates() {
-  auto result590 = m_netGroup.add_net_element(*m_tileDamageStatus);
-if (!result590) return std::unexpected(std::move(result590.error()));
-  auto result591 = m_netGroup.add_net_element(m_piecesNetState);
-if (!result591) return std::unexpected(std::move(result591.error()));
-  auto result592 = m_netGroup.add_net_element(m_tileDamageXNetState);
-if (!result592) return std::unexpected(std::move(result592.error()));
-  auto result593 = m_netGroup.add_net_element(m_tileDamageYNetState);
-if (!result593) return std::unexpected(std::move(result593.error()));
-  auto result594 = m_netGroup.add_net_element(m_tileDamageEventNetState);
-if (!result594) return std::unexpected(std::move(result594.error()));
-
-m_netGroup.set_needs_store_callback([this]() { return setNetStates(); });
-m_netGroup.set_needs_load_callback([this](bool) { return getNetStates(); });
-return {};
-}
-
-std::expected<void, StarException> Plant::getNetStates() {
-  if (m_piecesNetState.pull_updated()) {
-    auto result589 = readPieces(m_piecesNetState.get());
-if (!result589) return std::unexpected(std::move(result589.error()));
-    m_piecesUpdated = true;
-  }
-
-  m_tileDamageX = m_tileDamageXNetState.get();
-  m_tileDamageY = m_tileDamageYNetState.get();
-  if (m_tileDamageEventNetState.pull_occurred()) {
-    m_tileDamageEvent = true;
-    m_tileDamageEventTrigger = true;
-  }
-  return {};
-}
-
-std::expected<void, StarException> Plant::setNetStates() {
-  if (m_piecesUpdated) {
-    auto result588 = writePieces();
-if (!result588) return std::unexpected(std::move(result588.error()));
-m_piecesNetState.set(std::move(*result588));
-    m_piecesUpdated = false;
-  }
-  m_tileDamageXNetState.set(m_tileDamageX);
-  m_tileDamageYNetState.set(m_tileDamageY);
-  if (m_tileDamageEventTrigger) {
-    m_tileDamageEventTrigger = false;
-    m_tileDamageEventNetState.trigger();
-  }
-  return {};
-}
-
-std::expected<bool, StarException> Plant::damage_tiles(List<Vec2I> const& positions, Vec2F const& sourcePosition, TileDamage const& tileDamage) {
-  auto result584 = baseDamagePosition(positions);
-if (!result584) return std::unexpected(std::move(result584.error()));
-auto position = std::move(*result584);
-
-  auto result585 = world();
-if (!result585) return std::unexpected(std::move(result585.error()));
-auto geometry = result585->get().geometry();
-
-  m_tileDamageStatus->damage(m_tileDamageParameters, tileDamage);
-  m_tileDamageX = geometry.diff(position[0], tile_position()[0]);
-  m_tileDamageY = position[1] - tile_position()[1];
-  m_tileDamageEvent = true;
-  m_tileDamageEventTrigger = true;
-
-  bool breaking = false;
-  if (m_tileDamageStatus->dead()) {
-    breaking = true;
-    if (m_fallsWhenDead) {
-      m_tileDamageStatus->reset();
-      auto result587 = breakAtPosition(position, sourcePosition);
-if (!result587) return std::unexpected(std::move(result587.error()));
-    } else {
-      m_broken = true;
-    }
-  }
-
-  return breaking;
-}
-
-std::expected<void, StarException> Plant::breakAtPosition(Vec2I const& position, Vec2F const& sourcePosition) {
-  auto result575 = world();
-if (!result575) return std::unexpected(std::move(result575.error()));
-auto geometry = result575->get().geometry();
-  Vec2I internalPos = geometry.diff(position, tile_position());
-  std::size_t idx = std::numeric_limits<std::size_t>::max();
-  int segmentIdx = std::numeric_limits<int>::max();
-  for (std::size_t i = 0; i < m_pieces.size(); ++i) {
-    auto& piece = m_pieces[i];
-    if (piece.structuralSegment && piece.spaces.contains(internalPos)) {
-      if (piece.segmentIdx < segmentIdx) {
-        segmentIdx = piece.segmentIdx;
-        idx = i;
+    if (piece.rotation_type != DontRotate) {
+      float rotation = 0.0f;
+      if (sway) {
+        if (!wind) {
+          float interpolation = std::clamp(render_callback.presentation().interpolation(), 0.0f, 1.0f);
+          float level = std::lerp(m_previous_wind_level, m_wind_level, interpolation);
+          float intensity = std::fabs(level);
+          wind.emplace(
+            m_wind_time + std::remainder(m_previous_wind_time - m_wind_time, plant_wind_period) * (1.0f - interpolation),
+            world_position.x() / 10.0f, std::copysign(0.00117f, level), intensity, intensity / 300.0f);
+        }
+        rotation = wind->sign * (std::sin(wind->phase + piece.rotation_offset * 1.4f + wind->position_phase) * wind->intensity - wind->bias);
+      }
+      if (piece.rotation_type == RotateCrownBranch || piece.rotation_type == RotateCrownLeaves) {
+        drawable.rotate(rotation * 0.7f, piece.offset + Vec2F(size.x() / 2.0f, 0));
+        drawable.translate(Vec2F(0, -0.40f));
+      } else {
+        drawable.rotate(rotation, piece.offset + size / 2.0f);
       }
     }
+    drawable.translate(world_position);
+    if (auto result = render_callback.add_drawable(std::move(drawable), render_layer_plant); !result)
+      return std::unexpected(std::move(result.error()));
   }
 
-  // default to highest structural piece
-  if (idx >= m_pieces.size()) {
-    for (std::size_t i = m_pieces.size(); i > 0; --i) {
-      auto& piece = m_pieces[i - 1];
-      if (piece.structuralSegment) {
-        segmentIdx = piece.segmentIdx;
-        idx = i - 1;
-        break;
-      }
-    }
-  }
+  return {};
+}
 
-  // plant has no structural segments? this is a terrible fallback because it
-  // prevents destruction
-  if (idx >= m_pieces.size())
+std::expected<void, StarException> Plant::read_pieces(ByteArray const& pieces) {
+  // An empty field means no update; a serialized empty list clears the plant.
+  if (pieces.empty())
     return {};
 
-  PlantPiece breakPiece = m_pieces[idx];
-  Vec2F breakPoint = Vec2F(position) - Vec2F(tile_position());
-  if (breakPiece.spaces.size()) {
+  List<PlantPiece> decoded;
+  DataStreamReader ds(pieces.span());
+  auto read = ds.read_container(decoded, [](DataStream& stream, PlantPiece& piece) -> std::expected<void, StarException> {
+    if (auto result = stream.read(piece.image); !result)
+      return std::unexpected(std::move(result.error()));
+    if (auto result = stream.read(piece.offset[0]); !result)
+      return std::unexpected(std::move(result.error()));
+    if (auto result = stream.read(piece.offset[1]); !result)
+      return std::unexpected(std::move(result.error()));
+    if (auto result = stream.read(piece.rotation_type); !result)
+      return std::unexpected(std::move(result.error()));
+    if (auto result = stream.read(piece.rotation_offset); !result)
+      return std::unexpected(std::move(result.error()));
+    if (auto result = stream.read(piece.structural_segment); !result)
+      return std::unexpected(std::move(result.error()));
+    if (auto result = stream.read(piece.kind); !result)
+      return std::unexpected(std::move(result.error()));
+    if (auto result = stream.read(piece.segment_idx); !result)
+      return std::unexpected(std::move(result.error()));
+    return stream.read(piece.flip);
+  });
+  if (!read)
+    return std::unexpected(std::move(read.error()));
+  return replace_pieces(std::move(decoded));
+}
+
+std::expected<ByteArray, StarException> Plant::write_pieces() const {
+  return DataStreamBuffer::serialize_container(m_pieces, [](DataStream& stream, PlantPiece const& piece) -> std::expected<void, StarException> {
+    if (auto result = stream.write(piece.image); !result)
+      return std::unexpected(std::move(result.error()));
+    if (auto result = stream.write(piece.offset[0]); !result)
+      return std::unexpected(std::move(result.error()));
+    if (auto result = stream.write(piece.offset[1]); !result)
+      return std::unexpected(std::move(result.error()));
+    if (auto result = stream.write(piece.rotation_type); !result)
+      return std::unexpected(std::move(result.error()));
+    if (auto result = stream.write(piece.rotation_offset); !result)
+      return std::unexpected(std::move(result.error()));
+    if (auto result = stream.write(piece.structural_segment); !result)
+      return std::unexpected(std::move(result.error()));
+    if (auto result = stream.write(piece.kind); !result)
+      return std::unexpected(std::move(result.error()));
+    if (auto result = stream.write(piece.segment_idx); !result)
+      return std::unexpected(std::move(result.error()));
+    return stream.write(piece.flip);
+  });
+}
+
+std::expected<void, StarException> Plant::read_pieces_from_json(Json const& pieces) {
+  auto decoded = json_to_list<PlantPiece>(pieces, [](Json const& value) -> std::expected<PlantPiece, StarException> {
+    PlantPiece piece;
+    auto image = value.get_string("image");
+    if (!image)
+      return std::unexpected(std::move(image.error()));
+    piece.image = std::move(*image);
+    auto offset = value.get("offset");
+    if (!offset)
+      return std::unexpected(std::move(offset.error()));
+    auto position = json_to_vec2f(*offset);
+    if (!position)
+      return std::unexpected(std::move(position.error()));
+    piece.offset = *position;
+    auto rotation_name = value.get_string("rotationType");
+    if (!rotation_name)
+      return std::unexpected(std::move(rotation_name.error()));
+    if (!rotation_type_names)
+      return std::unexpected(rotation_type_names.error());
+    auto rotation_type = rotation_type_names->get_left(*rotation_name);
+    if (!rotation_type)
+      return std::unexpected(std::move(rotation_type.error()));
+    piece.rotation_type = rotation_type->get();
+    auto rotation_offset = value.get_float("rotationOffset");
+    if (!rotation_offset)
+      return std::unexpected(std::move(rotation_offset.error()));
+    piece.rotation_offset = *rotation_offset;
+    auto structural_segment = value.get_bool("structuralSegment");
+    if (!structural_segment)
+      return std::unexpected(std::move(structural_segment.error()));
+    piece.structural_segment = *structural_segment;
+    auto kind = value.get_int("kind");
+    if (!kind)
+      return std::unexpected(std::move(kind.error()));
+    piece.kind = static_cast<PlantPieceKind>(*kind);
+    auto segment_idx = value.get_int("segmentIdx");
+    if (!segment_idx)
+      return std::unexpected(std::move(segment_idx.error()));
+    piece.segment_idx = *segment_idx;
+    auto flip = value.get_bool("flip");
+    if (!flip)
+      return std::unexpected(std::move(flip.error()));
+    piece.flip = *flip;
+    return piece;
+  });
+  if (!decoded)
+    return std::unexpected(std::move(decoded.error()));
+  return replace_pieces(std::move(*decoded));
+}
+
+std::expected<Json, StarException> Plant::write_pieces_to_json() const {
+  return json_from_list<PlantPiece>(m_pieces, [](PlantPiece const& piece) -> std::expected<Json, StarException> {
+    if (!rotation_type_names)
+      return std::unexpected(rotation_type_names.error());
+    auto rotation_name = rotation_type_names->get_right(piece.rotation_type);
+    if (!rotation_name)
+      return std::unexpected(std::move(rotation_name.error()));
+    return JsonObject{
+      {"image", piece.image},
+      {"offset", json_from_vec2f(piece.offset)},
+      {"rotationType", rotation_name->get()},
+      {"rotationOffset", piece.rotation_offset},
+      {"structuralSegment", piece.structural_segment},
+      {"kind", piece.kind},
+      {"segmentIdx", piece.segment_idx},
+      {"flip", piece.flip},
+    };
+  });
+}
+
+std::expected<void, StarException> Plant::setup_net_states() {
+  if (auto result = m_net_group.add_net_element(*m_tile_damage_status); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = m_net_group.add_net_element(m_pieces_net_state); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = m_net_group.add_net_element(m_tile_damage_x_net_state); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = m_net_group.add_net_element(m_tile_damage_y_net_state); !result)
+    return std::unexpected(std::move(result.error()));
+  if (auto result = m_net_group.add_net_element(m_tile_damage_event_net_state); !result)
+    return std::unexpected(std::move(result.error()));
+  m_net_group.set_needs_store_callback([this]() { return store_net_states(); });
+  m_net_group.set_needs_load_callback([this](bool) { return load_net_states(); });
+  return {};
+}
+
+std::expected<void, StarException> Plant::load_net_states() {
+  // Retain the application request when parsing or asset lookup fails.
+  m_pieces_update_pending |= m_pieces_net_state.pull_updated();
+  if (m_pieces_update_pending) {
+    if (auto read = read_pieces(m_pieces_net_state.get()); !read)
+      return std::unexpected(std::move(read.error()));
+    m_pieces_update_pending = false;
+  }
+
+  m_tile_damage_x = m_tile_damage_x_net_state.get();
+  m_tile_damage_y = m_tile_damage_y_net_state.get();
+  if (m_tile_damage_event_net_state.pull_occurred()) {
+    m_tile_damage_event = true;
+    m_tile_damage_event_trigger = true;
+  }
+  return {};
+}
+
+std::expected<void, StarException> Plant::store_net_states() {
+  if (m_pieces_updated) {
+    auto pieces = write_pieces();
+    if (!pieces)
+      return std::unexpected(std::move(pieces.error()));
+    if (m_pieces_net_state.get() != *pieces)
+      m_pieces_net_state.push(std::move(*pieces));
+    m_pieces_updated = false;
+  }
+  m_tile_damage_x_net_state.set(m_tile_damage_x);
+  m_tile_damage_y_net_state.set(m_tile_damage_y);
+  if (m_tile_damage_event_trigger) {
+    m_tile_damage_event_trigger = false;
+    m_tile_damage_event_net_state.trigger();
+  }
+  return {};
+}
+
+std::expected<bool, StarException> Plant::damage_tiles(List<Vec2I> const& positions, Vec2F const& source_position, TileDamage const& tile_damage) {
+  if (positions.empty())
+    return std::unexpected(PlantException("Cannot damage a plant without a hit position"));
+
+  auto current_world = world();
+  if (!current_world)
+    return std::unexpected(std::move(current_world.error()));
+  if (m_pending_fall) {
+    if (auto resumed = resume_felling(current_world->get()); !resumed)
+      return std::unexpected(std::move(resumed.error()));
+    return true;
+  }
+
+  auto geometry = current_world->get().geometry();
+  auto position = base_damage_position(positions, geometry);
+  auto displacement = geometry.diff(position, m_tile_position);
+  m_tile_damage_status->damage(m_tile_damage_parameters, tile_damage);
+  m_tile_damage_x = displacement[0];
+  m_tile_damage_y = displacement[1];
+  m_tile_damage_event = true;
+  m_tile_damage_event_trigger = true;
+
+  if (!m_tile_damage_status->dead())
+    return false;
+  if (m_falls_when_dead) {
+    m_tile_damage_status->reset();
+    if (auto fallen = break_at_position(current_world->get(), position, source_position); !fallen)
+      return std::unexpected(std::move(fallen.error()));
+  } else {
+    m_broken = true;
+  }
+  return true;
+}
+
+std::expected<void, StarException> Plant::break_at_position(World& world, Vec2I const& position, Vec2F const& source_position) {
+  auto internal_position = world.geometry().diff(position, m_tile_position);
+  auto cut = m_pieces.size();
+  auto last_structural = cut;
+  for (std::size_t i = 0; i < m_pieces.size(); ++i) {
+    auto const& piece = m_pieces[i];
+    if (!piece.structural_segment)
+      continue;
+    last_structural = i;
+    if ((cut == m_pieces.size() || piece.segment_idx < m_pieces[cut].segment_idx) && piece.spaces.contains(internal_position))
+      cut = i;
+  }
+  if (cut == m_pieces.size())
+    cut = last_structural;
+  if (cut == m_pieces.size())
+    return {};
+
+  auto const& cut_piece = m_pieces[cut];
+  Vec2F break_point = Vec2F(position) - Vec2F(m_tile_position);
+  if (!cut_piece.spaces.empty()) {
     RectF bounds = RectF::null();
-    for (auto space : breakPiece.spaces) {
+    for (auto const& space : cut_piece.spaces) {
       bounds.combine(Vec2F(space));
       bounds.combine(Vec2F(space) + Vec2F(1, 1));
     }
-    breakPoint[0] = (bounds.max()[0] + bounds.min()[0]) / 2.0f;
-    if (!m_ceiling)
-      breakPoint[1] = bounds.min()[1];
-    else
-      breakPoint[1] = bounds.max()[1];
+    break_point[0] = (bounds.max()[0] + bounds.min()[0]) / 2.0f;
+    break_point[1] = m_ceiling ? bounds.max()[1] : bounds.min()[1];
   }
 
-  List<PlantPiece> droppedPieces;
-  if (m_pieces[idx].structuralSegment) {
-    idx = 0;
-    while (idx < m_pieces.size()) {
-      if (m_pieces[idx].segmentIdx >= segmentIdx) {
-        auto result576 = m_pieces.take_at(idx);
-        if (!result576)
-          return std::unexpected(std::move(result576.error()));
-        droppedPieces.push_back(std::move(*result576));
-        continue;
-      }
-      idx++;
-    }
-  } else {
-    auto result577 = m_pieces.take_at(idx);
-    if (!result577)
-      return std::unexpected(std::move(result577.error()));
-    droppedPieces.push_back(std::move(*result577));
-  }
-  m_piecesUpdated = true;
+  auto plant_description = description();
+  if (!plant_description)
+    return std::unexpected(std::move(plant_description.error()));
+  auto random = root().random().uniform_float(-0.3f, 0.3f);
+  if (!random)
+    return std::unexpected(std::move(random.error()));
 
-  Vec2I breakPointI = Vec2I(std::round(breakPoint[0]), std::round(breakPoint[1]));
+  PendingFall pending;
+  pending.break_point = break_point;
+  pending.world_break_point = break_point + Vec2F(m_tile_position);
+  pending.fall_vector = (pending.world_break_point - source_position).normalized();
+  pending.description = std::move(*plant_description);
+  pending.random = *random;
 
-  // Calculate a new origin for the droppedPieces
-  for (auto& piece : droppedPieces) {
-    piece.offset -= breakPoint;
-    Set<Vec2I> spaces = piece.spaces;
-    piece.spaces.clear();
-    for (auto const& space : spaces) {
-      piece.spaces.add(space - breakPointI);
-    }
-  }
-
-  Vec2F worldSpaceBreakPoint = breakPoint + Vec2F(tile_position());
-
-  List<int> segmentOrder;
-  Map<int, List<PlantPiece>> segments;
-  for (auto& piece : droppedPieces) {
-    if (!segments.contains(piece.segmentIdx))
-      segmentOrder.push_back(piece.segmentIdx);
-    segments[piece.segmentIdx].push_back(piece);
-  }
-  std::reverse(segmentOrder.begin(), segmentOrder.end());
-  auto result578 = this->root().random().uniform_float(-0.3f, 0.3f);
-if (!result578) return std::unexpected(std::move(result578.error()));
-float random = std::move(*result578);
-  auto fallVector = (worldSpaceBreakPoint - sourcePosition).normalized();
-  bool first = true;
-  for (auto segmentIdx : segmentOrder) {
-    auto segment = segments[segmentIdx];
-    auto result579 = world();
-if (!result579) return std::unexpected(std::move(result579.error()));
-auto result580 = description();
-if (!result580) return std::unexpected(std::move(result580.error()));
-auto result581 = PlantDrop::create(this->root(), segment,
-        worldSpaceBreakPoint,
-        fallVector,
-        std::move(*result580),
-        m_ceiling,
-        m_stemDropConfig,
-        m_foliageDropConfig,
-        m_saplingDropConfig,
-        first,
-        random);
-if (!result581) return std::unexpected(std::move(result581.error()));
-auto result582 = result579->get().addEntity(std::move(*result581));
-if (!result582) return std::unexpected(std::move(result582.error()));
-    first = false;
-  }
-
-  m_piecesScanned = false;
-
-  auto result583 = validatePieces();
-if (!result583) return std::unexpected(std::move(result583.error()));
-  return {};
-}
-
-std::expected<Vec2I, StarException> Plant::baseDamagePosition(List<Vec2I> const& positions) const {
-  if constexpr (Star::debug_enabled) {
-    Star::star_assert_failed((positions.size()));
-  }
-  auto result572 = positions.at(0);
-if (!result572) return std::unexpected(std::move(result572.error()));
-auto res = result572->get();
-
+  // Count groups in first-encounter order, then fill their contiguous slots
+  // in original piece order. Publication consumes the groups from the back.
+  auto cut_segment = cut_piece.segment_idx;
+  HashMap<int, std::size_t> groups;
   for (auto const& piece : m_pieces) {
-    if (piece.structuralSegment) {
-      for (auto space : piece.spaces) {
-        for (auto position : positions) {
-          auto result573 = world();
-if (!result573) return std::unexpected(std::move(result573.error()));
-          if (result573->get().geometry().equal(m_tilePosition + space, position)) {
-            // if this space is a "better match" for the root of the plant
-            if ((res[1] < position[1]) == m_ceiling) {
-              res = position;
-            }
-          }
-        }
-      }
+    if (piece.segment_idx < cut_segment)
+      continue;
+    auto [group, inserted] = groups.try_emplace(piece.segment_idx, groups.size());
+    if (inserted)
+      pending.segment_ends.push_back(0);
+    ++pending.segment_ends[group->second];
+  }
+  std::partial_sum(pending.segment_ends.begin(), pending.segment_ends.end(), pending.segment_ends.begin());
+  pending.indices.resize(pending.segment_ends.back());
+  for (auto& cursor : groups.value_view())
+    cursor = cursor == 0 ? 0 : pending.segment_ends[cursor - 1];
+
+  pending.slots.resize(m_pieces.size(), PendingFall::no_slot);
+  for (std::size_t i = 0; i < m_pieces.size(); ++i) {
+    auto segment = m_pieces[i].segment_idx;
+    if (segment >= cut_segment) {
+      auto slot = groups.find(segment)->second++;
+      pending.slots[i] = slot;
+      pending.indices[slot] = i;
     }
   }
-
-  return res;
+  auto published = publish_fall(world, pending);
+  if (!published)
+    m_pending_fall = std::make_unique<PendingFall>(std::move(pending));
+  return published;
 }
 
-std::expected<bool, StarException> Plant::damagable() const {
-  if (m_stemDropConfig.type() != Json::Type::Object)
-    return true;
-  auto result571 = m_stemDropConfig.get_bool("destructable", true);
-if (!result571) return std::unexpected(std::move(result571.error()));
-if (!std::move(*result571))
-    return false;
-  return true;
+std::expected<void, StarException> Plant::resume_felling(World& world) {
+  auto published = publish_fall(world, *m_pending_fall);
+  if (published)
+    m_pending_fall.reset();
+  return published;
+}
+
+std::expected<void, StarException> Plant::publish_fall(World& world, PendingFall& pending) {
+  auto publish = [&]() -> std::expected<void, StarException> {
+    while (!pending.segment_ends.empty()) {
+      if (!pending.unpublished_drop) {
+        auto group_count = pending.segment_ends.size();
+        auto begin = group_count == 1 ? 0 : pending.segment_ends[group_count - 2];
+        auto end = pending.segment_ends.back();
+        auto segment = std::span(pending.indices).subspan(begin, end - begin);
+        auto drop = PlantDrop::create_segment(root(), m_pieces, segment, pending.break_point, pending.world_break_point,
+            pending.fall_vector, pending.description, m_ceiling, m_stem_drop_config, m_foliage_drop_config,
+            m_sapling_drop_config, pending.first, pending.random);
+        if (!drop)
+          return std::unexpected(std::move(drop.error()));
+        pending.unpublished_drop = std::move(*drop);
+      }
+      if (auto added = world.addEntity(pending.unpublished_drop); !added)
+        return added;
+      pending.unpublished_drop.reset();
+      pending.segment_ends.pop_back();
+      pending.first = false;
+    }
+    return {};
+  };
+  auto result = publish();
+
+  // Remove exactly the published suffix of the grouped indices, even on an
+  // error. Compact standing wood once, preserving both orders for a retry.
+  auto remaining = pending.segment_ends.empty() ? 0 : pending.segment_ends.back();
+  if (remaining != pending.indices.size()) {
+    std::size_t kept = 0;
+    for (std::size_t i = 0; i < m_pieces.size(); ++i) {
+      auto slot = pending.slots[i];
+      if (slot != PendingFall::no_slot) {
+        if (slot >= remaining)
+          continue;
+        pending.indices[slot] = kept;
+      }
+      if (kept != i) {
+        m_pieces[kept] = std::move(m_pieces[i]);
+        pending.slots[kept] = slot;
+      }
+      ++kept;
+    }
+    m_pieces.resize(kept);
+    pending.slots.resize(kept);
+    pending.indices.resize(remaining);
+    commit_piece_geometry(derive_piece_geometry(m_pieces));
+    m_pieces_updated = true;
+  }
+
+  return result;
+}
+
+Vec2I Plant::base_damage_position(List<Vec2I> const& positions, WorldGeometry const& geometry) const {
+  auto result = positions.front();
+  if (positions.size() == 1)
+    return result;
+
+  // Retain the original piece/space iteration order. At equal Y the ceiling
+  // chooses the first match, while a floor plant chooses the last match.
+  HashMap<Vec2U, std::size_t> hits;
+  hits.reserve(positions.size());
+  for (std::size_t i = 0; i < positions.size(); ++i) {
+    auto index = geometry.index(positions[i]);
+    if (m_ceiling)
+      hits.try_emplace(index, i);
+    else
+      hits.insert_or_assign(index, i);
+  }
+  for (auto const& piece : m_pieces) {
+    if (!piece.structural_segment)
+      continue;
+    for (auto const& space : piece.spaces) {
+      auto hit = hits.find(geometry.index(m_tile_position + space));
+      if (hit == hits.end())
+        continue;
+      auto const& position = positions[hit->second];
+      if ((result[1] < position[1]) == m_ceiling)
+        result = position;
+    }
+  }
+  return result;
 }
 
 }

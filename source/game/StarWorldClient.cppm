@@ -421,6 +421,18 @@ private:
     List<std::shared_ptr<AudioInstance>> loops;
   };
 
+  struct DetachedPlantEffects {
+    // Only the collector is used after uninit; the entity is no longer in
+    // the map and never receives another update, query, or draw.
+    std::shared_ptr<Entity> source;
+    EntityId id;
+    std::uint64_t detached_step;
+    bool hidden;
+    Directives directive;
+  };
+
+  [[nodiscard]] std::expected<void, StarException> collect_detached_plant_effects();
+
   struct DamageNumber {
     float amount;
     Vec2F position;
@@ -487,6 +499,7 @@ private:
   std::shared_ptr<EntityMap> m_entityMap;
   Map<EntityId, EntityPresentation> m_entityPresentation;
   Map<EntityId, HiddenEntityAudio> m_hiddenEntityAudio;
+  std::vector<DetachedPlantEffects> m_detached_plant_effects;
   float m_inspectionFlickerMultiplier = 1.0f;
   float m_presentationTimestep = 0.0f;
   ClientRenderCallback m_event_render_callback{std::nullopt};

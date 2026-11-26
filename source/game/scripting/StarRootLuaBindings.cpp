@@ -688,16 +688,16 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
     return std::move(tech->parameters);
   }); !r) return std::unexpected(std::move(r.error()));
 
-  if (auto r = callbacks.register_callback("treeStemDirectory", [&root](String const& stemName) -> std::expected<std::optional<String>, StarException> {
-    auto database = root.plantDatabase();
+  if (auto r = callbacks.register_callback("treeStemDirectory", [&root](String const& stem_name) -> std::expected<std::optional<String>, StarException> {
+    auto database = root.plant_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    return (*database)->treeStemDirectory(stemName);
+    return (*database)->tree_stem_directory(stem_name);
   }); !r) return std::unexpected(std::move(r.error()));
 
-  if (auto r = callbacks.register_callback("treeFoliageDirectory", [&root](String const& foliageName) -> std::expected<std::optional<String>, StarException> {
-    auto database = root.plantDatabase();
+  if (auto r = callbacks.register_callback("treeFoliageDirectory", [&root](String const& foliage_name) -> std::expected<std::optional<String>, StarException> {
+    auto database = root.plant_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    return (*database)->treeFoliageDirectory(foliageName);
+    return (*database)->tree_foliage_directory(foliage_name);
   }); !r) return std::unexpected(std::move(r.error()));
 
   if (auto r = callbacks.register_callback("collection", [&root](String const& collection_name) -> std::expected<Collection, StarException> {
@@ -856,15 +856,15 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
     return (*database)->biome_config(type_name);
   }); !r) return std::unexpected(std::move(r.error()));
 
-  if (auto r = callbacks.register_callback("treeFoliageConfig", [&root](String const& typeName) -> std::expected<Json, StarException> {
-    auto database = root.plantDatabase();
+  if (auto r = callbacks.register_callback("treeFoliageConfig", [&root](String const& type_name) -> std::expected<Json, StarException> {
+    auto database = root.plant_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    return (*database)->treeFoliageConfig(typeName);
+    return (*database)->tree_foliage_config(type_name);
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.register_callback("treeStemConfig", [&root](String const& typeName) -> std::expected<Json, StarException> {
-    auto database = root.plantDatabase();
+  if (auto r = callbacks.register_callback("treeStemConfig", [&root](String const& type_name) -> std::expected<Json, StarException> {
+    auto database = root.plant_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    return (*database)->treeStemConfig(typeName);
+    return (*database)->tree_stem_config(type_name);
   }); !r) return std::unexpected(std::move(r.error()));
 
   return callbacks;

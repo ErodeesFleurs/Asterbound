@@ -169,7 +169,7 @@ public:
       Assets const& assets, String const& source_path) &;
 
   [[nodiscard]] std::expected<std::shared_ptr<ObjectDatabase const>, StarException> object_database();
-  [[nodiscard]] std::expected<std::shared_ptr<PlantDatabase const>, StarException> plantDatabase();
+  [[nodiscard]] std::expected<std::shared_ptr<PlantDatabase const>, StarException> plant_database();
   [[nodiscard]] std::expected<std::shared_ptr<ProjectileDatabase const>, StarException> projectileDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<MonsterDatabase const>, StarException> monster_database();
   [[nodiscard]] std::expected<std::shared_ptr<NpcDatabase const>, StarException> npc_database();
@@ -285,8 +285,8 @@ private:
   std::shared_ptr<ObjectDatabase> m_objectDatabase;
   std::mutex m_objectDatabaseMutex;
 
-  std::shared_ptr<PlantDatabase> m_plantDatabase;
-  std::mutex m_plantDatabaseMutex;
+  std::shared_ptr<PlantDatabase> m_plant_database;
+  std::mutex m_plant_database_mutex;
 
   std::shared_ptr<ProjectileDatabase> m_projectileDatabase;
   std::mutex m_projectileDatabaseMutex;

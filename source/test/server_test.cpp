@@ -9,6 +9,7 @@ import star.rpc_promise;
 import star.io_device;
 import star.byte_array;
 import star.data_stream_devices;
+import star.data_stream_extra;
 
 import std;
 typedef struct ZSTD_CCtx_s ZSTD_CCtx;
@@ -40,6 +41,7 @@ import star.string_view;
 import star.directives;
 import star.asset_path;
 import star.image;
+import star.buffer;
 import star.map;
 import star.ref_ptr;
 import star.logging;
@@ -56,6 +58,7 @@ import star.status_types;
 import star.damage;
 import star.light_source;
 import star.entity;
+import star.entity_map;
 import star.collision_block;
 import star.liquid_types;
 import star.tile_damage;
@@ -77,6 +80,7 @@ import star.interactive_entity;
 import star.tile_entity;
 import star.inspectable_entity;
 import star.plant;
+import star.plant_drop;
 import star.plant_database;
 import star.biome;
 import star.biome_placement;
@@ -99,7 +103,9 @@ import star.cellular_liquid;
 import star.world_structure;
 import star.lua_components;
 import star.drawable;
+import star.entity_rendering;
 import star.entity_rendering_types;
+import star.mixer;
 import star.sky_render_data;
 import star.parallax;
 import star.world_render_data;
@@ -152,6 +158,13 @@ namespace Star {
 struct WorldServerTestAccess {
   using Timing = WorldServer::UpdateTiming;
   using Limit = WorldServer::ProcessingLimit;
+
+  static auto limit_entity_ids(WorldServer& world, EntityId first, EntityId last) {
+    auto original = std::exchange(world.m_entityMap, std::make_shared<EntityMap>(world.geometry().size(), first, last));
+    return make_scope_exit([&world, original = std::move(original)]() mutable {
+      world.m_entityMap = std::move(original);
+    });
+  }
 
   static void start_break_clock(WorldServer& world) {
     world.m_current_time = 120;
@@ -233,6 +246,167 @@ const GameTestRegistration server_break_clock("GameTimers", "GlobalBreakRequests
     world->update(0.03125f).value();
     EXPECT_EQ(chair->checks - before, step / 4) << step;
   }
+});
+
+const GameTestRegistration plant_felling("PlantFelling", "WrappedTiesAndRetryAfterSecondPublicationFails", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(File::create_directories(overlay));
+  auto image = std::make_shared<Buffer>();
+  ASSERT_TRUE(Image::filled({tile_pixels, tile_pixels}, {255, 255, 255, 255}).write_png(fixture.root().logger(), image));
+  ASSERT_TRUE(File::write_file(image->take_data(), File::relative_to(overlay, "plant-felling-tile.png")));
+
+  auto settings = fixture.rootSettings();
+  settings.assetSources.push_back(overlay);
+  settings.storageDirectory = File::relative_to(*directory, "storage");
+  settings.runtimeConfigFile = {};
+  settings.logDirectory = {};
+  settings.logFile = {};
+  settings.includeUGC = false;
+  settings.mix_random_entropy = false;
+  auto root = Root::create(std::move(settings));
+  ASSERT_TRUE(root) << root.error().what();
+  auto created = createSchedulingWorld(**root);
+  ASSERT_TRUE(created) << created.error().what();
+  auto& world = **created;
+  auto close = make_scope_exit([&] { EXPECT_TRUE(world.close()); });
+  ASSERT_TRUE(world.generateRegion(RectI::with_size({-4, 1018}, {16, 28})));
+
+  // Use native ID exhaustion, not a stubbed addEntity: the standing tree and
+  // two blockers occupy three of four slots, so the second drop is rejected.
+  auto capacity = WorldServerTestAccess::limit_entity_ids(world, 500, 503);
+  auto remove_probes = make_scope_exit([&] {
+    for (auto id : world.entity_ids())
+      EXPECT_TRUE(world.removeEntity(id, false));
+  });
+  auto piece = [](Vec2F const& offset, int segment, bool structural) {
+    return JsonObject{{"image", "/plant-felling-tile.png"}, {"offset", json_from_vec2f(offset)},
+        {"rotationType", "dontRotate"}, {"rotationOffset", 0}, {"structuralSegment", structural},
+        {"segmentIdx", segment}, {"kind", structural ? Plant::Stem : Plant::Foliage}, {"flip", false}};
+  };
+  auto make_plant = [&](Vec2I const& origin, bool ceiling, JsonArray pieces) {
+    return Plant::create(**root, JsonObject{{"tilePosition", json_from_vec2i(origin)}, {"ceiling", ceiling},
+        {"descriptions", JsonObject{{"description", "Felling probe"}}}, {"ephemeral", false},
+        {"stemDropConfig", JsonObject{}}, {"foliageDropConfig", JsonObject{}}, {"saplingDropConfig", Json()},
+        {"tileDamageParameters", JsonObject{{"damageFactors", JsonObject{{"plantish", 1}}}, {"damageRecovery", 0}}},
+        {"fallsWhenDead", true}, {"pieces", std::move(pieces)}});
+  };
+  auto standing_offsets = [](Plant const& plant) {
+    List<Vec2F> offsets;
+    for (auto const& piece : plant.pieces())
+      offsets.push_back(piece.offset);
+    return offsets;
+  };
+  auto expect_drop = [&](std::shared_ptr<PlantDrop> const& drop, Vec2F const& origin, bool first,
+      List<Vec2F> const& offsets, RectF const& bounds, RectF const& stem_bounds) {
+    ASSERT_TRUE(drop);
+    EXPECT_EQ(world.geometry().diff(drop->position(), origin), Vec2F());
+    auto wire = drop->net_store();
+    ASSERT_TRUE(wire) << wire.error().what();
+    DataStreamReader stream(wire->span());
+    ASSERT_TRUE(stream.read<float>()); // Timeout.
+    EXPECT_EQ(stream.read<bool>(), first);
+    ASSERT_TRUE(stream.read<String>()); // Description.
+    EXPECT_EQ(stream.read<RectF>(), bounds);
+    EXPECT_EQ(stream.read<RectF>(), stem_bounds);
+    ASSERT_TRUE(stream.read<float>()); // Rotation rate.
+    List<Vec2F> actual;
+    auto read_offsets = stream.read_container(actual, [](DataStream& stream, Vec2F& offset) -> std::expected<void, StarException> {
+      if (auto image = stream.read<AssetPath>(); !image) return std::unexpected(std::move(image.error()));
+      if (auto x = stream.read(offset[0]); !x) return x;
+      if (auto y = stream.read(offset[1]); !y) return y;
+      if (auto flip = stream.read<bool>(); !flip) return std::unexpected(std::move(flip.error()));
+      if (auto kind = stream.read<Plant::PlantPieceKind>(); !kind) return std::unexpected(std::move(kind.error()));
+      return {};
+    });
+    ASSERT_TRUE(read_offsets) << read_offsets.error().what();
+    EXPECT_EQ(actual, offsets);
+  };
+
+  auto floor = make_plant({0, 1024}, false, {piece({0, 0}, 0, true), piece({0, 2}, 8, true), piece({2, 3}, 6, true),
+      piece({-1, 2}, 3, true), piece({1, 3}, 8, false), piece({1, 1}, 0, false), piece({-2, 3}, 3, false),
+      piece({3, 4}, 6, false)});
+  auto blocker = make_plant({8, 1024}, false, {piece({0, 0}, 0, true)});
+  auto second_blocker = make_plant({9, 1024}, false, {piece({0, 0}, 0, true)});
+  ASSERT_TRUE(floor) << floor.error().what();
+  ASSERT_TRUE(blocker) << blocker.error().what();
+  ASSERT_TRUE(second_blocker) << second_blocker.error().what();
+  for (auto const& position : {Vec2I(0, 1023), Vec2I(8, 1023), Vec2I(9, 1023), Vec2I(0, 1041)}) {
+    auto support = world.modifyServerTile(position);
+    ASSERT_TRUE(support && *support);
+    (*support)->get().foreground = structure_material_id;
+  }
+  ASSERT_TRUE(world.addEntity(*floor, 500));
+  ASSERT_TRUE(world.addEntity(*blocker, 502));
+  ASSERT_TRUE(world.addEntity(*second_blocker, 503));
+
+  constexpr std::uint64_t seed = 271828;
+  (*root)->random().seed(seed);
+  RandomService oracle(seed);
+  ASSERT_TRUE(oracle.uniform_float(-0.3f, 0.3f));
+  TileDamage const lethal(TileDamageType::Plantish, 2.0f);
+  // Different canonical X positions at the same height, with the seam target
+  // appearing before the other hit. Floor chooses the last piece-space match.
+  auto failed = (*floor)->damage_tiles({{17, 1029}, {2047, 1026}, {0, 1026}, {-1, 1026}}, {2.0f, 1026.0f}, lethal);
+  ASSERT_FALSE(failed);
+  EXPECT_NE(std::string_view(failed.error().what()).find("No more entity id space"), std::string_view::npos);
+  auto first = as<PlantDrop>(world.entity(501));
+  expect_drop(first, {-0.5f, 1026.0f}, true, {{-0.5f, 0}, {-1.5f, 1}},
+      RectF({-1, 0}, {1, 2}), RectF({0, 0}, {1, 1}));
+  EXPECT_EQ(standing_offsets(**floor), (List<Vec2F>{{0, 0}, {0, 2}, {2, 3}, {1, 3}, {1, 1}, {3, 4}}));
+  EXPECT_EQ((*floor)->spaces().contains({-1, 2}), false);
+  EXPECT_EQ((*floor)->spaces().contains({0, 2}), true);
+  EXPECT_EQ((*floor)->should_destroy(), false);
+  EXPECT_FALSE((*floor)->check_broken()); // Still out of IDs; the same cut is pending.
+  EXPECT_EQ(world.entity(501), first);
+
+  ASSERT_TRUE(world.removeEntity(502, false));
+  ASSERT_TRUE(world.removeEntity(503, false));
+  ASSERT_TRUE((*floor)->update(0.0f, 1)); // No new hit or break request.
+  EXPECT_EQ(world.entity(501), first);
+  expect_drop(as<PlantDrop>(world.entity(502)), {-0.5f, 1026.0f}, false, {{2.5f, 1}, {3.5f, 2}},
+      RectF({3, 1}, {5, 3}), RectF({3, 1}, {4, 2}));
+  // The last group is constructed only after retry, using remapped indices.
+  expect_drop(as<PlantDrop>(world.entity(503)), {-0.5f, 1026.0f}, false, {{0.5f, 0}, {1.5f, 1}},
+      RectF({1, 0}, {3, 2}), RectF({1, 0}, {2, 1}));
+  EXPECT_EQ(standing_offsets(**floor), (List<Vec2F>{{0, 0}, {1, 1}}));
+  EXPECT_EQ((*floor)->roots(), (List<Vec2I>{{0, -1}}));
+  EXPECT_EQ((*floor)->check_broken(), false);
+  EXPECT_EQ((*root)->random().next_u64(), oracle.next_u64());
+
+  // Root loss falls from the bottom of the remaining ground piece.
+  ASSERT_TRUE(world.removeEntity(501, false));
+  auto removed_support = world.modifyServerTile({0, 1023});
+  ASSERT_TRUE(removed_support && *removed_support);
+  (*removed_support)->get().foreground = empty_material_id;
+  EXPECT_EQ((*floor)->check_broken(), false);
+  EXPECT_EQ((*floor)->should_destroy(), true);
+  expect_drop(as<PlantDrop>(world.entity(501)), {0.5f, 1024.0f}, true, {{-0.5f, 0}, {0.5f, 1}},
+      RectF({-1, 0}, {1, 2}), RectF({-1, 0}, {0, 1}));
+  ASSERT_TRUE(world.removeEntity(500, false));
+  ASSERT_TRUE(world.removeEntity(501, false));
+  ASSERT_TRUE(world.removeEntity(502, false));
+  ASSERT_TRUE(world.removeEntity(503, false));
+
+  auto ceiling = make_plant({0, 1040}, true, {piece({0, 0}, 0, true), piece({0, -2}, 8, true),
+      piece({-1, -2}, 3, true), piece({1, -3}, 8, false)});
+  ASSERT_TRUE(ceiling) << ceiling.error().what();
+  ASSERT_TRUE(world.addEntity(*ceiling, 500));
+  // The ceiling keeps the first piece-space at equal Y and breaks at its top;
+  // the other equally-high structural group remains standing.
+  EXPECT_EQ((*ceiling)->damage_tiles({{17, 1034}, {2047, 1038}, {0, 1038}}, {2.0f, 1038.0f}, lethal), true);
+  List<std::shared_ptr<PlantDrop>> ceiling_drops;
+  for (auto id : world.entity_ids()) {
+    if (auto drop = as<PlantDrop>(world.entity(id)))
+      ceiling_drops.push_back(std::move(drop));
+  }
+  ASSERT_EQ(ceiling_drops.size(), 1u);
+  expect_drop(ceiling_drops.front(), {0.5f, 1039.0f}, true, {{-0.5f, -1}, {0.5f, -2}},
+      RectF({-1, -2}, {1, 0}), RectF({-1, -1}, {0, 0}));
+  EXPECT_EQ(standing_offsets(**ceiling), (List<Vec2F>{{0, 0}, {-1, -2}}));
+  EXPECT_EQ((*ceiling)->roots(), (List<Vec2I>{{0, 1}}));
 });
 
 namespace {
@@ -1046,3 +1220,316 @@ const GameTestRegistration
     EXPECT_EQ(world->currentStep(), 4u);
     EXPECT_EQ(triggered, 1u);
   });
+
+namespace {
+
+struct PlantEffectSink : NullRenderCallback {
+  std::expected<void, StarException> add_particle(Particle&& particle) override {
+    if (reject_at == accepted.size()) {
+      reject_at.reset();
+      rejected_particle = particle.position;
+      return std::unexpected(StarException("Reject plant particle"));
+    }
+    accepted += 'p';
+    particles.push_back(particle.position);
+    return {};
+  }
+
+  std::expected<void, StarException> add_audio(std::shared_ptr<AudioInstance> audio) override {
+    if (reject_at == accepted.size()) {
+      reject_at.reset();
+      rejected_audio = std::move(audio);
+      return std::unexpected(StarException("Reject plant sound"));
+    }
+    accepted += 'a';
+    sounds.push_back(std::move(audio));
+    return {};
+  }
+
+  std::optional<std::size_t> reject_at;
+  std::optional<Vec2F> rejected_particle;
+  std::shared_ptr<AudioInstance> rejected_audio;
+  std::string accepted;
+  List<Vec2F> particles;
+  List<std::shared_ptr<AudioInstance>> sounds;
+};
+
+std::expected<std::unique_ptr<Root>, StarException> plant_test_root(GameTest& fixture, String const& directory, String const& overlay = {}) {
+  auto settings = fixture.rootSettings();
+  if (!overlay.empty())
+    settings.assetSources.push_back(overlay);
+  settings.storageDirectory = File::relative_to(directory, "storage");
+  settings.runtimeConfigFile = {};
+  settings.logDirectory = {};
+  settings.logFile = {};
+  settings.includeUGC = false;
+  settings.mix_random_entropy = false;
+  return Root::create(std::move(settings));
+}
+
+Plant::PlantPiece plant_drop_piece(String image = "/items/materials/dirt.png") {
+  Plant::PlantPiece piece;
+  piece.image = std::move(image);
+  piece.kind = Plant::Stem;
+  piece.structural_segment = true;
+  piece.spaces.add({0, 0});
+  return piece;
+}
+
+Json plant_test_sounds() {
+  return JsonArray{JsonObject{{"file", "/sfx/interface/voice_on.ogg"}}};
+}
+
+Json plant_test_particles(float density) {
+  return JsonObject{{"density", density}, {"options", JsonArray{JsonObject{{"type", "ember"}}}}};
+}
+
+const GameTestRegistration plant_item_delivery("PlantDrop", "RetriesSecondNativeItemPublicationAndPreservesSaplingAndRng", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto root = plant_test_root(fixture, *directory);
+  ASSERT_TRUE(root) << root.error().what();
+  ASSERT_TRUE((*root)->itemDatabase());
+  ASSERT_TRUE((*root)->image_metadata_database());
+  auto created = createSchedulingWorld(**root);
+  ASSERT_TRUE(created) << created.error().what();
+  auto& world = **created;
+  auto close = make_scope_exit([&] { EXPECT_TRUE(world.close()); });
+  Vec2F origin(1024, 1024);
+  Json config = JsonObject{
+      {"drops", JsonArray{JsonArray{JsonObject{{"item", "dirtmaterial"}, {"count", 7}}, JsonObject{{"item", "sapling"}, {"count", 2}}}}},
+      {"sounds", JsonObject{{"breakTree", plant_test_sounds()}, {"hitGround", plant_test_sounds()}}}};
+  // Vanilla's builder treats the empty string as a named foliage in Lua.
+  // Use its stock stem/foliage pair, but distinguish both authored hue shifts.
+  Json sapling_config = JsonObject{{"stemName", "pineytree"}, {"stemHueShift", 12}, {"foliageName", "pinefoliage"}, {"foliageHueShift", 31}};
+  std::array<Vec2F, 2> baseline_positions;
+  std::uint64_t baseline_rng = 0;
+  for (bool reject_second : {false, true}) {
+    auto ids = WorldServerTestAccess::limit_entity_ids(world, 500, 502);
+    auto drop = PlantDrop::create(**root, {plant_drop_piece()}, origin, {}, "plant test", true, config, {}, sapling_config, true, 0);
+    ASSERT_TRUE(drop) << drop.error().what();
+    ASSERT_TRUE(world.addEntity(*drop, 500));
+    if (reject_second) {
+      auto filler = PlantDrop::create(**root, {plant_drop_piece()}, origin, {}, "filler", true, {}, {}, {}, false, 0);
+      ASSERT_TRUE(filler);
+      ASSERT_TRUE(world.addEntity(*filler, 502));
+    }
+    (*root)->random().seed(0x5a5011);
+    auto landed = (*drop)->update(5001.0f, 1);
+    if (reject_second) {
+      ASSERT_FALSE(landed);
+      EXPECT_EQ((*drop)->should_destroy(), false);
+      auto rejected_store = (*drop)->net_store();
+      auto rejected_state = (*drop)->snapshot_net_state();
+      ASSERT_TRUE(rejected_store && rejected_state);
+      auto observed = PlantDrop::create(**root, *rejected_store);
+      ASSERT_TRUE(observed);
+      ASSERT_TRUE((*observed)->read_net_state(rejected_state->first));
+      EXPECT_EQ((*observed)->should_destroy(), false);
+      // The first drop is present while the second still owns its retry slot.
+      ASSERT_TRUE(as<ItemDrop>(world.entity(501)));
+      ASSERT_TRUE(world.removeEntity(502, false));
+      ASSERT_TRUE((*drop)->update(1.0f / 60, 2));
+    } else {
+      ASSERT_TRUE(landed) << landed.error().what();
+    }
+    EXPECT_EQ((*drop)->should_destroy(), true);
+    ASSERT_TRUE((*drop)->update(1.0f / 60, 3));
+    ASSERT_EQ(world.entity_ids().size(), 3u);
+    auto dirt = as<ItemDrop>(world.entity(501));
+    auto sapling = as<ItemDrop>(world.entity(502));
+    ASSERT_TRUE(dirt && dirt->item() && sapling && sapling->item());
+    auto dirt_item = dirt->item()->descriptor();
+    auto sapling_item = sapling->item()->descriptor();
+    EXPECT_EQ(dirt_item.name(), String("dirtmaterial"));
+    EXPECT_EQ(dirt_item.count(), 7u);
+    EXPECT_EQ(sapling_item.name(), String("sapling"));
+    EXPECT_EQ(sapling_item.count(), 2u);
+    EXPECT_EQ(sapling_item.parameters().get_string("stemName"), String("pineytree"));
+    EXPECT_EQ(sapling_item.parameters().get_string("foliageName"), String("pinefoliage"));
+    EXPECT_EQ(sapling_item.parameters().get_int("stemHueShift"), 12);
+    EXPECT_EQ(sapling_item.parameters().get_int("foliageHueShift"), 31);
+    std::array positions{dirt->position(), sapling->position()};
+    auto next_rng = (*root)->random().next_u64();
+    if (reject_second) {
+      EXPECT_EQ(positions, baseline_positions);
+      EXPECT_EQ(next_rng, baseline_rng);
+    } else {
+      baseline_positions = positions;
+      baseline_rng = next_rng;
+    }
+
+    auto store = (*drop)->net_store();
+    auto state = (*drop)->snapshot_net_state();
+    ASSERT_TRUE(store && state);
+    auto replica = PlantDrop::create(**root, *store);
+    ASSERT_TRUE(replica);
+    ASSERT_TRUE((*replica)->read_net_state(state->first));
+    PlantEffectSink sink;
+    ASSERT_TRUE((*replica)->collect_render_events(sink));
+    EXPECT_TRUE(sink.accepted.empty()) << "late join replayed a completed event";
+  }
+
+  Json invalid = JsonObject{{"drops", JsonArray{JsonArray{JsonObject{{"item", "sapling"}, {"count", -1}}}}}};
+  auto negative = PlantDrop::create(**root, {plant_drop_piece()}, origin, {}, "negative", true, invalid, {}, {}, true, 0);
+  ASSERT_TRUE(negative);
+  ASSERT_TRUE(world.addEntity(*negative));
+  auto rejected = (*negative)->update(5001, 1);
+  ASSERT_FALSE(rejected);
+  EXPECT_NE(std::string_view(rejected.error().what()).find("negative"), std::string_view::npos);
+  EXPECT_EQ((*negative)->should_destroy(), false);
+  EXPECT_EQ(world.entity_ids().size(), 1u);
+});
+
+const GameTestRegistration plant_effect_delivery("PlantDrop", "FallingAndStandingEffectsRetryOnlyRejectedOutput", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto root = plant_test_root(fixture, *directory);
+  ASSERT_TRUE(root) << root.error().what();
+  ASSERT_TRUE((*root)->particle_database());
+  ASSERT_TRUE((*root)->image_metadata_database());
+  auto created = createSchedulingWorld(**root);
+  ASSERT_TRUE(created) << created.error().what();
+  auto& world = **created;
+  auto close = make_scope_exit([&] { EXPECT_TRUE(world.close()); });
+
+  Vec2I tile(1024, 1024);
+  String image = "/items/materials/dirt.png";
+  Json bursts = JsonObject{
+      {"particles", JsonObject{{"breakTree", plant_test_particles(0.5f)}, {"damageTree", plant_test_particles(2.0f)}}},
+      {"sounds", JsonObject{{"breakTree", plant_test_sounds()}, {"damageTree", plant_test_sounds()}}}};
+  Json standing_store = JsonObject{
+      {"tilePosition", json_from_vec2i(tile)}, {"ceiling", false}, {"ephemeral", false}, {"fallsWhenDead", false},
+      {"descriptions", JsonObject{{"description", "standing test"}}},
+      {"stemDropConfig", bursts}, {"foliageDropConfig", JsonObject{}}, {"saplingDropConfig", JsonObject{}},
+      {"tileDamageParameters", JsonObject{{"damageFactors", JsonObject{}}, {"damageRecovery", 0}}},
+      {"pieces", JsonArray{JsonObject{{"image", image}, {"offset", JsonArray{0, 0}}, {"rotationType", "dontRotate"},
+          {"rotationOffset", 0}, {"structuralSegment", true}, {"kind", static_cast<int>(Plant::Stem)}, {"segmentIdx", 0}, {"flip", false}}}}};
+
+  for (bool standing : {false, true}) {
+    std::string baseline_trace;
+    List<Vec2F> baseline_particles;
+    std::uint64_t baseline_rng = 0;
+    for (auto reject_at : std::array<std::optional<std::size_t>, 3>{std::nullopt,
+        standing ? 1u : 2u, standing ? 2u : 1u}) {
+      std::shared_ptr<Entity> entity;
+      if (standing) {
+        auto plant = Plant::create(**root, standing_store);
+        ASSERT_TRUE(plant) << plant.error().what();
+        ASSERT_TRUE((*plant)->init(world, 500, EntityMode::Master));
+        ASSERT_TRUE((*plant)->damage_tiles({tile}, Vec2F(tile), TileDamage{TileDamageType::Blockish, 0.25f}));
+        entity = std::move(*plant);
+      } else {
+        auto drop = PlantDrop::create(**root, {plant_drop_piece(image)}, Vec2F(tile), {}, "falling test", true, bursts, bursts, {}, true, 0);
+        ASSERT_TRUE(drop);
+        entity = std::move(*drop);
+      }
+      (*root)->random().seed(0x115011);
+      PlantEffectSink sink;
+      sink.reject_at = reject_at;
+      auto collected = entity->collect_render_events(sink);
+      if (reject_at) {
+        ASSERT_FALSE(collected);
+        ASSERT_EQ(sink.accepted.size(), *reject_at);
+        auto particle_index = sink.particles.size();
+        auto audio_index = sink.sounds.size();
+        ASSERT_TRUE(entity->collect_render_events(sink));
+        if (sink.rejected_particle) {
+          ASSERT_LT(particle_index, sink.particles.size());
+          EXPECT_EQ(sink.particles[particle_index], *sink.rejected_particle);
+        } else {
+          ASSERT_TRUE(sink.rejected_audio);
+          ASSERT_LT(audio_index, sink.sounds.size());
+          EXPECT_EQ(sink.sounds[audio_index], sink.rejected_audio);
+        }
+      } else {
+        ASSERT_TRUE(collected) << collected.error().what();
+      }
+      auto next_rng = (*root)->random().next_u64();
+      if (reject_at) {
+        EXPECT_EQ(sink.accepted, baseline_trace);
+        EXPECT_EQ(sink.particles, baseline_particles);
+        EXPECT_EQ(next_rng, baseline_rng);
+      } else {
+        ASSERT_TRUE(sink.accepted.starts_with(standing ? "ppa" : "aapp"));
+        baseline_trace = sink.accepted;
+        baseline_particles = sink.particles;
+        baseline_rng = next_rng;
+      }
+      ASSERT_TRUE(entity->collect_render_events(sink));
+      EXPECT_EQ(sink.accepted, baseline_trace);
+      if (standing)
+        ASSERT_TRUE(entity->uninit());
+    }
+  }
+});
+
+const GameTestRegistration plant_particle_budget("PlantDrop", "SparseSamplesResumeAndTransparentOrInvalidInputsTerminate", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(File::create_directory(overlay));
+  constexpr unsigned width_in_tiles = 16;
+  for (bool opaque_edge : {false, true}) {
+    Image image(width_in_tiles * tile_pixels, tile_pixels, PixelFormat::RGBA32);
+    for (unsigned y = 0; y < tile_pixels; ++y)
+      for (unsigned x = 0; x < width_in_tiles * tile_pixels; ++x)
+        ASSERT_TRUE(image.set(x, y, Vec4B(255, 255, 255, opaque_edge && x < tile_pixels ? 255 : 0)));
+    auto png = std::make_shared<Buffer>();
+    ASSERT_TRUE(image.write_png(fixture.root().logger(), png));
+    auto name = opaque_edge ? String("plant-sparse.png") : String("plant-transparent.png");
+    ASSERT_TRUE(File::write_file(png->take_data(), File::relative_to(overlay, name)));
+  }
+  auto root = plant_test_root(fixture, *directory, overlay);
+  ASSERT_TRUE(root) << root.error().what();
+  ASSERT_TRUE((*root)->particle_database());
+  ASSERT_TRUE((*root)->image_metadata_database());
+
+  auto create_drop = [&](String image, float density) {
+    Json config = JsonObject{{"particles", JsonObject{{"breakTree", plant_test_particles(density)}}}};
+    return PlantDrop::create(**root, {plant_drop_piece(std::move(image))}, {}, {}, "sparse", true, config, {}, {}, false, 0);
+  };
+  // Select a deterministic stream whose first hit cannot fit the initial tick.
+  std::optional<std::uint64_t> sparse_seed;
+  for (std::uint64_t seed = 0; seed < 64 && !sparse_seed; ++seed) {
+    RandomSource sample(seed);
+    for (std::size_t attempt = 1; attempt <= 1024; ++attempt) {
+      auto x = sample.normal_float(width_in_tiles / 8.0f, 0);
+      auto y = sample.normal_float(1.0f / 8.0f, 0);
+      ASSERT_TRUE(x && y);
+      float tile_x = width_in_tiles / 2.0f + *x;
+      float tile_y = 0.5f + *y;
+      if (tile_x >= 0 && tile_x < 1 && tile_y >= 0 && tile_y < 1) {
+        if (attempt > 256)
+          sparse_seed = seed;
+        break;
+      }
+    }
+  }
+  ASSERT_TRUE(sparse_seed);
+  PlantEffectSink sink;
+  auto sparse = create_drop("/plant-sparse.png", width_in_tiles);
+  ASSERT_TRUE(sparse);
+  (*root)->random().seed(*sparse_seed);
+  ASSERT_TRUE((*sparse)->collect_render_events(sink));
+  EXPECT_TRUE(sink.accepted.empty());
+  for (auto tick = 0; tick != 4; ++tick)
+    ASSERT_TRUE((*sparse)->collect_render_events(sink));
+  EXPECT_EQ(sink.accepted, "p");
+  auto transparent = create_drop("/plant-transparent.png", width_in_tiles);
+  ASSERT_TRUE(transparent);
+  ASSERT_TRUE((*transparent)->collect_render_events(sink));
+  EXPECT_EQ(sink.accepted, "p");
+
+  for (float divisor : {0.0f, -1.0f, 1.0e-20f}) {
+    auto invalid = create_drop("/plant-sparse.png", divisor);
+    ASSERT_TRUE(invalid);
+    EXPECT_FALSE((*invalid)->collect_render_events(sink));
+  }
+  EXPECT_EQ(sink.accepted, "p");
+});
+
+}

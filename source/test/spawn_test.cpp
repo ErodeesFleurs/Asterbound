@@ -57,6 +57,10 @@ import star.entity_rendering;
 import star.rect;
 import star.net_packets;
 import star.world_client;
+import star.plant;
+import star.plant_drop;
+import star.image;
+import star.buffer;
 import star.world;
 import star.byte_array;
 import star.world_render_data;
@@ -708,3 +712,103 @@ const GameTestRegistration presentation_removal_lifecycle(
     ASSERT_TRUE(world->removeEntity(master_id, false));
     ASSERT_TRUE((*universe)->close());
   });
+
+const GameTestRegistration detached_plant_impact("PlantDrop", "FinalSparseImpactContinuesAfterDeathPacketWithoutLateReplay", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(File::create_directory(overlay));
+  constexpr unsigned width_in_tiles = 8;
+  Image sparse(width_in_tiles * tile_pixels, tile_pixels, PixelFormat::RGBA32);
+  for (unsigned y = 0; y < tile_pixels; ++y)
+    for (unsigned x = 0; x < width_in_tiles * tile_pixels; ++x)
+      ASSERT_TRUE(sparse.set(x, y, Vec4B(255, 255, 255, x < tile_pixels ? 255 : 0)));
+  auto png = std::make_shared<Buffer>();
+  ASSERT_TRUE(sparse.write_png(fixture.root().logger(), png));
+  constexpr auto image_path = "/plant-retired-sparse.png";
+  ASSERT_TRUE(File::write_file(png->take_data(), File::relative_to(overlay, "plant-retired-sparse.png")));
+
+  auto settings = fixture.rootSettings();
+  settings.assetSources.push_back(overlay);
+  settings.storageDirectory = File::relative_to(*directory, "storage");
+  settings.runtimeConfigFile = {};
+  settings.logDirectory = {};
+  settings.logFile = {};
+  settings.includeUGC = false;
+  settings.mix_random_entropy = false;
+  auto created_root = Root::create(std::move(settings));
+  ASSERT_TRUE(created_root) << created_root.error().what();
+  Root& root = **created_root;
+  auto universe = TestUniverse::create(root, Vec2U(100, 100));
+  ASSERT_TRUE(universe) << universe.error().what();
+  (*universe)->client()->mainPlayer()->log()->setIntroComplete(true);
+  ASSERT_TRUE((*universe)->warpPlayer(InstanceWorldId("outpost")));
+  ASSERT_TRUE((*universe)->waitForWorldReady());
+  auto world = (*universe)->worldClient();
+  ASSERT_TRUE(world);
+  world->setAsyncLighting(false);
+  world->setFullBright(true);
+  constexpr float dt = 1.0f / 60;
+  constexpr EntityId live_id = 16319;
+  constexpr EntityId late_id = 16320;
+  Vec2F origin(world->clientWindow().center());
+
+  Plant::PlantPiece piece;
+  piece.image = String(std::string_view(image_path));
+  piece.kind = Plant::Stem;
+  piece.spaces.add({0, 0});
+  piece.structural_segment = true;
+  String marker = "plant-detached-impact-test";
+  Json particle = JsonObject{{"type", "text"}, {"text", marker}, {"timeToLive", 10}, {"ignoreWind", true},
+      {"collidesForeground", false}, {"collidesLiquid", false}};
+  Json stem = JsonObject{{"particles", JsonObject{{"hitGround", JsonObject{{"options", JsonArray{particle}}, {"density", 2}}}}}};
+  auto source = PlantDrop::create(root, {piece}, origin, {}, "retired tree", true, stem, {}, {}, false, 0);
+  ASSERT_TRUE(source);
+  ASSERT_TRUE((*source)->init(*world, live_id, EntityMode::Master));
+  auto store = (*source)->net_store();
+  auto baseline = (*source)->write_net_state();
+  ASSERT_TRUE(store && baseline);
+  ASSERT_TRUE(world->handleIncomingPackets({std::make_shared<EntityCreatePacket>(
+      EntityType::PlantDrop, std::move(*store), std::move(baseline->first), live_id)}));
+  auto live = world->entity(live_id);
+  ASSERT_TRUE(live);
+  for (unsigned tick = 0; tick < 30; ++tick)
+    ASSERT_TRUE(world->update(dt));
+
+  ASSERT_TRUE((*source)->update(5001, 1));
+  auto final = (*source)->write_net_state(baseline->second);
+  auto late_store = (*source)->net_store();
+  auto late_state = (*source)->snapshot_net_state();
+  ASSERT_TRUE(final && late_store && late_state);
+  ASSERT_TRUE((*source)->uninit());
+  root.random().seed(0x51a7710);
+  ASSERT_TRUE(world->handleIncomingPackets({std::make_shared<EntityDestroyPacket>(live_id, std::move(final->first), true)}));
+  for (unsigned tick = 0; tick < 120 && world->entity(live_id); ++tick)
+    ASSERT_TRUE(world->update(dt));
+  ASSERT_FALSE(world->entity(live_id));
+  ASSERT_FALSE(live->inWorld());
+
+  WorldRenderData display;
+  auto particle_count = [&] { return std::ranges::count(display.particles, marker, &Particle::string); };
+  ASSERT_TRUE(world->render(display, 0, std::nullopt, PresentationContext()));
+  EXPECT_LT(particle_count(), 4);
+  for (unsigned tick = 0; tick < 120 && particle_count() < 4; ++tick) {
+    ASSERT_TRUE(world->update(dt));
+    ASSERT_TRUE(world->render(display, 0, std::nullopt, PresentationContext()));
+  }
+  ASSERT_EQ(particle_count(), 4);
+
+  ASSERT_TRUE(world->handleIncomingPackets({std::make_shared<EntityCreatePacket>(
+      EntityType::PlantDrop, std::move(*late_store), std::move(late_state->first), late_id)}));
+  ASSERT_TRUE(world->entity(late_id));
+  for (unsigned tick = 0; tick < 30; ++tick)
+    ASSERT_TRUE(world->update(dt));
+  ASSERT_TRUE(world->handleIncomingPackets({std::make_shared<EntityDestroyPacket>(late_id, ByteArray{}, true)}));
+  for (unsigned tick = 0; tick < 120; ++tick)
+    ASSERT_TRUE(world->update(dt));
+  ASSERT_FALSE(world->entity(late_id));
+  ASSERT_TRUE(world->render(display, 0, std::nullopt, PresentationContext()));
+  EXPECT_EQ(particle_count(), 4);
+  ASSERT_TRUE((*universe)->close());
+});

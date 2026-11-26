@@ -1,4 +1,5 @@
 #include <cstdio>
+import star.buffer;
 import star.json_extra;
 import star.json;
 import star.xx_hash;
@@ -141,6 +142,186 @@ import star.game_test;
 using namespace Star;
 
 namespace {
+
+struct GeometryProbePiece {
+  String image;
+  float x = 0;
+};
+
+Json geometry_probe_store(Vec2I position, bool ceiling, std::span<GeometryProbePiece const> pieces) {
+  JsonArray serialized;
+  for (auto const& piece : pieces) {
+    serialized.emplace_back(JsonObject{
+      {"image", piece.image}, {"offset", JsonArray{piece.x, 0}},
+      {"rotationType", "dontRotate"}, {"rotationOffset", 0},
+      {"structuralSegment", true}, {"kind", static_cast<int>(Plant::Stem)},
+      {"segmentIdx", 0}, {"flip", false},
+    });
+  }
+  return JsonObject{
+    {"tilePosition", json_from_vec2i(position)}, {"ceiling", ceiling}, {"ephemeral", false},
+    {"stemDropConfig", JsonObject{}}, {"foliageDropConfig", JsonObject{}}, {"saplingDropConfig", JsonObject{}},
+    {"descriptions", JsonObject{{"description", "geometry probe"}}}, {"fallsWhenDead", false},
+    {"tileDamageParameters", JsonObject{{"damageFactors", JsonObject{}}, {"damageRecovery", 0}}},
+    {"pieces", std::move(serialized)},
+  };
+}
+
+std::expected<ByteArray, StarException> geometry_probe_delta(
+    std::span<GeometryProbePiece const> pieces, bool truncate = false) {
+  auto payload = DataStreamBuffer::serialize_container(pieces,
+      [](DataStream& stream, GeometryProbePiece const& piece) -> std::expected<void, StarException> {
+    if (auto result = stream.write(piece.image); !result) return std::unexpected(std::move(result.error()));
+    if (auto result = stream.write(piece.x); !result) return std::unexpected(std::move(result.error()));
+    if (auto result = stream.write(0.0f); !result) return std::unexpected(std::move(result.error()));
+    if (auto result = stream.write(Plant::DontRotate); !result) return std::unexpected(std::move(result.error()));
+    if (auto result = stream.write(0.0f); !result) return std::unexpected(std::move(result.error()));
+    if (auto result = stream.write(true); !result) return std::unexpected(std::move(result.error()));
+    if (auto result = stream.write(Plant::Stem); !result) return std::unexpected(std::move(result.error()));
+    if (auto result = stream.write(0); !result) return std::unexpected(std::move(result.error()));
+    return stream.write(false);
+  });
+  if (!payload) return std::unexpected(std::move(payload.error()));
+  if (truncate)
+    payload->resize(payload->size() - 1);
+
+  DataStreamBuffer delta;
+  if (auto result = delta.write(false); !result) return std::unexpected(std::move(result.error()));
+  // Plant's second net element is the serialized piece list.
+  if (auto result = delta.write_vlq_u(2); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = delta.write(*payload); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = delta.write_vlq_u(0); !result) return std::unexpected(std::move(result.error()));
+  return delta.take_data();
+}
+
+const GameTestRegistration plant_geometry(
+  "PlantGeometry", "RescansReplaceShapeAndRetryFailedPayloads", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory) << directory.error().what();
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    auto overlay = File::relative_to(*directory, "assets");
+    ASSERT_TRUE(File::create_directory(overlay));
+    auto write_png = [&](String const& filename, unsigned tiles_wide) {
+      unsigned width = tile_pixels * tiles_wide;
+      Image image(width, tile_pixels, PixelFormat::RGBA32);
+      for (unsigned y = 0; y < tile_pixels; ++y)
+        for (unsigned x = 0; x < width; ++x)
+          ASSERT_TRUE(image.set(x, y, Vec4B(12, 34, 56, 255)));
+      auto png = std::make_shared<Buffer>();
+      ASSERT_TRUE(image.write_png(fixture.root().logger(), png));
+      ASSERT_TRUE(File::write_file(png->take_data(), File::relative_to(overlay, filename)));
+    };
+    ASSERT_NO_FATAL_FAILURE(write_png("plant-geometry-wide.png", 3));
+    ASSERT_NO_FATAL_FAILURE(write_png("plant-geometry-narrow.png", 1));
+    std::array const repair_names{String("plant-geometry-floor.png"), String("plant-geometry-ceiling.png")};
+    for (auto const& name : repair_names)
+      ASSERT_TRUE(File::write_file(String("not a PNG"), File::relative_to(overlay, name)));
+
+    auto settings = fixture.rootSettings();
+    settings.assetSources.push_back(overlay);
+    settings.storageDirectory = File::relative_to(*directory, "storage");
+    settings.runtimeConfigFile = {};
+    settings.logDirectory = {};
+    settings.logFile = {};
+    settings.includeUGC = false;
+    settings.assetsSettings.missing_image = {};
+    auto root = Root::create(std::move(settings));
+    ASSERT_TRUE(root) << root.error().what();
+    auto assets = (*root)->assets();
+    ASSERT_TRUE(assets) << assets.error().what();
+    auto storage = File::ephemeral_file((*root)->random());
+    ASSERT_TRUE(storage) << storage.error().what();
+    auto created = WorldServer::create(**root, Vec2U(2048, 2048), *storage);
+    ASSERT_TRUE(created) << created.error().what();
+    auto world = *created;
+    auto close_world = make_scope_exit([&] { EXPECT_TRUE(world->close()); });
+    Vec2I const position(1024, 1024);
+    ASSERT_TRUE(world->generateRegion(RectI::with_size(position - Vec2I(4, 4), Vec2I(9, 9))));
+    auto materials = (*root)->material_database();
+    ASSERT_TRUE(materials) << materials.error().what();
+    auto dirt = (*materials)->material_id("dirt");
+    ASSERT_TRUE(dirt) << dirt.error().what();
+
+    std::array const wide{GeometryProbePiece{"/plant-geometry-wide.png"}};
+    std::array const narrow{GeometryProbePiece{"/plant-geometry-narrow.png"}};
+    auto narrow_delta = geometry_probe_delta(narrow);
+    ASSERT_TRUE(narrow_delta) << narrow_delta.error().what();
+
+    for (bool ceiling : {false, true}) {
+      SCOPED_TRACE(ceiling);
+      auto const& repair_name = repair_names[ceiling ? 1 : 0];
+      std::array const repair{
+        GeometryProbePiece{narrow.front().image, 1},
+        GeometryProbePiece{String("/") + repair_name, 2},
+      };
+      auto bad_delta = geometry_probe_delta(repair);
+      auto truncated_delta = geometry_probe_delta(repair, true);
+      ASSERT_TRUE(bad_delta && truncated_delta);
+
+      auto wide_store = geometry_probe_store(position, ceiling, wide);
+      auto bad_store = geometry_probe_store(position, ceiling, repair);
+      auto master = Plant::create(**root, wide_store);
+      ASSERT_TRUE(master) << master.error().what();
+      EXPECT_FALSE(Plant::create(**root, bad_store));
+      auto net_store = (*master)->net_store();
+      ASSERT_TRUE(net_store) << net_store.error().what();
+      auto short_store = *net_store;
+      short_store.resize(short_store.size() - 1);
+      EXPECT_FALSE(Plant::create(**root, short_store));
+      auto from_network = Plant::create(**root, *net_store);
+      ASSERT_TRUE(from_network) << from_network.error().what();
+      auto& plant = **from_network;
+      ASSERT_TRUE(plant.init(*world, 1234, EntityMode::Slave));
+
+      int const root_y = ceiling ? 1 : -1;
+      auto expect_geometry = [&](List<Vec2I> const& spaces, List<Vec2I> const& roots, float max_x) {
+        EXPECT_EQ(plant.spaces(), spaces);
+        EXPECT_EQ(plant.roots(), roots);
+        EXPECT_EQ(plant.interactive_bound_box(), RectF(0, 0, max_x, 0));
+        EXPECT_EQ(plant.meta_bound_box(), RectF(-1, -1, max_x + 2, 2));
+      };
+      expect_geometry({{0, 0}, {1, 0}, {2, 0}}, {{0, root_y}, {1, root_y}, {2, root_y}}, 2);
+      for (auto const& root_position : plant.roots()) {
+        auto tile = world->modifyServerTile(position + root_position, true);
+        ASSERT_TRUE(tile && *tile);
+        (*tile)->get().foreground = *dirt;
+      }
+      for (int attempt = 0; attempt < 2; ++attempt) {
+        ASSERT_TRUE(plant.read_net_state(*narrow_delta));
+        expect_geometry({{0, 0}}, {{0, root_y}}, 0);
+      }
+      auto old_support = world->modifyServerTile(position + Vec2I(2, root_y), true);
+      ASSERT_TRUE(old_support && *old_support);
+      (*old_support)->get().foreground = empty_material_id;
+      auto broken = plant.check_broken();
+      ASSERT_TRUE(broken) << broken.error().what();
+      EXPECT_FALSE(*broken);
+
+      EXPECT_FALSE(plant.read_net_state(*truncated_delta));
+      expect_geometry({{0, 0}}, {{0, root_y}}, 0);
+      EXPECT_FALSE(plant.read_net_state(ByteArray{}));
+      ASSERT_TRUE(plant.read_net_state(*narrow_delta));
+
+      EXPECT_FALSE(plant.read_net_state(*bad_delta));
+      expect_geometry({{0, 0}}, {{0, root_y}}, 0);
+      auto retained = plant.pieces();
+      ASSERT_EQ(retained.size(), 1u);
+      EXPECT_EQ(retained.front().image, narrow.front().image);
+      EXPECT_EQ(retained.front().offset, Vec2F(0, 0));
+      EXPECT_EQ(retained.front().image_size, Vec2U(tile_pixels, tile_pixels));
+      EXPECT_FALSE(plant.read_net_state(ByteArray{}));
+
+      ASSERT_NO_FATAL_FAILURE(write_png(repair_name, 1));
+      (*assets)->hot_reload();
+      auto reapplied = ceiling ? plant.update(0.0f, 1) : plant.read_net_state(ByteArray{});
+      ASSERT_TRUE(reapplied) << reapplied.error().what();
+      expect_geometry({{0, 0}, {1, 0}, {2, 0}}, {{0, root_y}, {1, root_y}, {2, root_y}}, 2);
+      EXPECT_EQ(plant.pieces().size(), 2u);
+      auto restored = Plant::create(**root, bad_store);
+      ASSERT_TRUE(restored) << restored.error().what();
+      EXPECT_EQ((*restored)->roots(), plant.roots());
+    }
+  });
 
 const GameTestRegistration reentrant_replacement("WorldEntityMessageQueue", "ReentrantReplacementSurvivesNestedDrainAndGrowth",
 [](GameTest& fixture) {

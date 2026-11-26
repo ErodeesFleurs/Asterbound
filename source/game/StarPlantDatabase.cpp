@@ -1,237 +1,235 @@
-import star.json;
-import star.json_extra;
-import star.bi_map;
-import star.id_map;
-import star.set;
-import star.casting;
-import star.data_stream;
-import star.game_types;
-import star.strong_typedef;
-import star.list;
-import star.image_processing;
-import star.hash;
-import star.string_view;
-import star.thread;
-import star.directives;
-import star.asset_path;
-import star.ordered_map;
-import star.io_device;
-import star.ref_ptr;
-import star.logging;
-import star.listener;
 import std;
 import star.string;
+import star.list;
+import star.json;
+import star.json_extra;
 import star.format;
-
+import star.asset_path;
 import star.tile_damage;
-import star.damage_types;
-import star.world_geometry;
-import star.status_types;
-import star.damage;
-import star.light_source;
-import star.entity;
-import star.interaction_types;
-import star.item_descriptor;
-import star.celestial_coordinate;
-import star.quest_descriptor;
-import star.interactive_entity;
-import star.collision_block;
-import star.tile_entity;
-import star.inspectable_entity;
-import star.plant;
-import star.asset_source;
 import star.assets;
-import star.root_base;
-import star.configuration;
 import star.root;
-
+import star.plant;
 import star.plant_database;
 
 namespace Star {
+namespace {
 
-TreeVariant::TreeVariant()
-  : stemHueShift(), foliageHueShift(), ceiling(), ephemeral() {}
+template <typename Variant>
+concept plant_variant = std::same_as<Variant, TreeVariant> || std::same_as<Variant, GrassVariant>
+    || std::same_as<Variant, BushVariant>;
 
-std::expected<TreeVariant, StarException> TreeVariant::create(Assets const& assets, Json const& variant) {
-  TreeVariant value;
-  auto result147 = variant.get_string("stemName");
-if (!result147) return std::unexpected(std::move(result147.error()));
-value.stemName = std::move(*result147);
-  auto result148 = variant.get_string("foliageName");
-if (!result148) return std::unexpected(std::move(result148.error()));
-value.foliageName = std::move(*result148);
-  auto result149 = variant.get_string("stemDirectory");
-if (!result149) return std::unexpected(std::move(result149.error()));
-value.stemDirectory = std::move(*result149);
-  auto result150 = variant.get("stemSettings");
-if (!result150) return std::unexpected(std::move(result150.error()));
-value.stemSettings = std::move(*result150);
-  auto result151 = variant.get_float("stemHueShift");
-if (!result151) return std::unexpected(std::move(result151.error()));
-value.stemHueShift = std::move(*result151);
-  auto result152 = variant.get_string("foliageDirectory");
-if (!result152) return std::unexpected(std::move(result152.error()));
-value.foliageDirectory = std::move(*result152);
-  auto result153 = variant.get("foliageSettings");
-if (!result153) return std::unexpected(std::move(result153.error()));
-value.foliageSettings = std::move(*result153);
-  auto result154 = variant.get_float("foliageHueShift");
-if (!result154) return std::unexpected(std::move(result154.error()));
-value.foliageHueShift = std::move(*result154);
-  auto result155 = variant.get("descriptions");
-if (!result155) return std::unexpected(std::move(result155.error()));
-value.descriptions = std::move(*result155);
-  auto result156 = variant.get_bool("ceiling");
-if (!result156) return std::unexpected(std::move(result156.error()));
-value.ceiling = std::move(*result156);
-  auto result157 = variant.get_bool("ephemeral");
-if (!result157) return std::unexpected(std::move(result157.error()));
-value.ephemeral = std::move(*result157);
-  auto result158 = variant.get("stemDropConfig");
-if (!result158) return std::unexpected(std::move(result158.error()));
-value.stemDropConfig = std::move(*result158);
-  auto result159 = variant.get("foliageDropConfig");
-if (!result159) return std::unexpected(std::move(result159.error()));
-value.foliageDropConfig = std::move(*result159);
-  auto result160 = variant.get("tileDamageParameters");
-if (!result160) return std::unexpected(std::move(result160.error()));
-auto result161 = TileDamageParameters::create(assets, std::move(*result160));
-if (!result161) return std::unexpected(std::move(result161.error()));
-value.tileDamageParameters = std::move(*result161);
-  return value;
+template <plant_variant Variant>
+std::expected<void, StarException> read_stored_traits(Json const& store, Variant& variant) {
+  auto descriptions = store.get("descriptions");
+  if (!descriptions) return std::unexpected(std::move(descriptions.error()));
+  auto ceiling = store.get_bool("ceiling");
+  if (!ceiling) return std::unexpected(std::move(ceiling.error()));
+  auto ephemeral = store.get_bool("ephemeral");
+  if (!ephemeral) return std::unexpected(std::move(ephemeral.error()));
+  variant.descriptions = std::move(*descriptions);
+  variant.ceiling = *ceiling;
+  variant.ephemeral = *ephemeral;
+  return {};
 }
 
-std::expected<Json, StarException> TreeVariant::toJson() const {
-  auto result186 = tileDamageParameters.to_json();
-if (!result186) return std::unexpected(std::move(result186.error()));
-return JsonObject{
-      {"stemName", stemName},
-      {"foliageName", foliageName},
-      {"stemDirectory", stemDirectory},
-      {"stemSettings", stemSettings},
-      {"stemHueShift", stemHueShift},
-      {"foliageDirectory", foliageDirectory},
-      {"foliageSettings", foliageSettings},
-      {"foliageHueShift", foliageHueShift},
+std::expected<TileDamageParameters, StarException> read_stored_damage(Assets const& assets, Json const& store) {
+  return store.get("tileDamageParameters").and_then(
+      [&](Json const& damage) { return TileDamageParameters::create(assets, damage); });
+}
+
+std::expected<Json, StarException> resolve_descriptions(Json const& settings, String const& name,
+    std::optional<std::reference_wrapper<String const>> suffix = std::nullopt) {
+  auto entries = settings.iterate_object();
+  if (!entries) return std::unexpected(std::move(entries.error()));
+  JsonObject descriptions;
+  for (auto const& [key, value] : *entries) {
+    auto localized = key.ends_with("Description");
+    if (!localized) return std::unexpected(std::move(localized.error()));
+    if (*localized)
+      descriptions.insert(key, value);
+  }
+  auto text = settings.opt_string("description");
+  if (!text) return std::unexpected(std::move(text.error()));
+  descriptions.insert("description", *text ? std::move(**text) : (suffix ? name + " with " + suffix->get() : name));
+  return Json(std::move(descriptions));
+}
+
+std::expected<TileDamageParameters, StarException> resolve_damage(Root& root, Json const& settings, Json const& default_table) {
+  auto assets = root.assets();
+  if (!assets) return std::unexpected(std::move(assets.error()));
+  auto table = settings.find("damageTable");
+  if (!table) return std::unexpected(std::move(table.error()));
+  auto health = settings.get_float("health", 1.0f);
+  if (!health) return std::unexpected(std::move(health.error()));
+  return TileDamageParameters::create(**assets, *table ? (*table)->get() : default_table, *health);
+}
+
+Json const& empty_plant_config() {
+  static Json const empty(JsonObject{});
+  return empty;
+}
+
+std::expected<Json, StarException> resolve_drop_config(Json const& settings) {
+  auto drop = settings.find("dropConfig");
+  if (!drop) return std::unexpected(std::move(drop.error()));
+  if (*drop)
+    return (*drop)->get();
+  return empty_plant_config();
+}
+
+}
+
+std::expected<TreeVariant, StarException> TreeVariant::create(Assets const& assets, Json const& store) {
+  auto stem_name = store.get_string("stemName");
+  if (!stem_name) return std::unexpected(std::move(stem_name.error()));
+  auto foliage_name = store.get_string("foliageName");
+  if (!foliage_name) return std::unexpected(std::move(foliage_name.error()));
+  auto stem_directory = store.get_string("stemDirectory");
+  if (!stem_directory) return std::unexpected(std::move(stem_directory.error()));
+  auto stem_settings = store.get("stemSettings");
+  if (!stem_settings) return std::unexpected(std::move(stem_settings.error()));
+  auto stem_hue_shift = store.get_float("stemHueShift");
+  if (!stem_hue_shift) return std::unexpected(std::move(stem_hue_shift.error()));
+  auto foliage_directory = store.get_string("foliageDirectory");
+  if (!foliage_directory) return std::unexpected(std::move(foliage_directory.error()));
+  auto foliage_settings = store.get("foliageSettings");
+  if (!foliage_settings) return std::unexpected(std::move(foliage_settings.error()));
+  auto foliage_hue_shift = store.get_float("foliageHueShift");
+  if (!foliage_hue_shift) return std::unexpected(std::move(foliage_hue_shift.error()));
+  TreeVariant variant{
+    .stem_name = std::move(*stem_name),
+    .foliage_name = std::move(*foliage_name),
+    .stem_directory = std::move(*stem_directory),
+    .stem_settings = std::move(*stem_settings),
+    .stem_hue_shift = *stem_hue_shift,
+    .foliage_directory = std::move(*foliage_directory),
+    .foliage_settings = std::move(*foliage_settings),
+    .foliage_hue_shift = *foliage_hue_shift,
+  };
+  if (auto traits = read_stored_traits(store, variant); !traits)
+    return std::unexpected(std::move(traits.error()));
+  auto stem_drop_config = store.get("stemDropConfig");
+  if (!stem_drop_config) return std::unexpected(std::move(stem_drop_config.error()));
+  auto foliage_drop_config = store.get("foliageDropConfig");
+  if (!foliage_drop_config) return std::unexpected(std::move(foliage_drop_config.error()));
+  auto damage = read_stored_damage(assets, store);
+  if (!damage) return std::unexpected(std::move(damage.error()));
+  variant.stem_drop_config = std::move(*stem_drop_config);
+  variant.foliage_drop_config = std::move(*foliage_drop_config);
+  variant.tile_damage_parameters = std::move(*damage);
+  return variant;
+}
+
+std::expected<Json, StarException> TreeVariant::to_json() const {
+  auto damage = tile_damage_parameters.to_json();
+  if (!damage) return std::unexpected(std::move(damage.error()));
+  return JsonObject{
+      {"stemName", stem_name},
+      {"foliageName", foliage_name},
+      {"stemDirectory", stem_directory},
+      {"stemSettings", stem_settings},
+      {"stemHueShift", stem_hue_shift},
+      {"foliageDirectory", foliage_directory},
+      {"foliageSettings", foliage_settings},
+      {"foliageHueShift", foliage_hue_shift},
       {"descriptions", descriptions},
       {"ceiling", ceiling},
       {"ephemeral", ephemeral},
-      {"stemDropConfig", stemDropConfig},
-      {"foliageDropConfig", foliageDropConfig},
-      {"tileDamageParameters", std::move(*result186)},
+      {"stemDropConfig", stem_drop_config},
+      {"foliageDropConfig", foliage_drop_config},
+      {"tileDamageParameters", std::move(*damage)},
   };
 }
 
-GrassVariant::GrassVariant() : hueShift(), ceiling(), ephemeral() {}
-
-std::expected<GrassVariant, StarException> GrassVariant::create(Assets const& assets, Json const& variant) {
-  GrassVariant value;
-  auto result162 = variant.get_string("name");
-if (!result162) return std::unexpected(std::move(result162.error()));
-value.name = std::move(*result162);
-  auto result163 = variant.get_string("directory");
-if (!result163) return std::unexpected(std::move(result163.error()));
-value.directory = std::move(*result163);
-  auto result164 = variant.get("images");
-if (!result164) return std::unexpected(std::move(result164.error()));
-auto result165 = json_to_string_list(std::move(*result164));
-if (!result165) return std::unexpected(std::move(result165.error()));
-value.images = std::move(*result165);
-  auto result166 = variant.get_float("hueShift");
-if (!result166) return std::unexpected(std::move(result166.error()));
-value.hueShift = std::move(*result166);
-  auto result167 = variant.get("descriptions");
-if (!result167) return std::unexpected(std::move(result167.error()));
-value.descriptions = std::move(*result167);
-  auto result168 = variant.get_bool("ceiling");
-if (!result168) return std::unexpected(std::move(result168.error()));
-value.ceiling = std::move(*result168);
-  auto result169 = variant.get_bool("ephemeral");
-if (!result169) return std::unexpected(std::move(result169.error()));
-value.ephemeral = std::move(*result169);
-  auto result170 = variant.get("tileDamageParameters");
-if (!result170) return std::unexpected(std::move(result170.error()));
-auto result171 = TileDamageParameters::create(assets, std::move(*result170));
-if (!result171) return std::unexpected(std::move(result171.error()));
-value.tileDamageParameters = std::move(*result171);
-  return value;
+std::expected<GrassVariant, StarException> GrassVariant::create(Assets const& assets, Json const& store) {
+  auto name = store.get_string("name");
+  if (!name) return std::unexpected(std::move(name.error()));
+  auto directory = store.get_string("directory");
+  if (!directory) return std::unexpected(std::move(directory.error()));
+  auto images = store.get("images").and_then(json_to_string_list);
+  if (!images) return std::unexpected(std::move(images.error()));
+  auto hue_shift = store.get_float("hueShift");
+  if (!hue_shift) return std::unexpected(std::move(hue_shift.error()));
+  GrassVariant variant{
+    .name = std::move(*name),
+    .directory = std::move(*directory),
+    .images = std::move(*images),
+    .hue_shift = *hue_shift,
+  };
+  if (auto traits = read_stored_traits(store, variant); !traits)
+    return std::unexpected(std::move(traits.error()));
+  auto damage = read_stored_damage(assets, store);
+  if (!damage) return std::unexpected(std::move(damage.error()));
+  variant.tile_damage_parameters = std::move(*damage);
+  return variant;
 }
 
-std::expected<Json, StarException> GrassVariant::toJson() const {
-  auto result187 = tileDamageParameters.to_json();
-if (!result187) return std::unexpected(std::move(result187.error()));
-return JsonObject{{"name", name},
+std::expected<Json, StarException> GrassVariant::to_json() const {
+  auto damage = tile_damage_parameters.to_json();
+  if (!damage) return std::unexpected(std::move(damage.error()));
+  return JsonObject{{"name", name},
       {"directory", directory},
       {"images", json_from_string_list(images)},
-      {"hueShift", hueShift},
+      {"hueShift", hue_shift},
       {"descriptions", descriptions},
       {"ceiling", ceiling},
       {"ephemeral", ephemeral},
-      {"tileDamageParameters", std::move(*result187)}};
+      {"tileDamageParameters", std::move(*damage)}};
 }
 
-BushVariant::BushVariant() : baseHueShift(), modHueShift(), ceiling(), ephemeral() {}
-
-std::expected<BushVariant, StarException> BushVariant::create(Assets const& assets, Json const& variant) {
-  BushVariant value;
-  auto result172 = variant.get_string("bushName");
-if (!result172) return std::unexpected(std::move(result172.error()));
-value.bushName = std::move(*result172);
-  auto result173 = variant.get_string("modName");
-if (!result173) return std::unexpected(std::move(result173.error()));
-value.modName = std::move(*result173);
-  auto result174 = variant.get_string("directory");
-if (!result174) return std::unexpected(std::move(result174.error()));
-value.directory = std::move(*result174);
-  auto result175 = variant.get_array("shapes");
-if (!result175) return std::unexpected(std::move(result175.error()));
-for (auto const& v : std::move(*result175)) {
-auto result176 = v.get_string(0);
-if (!result176) return std::unexpected(std::move(result176.error()));
-auto result177 = v.get(1);
-if (!result177) return std::unexpected(std::move(result177.error()));
-auto result178 = json_to_string_list(std::move(*result177));
-if (!result178) return std::unexpected(std::move(result178.error()));
-value.shapes.push_back(BushShape{std::move(*result176), std::move(*result178)});
-}
-  auto result179 = variant.get_float("baseHueShift");
-if (!result179) return std::unexpected(std::move(result179.error()));
-value.baseHueShift = std::move(*result179);
-  auto result180 = variant.get_float("modHueShift");
-if (!result180) return std::unexpected(std::move(result180.error()));
-value.modHueShift = std::move(*result180);
-  auto result181 = variant.get("descriptions");
-if (!result181) return std::unexpected(std::move(result181.error()));
-value.descriptions = std::move(*result181);
-  auto result182 = variant.get_bool("ceiling");
-if (!result182) return std::unexpected(std::move(result182.error()));
-value.ceiling = std::move(*result182);
-  auto result183 = variant.get_bool("ephemeral");
-if (!result183) return std::unexpected(std::move(result183.error()));
-value.ephemeral = std::move(*result183);
-  auto result184 = variant.get("tileDamageParameters");
-if (!result184) return std::unexpected(std::move(result184.error()));
-auto result185 = TileDamageParameters::create(assets, std::move(*result184));
-if (!result185) return std::unexpected(std::move(result185.error()));
-value.tileDamageParameters = std::move(*result185);
-  return value;
+std::expected<BushVariant, StarException> BushVariant::create(Assets const& assets, Json const& store) {
+  auto bush_name = store.get_string("bushName");
+  if (!bush_name) return std::unexpected(std::move(bush_name.error()));
+  auto mod_name = store.get_string("modName");
+  if (!mod_name) return std::unexpected(std::move(mod_name.error()));
+  auto directory = store.get_string("directory");
+  if (!directory) return std::unexpected(std::move(directory.error()));
+  auto shape_array = store.get("shapes").and_then(&Json::array_ptr);
+  if (!shape_array) return std::unexpected(std::move(shape_array.error()));
+  List<BushShape> shapes;
+  shapes.reserve((*shape_array)->size());
+  for (auto const& shape : **shape_array) {
+    auto image = shape.get_string(0);
+    if (!image) return std::unexpected(std::move(image.error()));
+    auto mods = shape.get(1).and_then(json_to_string_list);
+    if (!mods) return std::unexpected(std::move(mods.error()));
+    shapes.push_back({std::move(*image), std::move(*mods)});
+  }
+  auto base_hue_shift = store.get_float("baseHueShift");
+  if (!base_hue_shift) return std::unexpected(std::move(base_hue_shift.error()));
+  auto mod_hue_shift = store.get_float("modHueShift");
+  if (!mod_hue_shift) return std::unexpected(std::move(mod_hue_shift.error()));
+  BushVariant variant{
+    .bush_name = std::move(*bush_name),
+    .mod_name = std::move(*mod_name),
+    .directory = std::move(*directory),
+    .shapes = std::move(shapes),
+    .base_hue_shift = *base_hue_shift,
+    .mod_hue_shift = *mod_hue_shift,
+  };
+  if (auto traits = read_stored_traits(store, variant); !traits)
+    return std::unexpected(std::move(traits.error()));
+  auto damage = read_stored_damage(assets, store);
+  if (!damage) return std::unexpected(std::move(damage.error()));
+  variant.tile_damage_parameters = std::move(*damage);
+  return variant;
 }
 
-std::expected<Json, StarException> BushVariant::toJson() const {
-  auto result188 = tileDamageParameters.to_json();
-if (!result188) return std::unexpected(std::move(result188.error()));
-return JsonObject{{"bushName", bushName},
-      {"modName", modName},
+std::expected<Json, StarException> BushVariant::to_json() const {
+  auto damage = tile_damage_parameters.to_json();
+  if (!damage) return std::unexpected(std::move(damage.error()));
+  return JsonObject{{"bushName", bush_name},
+      {"modName", mod_name},
       {"directory", directory},
       {"shapes", shapes.transformed([](BushShape const& shape) -> Json {
           return JsonArray{shape.image, json_from_string_list(shape.mods)};
         })},
-      {"baseHueShift", baseHueShift},
-      {"modHueShift", modHueShift},
+      {"baseHueShift", base_hue_shift},
+      {"modHueShift", mod_hue_shift},
       {"descriptions", descriptions},
       {"ceiling", ceiling},
       {"ephemeral", ephemeral},
-      {"tileDamageParameters", std::move(*result188)}};
+      {"tileDamageParameters", std::move(*damage)}};
 }
 
 std::expected<std::shared_ptr<PlantDatabase>, StarException> PlantDatabase::create(Root& root) {
@@ -250,19 +248,19 @@ std::expected<std::shared_ptr<PlantDatabase>, StarException> PlantDatabase::crea
     if (!grasses) return std::unexpected(std::move(grasses.error()));
     auto bushes = (*assets)->scan_extension("bush");
     if (!bushes) return std::unexpected(std::move(bushes.error()));
-    for (auto files : {*stems,*foliages,*grasses,*bushes})
+    for (auto const& files : {*stems, *foliages, *grasses, *bushes})
       if (auto queued = (*assets)->queue_jsons(files.get()); !queued) return std::unexpected(std::move(queued.error()));
-    auto read = [&](auto const& files, auto& configs) -> std::expected<void, StarException> {
-      for (auto const& scannedFile : files) {
-        String file = scannedFile.string();
+    auto read = [&](CaseInsensitiveStringSet const& files, ConfigMap& configs) -> std::expected<void, StarException> {
+      for (auto const& scanned_file : files) {
+        String const& file = scanned_file.string();
         auto loaded = [&]() -> std::expected<void, StarException> {
           auto config = (*assets)->json(file);
           if (!config) return std::unexpected(std::move(config.error()));
           auto name = config->get_string("name");
           if (!name) return std::unexpected(std::move(name.error()));
-          auto settings = config->to_object();
-          if (!settings) return std::unexpected(std::move(settings.error()));
-          configs.insert(std::move(*name), Config{AssetPath::directory(file), std::move(*settings)});
+          // The first path in the asset scan order wins a duplicate name.
+          // Settings are immutable and can share the asset's JSON storage.
+          configs.insert(std::move(*name), Config{AssetPath::directory(file), std::move(*config)});
           return {};
         }();
         if (!loaded)
@@ -270,391 +268,275 @@ std::expected<std::shared_ptr<PlantDatabase>, StarException> PlantDatabase::crea
       }
       return {};
     };
-    if (auto result = read(stems->get(),database->m_treeStemConfigs); !result) return result;
-    if (auto result = read(foliages->get(),database->m_treeFoliageConfigs); !result) return result;
-    if (auto result = read(grasses->get(),database->m_grassConfigs); !result) return result;
-    return read(bushes->get(),database->m_bushConfigs);
+    if (auto result = read(stems->get(), database->m_tree_stem_configs); !result) return result;
+    if (auto result = read(foliages->get(), database->m_tree_foliage_configs); !result) return result;
+    if (auto result = read(grasses->get(), database->m_grass_configs); !result) return result;
+    return read(bushes->get(), database->m_bush_configs);
   }();
-  if (!load) return std::unexpected(PlantDatabaseException("Error loading plant database",load.error()));
+  if (!load) return std::unexpected(PlantDatabaseException("Error loading plant database", load.error()));
   return database;
 }
 
-std::expected<StringList, StarException> PlantDatabase::treeStemNames(bool ceiling) const {
+std::expected<StringList, StarException> PlantDatabase::tree_stem_names(bool ceiling) const {
   StringList names;
-  for (auto const& pair : m_treeStemConfigs) {
-    auto result255 = pair.second.settings.get_bool("ceiling", false);
-if (!result255) return std::unexpected(std::move(result255.error()));
-if (std::move(*result255) == ceiling)
-  names.push_back(pair.first);
+  for (auto const& [name, config] : m_tree_stem_configs) {
+    auto is_ceiling = config.settings.get_bool("ceiling", false);
+    if (!is_ceiling) return std::unexpected(std::move(is_ceiling.error()));
+    if (*is_ceiling == ceiling)
+      names.push_back(name);
   }
   return names;
 }
 
-StringList PlantDatabase::treeFoliageNames() const {
-  return m_treeFoliageConfigs.keys();
+StringList PlantDatabase::tree_foliage_names() const {
+  return m_tree_foliage_configs.keys();
 }
 
-std::expected<String, StarException> PlantDatabase::treeStemShape(String const& stemName) const {
-  auto result252 = m_treeStemConfigs.get(stemName);
-if (!result252) return std::unexpected(std::move(result252.error()));
-auto result253 = result252->get().settings.get("shape");
-if (!result253) return std::unexpected(std::move(result253.error()));
-auto result254 = std::move(*result253).to_string();
-if (!result254) return std::unexpected(std::move(result254.error()));
-return std::move(*result254);
-}
-
-std::expected<String, StarException> PlantDatabase::treeFoliageShape(String const& foliageName) const {
-  auto result249 = m_treeFoliageConfigs.get(foliageName);
-if (!result249) return std::unexpected(std::move(result249.error()));
-auto result250 = result249->get().settings.get("shape");
-if (!result250) return std::unexpected(std::move(result250.error()));
-auto result251 = std::move(*result250).to_string();
-if (!result251) return std::unexpected(std::move(result251.error()));
-return std::move(*result251);
-}
-
-std::optional<String> PlantDatabase::treeStemDirectory(String const& stemName) const {
-  if (auto stem = m_treeStemConfigs.maybe(stemName))
-    return stem->directory;
-  return {};
-}
-
-std::optional<String> PlantDatabase::treeFoliageDirectory(String const& foliageName) const {
-  if (auto foliage = m_treeFoliageConfigs.maybe(foliageName))
-    return foliage->directory;
-  return {};
-}
-
-std::expected<TreeVariant, StarException> PlantDatabase::buildTreeVariant(
-    String const& stemName, float stemHueShift, String const& foliageName, float foliageHueShift) const {
-  if (!m_treeStemConfigs.contains(stemName) || !m_treeFoliageConfigs.contains(foliageName))
-    return std::unexpected(PlantDatabaseException::format("stemName '{}' or foliageName '{}' not found in plant database", stemName, foliageName));
-
-  TreeVariant treeVariant;
-
-  treeVariant.stemName = stemName;
-  treeVariant.foliageName = foliageName;
-
-  auto result236 = m_treeStemConfigs.get(stemName);
-if (!result236) return std::unexpected(std::move(result236.error()));
-auto const& stemConfig = result236->get();
-  treeVariant.stemDirectory = stemConfig.directory;
-  treeVariant.stemSettings = stemConfig.settings;
-  treeVariant.stemHueShift = stemHueShift;
-
-  auto result237 = m_treeFoliageConfigs.get(foliageName);
-if (!result237) return std::unexpected(std::move(result237.error()));
-auto const& foliageConfig = result237->get();
-  treeVariant.foliageDirectory = foliageConfig.directory;
-  treeVariant.foliageSettings = foliageConfig.settings;
-  treeVariant.foliageHueShift = foliageHueShift;
-
-  auto result238 = stemConfig.settings.get_bool("ceiling", false);
-if (!result238) return std::unexpected(std::move(result238.error()));
-treeVariant.ceiling = std::move(*result238);
-
-  auto result239 = stemConfig.settings.get("dropConfig", JsonObject());
-if (!result239) return std::unexpected(std::move(result239.error()));
-treeVariant.stemDropConfig = std::move(*result239);
-  auto result240 = foliageConfig.settings.get("dropConfig", JsonObject());
-if (!result240) return std::unexpected(std::move(result240.error()));
-treeVariant.foliageDropConfig = std::move(*result240);
-
-  JsonObject descriptions;
-  auto result241 = stemConfig.settings.iterate_object();
-  if (!result241)
-    return std::unexpected(std::move(result241.error()));
-  for (auto const& entry : std::move(*result241)) {
-    auto result242 = entry.first.ends_with("Description");
-if (!result242) return std::unexpected(std::move(result242.error()));
-if (std::move(*result242))
-      descriptions[entry.first] = entry.second;
-  }
-  auto result243 = stemConfig.settings.get_string("description", stemName + " with " + foliageName);
-if (!result243) return std::unexpected(std::move(result243.error()));
-descriptions["description"] = std::move(*result243);
-  treeVariant.descriptions = descriptions;
-
-  auto result244 = stemConfig.settings.get_bool("allowsBlockPlacement", false);
-if (!result244) return std::unexpected(std::move(result244.error()));
-treeVariant.ephemeral = std::move(*result244);
-
-  auto result245 = m_root.assets();
-if (!result245) return std::unexpected(std::move(result245.error()));
-auto result246 = stemConfig.settings.get("damageTable", "/plants/treeDamage.config");
-if (!result246) return std::unexpected(std::move(result246.error()));
-auto result247 = stemConfig.settings.get_float("health", 1.0f);
-if (!result247) return std::unexpected(std::move(result247.error()));
-auto result248 = TileDamageParameters::create(*std::move(*result245),
-      std::move(*result246),
-      std::move(*result247));
-if (!result248) return std::unexpected(std::move(result248.error()));
-treeVariant.tileDamageParameters = std::move(*result248);
-
-  return treeVariant;
-}
-
-std::expected<TreeVariant, StarException> PlantDatabase::buildTreeVariant(String const& stemName, float stemHueShift) const {
-  if (!m_treeStemConfigs.contains(stemName))
-    return std::unexpected(PlantDatabaseException(Star::format("stemName '{}' not found in plant database", stemName)));
-
-  TreeVariant treeVariant;
-
-  auto result225 = m_treeStemConfigs.get(stemName);
-if (!result225) return std::unexpected(std::move(result225.error()));
-auto const& stemConfig = result225->get();
-  treeVariant.stemDirectory = stemConfig.directory;
-  treeVariant.stemSettings = stemConfig.settings;
-  treeVariant.stemHueShift = stemHueShift;
-
-  auto result226 = stemConfig.settings.get_bool("ceiling", false);
-if (!result226) return std::unexpected(std::move(result226.error()));
-treeVariant.ceiling = std::move(*result226);
-
-  auto result227 = stemConfig.settings.get("dropConfig", JsonObject());
-if (!result227) return std::unexpected(std::move(result227.error()));
-treeVariant.stemDropConfig = std::move(*result227);
-
-  treeVariant.foliageSettings = JsonObject();
-  treeVariant.foliageDropConfig = JsonObject();
-
-  JsonObject descriptions;
-  auto result228 = stemConfig.settings.iterate_object();
-  if (!result228)
-    return std::unexpected(std::move(result228.error()));
-  for (auto const& entry : std::move(*result228)) {
-    auto result229 = entry.first.ends_with("Description");
-if (!result229) return std::unexpected(std::move(result229.error()));
-if (std::move(*result229))
-      descriptions[entry.first] = entry.second;
-  }
-  auto result230 = stemConfig.settings.get_string("description", stemName);
-if (!result230) return std::unexpected(std::move(result230.error()));
-descriptions["description"] = std::move(*result230);
-  treeVariant.descriptions = descriptions;
-
-  auto result231 = stemConfig.settings.get_bool("ephemeral", false);
-if (!result231) return std::unexpected(std::move(result231.error()));
-treeVariant.ephemeral = std::move(*result231);
-
-  auto result232 = m_root.assets();
-if (!result232) return std::unexpected(std::move(result232.error()));
-auto result233 = stemConfig.settings.get("damageTable", "/plants/treeDamage.config");
-if (!result233) return std::unexpected(std::move(result233.error()));
-auto result234 = stemConfig.settings.get_float("health", 1.0f);
-if (!result234) return std::unexpected(std::move(result234.error()));
-auto result235 = TileDamageParameters::create(*std::move(*result232),
-      std::move(*result233),
-      std::move(*result234));
-if (!result235) return std::unexpected(std::move(result235.error()));
-treeVariant.tileDamageParameters = std::move(*result235);
-
-  return treeVariant;
-}
-
-std::expected<StringList, StarException> PlantDatabase::grassNames(bool ceiling) const {
-  StringList names;
-  for (auto const& pair : m_grassConfigs) {
-    auto result224 = pair.second.settings.get_bool("ceiling", false);
-if (!result224) return std::unexpected(std::move(result224.error()));
-if (std::move(*result224) == ceiling)
-  names.push_back(pair.first);
-  }
-  return names;
-}
-
-std::expected<GrassVariant, StarException> PlantDatabase::buildGrassVariant(String const& name, float hueShift) const {
-  if (!m_grassConfigs.contains(name))
-    return std::unexpected(PlantDatabaseException(Star::format("grass '{}' not found in plant database", name)));
-
-  GrassVariant grassVariant;
-  auto result212 = m_grassConfigs.get(name);
-if (!result212) return std::unexpected(std::move(result212.error()));
-auto const& config = result212->get();
-
-  grassVariant.name = name;
-  grassVariant.directory = config.directory;
-  auto result213 = config.settings.get("images");
-if (!result213) return std::unexpected(std::move(result213.error()));
-auto result214 = json_to_string_list(std::move(*result213));
-if (!result214) return std::unexpected(std::move(result214.error()));
-grassVariant.images = std::move(*result214);
-  grassVariant.hueShift = hueShift;
-  auto result215 = config.settings.get_bool("ceiling", false);
-if (!result215) return std::unexpected(std::move(result215.error()));
-grassVariant.ceiling = std::move(*result215);
-
-  JsonObject descriptions;
-  auto result216 = config.settings.iterate_object();
-  if (!result216)
-    return std::unexpected(std::move(result216.error()));
-  for (auto const& entry : std::move(*result216)) {
-    auto result217 = entry.first.ends_with("Description");
-if (!result217) return std::unexpected(std::move(result217.error()));
-if (std::move(*result217))
-      descriptions[entry.first] = entry.second;
-  }
-  auto result218 = config.settings.get_string("description", name);
-if (!result218) return std::unexpected(std::move(result218.error()));
-descriptions["description"] = std::move(*result218);
-  grassVariant.descriptions = descriptions;
-
-  auto result219 = config.settings.get_bool("ephemeral", true);
-if (!result219) return std::unexpected(std::move(result219.error()));
-grassVariant.ephemeral = std::move(*result219);
-  auto result220 = m_root.assets();
-if (!result220) return std::unexpected(std::move(result220.error()));
-auto result221 = config.settings.get("damageTable", "/plants/grassDamage.config");
-if (!result221) return std::unexpected(std::move(result221.error()));
-auto result222 = config.settings.get_float("health", 1.0f);
-if (!result222) return std::unexpected(std::move(result222.error()));
-auto result223 = TileDamageParameters::create(*std::move(*result220),
-      std::move(*result221),
-      std::move(*result222));
-if (!result223) return std::unexpected(std::move(result223.error()));
-grassVariant.tileDamageParameters = std::move(*result223);
-
-  return grassVariant;
-}
-
-std::expected<StringList, StarException> PlantDatabase::bushNames(bool ceiling) const {
-  StringList names;
-  for (auto const& pair : m_bushConfigs) {
-    auto result211 = pair.second.settings.get_bool("ceiling");
-if (!result211) return std::unexpected(std::move(result211.error()));
-if (std::move(*result211) == ceiling)
-  names.push_back(pair.first);
-  }
-  return names;
-}
-
-std::expected<StringList, StarException> PlantDatabase::bushMods(String const& bushName) const {
-  auto config = m_bushConfigs.get(bushName);
+std::expected<String, StarException> PlantDatabase::tree_stem_shape(String const& stem_name) const {
+  auto config = m_tree_stem_configs.get(stem_name);
   if (!config) return std::unexpected(std::move(config.error()));
-  auto mods = config->get().settings.opt("mods");
+  return config->get().settings.get_string("shape");
+}
+
+std::expected<String, StarException> PlantDatabase::tree_foliage_shape(String const& foliage_name) const {
+  auto config = m_tree_foliage_configs.get(foliage_name);
+  if (!config) return std::unexpected(std::move(config.error()));
+  return config->get().settings.get_string("shape");
+}
+
+std::optional<String> PlantDatabase::tree_stem_directory(String const& stem_name) const {
+  auto stem = m_tree_stem_configs.find(stem_name);
+  if (stem != m_tree_stem_configs.end())
+    return stem->second.directory;
+  return std::nullopt;
+}
+
+std::optional<String> PlantDatabase::tree_foliage_directory(String const& foliage_name) const {
+  auto foliage = m_tree_foliage_configs.find(foliage_name);
+  if (foliage != m_tree_foliage_configs.end())
+    return foliage->second.directory;
+  return std::nullopt;
+}
+
+std::expected<TreeVariant, StarException> PlantDatabase::build_tree_variant(
+    String const& stem_name, float stem_hue_shift, String const& foliage_name, float foliage_hue_shift) const {
+  if (auto stem = m_tree_stem_configs.find(stem_name); stem != m_tree_stem_configs.end()) {
+    if (auto foliage = m_tree_foliage_configs.find(foliage_name); foliage != m_tree_foliage_configs.end())
+      return resolve_tree_variant(stem_name, stem->second, stem_hue_shift,
+          FoliageSelection{foliage_name, foliage->second, foliage_hue_shift});
+  }
+  return std::unexpected(PlantDatabaseException::format(
+      "stemName '{}' or foliageName '{}' not found in plant database", stem_name, foliage_name));
+}
+
+std::expected<TreeVariant, StarException> PlantDatabase::build_tree_variant(String const& stem_name, float stem_hue_shift) const {
+  auto stem = m_tree_stem_configs.find(stem_name);
+  if (stem == m_tree_stem_configs.end())
+    return std::unexpected(PlantDatabaseException::format("stemName '{}' not found in plant database", stem_name));
+  return resolve_tree_variant(stem_name, stem->second, stem_hue_shift, std::nullopt);
+}
+
+std::expected<TreeVariant, StarException> PlantDatabase::resolve_tree_variant(
+    String const& stem_name, Config const& stem_config, float stem_hue_shift,
+    std::optional<FoliageSelection> foliage) const {
+  auto ceiling = stem_config.settings.get_bool("ceiling", false);
+  if (!ceiling) return std::unexpected(std::move(ceiling.error()));
+  auto stem_drop_config = resolve_drop_config(stem_config.settings);
+  if (!stem_drop_config) return std::unexpected(std::move(stem_drop_config.error()));
+
+  TreeVariant variant;
+  std::optional<std::reference_wrapper<String const>> foliage_name;
+  if (foliage) {
+    auto const& [name, config, hue_shift] = *foliage;
+    auto foliage_drop_config = resolve_drop_config(config.settings);
+    if (!foliage_drop_config) return std::unexpected(std::move(foliage_drop_config.error()));
+    foliage_name = std::cref(name);
+    variant.foliage_name = name;
+    variant.foliage_directory = config.directory;
+    variant.foliage_settings = config.settings;
+    variant.foliage_hue_shift = hue_shift;
+    variant.foliage_drop_config = std::move(*foliage_drop_config);
+  } else {
+    variant.foliage_settings = empty_plant_config();
+    variant.foliage_drop_config = empty_plant_config();
+  }
+
+  auto descriptions = resolve_descriptions(stem_config.settings, stem_name, foliage_name);
+  if (!descriptions) return std::unexpected(std::move(descriptions.error()));
+  // The two legacy asset fields are independent; only a tree with foliage uses allowsBlockPlacement.
+  auto ephemeral = foliage ? stem_config.settings.get_bool("allowsBlockPlacement", false)
+                           : stem_config.settings.get_bool("ephemeral", false);
+  if (!ephemeral) return std::unexpected(std::move(ephemeral.error()));
+  static Json const default_damage_table("/plants/treeDamage.config");
+  auto damage = resolve_damage(m_root, stem_config.settings, default_damage_table);
+  if (!damage) return std::unexpected(std::move(damage.error()));
+
+  variant.stem_name = stem_name;
+  variant.stem_directory = stem_config.directory;
+  variant.stem_settings = stem_config.settings;
+  variant.stem_hue_shift = stem_hue_shift;
+  variant.ceiling = *ceiling;
+  variant.stem_drop_config = std::move(*stem_drop_config);
+  variant.descriptions = std::move(*descriptions);
+  variant.ephemeral = *ephemeral;
+  variant.tile_damage_parameters = std::move(*damage);
+  return variant;
+}
+
+std::expected<StringList, StarException> PlantDatabase::grass_names(bool ceiling) const {
+  StringList names;
+  for (auto const& [name, config] : m_grass_configs) {
+    auto is_ceiling = config.settings.get_bool("ceiling", false);
+    if (!is_ceiling) return std::unexpected(std::move(is_ceiling.error()));
+    if (*is_ceiling == ceiling)
+      names.push_back(name);
+  }
+  return names;
+}
+
+std::expected<GrassVariant, StarException> PlantDatabase::build_grass_variant(String const& name, float hue_shift) const {
+  auto entry = m_grass_configs.find(name);
+  if (entry == m_grass_configs.end())
+    return std::unexpected(PlantDatabaseException::format("grass '{}' not found in plant database", name));
+  auto const& config = entry->second;
+  auto images = config.settings.get("images").and_then(json_to_string_list);
+  if (!images) return std::unexpected(std::move(images.error()));
+  auto ceiling = config.settings.get_bool("ceiling", false);
+  if (!ceiling) return std::unexpected(std::move(ceiling.error()));
+  auto descriptions = resolve_descriptions(config.settings, name);
+  if (!descriptions) return std::unexpected(std::move(descriptions.error()));
+  auto ephemeral = config.settings.get_bool("ephemeral", true);
+  if (!ephemeral) return std::unexpected(std::move(ephemeral.error()));
+  static Json const default_damage_table("/plants/grassDamage.config");
+  auto damage = resolve_damage(m_root, config.settings, default_damage_table);
+  if (!damage) return std::unexpected(std::move(damage.error()));
+  return GrassVariant{
+    .name = name,
+    .directory = config.directory,
+    .images = std::move(*images),
+    .hue_shift = hue_shift,
+    .descriptions = std::move(*descriptions),
+    .ceiling = *ceiling,
+    .ephemeral = *ephemeral,
+    .tile_damage_parameters = std::move(*damage),
+  };
+}
+
+std::expected<StringList, StarException> PlantDatabase::bush_names(bool ceiling) const {
+  StringList names;
+  for (auto const& [name, config] : m_bush_configs) {
+    auto is_ceiling = config.settings.get_bool("ceiling");
+    if (!is_ceiling) return std::unexpected(std::move(is_ceiling.error()));
+    if (*is_ceiling == ceiling)
+      names.push_back(name);
+  }
+  return names;
+}
+
+std::expected<StringList, StarException> PlantDatabase::bush_mods(String const& bush_name) const {
+  auto config = m_bush_configs.get(bush_name);
+  if (!config) return std::unexpected(std::move(config.error()));
+  auto mods = config->get().settings.find("mods");
   if (!mods) return std::unexpected(std::move(mods.error()));
-  if (!*mods) return StringList{};
-  return json_to_string_list(**mods);
+  if (!*mods || (*mods)->get().is_null()) return StringList{};
+  return json_to_string_list((*mods)->get());
 }
 
-std::expected<BushVariant, StarException> PlantDatabase::buildBushVariant(String const& bushName, float baseHueShift, String const& modName, float modHueShift) const {
-  if (!m_bushConfigs.contains(bushName))
-    return std::unexpected(PlantDatabaseException(Star::format("bush '{}' not found in plant database", bushName)));
-
-  BushVariant bushVariant;
-  auto result193 = m_bushConfigs.get(bushName);
-if (!result193) return std::unexpected(std::move(result193.error()));
-auto const& config = result193->get();
-
-  bushVariant.bushName = bushName;
-  bushVariant.modName = modName;
-  bushVariant.directory = config.directory;
-  auto result194 = config.settings.get("shapes");
-if (!result194) return std::unexpected(std::move(result194.error()));
-auto shapes = result194->iterate_array();
-if (!shapes)
-  return std::unexpected(std::move(shapes.error()));
-for (auto const& shapeVar : *shapes) {
-  auto shapeMap = shapeVar.object_ptr();
-  if (!shapeMap)
-    return std::unexpected(std::move(shapeMap.error()));
-  auto result197 = (*shapeMap)->get("base");
-  if (!result197)
-    return std::unexpected(std::move(result197.error()));
-  auto result198 = result197->get().to_string();
-  if (!result198)
-    return std::unexpected(std::move(result198.error()));
-  auto base = std::move(*result198);
-  StringList mods;
-  if (!modName.empty()) {
-    auto result199 = (*shapeMap)->get("mods");
-    if (!result199)
-      return std::unexpected(std::move(result199.error()));
-    auto result200 = result199->get().get(modName, JsonArray());
-    if (!result200)
-      return std::unexpected(std::move(result200.error()));
-    auto result201 = json_to_string_list(std::move(*result200));
-    if (!result201)
-      return std::unexpected(std::move(result201.error()));
-    mods = std::move(*result201);
+std::expected<BushVariant, StarException> PlantDatabase::build_bush_variant(
+    String const& bush_name, float base_hue_shift, String const& mod_name, float mod_hue_shift) const {
+  auto entry = m_bush_configs.find(bush_name);
+  if (entry == m_bush_configs.end())
+    return std::unexpected(PlantDatabaseException::format("bush '{}' not found in plant database", bush_name));
+  auto const& config = entry->second;
+  auto shape_array = config.settings.get("shapes").and_then(&Json::array_ptr);
+  if (!shape_array) return std::unexpected(std::move(shape_array.error()));
+  List<BushVariant::BushShape> shapes;
+  shapes.reserve((*shape_array)->size());
+  for (auto const& shape : **shape_array) {
+    auto fields = shape.object_ptr();
+    if (!fields) return std::unexpected(std::move(fields.error()));
+    auto base = (*fields)->get("base");
+    if (!base) return std::unexpected(std::move(base.error()));
+    auto image = base->get().to_string();
+    if (!image) return std::unexpected(std::move(image.error()));
+    StringList mods;
+    if (!mod_name.empty()) {
+      auto mod_table = (*fields)->get("mods");
+      if (!mod_table) return std::unexpected(std::move(mod_table.error()));
+      auto selection = mod_table->get().find(mod_name);
+      if (!selection) return std::unexpected(std::move(selection.error()));
+      if (*selection) {
+        auto parsed = json_to_string_list((*selection)->get());
+        if (!parsed) return std::unexpected(std::move(parsed.error()));
+        mods = std::move(*parsed);
+      }
+    }
+    shapes.push_back({std::move(*image), std::move(mods)});
   }
-  bushVariant.shapes.push_back({base, mods});
-}
-  bushVariant.baseHueShift = baseHueShift;
-  bushVariant.modHueShift = modHueShift;
-  auto result202 = config.settings.get_bool("ceiling", false);
-if (!result202) return std::unexpected(std::move(result202.error()));
-bushVariant.ceiling = std::move(*result202);
-
-  JsonObject descriptions;
-  auto result203 = config.settings.iterate_object();
-  if (!result203)
-    return std::unexpected(std::move(result203.error()));
-  for (auto const& entry : std::move(*result203)) {
-    auto result204 = entry.first.ends_with("Description");
-if (!result204) return std::unexpected(std::move(result204.error()));
-if (std::move(*result204))
-      descriptions[entry.first] = entry.second;
-  }
-  auto result205 = config.settings.get_string("description", bushName + " with " + modName);
-if (!result205) return std::unexpected(std::move(result205.error()));
-descriptions["description"] = std::move(*result205);
-  bushVariant.descriptions = descriptions;
-
-  auto result206 = config.settings.get_bool("ephemeral", true);
-if (!result206) return std::unexpected(std::move(result206.error()));
-bushVariant.ephemeral = std::move(*result206);
-  auto result207 = m_root.assets();
-if (!result207) return std::unexpected(std::move(result207.error()));
-auto result208 = config.settings.get("damageTable", "/plants/bushDamage.config");
-if (!result208) return std::unexpected(std::move(result208.error()));
-auto result209 = config.settings.get_float("health", 1.0f);
-if (!result209) return std::unexpected(std::move(result209.error()));
-auto result210 = TileDamageParameters::create(*std::move(*result207),
-      std::move(*result208),
-      std::move(*result209));
-if (!result210) return std::unexpected(std::move(result210.error()));
-bushVariant.tileDamageParameters = std::move(*result210);
-  return bushVariant;
+  auto ceiling = config.settings.get_bool("ceiling", false);
+  if (!ceiling) return std::unexpected(std::move(ceiling.error()));
+  auto descriptions = resolve_descriptions(config.settings, bush_name, std::cref(mod_name));
+  if (!descriptions) return std::unexpected(std::move(descriptions.error()));
+  auto ephemeral = config.settings.get_bool("ephemeral", true);
+  if (!ephemeral) return std::unexpected(std::move(ephemeral.error()));
+  static Json const default_damage_table("/plants/bushDamage.config");
+  auto damage = resolve_damage(m_root, config.settings, default_damage_table);
+  if (!damage) return std::unexpected(std::move(damage.error()));
+  return BushVariant{
+    .bush_name = bush_name,
+    .mod_name = mod_name,
+    .directory = config.directory,
+    .shapes = std::move(shapes),
+    .base_hue_shift = base_hue_shift,
+    .mod_hue_shift = mod_hue_shift,
+    .descriptions = std::move(*descriptions),
+    .ceiling = *ceiling,
+    .ephemeral = *ephemeral,
+    .tile_damage_parameters = std::move(*damage),
+  };
 }
 
-std::expected<std::shared_ptr<Plant>, StarException> PlantDatabase::createPlant(TreeVariant const& treeVariant, std::uint64_t seed) const {
-  auto plant = Plant::create(m_root, treeVariant, seed);
-  if (!plant) return std::unexpected(PlantDatabaseException(Star::format("Error constructing plant from tree variant stem: {} foliage: {}", treeVariant.stemName, treeVariant.foliageName),plant.error()));
+std::expected<std::shared_ptr<Plant>, StarException> PlantDatabase::create_plant(TreeVariant const& variant, std::uint64_t seed) const {
+  auto plant = Plant::create(m_root, variant, seed);
+  if (!plant)
+    return std::unexpected(PlantDatabaseException(Star::format(
+        "Error constructing plant from tree variant stem: {} foliage: {}", variant.stem_name, variant.foliage_name), plant.error()));
   return plant;
 }
 
-std::expected<std::shared_ptr<Plant>, StarException> PlantDatabase::createPlant(GrassVariant const& grassVariant, std::uint64_t seed) const {
-  auto plant = Plant::create(m_root, grassVariant, seed);
-  if (!plant) return std::unexpected(PlantDatabaseException(Star::format("Error constructing plant from grass variant name: {}", grassVariant.name),plant.error()));
+std::expected<std::shared_ptr<Plant>, StarException> PlantDatabase::create_plant(GrassVariant const& variant, std::uint64_t seed) const {
+  auto plant = Plant::create(m_root, variant, seed);
+  if (!plant)
+    return std::unexpected(PlantDatabaseException(
+        Star::format("Error constructing plant from grass variant name: {}", variant.name), plant.error()));
   return plant;
 }
 
-std::expected<std::shared_ptr<Plant>, StarException> PlantDatabase::createPlant(BushVariant const& bushVariant, std::uint64_t seed) const {
-  auto plant = Plant::create(m_root, bushVariant, seed);
-  if (!plant) return std::unexpected(PlantDatabaseException(Star::format("Error constructing plant from bush variant name: {} mod: {}", bushVariant.bushName, bushVariant.modName),plant.error()));
+std::expected<std::shared_ptr<Plant>, StarException> PlantDatabase::create_plant(BushVariant const& variant, std::uint64_t seed) const {
+  auto plant = Plant::create(m_root, variant, seed);
+  if (!plant)
+    return std::unexpected(PlantDatabaseException(Star::format(
+        "Error constructing plant from bush variant name: {} mod: {}", variant.bush_name, variant.mod_name), plant.error()));
   return plant;
 }
 
-Json PlantDatabase::Config::toJson() const {
+Json PlantDatabase::Config::to_json() const {
   return JsonObject{
     {"config", settings},
     {"path", directory}
   };
 }
 
-
-std::expected<Json, StarException> PlantDatabase::treeFoliageConfig(String const & foliageName) const {
-  auto config = m_treeFoliageConfigs.get(foliageName);
+std::expected<Json, StarException> PlantDatabase::tree_foliage_config(String const& foliage_name) const {
+  auto config = m_tree_foliage_configs.get(foliage_name);
   if (!config) return std::unexpected(std::move(config.error()));
-  return config->get().toJson();
+  return config->get().to_json();
 }
 
-std::expected<Json, StarException> PlantDatabase::treeStemConfig(String const & stemName) const {
-  auto config = m_treeStemConfigs.get(stemName);
+std::expected<Json, StarException> PlantDatabase::tree_stem_config(String const& stem_name) const {
+  auto config = m_tree_stem_configs.get(stem_name);
   if (!config) return std::unexpected(std::move(config.error()));
-  return config->get().toJson();
+  return config->get().to_json();
 }
 
 }

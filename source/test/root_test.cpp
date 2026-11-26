@@ -75,6 +75,7 @@ import star.net_compatibility;
 import star.name_generator;
 import star.species_database;
 import star.item_descriptor;
+import star.plant;
 import star.plant_database;
 import star.quest_template_database;
 import star.monster_database;
@@ -535,7 +536,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
     };
     ASSERT_NO_FATAL_FAILURE(expectCatalog("assets", root.assets()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("objectDatabase", root.object_database()));
-    ASSERT_NO_FATAL_FAILURE(expectCatalog("plantDatabase", root.plantDatabase()));
+    ASSERT_NO_FATAL_FAILURE(expectCatalog("plant_database", root.plant_database()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("projectileDatabase", root.projectileDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("monsterDatabase", root.monster_database()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("npcDatabase", root.npc_database()));
@@ -2216,19 +2217,19 @@ const GameTestRegistration bushShapeBoundaries("RootTest", "BushShapeBoundaries"
      {"borrowed-null-shape.bush", R"JSON({"name":"borrowed-null-shape","shapes":[null]})JSON"}}));
   auto root = Root::create(std::move(*settings));
   ASSERT_TRUE(root) << root.error().what();
-  auto database = (*root)->plantDatabase();
+  auto database = (*root)->plant_database();
   ASSERT_TRUE(database) << database.error().what();
   for (auto const& name : {"borrowed-no-mods", "borrowed-null-mods"}) {
-    auto variant = (*database)->buildBushVariant(String(std::string_view(name)), 12.0f, "", 24.0f);
+    auto variant = (*database)->build_bush_variant(String(std::string_view(name)), 12.0f, "", 24.0f);
     ASSERT_TRUE(variant) << variant.error().what();
     ASSERT_EQ(variant->shapes.size(), 1u);
     EXPECT_EQ(variant->shapes[0].image, "base.png");
     EXPECT_TRUE(variant->shapes[0].mods.empty());
-    EXPECT_EQ(variant->baseHueShift, 12.0f);
-    EXPECT_EQ(variant->modHueShift, 24.0f);
-    EXPECT_FALSE((*database)->buildBushVariant(String(std::string_view(name)), 0.0f, "flower", 0.0f));
+    EXPECT_EQ(variant->base_hue_shift, 12.0f);
+    EXPECT_EQ(variant->mod_hue_shift, 24.0f);
+    EXPECT_FALSE((*database)->build_bush_variant(String(std::string_view(name)), 0.0f, "flower", 0.0f));
   }
-  auto variant = (*database)->buildBushVariant("borrowed-mods", 12.0f, "flower", 24.0f);
+  auto variant = (*database)->build_bush_variant("borrowed-mods", 12.0f, "flower", 24.0f);
   ASSERT_TRUE(variant) << variant.error().what();
   ASSERT_EQ(variant->shapes.size(), 2u);
   EXPECT_EQ(variant->shapes[0].image, "first.png");
@@ -2236,7 +2237,145 @@ const GameTestRegistration bushShapeBoundaries("RootTest", "BushShapeBoundaries"
   EXPECT_EQ(variant->shapes[1].image, "second.png");
   EXPECT_TRUE(variant->shapes[1].mods.empty());
   for (auto const& name : {"borrowed-null-selection", "borrowed-invalid-base", "borrowed-null-shape"})
-    EXPECT_FALSE((*database)->buildBushVariant(String(std::string_view(name)), 0.0f, "flower", 0.0f));
+    EXPECT_FALSE((*database)->build_bush_variant(String(std::string_view(name)), 0.0f, "flower", 0.0f));
+  auto assets = (*root)->assets();
+  ASSERT_TRUE(assets) << assets.error().what();
+  auto store = variant->to_json();
+  ASSERT_TRUE(store) << store.error().what();
+  EXPECT_EQ(store->get_string("bushName"), String("borrowed-mods"));
+  EXPECT_EQ(store->get_string("modName"), String("flower"));
+  auto restored = BushVariant::create(**assets, *store);
+  ASSERT_TRUE(restored) << restored.error().what();
+  EXPECT_EQ(restored->to_json(), *store);
+});
+
+const GameTestRegistration plant_catalog_variants("PlantCatalogTest", "TreeIdentityLegacyFlagsAndDuplicatePriority", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto settings = isolationSettings(fixture.rootSettings(), *directory, "plant-catalog");
+  ASSERT_TRUE(settings) << settings.error().what();
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(File::create_directory(File::relative_to(overlay, "catalog-a")));
+  ASSERT_TRUE(File::create_directory(File::relative_to(overlay, "catalog-b")));
+  ASSERT_TRUE(writeIsolationModules(overlay, {
+    {"catalog-a/duplicate.modularstem", R"JSON({
+      "name":"catalog-probe","shape":"catalog-probe","ephemeral":true,"allowsBlockPlacement":false,
+      "avianDescription":"First fixture", "health":5, "dropConfig":{"catalogKind":"stem"},
+      "base":{"base":{"image":"/catalog-stem.png","attachment":{"bx":0,"by":0,"x":0,"y":8}}},
+      "middle":{},"middleMinSize":0,"middleMaxSize":0
+    })JSON"},
+    {"catalog-b/duplicate.modularstem", R"JSON({
+      "name":"catalog-probe","shape":"catalog-probe","ephemeral":true,"allowsBlockPlacement":false,
+      "avianDescription":"Second fixture", "health":5, "dropConfig":{"catalogKind":"stem"},
+      "base":{"base":{"image":"/catalog-stem.png","attachment":{"bx":0,"by":0,"x":0,"y":8}}},
+      "middle":{},"middleMinSize":0,"middleMaxSize":0
+    })JSON"},
+    {"catalog-reverse.modularstem", R"JSON({
+      "name":"catalog-reverse","shape":"catalog-probe","ephemeral":false,"allowsBlockPlacement":true
+    })JSON"},
+    {"catalog-fixture.modularfoliage", R"JSON({
+      "name":"catalog-leaf","shape":"catalog-probe","dropConfig":{"catalogKind":"foliage"}
+    })JSON"},
+    {"catalog-fixture.grass", R"JSON({
+      "name":"catalog-grass","images":["first.png","second.png"],"description":"Catalog grass","ephemeral":false
+    })JSON"},
+  }));
+  Image image(tile_pixels, tile_pixels, PixelFormat::RGBA32);
+  for (unsigned y = 0; y < tile_pixels; ++y)
+    for (unsigned x = 0; x < tile_pixels; ++x)
+      ASSERT_TRUE(image.set(x, y, Vec4B(120, 80, 40, 255)));
+  auto png = std::make_shared<Buffer>();
+  ASSERT_TRUE(image.write_png(fixture.root().logger(), png));
+  ASSERT_TRUE(File::write_file(png->take_data(), File::relative_to(overlay, "catalog-stem.png")));
+
+  auto root = Root::create(std::move(*settings));
+  ASSERT_TRUE(root) << root.error().what();
+  auto assets = (*root)->assets();
+  ASSERT_TRUE(assets) << assets.error().what();
+  auto scanned = (*assets)->scan_extension("modularstem");
+  ASSERT_TRUE(scanned) << scanned.error().what();
+  auto const& scan_order = scanned->get();
+  auto is_duplicate = [](CaseInsensitiveString const& asset) {
+    return asset.string() == "/catalog-a/duplicate.modularstem" || asset.string() == "/catalog-b/duplicate.modularstem";
+  };
+  ASSERT_EQ(std::ranges::count_if(scan_order, is_duplicate), 2);
+  auto first = std::ranges::find_if(scan_order, is_duplicate);
+  ASSERT_TRUE(first != scan_order.end());
+  auto first_settings = (*assets)->json(first->string());
+  ASSERT_TRUE(first_settings) << first_settings.error().what();
+  auto first_object = first_settings->object_ptr();
+  ASSERT_TRUE(first_object) << first_object.error().what();
+
+  auto database = (*root)->plant_database();
+  ASSERT_TRUE(database) << database.error().what();
+  auto const& catalog = **database;
+  auto winning_directory = AssetPath::directory(first->string());
+  EXPECT_EQ(catalog.tree_stem_directory("catalog-probe"), winning_directory);
+  EXPECT_EQ(catalog.tree_stem_shape("catalog-probe"), String("catalog-probe"));
+  EXPECT_EQ(catalog.tree_foliage_shape("catalog-leaf"), String("catalog-probe"));
+  auto listed_config = catalog.tree_stem_config("catalog-probe");
+  ASSERT_TRUE(listed_config) << listed_config.error().what();
+  EXPECT_EQ(listed_config->get("config"), *first_settings);
+  EXPECT_EQ(listed_config->get_string("path"), winning_directory);
+
+  auto leafless = catalog.build_tree_variant("catalog-probe", 12.0f);
+  ASSERT_TRUE(leafless) << leafless.error().what();
+  auto leafy = catalog.build_tree_variant("catalog-probe", 12.0f, "catalog-leaf", -6.0f);
+  ASSERT_TRUE(leafy) << leafy.error().what();
+  EXPECT_EQ(leafless->stem_name, "catalog-probe");
+  EXPECT_EQ(leafless->stem_directory, winning_directory);
+  EXPECT_EQ(leafless->stem_settings.object_ptr(), *first_object);
+  auto avian = first_settings->get("avianDescription");
+  ASSERT_TRUE(avian) << avian.error().what();
+  EXPECT_EQ(leafless->descriptions.get("avianDescription"), *avian);
+  EXPECT_EQ(leafless->descriptions.get_string("description"), String("catalog-probe"));
+  EXPECT_EQ(leafless->stem_drop_config.get_string("catalogKind"), String("stem"));
+  EXPECT_TRUE(leafless->ephemeral);
+  EXPECT_TRUE(leafless->foliage_name.empty());
+  EXPECT_EQ(leafless->foliage_settings, Json(JsonObject{}));
+  EXPECT_EQ(leafless->foliage_drop_config, Json(JsonObject{}));
+  EXPECT_EQ(leafy->stem_settings.object_ptr(), *first_object);
+  EXPECT_EQ(leafy->foliage_name, "catalog-leaf");
+  EXPECT_EQ(leafy->foliage_hue_shift, -6.0f);
+  EXPECT_EQ(leafy->descriptions.get_string("description"), String("catalog-probe with catalog-leaf"));
+  EXPECT_EQ(leafy->foliage_drop_config.get_string("catalogKind"), String("foliage"));
+  EXPECT_FALSE(leafy->ephemeral);
+
+  auto reverse_leafless = catalog.build_tree_variant("catalog-reverse", 0.0f);
+  ASSERT_TRUE(reverse_leafless) << reverse_leafless.error().what();
+  auto reverse_leafy = catalog.build_tree_variant("catalog-reverse", 0.0f, "catalog-leaf", 0.0f);
+  ASSERT_TRUE(reverse_leafy) << reverse_leafy.error().what();
+  EXPECT_FALSE(reverse_leafless->ephemeral);
+  EXPECT_TRUE(reverse_leafy->ephemeral);
+
+  auto grass = catalog.build_grass_variant("catalog-grass", 17.0f);
+  ASSERT_TRUE(grass) << grass.error().what();
+  EXPECT_EQ(grass->images, (StringList{"first.png", "second.png"}));
+  EXPECT_EQ(grass->descriptions.get_string("description"), String("Catalog grass"));
+  EXPECT_FALSE(grass->ephemeral);
+  auto grass_store = grass->to_json();
+  ASSERT_TRUE(grass_store) << grass_store.error().what();
+  EXPECT_EQ(grass_store->get_float("hueShift"), 17.0f);
+  auto grass_restored = GrassVariant::create(**assets, *grass_store);
+  ASSERT_TRUE(grass_restored) << grass_restored.error().what();
+  EXPECT_EQ(grass_restored->to_json(), *grass_store);
+
+  auto stored = leafless->to_json();
+  ASSERT_TRUE(stored) << stored.error().what();
+  EXPECT_EQ(stored->get_string("stemName"), String("catalog-probe"));
+  EXPECT_EQ(stored->get_float("stemHueShift"), 12.0f);
+  EXPECT_EQ(stored->query_float("tileDamageParameters.totalHealth"), 5.0f);
+  auto restored = TreeVariant::create(**assets, *stored);
+  ASSERT_TRUE(restored) << restored.error().what();
+  EXPECT_EQ(restored->to_json(), *stored);
+
+  auto plant = catalog.create_plant(*restored, 0x9123ull);
+  ASSERT_TRUE(plant) << plant.error().what();
+  auto plant_store = (*plant)->disk_store();
+  ASSERT_TRUE(plant_store) << plant_store.error().what();
+  EXPECT_EQ(plant_store->get("saplingDropConfig"),
+      Json(JsonObject{{"stemName", "catalog-probe"}, {"stemHueShift", 12.0f}, {"foliageName", ""}, {"foliageHueShift", 0.0f}}));
 });
 
 const GameTestRegistration gender_name_rules("NameGeneratorConsumerTest", "SpeciesAndNpcUseTheirOwnGenderRules", [](GameTest& fixture) {

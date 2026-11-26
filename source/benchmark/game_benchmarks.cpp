@@ -1209,11 +1209,11 @@ int main(int argc, char** argv) {
   }
   for (std::string_view scenario : {"FirstTree", "Build16", "Sample128", "RandomSample128"}) {
     benchmark::RegisterBenchmark(std::string("Game/Biome/").append(scenario).c_str(), [&, scenario](benchmark::State& state) {
-      auto plants = session.root.plantDatabase();
+      auto plants = session.root.plant_database();
       if (!plants) return session.fail(state, plants.error());
-      auto stems = (*plants)->treeStemNames();
+      auto stems = (*plants)->tree_stem_names();
       if (!stems) return session.fail(state, stems.error());
-      auto leaves = (*plants)->treeFoliageNames();
+      auto leaves = (*plants)->tree_foliage_names();
       std::ranges::sort(*stems);
       std::ranges::sort(leaves);
       if (stems->empty()) return session.fail(state, "No tree stems");
@@ -1234,12 +1234,12 @@ int main(int argc, char** argv) {
       std::uint64_t hash = 14695981039346656037ull;
       auto mix = [&](std::uint32_t value) { hash = (hash ^ value) * 1099511628211ull; };
       auto mix_tree = [&](TreeVariant const& tree) {
-        for (auto const& name : {std::cref(tree.stemName), std::cref(tree.foliageName)}) {
+        for (auto const& name : {std::cref(tree.stem_name), std::cref(tree.foliage_name)}) {
           for (unsigned char c : name.get().utf8()) mix(c);
           mix(256);
         }
-        mix(std::bit_cast<std::uint32_t>(tree.stemHueShift));
-        mix(std::bit_cast<std::uint32_t>(tree.foliageHueShift));
+        mix(std::bit_cast<std::uint32_t>(tree.stem_hue_shift));
+        mix(std::bit_cast<std::uint32_t>(tree.foliage_hue_shift));
       };
       auto store = distribution.to_json();
       if (!store) return session.fail(state, store.error());

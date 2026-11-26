@@ -404,53 +404,32 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
     return std::unexpected(std::move(treeResult.error()));
   auto tree = std::move(*treeResult);
   if (tree) {
-    auto stemNameConfigResult = config_value("stemName");
-    if (!stemNameConfigResult)
-      return std::unexpected(std::move(stemNameConfigResult.error()));
-    auto stemNameConfig = std::move(*stemNameConfigResult);
-    auto stemNameResult = stemNameConfig.to_string();
-    if (!stemNameResult)
-      return std::unexpected(std::move(stemNameResult.error()));
-    auto stemName = std::move(*stemNameResult);
-    auto stemHueShiftConfigResult = config_value("stemHueShift", 0);
-    if (!stemHueShiftConfigResult)
-      return std::unexpected(std::move(stemHueShiftConfigResult.error()));
-    auto stemHueShiftConfig = std::move(*stemHueShiftConfigResult);
-    auto stemHueShiftResult = stemHueShiftConfig.to_float();
-    if (!stemHueShiftResult)
-      return std::unexpected(std::move(stemHueShiftResult.error()));
-    auto stemHueShift = std::move(*stemHueShiftResult);
-    auto foliageNameConfigResult = config_value("foliageName", "");
-    if (!foliageNameConfigResult)
-      return std::unexpected(std::move(foliageNameConfigResult.error()));
-    auto foliageNameConfig = std::move(*foliageNameConfigResult);
-    auto foliageNameResult = foliageNameConfig.to_string();
-    if (!foliageNameResult)
-      return std::unexpected(std::move(foliageNameResult.error()));
-    auto foliageName = std::move(*foliageNameResult);
-    auto foliageHueShiftConfigResult = config_value("foliageHueShift", 0);
-    if (!foliageHueShiftConfigResult)
-      return std::unexpected(std::move(foliageHueShiftConfigResult.error()));
-    auto foliageHueShiftConfig = std::move(*foliageHueShiftConfigResult);
-    auto foliageHueShiftResult = foliageHueShiftConfig.to_float();
-    if (!foliageHueShiftResult)
-      return std::unexpected(std::move(foliageHueShiftResult.error()));
-    auto foliageHueShift = std::move(*foliageHueShiftResult);
-    Vec2I plantPosition = tile_position();
-    auto plantsResult = root().plantDatabase();
-    if (!plantsResult)
-      return std::unexpected(std::move(plantsResult.error()));
-    auto plants = std::move(*plantsResult);
-    auto variantResult = foliageName.empty() ? plants->buildTreeVariant(stemName, stemHueShift) : plants->buildTreeVariant(stemName, stemHueShift, foliageName, foliageHueShift);
-    if (!variantResult)
-      return std::unexpected(std::move(variantResult.error()));
-    auto plantResult = plants->createPlant(*variantResult, root().random().next_i64());
-    if (!plantResult)
-      return std::unexpected(std::move(plantResult.error()));
-    auto plant = std::move(*plantResult);
-    auto operation13 = plant->set_tile_position(plantPosition);
-    if (!operation13)
-      return std::unexpected(std::move(operation13.error()));
+    auto stem_name = config_value("stemName").and_then(&Json::to_string);
+    if (!stem_name)
+      return std::unexpected(std::move(stem_name.error()));
+    auto stem_hue_shift = config_value("stemHueShift", 0).and_then(&Json::to_float);
+    if (!stem_hue_shift)
+      return std::unexpected(std::move(stem_hue_shift.error()));
+    auto foliage_name = config_value("foliageName", "").and_then(&Json::to_string);
+    if (!foliage_name)
+      return std::unexpected(std::move(foliage_name.error()));
+    auto foliage_hue_shift = config_value("foliageHueShift", 0).and_then(&Json::to_float);
+    if (!foliage_hue_shift)
+      return std::unexpected(std::move(foliage_hue_shift.error()));
+    auto plant_position = tile_position();
+    auto plants = root().plant_database();
+    if (!plants)
+      return std::unexpected(std::move(plants.error()));
+    auto variant = foliage_name->empty() ? (*plants)->build_tree_variant(*stem_name, *stem_hue_shift)
+                                        : (*plants)->build_tree_variant(*stem_name, *stem_hue_shift, *foliage_name, *foliage_hue_shift);
+    if (!variant)
+      return std::unexpected(std::move(variant.error()));
+    auto created = (*plants)->create_plant(*variant, root().random().next_i64());
+    if (!created)
+      return std::unexpected(std::move(created.error()));
+    auto plant = std::move(*created);
+    if (auto positioned = plant->set_tile_position(plant_position); !positioned)
+      return std::unexpected(std::move(positioned.error()));
     auto occupiedResult = anySpacesOccupied(plant->spaces());
     if (!occupiedResult)
       return std::unexpected(std::move(occupiedResult.error()));

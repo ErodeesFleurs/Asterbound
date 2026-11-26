@@ -324,6 +324,17 @@ When checking render event retries, compare particle positions, audio instance
 identity, delivery order and the next RNG value against uninterrupted delivery.
 Equal event counts alone do not rule out rerolled particles or restarted loops.
 
+### Plant geometry and felling
+
+Plant occupation always includes the local origin. Roots are derived from the
+current occupied cells at local Y zero, one tile below a ground plant or above
+a ceiling plant. Replacing pieces must replace those roots, not append to them.
+
+Cut segments are published in reverse order of their first appearance in the
+piece list. Piece order within a segment is significant for rendering and
+drops. Tree generation uses both the supplied seed and the world's random
+source for sway; reproducing only the seed does not reproduce all piece data.
+
 ### Shutdown order
 
 Shutdown stops audio callbacks and client services first, releases SDK/GL owners
