@@ -25,8 +25,14 @@ local function log(...)
 	sb.logInfo(...)
 end
 
-local function boolToColor(bool)
-	return bool and "0f0" or "f00"
+local function skin(button, stem, selected, sharedHover)
+	local prefix = PATH .. stem .. "_"
+	local state = selected and "on" or "off"
+	widget.setButtonImages(button, {
+		base = prefix .. state .. ".png",
+		hover = prefix .. (sharedHover and "stay" or state .. "_stay") .. ".png",
+		pressed = prefix .. "on.png"
+	})
 end
 
 local function mapToRange(x, min, max)
@@ -63,7 +69,12 @@ local function addDeviceToList(deviceName)
 	log("Added audio device '%s' to list", deviceName)
 	return button
 end
-
+local function updateDeviceSkin()
+	local selected = widget.getListSelected(DEVICE_LIST_WIDGET)
+	for id in pairs(widgetsToDevices) do
+		skin(fmt("%s.%s.button", DEVICE_LIST_WIDGET, id), "tab", id == selected)
+	end
+end
 function selectDevice()
 	local selected = widget.getListSelected(DEVICE_LIST_WIDGET)
 	if selected == nullWidget then
@@ -82,6 +93,7 @@ function selectDevice()
 		set("deviceName", deviceName)
 		set("inputEnabled", true)
 	end
+	updateDeviceSkin()
 end
 
 local function initCallbacks()
@@ -90,23 +102,22 @@ end
 
 local function updateVoiceButton()
 	local enabled = settings.enabled
-	local color = boolToColor(enabled)
-	widget.setText("enableVoiceToggle", str(fmt("^#%s;", color), enabled and "DisableVoiceChat" or "EnableVoiceChat"))
-	widget.setImage("enableVoiceToggleBack", PATH .. "bigbuttonback.png?multiply=" .. color)
+	skin("enableVoiceToggle", "bigtab", enabled)
+	widget.setText("enableVoiceToggle", str(enabled and "DisableVoiceChat" or "EnableVoiceChat"))
 end
 
 local function updateVoiceModeButtons()
 	local pushToTalk = settings.inputMode:lower() == "pushtotalk"
-	widget.setImage("pushToTalkBack",    PATH .. "pushtotalkback.png?multiply=" .. boolToColor(    pushToTalk))
-	widget.setImage("voiceActivityBack", PATH .. "activityback.png?multiply="   .. boolToColor(not pushToTalk))
-	widget.setText("pushToTalk",    str(fmt("^#%s;", boolToColor(    pushToTalk)), "PushToTalk"))
-	widget.setText("voiceActivity", str(fmt("^#%s;", boolToColor(not pushToTalk)), "Activity"))
+	skin("pushToTalk", "pushtotalk", pushToTalk, true)
+	skin("voiceActivity", "activity", not pushToTalk, true)
+	widget.setText("pushToTalk", str("PushToTalk"))
+	widget.setText("voiceActivity", str("Activity"))
 end
 
 local voiceCanvas, inputCanvas = nil, nil
 local function updateVolumeCanvas(canvas, volume, multiplier)
 	canvas:clear()
-	local lineEnd = 1 + volume * 195
+	local lineEnd = 1 + volume * 166
 	local lineColor = {95, 110, 255, 225}
 	local multiplied = volume * multiplier
 	if multiplied > 1 then
@@ -123,31 +134,31 @@ local function updateVolumeCanvas(canvas, volume, multiplier)
 	canvas:drawLine({1, MID}, {lineEnd, MID}, lineColor, 60)
 	canvas:drawLine({lineEnd - 0.5, MID}, {lineEnd + 0.5, MID}, {255, 255, 255, 200}, 60)
 	local label = volume == 0 and str("^#f00,shadow;", "Muted") or fmt("^shadow;%s%%", math.floor(volume * multiplier * 1000) * 0.1)
-	canvas:drawText(label, {position = {92.5, MID}, horizontalAnchor = "mid", verticalAnchor = "mid"}, 16, {255, 255, 255, 255})
+	canvas:drawText(label, {position = {84, MID}, horizontalAnchor = "mid", verticalAnchor = "mid"}, 16, {255, 255, 255, 255})
 end
 
 local thresholdCanvas = nil
 local function updateThresholdCanvas(canvas, dB)
 	canvas:clear()
   local scale = pane.scale()
-	local lineEnd = 1 + (1 - (dB / MINIMUM_DB)) * 195
+	local lineEnd = 1 + (1 - (dB / MINIMUM_DB)) * 166
 	local lineColor = {255, 255, 0, 127}
 	canvas:drawLine({1,  2}, {lineEnd,  2}, lineColor, scale)
 	canvas:drawLine({1, 13}, {lineEnd, 13}, lineColor, scale)
 	lineColor[4] = 64
-	canvas:drawLine({lineEnd,  2}, {196,  2}, lineColor, scale)
-	canvas:drawLine({lineEnd, 13}, {196, 13}, lineColor, scale)
+	canvas:drawLine({lineEnd,  2}, {167,  2}, lineColor, scale)
+	canvas:drawLine({lineEnd, 13}, {167, 13}, lineColor, scale)
 	canvas:drawLine({lineEnd - 0.5, MID}, {lineEnd + 0.5, MID}, {255, 255, 255, 200}, 60)
 
 	local loudness = 1 - (voice.speaker().smoothDecibels / MINIMUM_DB)
-	local loudnessEnd = math.min(1 + loudness * 195, 196)
+	local loudnessEnd = math.min(1 + loudness * 166, 167)
 	if loudnessEnd > 0 then
 		lineColor[4] = 200
 		canvas:drawLine({1, MID}, {loudnessEnd, MID}, lineColor, 4 * scale)
 	end
 
 	local label = fmt("^shadow;%sdB", math.floor(dB * 10) * 0.1)
-	canvas:drawText(label, {position = {92.5, MID}, horizontalAnchor = "mid", verticalAnchor = "mid"}, 16, {255, 255, 255, 255})
+	canvas:drawText(label, {position = {84, MID}, horizontalAnchor = "mid", verticalAnchor = "mid"}, 16, {255, 255, 255, 255})
 end
 
 function init()
@@ -186,6 +197,7 @@ function displayed()
 		widget.setListSelected(DEVICE_LIST_WIDGET, preferredDeviceWidget)
 	end
 
+	updateDeviceSkin()
 	updateVoiceButton()
 	updateVoiceModeButtons()
 	updateVolumeCanvas(voiceCanvas, settings.outputVolume / VOICE_MAX, VOICE_MAX)
@@ -198,11 +210,11 @@ function update()
 end
 
 local function sliderToValue(x)
-	return mapToRange(x, 5, 187)
+	return mapToRange(x, 5, 158)
 end
 
 local function mouseInSlider(mouse)
-	return mouse[1] > 0 and mouse[1] < 197
+	return mouse[1] > 0 and mouse[1] < 168
 	   and mouse[2] > 0 and mouse[2] < 16
 end
 
