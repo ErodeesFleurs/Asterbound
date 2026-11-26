@@ -947,7 +947,7 @@ std::expected<float, StarException> WorldClient::windLevel(Vec2F const& pos) con
   if (!layer) {
     return std::unexpected(std::move(layer.error()));
   }
-  if (!*layer || (*layer)->get().domain != m_weatherDomain) {
+  if (!*layer || (*layer)->get().domain != m_weather_domain) {
     return WorldImpl::windLevel(m_tileArray, pos, 0.0f);
   }
   
@@ -990,7 +990,7 @@ WorldClient::EntityRenderSample WorldClient::sample_entity(Entity const& entity,
 
 void WorldClient::resetPresentation() {
   m_entityPresentation.clear();
-  m_parallaxWindTime.resetPresentation();
+  m_parallax_wind_time.reset_presentation();
   if (m_particles)
     m_particles->resetPresentation();
   if (m_sky)
@@ -1021,6 +1021,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
   render_data.prepare_frame();
   float const interpolation = presentation.interpolation();
   if (!inWorld()) {
+    render_data.parallax_layers.clear();
     render_data.entity_drawables.clear();
     render_data.particles.clear();
     return {};
@@ -1322,126 +1323,76 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
     return std::unexpected(std::move(result75.error()));
   render_data.sky_render_data = (std::move(*result75));
   
-  auto biome_result = mainEnvironmentBiome();
+  auto biome_result = main_environment_biome();
   if (!biome_result)
     return std::unexpected(std::move(biome_result.error()));
   auto const& environment_biome = *biome_result;
 
-  if (environment_biome) {
-    setParallax(environment_biome->parallax);
-  }
-  
-  if (m_currentParallax) {
-    if (m_parallax_fade_timer.ready()) {
-      render_data.parallax_layers.append_range(m_currentParallax->layers());
-    } else {
-      for (auto layer : m_currentParallax->layers()) {
-        layer.alpha = std::min(1.0f, m_parallax_fade_timer.remaining_fraction() * 2);
-        render_data.parallax_layers.push_back(layer);
-      }
-    }
-  }
-  
-  if (m_nextParallax) {
-    for (auto layer : m_nextParallax->layers()) {
-      layer.alpha = std::min(1.0f, (1.0f - m_parallax_fade_timer.remaining_fraction()) * 2);
-      render_data.parallax_layers.push_back(layer);
-    }
-  }
-  
-  auto result77 = currentWeatherDomain();
-  if (!result77)
-    return std::unexpected(std::move(result77.error()));
-  auto weather_parallax_asset = *result77 == m_weatherDomain ? m_weather->weatherParallax() : std::optional<String>();
-  if (weather_parallax_asset != m_weatherParallaxAsset || environment_biome != m_weatherParallaxBiome) {
-    m_weatherParallaxAsset = weather_parallax_asset;
-    m_weatherParallaxBiome = environment_biome;
-    m_weatherParallax.reset();
-    
-    {
-      bool condition80 = static_cast<bool>(weather_parallax_asset);
-      if (condition80) {
-        auto result78 = this->root().assets();
-        if (!result78)
-          return std::unexpected(std::move(result78.error()));
-        auto result79 = (std::move(*result78))->asset_exists(*weather_parallax_asset);
-        if (!result79)
-          return std::unexpected(std::move(result79.error()));
-        condition80 = static_cast<bool>((std::move(*result79)));
-      }
-      if (condition80) {
-        if (environment_biome && environment_biome->parallax) {
-          auto result81 = environment_biome->parallax->createOverlay(*weather_parallax_asset);
-          if (!result81)
-            return std::unexpected(std::move(result81.error()));
-          m_weatherParallax = (std::move(*result81));
+  if (environment_biome)
+    set_parallax(environment_biome->parallax);
+
+  auto weather_domain = current_weather_domain();
+  if (!weather_domain)
+    return std::unexpected(std::move(weather_domain.error()));
+  auto weather_asset = weather_domain->get() == m_weather_domain ? m_weather->weather_parallax() : std::nullopt;
+  if (auto updated = update_weather_parallax(weather_asset, environment_biome); !updated)
+    return std::unexpected(std::move(updated.error()));
+
+  auto layers = render_data.parallax_layers.sample_sources(m_current_parallax, m_next_parallax, m_weather_parallax.overlay);
+  if (!layers.empty()) {
+    float const remaining = m_parallax_fade_timer.remaining_fraction();
+    float const current_alpha = std::min(1.0f, remaining * 2);
+    float const next_alpha = std::min(1.0f, (1.0f - remaining) * 2);
+    float const weather_intensity = m_weather->weather_intensity();
+    bool const fading = !m_parallax_fade_timer.ready();
+    float const wind_interpolation = render_data.sky_render_data.epochTime == m_sky->epochTime() ? 1.0f : interpolation;
+    auto const wind_time_sample = m_parallax_wind_time.sample(wind_interpolation);
+    std::shared_ptr<FunctionDatabase const> functions;
+    for (auto& sample : layers) {
+      auto const& layer = sample.layer.get();
+      if (sample.source_index == 0)
+        sample.alpha = fading ? current_alpha : layer.alpha;
+      else if (sample.source_index == 1)
+        sample.alpha = next_alpha;
+      else
+        sample.alpha = layer.alpha * weather_intensity;
+      sample.parallax_offset = layer.parallax_offset;
+      sample.speed = layer.speed;
+
+      if (layer.follows_wind || layer.wind_speed_multiplier) {
+        double wind_time;
+        float horizontal_speed = layer.speed[0];
+        if (layer.follows_wind) {
+          // Texture offsets move imagery in the opposite direction.
+          horizontal_speed = -std::abs(horizontal_speed);
+          wind_time = layer.wind_speed_multiplier
+              ? wind_time_sample[2] * *layer.wind_speed_multiplier
+              : wind_time_sample[0];
         } else {
-          float hue_shift = environment_biome ? environment_biome->hue_shift : 0.0f;
-          std::optional<TreeVariant> tree_variant;
-          if (environment_biome) {
-            if (auto tree = environment_biome->surface_placeables.first_tree())
-              tree_variant.emplace(tree->get()); // The parallax retains its own variant.
-          }
-          auto overlay = Parallax::create(this->root(), *weather_parallax_asset,
-              m_worldTemplate->worldSeed(), m_worldTemplate->surfaceLevel(), hue_shift, std::move(tree_variant));
-          if (!overlay)
-            return std::unexpected(std::move(overlay.error()));
-          m_weatherParallax = std::move(*overlay);
+          wind_time = wind_time_sample[1] * *layer.wind_speed_multiplier;
         }
-        auto result83 = m_weatherParallax->fadeToSkyColor(m_sky->mainSkyColor());
-        if (!result83)
-          return std::unexpected(std::move(result83.error()));
+
+        sample.parallax_offset[0] += horizontal_speed * wind_time / m_sky->dayLength();
+        sample.speed[0] = 0.0f;
+      }
+
+      if (!layer.time_of_day_correlation.empty()) {
+        if (!functions) {
+          auto database = this->root().functionDatabase();
+          if (!database)
+            return std::unexpected(std::move(database.error()));
+          functions = std::move(*database);
+        }
+        auto correlation = functions->function(layer.time_of_day_correlation);
+        if (!correlation)
+          return std::unexpected(std::move(correlation.error()));
+        auto factor = (*correlation)->evaluate(m_sky->timeOfDay() / m_sky->dayLength());
+        if (!factor)
+          return std::unexpected(std::move(factor.error()));
+        sample.alpha *= std::clamp(static_cast<float>(*factor), 0.0f, 1.0f);
       }
     }
   }
-  
-  if (m_weatherParallax) {
-    for (auto layer : m_weatherParallax->layers()) {
-      layer.alpha *= m_weather->weatherIntensity();
-      render_data.parallax_layers.push_back(std::move(layer));
-    }
-  }
-  
-  
-  auto result85 = this->root().functionDatabase();
-  if (!result85)
-    return std::unexpected(std::move(result85.error()));
-  auto function_database = (std::move(*result85));
-  float wind_interpolation = render_data.sky_render_data.epochTime == m_sky->epochTime() ? 1.0f : interpolation;
-  auto wind_time_sample = m_parallaxWindTime.sample(wind_interpolation);
-  for (auto& layer : render_data.parallax_layers) {
-    if (layer.followsWind || layer.windSpeedMultiplier) {
-      double wind_time;
-      float horizontal_speed = layer.speed[0];
-      if (layer.followsWind) {
-        // Parallax texture offsets move the image opposite the offset sign,
-        // so negate the magnitude to make positive wind move imagery right.
-        horizontal_speed = -std::abs(horizontal_speed);
-        wind_time = layer.windSpeedMultiplier
-            ? wind_time_sample[2] * *layer.windSpeedMultiplier
-            : wind_time_sample[0];
-      } else {
-        wind_time = wind_time_sample[1] * *layer.windSpeedMultiplier;
-      }
-      
-      layer.parallaxOffset[0] += horizontal_speed * wind_time / m_sky->dayLength();
-      layer.speed[0] = 0.0f;
-    }
-    
-    if (!layer.timeOfDayCorrelation.empty()) {
-      auto result86 = function_database->function(layer.timeOfDayCorrelation);
-      if (!result86)
-        return std::unexpected(std::move(result86.error()));
-      auto result87 = (std::move(*result86))->evaluate(m_sky->timeOfDay() / m_sky->dayLength());
-      if (!result87)
-        return std::unexpected(std::move(result87.error()));
-      layer.alpha *= std::clamp(static_cast<float>(std::move(*result87)), 0.0f, 1.0f);
-    }
-  }
-  
-  std::stable_sort(render_data.parallax_layers.begin(), render_data.parallax_layers.end(), [](ParallaxLayer const& a, ParallaxLayer const& b) {
-    return std::tie(a.zLevel, a.verticalOrigin) > std::tie(b.zLevel, b.verticalOrigin);
-  });
   
   auto overlay_to_drawable = [&self = *this](WorldStructure::Overlay const& overlay) -> std::expected<Drawable, StarException> {
     auto result88 = self.root().image_metadata_database();
@@ -1492,19 +1443,61 @@ void WorldClient::setInteractiveHighlightMode(bool enabled) {
   m_interactiveHighlightMode = enabled;
 }
 
-void WorldClient::setParallax(std::shared_ptr<Parallax> newParallax) {
-  if (newParallax) {
-    if (!m_currentParallax) {
-      m_currentParallax = std::move(newParallax);
-    } else if (m_parallax_fade_timer.ready() && newParallax != m_currentParallax) {
-      m_nextParallax = std::move(newParallax);
-      m_parallax_fade_timer.reset();
-    } else if (m_nextParallax && newParallax == m_currentParallax) {
-      m_currentParallax = m_nextParallax;
-      m_nextParallax = std::move(newParallax);
-      m_parallax_fade_timer.invert();
-    }
+void WorldClient::set_parallax(std::shared_ptr<Parallax> const& new_parallax) {
+  if (!new_parallax)
+    return;
+  if (!m_current_parallax) {
+    m_current_parallax = new_parallax;
+  } else if (m_parallax_fade_timer.ready() && new_parallax != m_current_parallax) {
+    m_next_parallax = new_parallax;
+    m_parallax_fade_timer.reset();
+  } else if (m_next_parallax && new_parallax == m_current_parallax) {
+    m_current_parallax.swap(m_next_parallax);
+    m_parallax_fade_timer.invert();
   }
+}
+
+std::expected<void, StarException> WorldClient::update_weather_parallax(
+    std::optional<std::reference_wrapper<String const>> asset, std::shared_ptr<Biome const> const& biome) {
+  auto const& cached = m_weather_parallax;
+  if (biome == cached.biome && (asset ? cached.asset && asset->get() == *cached.asset : !cached.asset))
+    return {};
+
+  WeatherParallax pending{.biome = biome};
+  if (asset) {
+    auto const& path = asset->get();
+    auto assets = this->root().assets();
+    if (!assets)
+      return std::unexpected(std::move(assets.error()));
+    auto exists = (*assets)->asset_exists(path);
+    if (!exists)
+      return std::unexpected(std::move(exists.error()));
+
+    if (*exists) {
+      auto create_overlay = [&]() -> std::expected<std::shared_ptr<Parallax>, StarException> {
+        if (biome && biome->parallax)
+          return biome->parallax->create_overlay(path);
+
+        std::optional<TreeVariant> tree_variant;
+        if (biome) {
+          if (auto tree = biome->surface_placeables.first_tree())
+            tree_variant.emplace(tree->get());
+        }
+        return Parallax::create(this->root(), path, m_worldTemplate->worldSeed(), m_worldTemplate->surfaceLevel(),
+            biome ? biome->hue_shift : 0.0f, std::move(tree_variant));
+      };
+      auto overlay = create_overlay();
+      if (!overlay)
+        return std::unexpected(std::move(overlay.error()));
+      auto faded = (*overlay)->fade_to_sky_color(m_sky->mainSkyColor());
+      if (!faded)
+        return std::unexpected(std::move(faded.error()));
+      pending.overlay = std::move(*overlay);
+    }
+    pending.asset.emplace(path);
+  }
+  m_weather_parallax = std::move(pending);
+  return {};
 }
 
 void WorldClient::overrideGravity(float gravity) {
@@ -1807,15 +1800,13 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       auto result124 = m_sky->readUpdate(environmentUpdatePacket->sky_delta, m_clientState->netCompatibilityRules());
       if (!result124)
         return std::unexpected(std::move(result124.error()));
-      auto result125 = currentWeatherDomain();
-      if (!result125)
-        return std::unexpected(std::move(result125.error()));
-      auto weatherDomain = (std::move(*result125));
-      if (weatherDomain != m_weatherDomain) {
-        auto result126 = m_weather->clear();
-        if (!result126)
-          return std::unexpected(std::move(result126.error()));
-        m_weatherDomain = std::exchange(weatherDomain, {});
+      auto domain = current_weather_domain();
+      if (!domain)
+        return std::unexpected(std::move(domain.error()));
+      if (auto const& weather_domain = domain->get(); weather_domain != m_weather_domain) {
+        if (auto cleared = m_weather->clear(); !cleared)
+          return std::unexpected(std::move(cleared.error()));
+        m_weather_domain = weather_domain;
       }
       auto result127 = m_weather->readUpdate(environmentUpdatePacket->weather_delta, m_clientState->netCompatibilityRules());
       if (!result127)
@@ -2027,10 +2018,8 @@ std::expected<void, StarException> WorldClient::update(float dt) {
   m_presentationTimestep = dt;
   m_world_dim_timer.tick(dt);
   m_parallax_fade_timer.tick(dt);
-  if (m_parallax_fade_timer.ready() && m_nextParallax) {
-    m_currentParallax = m_nextParallax;
-    m_nextParallax.reset();
-  }
+  if (m_parallax_fade_timer.ready() && m_next_parallax)
+    m_current_parallax = std::move(m_next_parallax);
   auto beginPresentation = m_entityMap->for_all_entities([&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
     auto& state = m_entityPresentation[entity->entityId()];
     if (state.instance.lock() != entity || state.epoch != entity->presentation_epoch()) {
@@ -2170,29 +2159,18 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     // Weather generation is layer-scoped, but the particle manager also owns
     // particles from entities, materials, and effects and must retain the full
     // client region.
-    RectI weatherParticleRegion = particleRegion;
-    
-    std::optional<String> weatherDomain = m_weatherDomain;
-    if (clientWindow.is_empty()) {
-      weatherParticleRegion = {};
-    } else {
-      auto result162 = m_worldTemplate->weatherLayerAt(Vec2I::floor(m_clientState->windowCenter()));
-      if (!result162)
-        return std::unexpected(std::move(result162.error()));
-      if (auto layer = (std::move(*result162))) {
-        weatherDomain = layer->get().domain;
-        weatherParticleRegion = RectI(weatherParticleRegion.x_min(), std::max(weatherParticleRegion.y_min(), layer->get().minHeight),
-            weatherParticleRegion.x_max(), std::min(weatherParticleRegion.y_max(), layer->get().maxHeight));
-      } else {
-        weatherParticleRegion = {};
+    RectI weather_particle_region;
+    if (!clientWindow.is_empty()) {
+      auto layer = m_worldTemplate->weatherLayerAt(Vec2I::floor(m_clientState->windowCenter()));
+      if (!layer)
+        return std::unexpected(std::move(layer.error()));
+      if (*layer && (*layer)->get().domain == m_weather_domain) {
+        auto const& weather_layer = (*layer)->get();
+        weather_particle_region = RectI(particleRegion.x_min(), std::max(particleRegion.y_min(), weather_layer.minHeight),
+            particleRegion.x_max(), std::min(particleRegion.y_max(), weather_layer.maxHeight));
       }
     }
-    
-    if (weatherDomain != m_weatherDomain) {
-      weatherParticleRegion = {};
-    }
-    
-    m_weather->setVisibleRegion(weatherParticleRegion);
+    m_weather->setVisibleRegion(weather_particle_region);
   }
   m_clientState->setClientPresenceEntities(std::move(clientPresenceEntities));
 
@@ -2210,7 +2188,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     return std::unexpected(std::move(result165.error()));
   
   if (!m_headless) {
-    m_parallaxWindTime.beginUpdate(m_sky->epochTime());
+    m_parallax_wind_time.begin_update(m_sky->epochTime());
     m_sky->beginUpdate();
   }
   auto result166 = m_sky->update(dt);
@@ -2232,13 +2210,12 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     if (!flickerSample)
       return std::unexpected(std::move(flickerSample.error()));
     m_inspectionFlickerMultiplier = *flickerSample;
-    double parallaxEpoch = m_sky->epochTime();
-    auto weather_domain = currentWeatherDomain();
+    double parallax_epoch = m_sky->epochTime();
+    auto weather_domain = current_weather_domain();
     if (!weather_domain)
       return std::unexpected(std::move(weather_domain.error()));
-    bool const weather_in_domain = *weather_domain == m_weatherDomain;
-    float parallaxWind = weather_in_domain ? m_weather->wind() : 0.0f;
-    m_parallaxWindTime.update(parallaxEpoch, parallaxWind);
+    bool const weather_in_domain = weather_domain->get() == m_weather_domain;
+    m_parallax_wind_time.update(parallax_epoch, weather_in_domain ? m_weather->wind() : 0.0f);
     if (!m_mainPlayer->isDead()) {
       // Clear m_requestedDrops every so often in case of entity id reuse or
       // desyncs etc
@@ -3306,7 +3283,7 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
       if (!result263)
         return std::unexpected(std::move(result263.error()));
       if (auto layer = (std::move(*result263))) {
-        m_weatherDomain = layer->get().domain;
+        m_weather_domain = layer->get().domain;
       }
     }
     auto result264 = m_weather->readUpdate(startPacket.weather_data, m_clientState->netCompatibilityRules());
@@ -3510,13 +3487,11 @@ std::expected<void, StarException> WorldClient::clearWorld() {
 
   m_sky.reset();
 
-  m_currentParallax.reset();
-  m_nextParallax.reset();
-  m_weatherParallaxAsset.reset();
-  m_weatherParallaxBiome.reset();
-  m_weatherParallax.reset();
-  m_weatherDomain.reset();
-  m_parallaxWindTime = {};
+  m_current_parallax.reset();
+  m_next_parallax.reset();
+  m_weather_parallax = {};
+  m_weather_domain.reset();
+  m_parallax_wind_time = {};
   if (m_weather)
     remember(m_weather->clear());
   m_parallax_fade_timer.set_done();
@@ -3604,24 +3579,18 @@ Vec2I WorldClient::environment_biome_track_position() const {
   return {m_geometry.xwrap(pos[0]), pos[1]};
 }
 
-std::expected<std::optional<String>, StarException> WorldClient::currentWeatherDomain() const {
-  if (!m_worldTemplate) {
-    return {};
-  }
+std::expected<std::reference_wrapper<std::optional<String> const>, StarException> WorldClient::current_weather_domain() const {
+  static constexpr std::optional<String> no_domain;
+  if (!m_worldTemplate)
+    return std::cref(no_domain);
   
-  auto window = m_clientState->window();
-  if (window.is_empty()) {
-    return m_weatherDomain;
-  }
-  {
-    auto result296 = m_worldTemplate->weatherLayerAt(Vec2I::floor(m_clientState->windowCenter()));
-    if (!result296)
-      return std::unexpected(std::move(result296.error()));
-    if (auto layer = (std::move(*result296))) {
-      return layer->get().domain;
-    }
-  }
-  return {};
+  if (m_clientState->window().is_empty())
+    return std::cref(m_weather_domain);
+
+  auto layer = m_worldTemplate->weatherLayerAt(Vec2I::floor(m_clientState->windowCenter()));
+  if (!layer)
+    return std::unexpected(std::move(layer.error()));
+  return std::cref(*layer ? (*layer)->get().domain : no_domain);
 }
 
 void WorldClient::play_alt_music(StringList tracks, float fade_time, int loops) {
@@ -3639,7 +3608,7 @@ void WorldClient::stop_alt_music(float fade_time) {
   m_music_track.set_volume(1.0f, 0.0f, fade_time);
 }
 
-std::expected<std::shared_ptr<Biome const>, StarException> WorldClient::mainEnvironmentBiome() const {
+std::expected<std::shared_ptr<Biome const>, StarException> WorldClient::main_environment_biome() const {
   if (!inWorld()) {
     return {};
   }
@@ -3799,7 +3768,7 @@ std::expected<bool, StarException> WorldClient::exposedToWeather(Vec2F const& po
   if (!domain) {
     return std::unexpected(std::move(domain.error()));
   }
-  if (*domain && (*layer)->get().domain == m_weatherDomain && pos[1] > (*domain)->get().effectsMinHeight
+  if (*domain && (*layer)->get().domain == m_weather_domain && pos[1] > (*domain)->get().effectsMinHeight
         && liquidLevel(Vec2I::floor(pos)).liquid == empty_liquid_id) {
     auto result303 = this->root().assets();
     if (!result303)

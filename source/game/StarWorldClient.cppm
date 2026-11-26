@@ -147,30 +147,30 @@ using WorldClientException = StarError<WorldClientExceptionTag, StarException>;
 // Tick-owned integrals, ordered as direction, magnitude and signed wind time.
 // Display sampling only reads the two fixed-size endpoints.
 struct ParallaxWindTime {
-  void beginUpdate(double epoch) {
+  void begin_update(double epoch) {
     previous = current;
-    lastEpoch = epoch;
+    last_epoch = epoch;
   }
 
   void update(double epoch, float wind) {
-    if (lastEpoch && epoch >= *lastEpoch) {
-      double elapsed = epoch - *lastEpoch;
+    if (last_epoch && epoch >= *last_epoch) {
+      double elapsed = epoch - *last_epoch;
       current += Vec3D(wind > 0.0f ? 1.0 : -1.0, std::abs(wind), wind) * elapsed;
     } else {
       previous = current;
     }
-    lastEpoch = epoch;
+    last_epoch = epoch;
   }
 
   Vec3D sample(float alpha) const {
     return previous + std::clamp(static_cast<double>(alpha), 0.0, 1.0) * (current - previous);
   }
 
-  void resetPresentation() { previous = current; }
+  void reset_presentation() { previous = current; }
 
   Vec3D previous;
   Vec3D current;
-  std::optional<double> lastEpoch;
+  std::optional<double> last_epoch;
 };
 
 // Pending, completed and displayed maps rotate ownership without copying. A
@@ -300,7 +300,7 @@ public:
   void dimWorld();
   bool interactiveHighlightMode() const;
   void setInteractiveHighlightMode(bool enabled);
-  void setParallax(std::shared_ptr<Parallax> newParallax);
+  void set_parallax(std::shared_ptr<Parallax> const& new_parallax);
   void overrideGravity(float gravity);
   void resetGravity();
 
@@ -455,12 +455,14 @@ private:
   [[nodiscard]] std::expected<void, StarException> sparkDamagedBlocks();
 
   Vec2I environment_biome_track_position() const;
-  [[nodiscard]] std::expected<std::optional<String>, StarException> currentWeatherDomain() const;
+  [[nodiscard]] std::expected<std::reference_wrapper<std::optional<String> const>, StarException> current_weather_domain() const;
+  [[nodiscard]] std::expected<void, StarException> update_weather_parallax(
+      std::optional<std::reference_wrapper<String const>> asset, std::shared_ptr<Biome const> const& biome);
 
   void play_alt_music(StringList tracks, float fade_time, int loops);
   void stop_alt_music(float fade_time);
 
-  [[nodiscard]] std::expected<std::shared_ptr<Biome const>, StarException> mainEnvironmentBiome() const;
+  [[nodiscard]] std::expected<std::shared_ptr<Biome const>, StarException> main_environment_biome() const;
 
   // Populates foregroundTransparent / backgroundTransparent flag on ClientTile
   // based on transparency rules.
@@ -549,13 +551,16 @@ private:
   bool m_interactiveHighlightMode = false;
 
   GameTimer m_parallax_fade_timer;
-  std::shared_ptr<Parallax> m_currentParallax;
-  std::shared_ptr<Parallax> m_nextParallax;
-  std::optional<String> m_weatherParallaxAsset;
-  std::shared_ptr<Biome const> m_weatherParallaxBiome;
-  std::shared_ptr<Parallax> m_weatherParallax;
-  std::optional<String> m_weatherDomain;
-  ParallaxWindTime m_parallaxWindTime;
+  std::shared_ptr<Parallax const> m_current_parallax;
+  std::shared_ptr<Parallax const> m_next_parallax;
+  struct WeatherParallax {
+    std::optional<String> asset;
+    std::shared_ptr<Biome const> biome;
+    std::shared_ptr<Parallax const> overlay;
+  };
+  WeatherParallax m_weather_parallax;
+  std::optional<String> m_weather_domain;
+  ParallaxWindTime m_parallax_wind_time;
 
   std::optional<float> m_overrideGravity;
 

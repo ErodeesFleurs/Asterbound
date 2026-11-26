@@ -8,6 +8,7 @@
 import std;
 import star.algorithm;
 import star.assets;
+import star.asset_path;
 import star.buffer;
 import star.byte_array;
 import star.file;
@@ -25,14 +26,17 @@ import star.matrix3;
 import star.color;
 import star.drawable;
 import star.drawable_painter;
+import star.environment_painter;
 import star.game_types;
 import star.line;
 import star.list;
 import star.material_types;
+import star.parallax;
 import star.poly;
 import star.random;
 import star.ref_ptr;
 import star.root;
+import star.sky_render_data;
 import star.tile_painter;
 import star.world_camera;
 import star.world_geometry;
@@ -551,6 +555,103 @@ auto const tile_directive_registration = [] {
       nullptr, nullptr, location.file_name(), static_cast<int>(location.line()),
       [] { return std::make_unique<OpenGlTileDirectiveRegression>().release(); });
 }();
+
+TEST_F(OpenGlRendererRegression, ParallaxTilesPreserveFrameZeroGeometryAndRetryTextures) {
+  RandomService random(0);
+  auto directory = checked(File::temporary_directory(random));
+  auto cleanup = make_scope_exit([&] { checked(File::remove_all(directory)); });
+  auto overlay = File::relative_to(directory, "assets");
+  checked(File::create_directory(overlay));
+  auto write_asset = [&](String const& name, String const& text) {
+    checked(File::write_file(text, File::relative_to(overlay, name)));
+  };
+  auto write_png = [&](String const& name, Image const& image) {
+    auto buffer = std::make_shared<Buffer>();
+    checked(image.write_png(logger, buffer));
+    checked(File::write_file(buffer->take_data(), File::relative_to(overlay, name)));
+  };
+  write_asset("preload.config", "[]");
+  write_asset("parallax_base.frames", R"({"frameList":{"0":[0,4,16,20],"2":[16,0,40,20]},"aliases":{"1":"0"}})");
+  write_asset("parallax_overlay.frames", R"({"frameList":{"2":[0,0,16,16]},"aliases":{"0":"2","1":"2"}})");
+  auto base = Image::filled({40, 20}, {0, 255, 255, 255});
+  checked(base.fill_rect({16, 0}, {8, 8}, Vec4B(255, 0, 0, 255)));
+  checked(base.fill_rect({24, 0}, {16, 8}, Vec4B(0, 255, 0, 255)));
+  checked(base.fill_rect({16, 8}, {8, 12}, Vec4B(255, 255, 0, 255)));
+  checked(base.fill_rect({24, 8}, {16, 12}, Vec4B(255, 0, 255, 255)));
+  write_png("parallax_base.png", base);
+  write_png("parallax_overlay.png", Image::filled({16, 16}, {0, 0, 255, 128}));
+
+  Root::Settings settings{};
+  settings.assetSources = {overlay};
+  settings.assetsSettings.worker_pool_size = 0; // Keep first presentation cold deterministically.
+  settings.assetsSettings.asset_time_to_live = 600;
+  settings.assetsSettings.allow_remote_assets = false;
+  settings.defaultConfiguration = JsonObject{};
+  settings.storageDirectory = File::relative_to(directory, "storage");
+  settings.logLevel = LogLevel::Error;
+  auto root = checked(Root::create(std::move(settings)));
+  auto assets = checked(root->assets());
+  auto painter = checked(EnvironmentPainter::create(*root, renderer));
+
+  WorldCamera camera;
+  camera.setScreenSize({Width, Height});
+  SkyRenderData sky{};
+  sky.dayLength = 120;
+  ParallaxLayer layer;
+  layer.textures = {"/parallax_base.png", "/parallax_overlay.png"};
+  layer.frame_number = 3;
+  layer.frame_offset = -1; // Epoch zero selects frame two, not frame zero.
+  layer.animation_cycle = 3;
+  layer.parallax_value = {1, 1};
+  layer.repeat = {false, false};
+  layer.unlit = true;
+  std::array samples{ParallaxLayerSample{.layer = std::cref(layer), .alpha = 0.5f, .parallax_offset = {}, .speed = {}}};
+  auto draw = [&](Vec2F world_position = {}) {
+    checked(renderer->startFrame());
+    select("internal");
+    checked(painter->render_parallax_layers(world_position, camera, samples, sky));
+    auto frame = pixels();
+    checked(renderer->finishFrame());
+    return frame;
+  };
+  Pixel const black{0, 0, 0, 255};
+  expectPixel(draw(), Width, 50, 34, black);
+  checked(assets->image(AssetPath("/parallax_base.png:2")));
+  expectPixel(draw(), Width, 50, 34, {127, 0, 0, 255});
+  checked(assets->image(AssetPath("/parallax_overlay.png:2")));
+  auto stacked = draw();
+  expectPixel(stacked, Width, 50, 34, {95, 0, 64, 255});
+  expectPixel(stacked, Width, 58, 34, {0, 95, 64, 255});
+  expectPixel(stacked, Width, 50, 43, {95, 95, 64, 255});
+  expectPixel(stacked, Width, 64, 34, black); // Frame two is wider than frame zero.
+  expectPixel(draw({100, 0}), Width, 50, 34, black);
+  expectPixel(draw({0x1p32f, 0}), Width, 50, 34, black); // Avoid an out-of-range tile index conversion.
+
+  layer.repeat[0] = true;
+  auto before_seam = draw({-0.25f, 0});
+  auto after_seam = draw({1.75f, 0});
+  EXPECT_EQ(before_seam, after_seam); // One image period across the camera seam.
+  expectPixel(before_seam, Width, 51, 34, {95, 0, 64, 255});
+
+  layer.repeat = {false, true};
+  layer.tile_limit_top = -8;
+  auto fractional_top = draw();
+  expectPixel(fractional_top, Width, 50, 33, {95, 95, 64, 255}); // Clipped UV starts in the upper half.
+  expectPixel(fractional_top, Width, 50, 40, black);
+  layer.tile_limit_top = -16;
+  auto integer_top = draw();
+  expectPixel(integer_top, Width, 50, 33, {95, 0, 64, 255});
+  expectPixel(integer_top, Width, 50, 48, black);
+  layer.tile_limit_top.reset();
+  layer.tile_limit_bottom = 8;
+  auto fractional_bottom = draw();
+  expectPixel(fractional_bottom, Width, 50, 23, black);
+  expectPixel(fractional_bottom, Width, 50, 25, {95, 0, 64, 255});
+  layer.tile_limit_bottom = 0; // Keep the complete row with y + 1 equal to the cutoff.
+  auto integer_bottom = draw();
+  expectPixel(integer_bottom, Width, 50, 14, black);
+  expectPixel(integer_bottom, Width, 50, 17, {95, 0, 64, 255});
+}
 
 TEST_F(OpenGlRendererRegression, RekeyedLayersPreserveOverlappingPixelsAndEntityOrder) {
   DrawablePainter painter(renderer, {});

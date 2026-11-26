@@ -191,6 +191,12 @@ parallax integrals also advance only on ticks, but their direction, magnitude an
 signed-time endpoints are sampled at the display alpha. Clock corrections and
 presentation resets do not blend unrelated wind histories.
 
+Parallax composition orders equal-depth, equal-origin layers stably: current
+biome, incoming biome, then weather. A weather overlay's cache key is published
+with its prepared layers so a failed replacement can be retried. Animated
+tiling uses frame zero for dimensions and the selected frame for drawing;
+quads retain row, column, then texture order for transparent overlays.
+
 Nameplates and speech bubbles sample both their entity anchors and separation
 offsets. Separation solving and offset tweening run only on ticks; render visits
 are read-only. Newly created or replaced entities/bubbles start without stale

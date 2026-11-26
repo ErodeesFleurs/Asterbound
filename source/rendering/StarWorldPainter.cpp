@@ -263,16 +263,17 @@ std::expected<void, StarException> WorldPainter::render(WorldRenderData& render_
 
   // Parallax layers
 
-  auto parallax_delta = m_camera.worldGeometry().diff(m_camera.centerWorldPosition(), m_previousCameraCenter);
+  auto camera_center = m_camera.centerWorldPosition();
+  auto parallax_delta = m_camera.worldGeometry().diff(camera_center, m_previous_camera_center);
   if (parallax_delta.magnitude() > 10)
-    m_parallaxWorldPosition = m_camera.centerWorldPosition();
+    m_parallax_world_position = camera_center;
   else
-    m_parallaxWorldPosition += parallax_delta;
-  m_previousCameraCenter = m_camera.centerWorldPosition();
-  m_parallaxWorldPosition[1] = m_camera.centerWorldPosition()[1];
+    m_parallax_world_position += parallax_delta;
+  m_previous_camera_center = camera_center;
+  m_parallax_world_position[1] = camera_center[1];
 
-  if (!render_data.parallax_layers.empty()) {
-    if (auto result = m_environmentPainter->renderParallaxLayers(m_parallaxWorldPosition, m_camera, render_data.parallax_layers, render_data.sky_render_data); !result)
+  if (auto layers = render_data.parallax_layers.samples(); !layers.empty()) {
+    if (auto result = m_environmentPainter->render_parallax_layers(m_parallax_world_position, m_camera, layers, render_data.sky_render_data); !result)
       return std::unexpected(std::move(result.error()));
   }
 

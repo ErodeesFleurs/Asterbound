@@ -496,7 +496,7 @@ float ClientWeather::wind() const {
   return m_currentWind * m_currentWeatherIntensity;
 }
 
-float ClientWeather::weatherIntensity() const {
+float ClientWeather::weather_intensity() const {
   return m_currentWeatherIntensity;
 }
 
@@ -521,9 +521,9 @@ std::span<String const> ClientWeather::weather_track_options() const {
   return {};
 }
 
-std::optional<String> ClientWeather::weatherParallax() const {
-  if (m_currentWeatherType)
-    return m_currentWeatherType->parallax;
+std::optional<std::reference_wrapper<String const>> ClientWeather::weather_parallax() const {
+  if (m_currentWeatherType && m_currentWeatherType->parallax)
+    return std::cref(*m_currentWeatherType->parallax);
   return {};
 }
 

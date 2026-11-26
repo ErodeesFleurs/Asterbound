@@ -121,6 +121,66 @@ inline void route_entity_drawables(FrameLayers<EntityDrawableGroup>& routes, Lis
         routes.append(key, {entity.highlight_effect, std::cref(drawables)});
 }
 
+struct ParallaxLayerSample {
+  std::reference_wrapper<ParallaxLayer const> layer;
+  float alpha;
+  Vec2F parallax_offset;
+  Vec2F speed;
+  std::uint8_t source_index;
+  std::size_t submission_order;
+};
+
+class ParallaxRenderLayers {
+public:
+  // Each source owns immutable layer data. Only presentation values are
+  // refreshed per frame; ordering is rebuilt when the source tuple changes.
+  std::span<ParallaxLayerSample> sample_sources(std::shared_ptr<Parallax const> const& current,
+      std::shared_ptr<Parallax const> const& next, std::shared_ptr<Parallax const> const& weather) {
+    if (m_sources[0] != current || m_sources[1] != next || m_sources[2] != weather) {
+      m_samples.clear();
+      m_sources = {current, next, weather};
+      std::size_t layer_count = 0;
+      for (auto const& source : m_sources)
+        if (source)
+          layer_count += source->layers().size();
+      m_samples.reserve(layer_count);
+      for (std::uint8_t source_index = 0; source_index < m_sources.size(); ++source_index) {
+        if (auto const& source = m_sources[source_index]) {
+          for (auto const& layer : source->layers())
+            m_samples.push_back({std::cref(layer), layer.alpha, layer.parallax_offset, layer.speed, source_index, m_samples.size()});
+        }
+      }
+      // Break equal display keys with submission order so an in-place sort
+      // preserves current, next, weather and each source's internal order.
+      std::ranges::sort(m_samples, [](ParallaxLayerSample const& a, ParallaxLayerSample const& b) {
+        auto key = [](ParallaxLayer const& layer) { return std::tie(layer.z_level, layer.vertical_origin); };
+        auto const a_key = key(a.layer.get());
+        auto const b_key = key(b.layer.get());
+        return a_key == b_key ? a.submission_order < b.submission_order : a_key > b_key;
+      });
+    }
+    m_active = true;
+    return m_samples;
+  }
+
+  std::span<ParallaxLayerSample const> samples() const {
+    return m_active ? std::span<ParallaxLayerSample const>(m_samples) : std::span<ParallaxLayerSample const>();
+  }
+
+  void prepare_frame() { m_active = false; }
+
+  void clear() {
+    m_samples.clear();
+    m_sources = {};
+    m_active = false;
+  }
+
+private:
+  std::array<std::shared_ptr<Parallax const>, 3> m_sources;
+  List<ParallaxLayerSample> m_samples;
+  bool m_active = false;
+};
+
 struct WorldRenderData {
   // Reset transient frame data while retaining entity and particle sample slots.
   // WorldClient refills/truncates those slots before publishing the frame.
@@ -142,7 +202,7 @@ struct WorldRenderData {
   List<Drawable> background_overlays;
   List<Drawable> foreground_overlays;
 
-  List<ParallaxLayer> parallax_layers;
+  ParallaxRenderLayers parallax_layers;
 
   SkyRenderData sky_render_data;
 
@@ -164,7 +224,7 @@ inline void WorldRenderData::prepare_frame() {
   nametags.clear();
   background_overlays.clear();
   foreground_overlays.clear();
-  parallax_layers.clear();
+  parallax_layers.prepare_frame();
 }
 
 }
@@ -176,5 +236,7 @@ export namespace Star {
   using ::Star::EntityDrawableGroup;
   using ::Star::route_entity_drawables;
   using ::Star::EntityDrawables;
+  using ::Star::ParallaxLayerSample;
+  using ::Star::ParallaxRenderLayers;
   using ::Star::WorldRenderData;
 }

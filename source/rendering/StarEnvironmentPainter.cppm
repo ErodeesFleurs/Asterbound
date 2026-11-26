@@ -88,7 +88,8 @@ public:
   [[nodiscard]] std::expected<void, StarException> renderFrontOrbiters(float pixelRatio, Vec2F const& screenSize, SkyRenderData const& sky);
   [[nodiscard]] std::expected<void, StarException> renderSky(Vec2F const& screenSize, SkyRenderData const& sky);
 
-  [[nodiscard]] std::expected<void, StarException> renderParallaxLayers(Vec2F parallaxWorldPosition, WorldCamera const& camera, ParallaxLayers const& layers, SkyRenderData const& sky);
+  [[nodiscard]] std::expected<void, StarException> render_parallax_layers(
+      Vec2F world_position, WorldCamera const& camera, std::span<ParallaxLayerSample const> layers, SkyRenderData const& sky);
 
   void cleanup(std::int64_t textureTimeout);
 

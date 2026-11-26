@@ -144,14 +144,15 @@ public:
   std::expected<void, StarException> update(double dt);
 
   float wind() const;
-  float weatherIntensity() const;
+  float weather_intensity() const;
 
   StringList statusEffects() const;
 
   List<Particle> pullNewParticles();
   // Borrowed until the next weather update or clear; consume synchronously.
   [[nodiscard]] std::span<String const> weather_track_options() const;
-  std::optional<String> weatherParallax() const;
+  // Borrowed until the next weather update or clear.
+  [[nodiscard]] std::optional<std::reference_wrapper<String const>> weather_parallax() const;
   
   [[nodiscard]]
   std::expected<std::optional<String>, StarException> activeWeather() const;

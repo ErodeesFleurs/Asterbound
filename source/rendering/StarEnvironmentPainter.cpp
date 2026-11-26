@@ -341,122 +341,162 @@ std::expected<void, StarException> EnvironmentPainter::renderSky(Vec2F const& sc
 }
 
 // TODO: Fix this to work with decimal zoom levels. Currently, the clouds shake rapidly when interpolating between zoom levels.
-std::expected<void, StarException> EnvironmentPainter::renderParallaxLayers(
-    Vec2F parallaxWorldPosition, WorldCamera const& camera, ParallaxLayers const& layers, SkyRenderData const& sky) {
-
-  // Note: the "parallax space" referenced below is a grid where the scale of each cell is the size of the parallax image
-
+std::expected<void, StarException> EnvironmentPainter::render_parallax_layers(
+    Vec2F world_position, WorldCamera const& camera, std::span<ParallaxLayerSample const> layers, SkyRenderData const& sky) {
   auto& primitives = m_renderer->immediatePrimitives();
+  auto pixel_ratio = camera.pixelRatio();
+  auto screen_size = camera.screenSize();
+  SmallList<TexturePtr, 4> textures;
+  auto first_rejected_row = [](std::int64_t begin, std::int64_t end, std::predicate<std::int64_t> auto before) {
+    while (begin < end) {
+      auto middle = std::midpoint(begin, end);
+      if (before(middle))
+        begin = middle + 1;
+      else
+        end = middle;
+    }
+    return begin;
+  };
 
-  for (auto& layer : layers) {
-    if (layer.alpha == 0)
+  for (auto const& sample : layers) {
+    if (sample.alpha == 0 || !is_finite(sample.alpha))
+      continue;
+    auto const& layer = sample.layer.get();
+
+    auto first_texture = layer.textures.first();
+    if (!first_texture) return std::unexpected(std::move(first_texture.error()));
+    AssetPath first_path = first_texture->get();
+    first_path.directives += layer.directives;
+    bool animated = layer.frame_number > 1;
+    if (animated)
+      first_path.sub_path.emplace("0");
+    // Frame zero determines tiling geometry regardless of the displayed frame.
+    auto sizing_texture = m_textureGroup->loadTexture(first_path);
+    if (!sizing_texture) return std::unexpected(std::move(sizing_texture.error()));
+    Vec2F texture_size((*sizing_texture)->size());
+    Vec2F tile_size = texture_size * pixel_ratio;
+
+    Vec2F pixel_offset = sample.parallax_offset * pixel_ratio;
+    for (auto axis : {0u, 1u}) {
+      if (sample.speed[axis] != 0) {
+        double drift = std::fmod(double(sample.speed[axis]) * (sky.epochTime / double(sky.dayLength)), double(texture_size[axis]));
+        pixel_offset[axis] = std::fmod(pixel_offset[axis] + drift * pixel_ratio, tile_size[axis]);
+      }
+    }
+
+    // Parallax space is a grid in which each cell is one image.
+    Vec2F camera_center = world_position - Vec2F(0.0f, layer.vertical_origin);
+    camera_center = Vec2F(
+        (((camera_center[0] / tile_size[0]) * tile_pixels) * pixel_ratio) / layer.parallax_value[0],
+        (((camera_center[1] / tile_size[1]) * tile_pixels) * pixel_ratio) / layer.parallax_value[1]);
+    float screen_width = screen_size[0] / tile_size[0];
+    float screen_height = screen_size[1] / tile_size[1];
+    float screen_left = camera_center[0] - screen_width / 2.0;
+    float screen_bottom = camera_center[1] - screen_height / 2.0;
+    Vec2F screen_offset = pixel_offset.piecewise_divide(tile_size);
+
+    float left = std::floor(screen_left + screen_offset[0]);
+    float bottom = std::floor(screen_bottom + screen_offset[1]);
+    float right = std::ceil(screen_left + screen_width + screen_offset[0]);
+    float top = std::ceil(screen_bottom + screen_height + screen_offset[1]);
+    auto valid_tile_index = [](float index) {
+      return double(index) >= std::numeric_limits<std::int32_t>::min()
+          && double(index) <= std::numeric_limits<std::int32_t>::max();
+    };
+    auto finite_bounds = classify_finite(left, bottom, right, top);
+    if (!std::ranges::all_of(finite_bounds, std::identity{})
+        || !valid_tile_index(left) || !valid_tile_index(bottom) || !valid_tile_index(right) || !valid_tile_index(top))
       continue;
 
-    Vec4B drawColor;
-    if (layer.unlit || layer.lightMapped)
-      drawColor = Vec4B(255, 255, 255, std::floor(255 * layer.alpha));
-    else
-      drawColor = Vec4B(sky.environmentLight.to_rgb(), std::floor(255 * layer.alpha));
-
-    Vec2F parallaxValue = layer.parallaxValue;
-    Vec2B parallaxRepeat = layer.repeat;
-    Vec2F parallaxOrigin = {0.0f, layer.verticalOrigin};
-
-    auto firstTexture = layer.textures.first();
-    if (!firstTexture) return std::unexpected(std::move(firstTexture.error()));
-    AssetPath first = firstTexture->get();
-    first.directives += layer.directives;
-    if (layer.frameNumber > 1)
-      first.sub_path.emplace("0");
-    auto parallaxTexture = m_textureGroup->loadTexture(first);
-    if (!parallaxTexture) return std::unexpected(std::move(parallaxTexture.error()));
-    Vec2F parallaxSize = Vec2F((*parallaxTexture)->size());
-    Vec2F parallaxPixels = parallaxSize * camera.pixelRatio();
-
-    // texture offset in *screen pixel space*
-    Vec2F parallaxOffset = layer.parallaxOffset * camera.pixelRatio();
-    if (layer.speed[0] != 0) {
-      double drift = std::fmod((double)layer.speed[0] * (sky.epochTime / (double)sky.dayLength), (double)parallaxSize[0]);
-      parallaxOffset[0] = std::fmod(parallaxOffset[0] + drift * camera.pixelRatio(), parallaxPixels[0]);
+    // Keep the original screen-relative anchor while narrowing the submitted
+    // range. Widen before subtracting indices or advancing past an endpoint.
+    auto screen_x = static_cast<std::int64_t>(left);
+    auto screen_y = static_cast<std::int64_t>(bottom);
+    auto min_x = screen_x;
+    auto min_y = screen_y;
+    auto max_x = static_cast<std::int64_t>(right);
+    auto max_y = static_cast<std::int64_t>(top);
+    if (!layer.repeat[0]) {
+      min_x = std::max(min_x, std::int64_t{0});
+      max_x = std::min(max_x, std::int64_t{0});
     }
-    if (layer.speed[1] != 0) {
-      double drift = std::fmod((double)layer.speed[1] * (sky.epochTime / (double)sky.dayLength), (double)parallaxSize[1]);
-      parallaxOffset[1] = std::fmod(parallaxOffset[1] + drift * camera.pixelRatio(), parallaxPixels[1]);
+    if (!layer.repeat[1]) {
+      min_y = std::max(min_y, std::int64_t{0});
+      max_y = std::min(max_y, std::int64_t{0});
     }
+    float tile_limit_top = top;
+    if (layer.tile_limit_top)
+      tile_limit_top = (sample.parallax_offset[1] - *layer.tile_limit_top) / texture_size[1];
+    float tile_limit_bottom = bottom;
+    if (layer.tile_limit_bottom)
+      tile_limit_bottom = (sample.parallax_offset[1] - *layer.tile_limit_bottom) / texture_size[1];
 
-    // parallax camera world position in *parallax space*
-    Vec2F parallaxCameraCenter = parallaxWorldPosition - parallaxOrigin;
-    parallaxCameraCenter =
-        Vec2F((((parallaxCameraCenter[0] / parallaxPixels[0]) * tile_pixels) * camera.pixelRatio()) / parallaxValue[0],
-            (((parallaxCameraCenter[1] / parallaxPixels[1]) * tile_pixels) * camera.pixelRatio()) / parallaxValue[1]);
+    auto finite_limits = classify_finite(tile_limit_top, tile_limit_bottom);
+    if (!finite_limits[0] || !finite_limits[1] || min_x > max_x || min_y > max_y)
+      continue;
+    // Keep the legacy float comparisons, including at large indices where
+    // consecutive integers round to the same float.
+    if (float(min_y + 1) < tile_limit_bottom)
+      min_y = first_rejected_row(min_y, max_y + 1, [&](std::int64_t y) { return float(y + 1) < tile_limit_bottom; });
+    if (float(max_y) > tile_limit_top)
+      max_y = first_rejected_row(min_y, max_y + 1, [&](std::int64_t y) { return float(y) <= tile_limit_top; }) - 1;
+    if (min_y > max_y)
+      continue;
 
-    // width / height of screen in *parallax space*
-    float parallaxScreenWidth = camera.screenSize()[0] / parallaxPixels[0];
-    float parallaxScreenHeight = camera.screenSize()[1] / parallaxPixels[1];
-
-    // screen world position in *parallax space*
-    float parallaxScreenLeft = parallaxCameraCenter[0] - parallaxScreenWidth / 2.0;
-    float parallaxScreenBottom = parallaxCameraCenter[1] - parallaxScreenHeight / 2.0;
-
-    // screen boundary world positions in *parallax space*
-    Vec2F parallaxScreenOffset = parallaxOffset.piecewise_divide(parallaxPixels);
-    int left = std::floor(parallaxScreenLeft + parallaxScreenOffset[0]);
-    int bottom = std::floor(parallaxScreenBottom + parallaxScreenOffset[1]);
-    int right = std::ceil(parallaxScreenLeft + parallaxScreenWidth + parallaxScreenOffset[0]);
-    int top = std::ceil(parallaxScreenBottom + parallaxScreenHeight + parallaxScreenOffset[1]);
-
-    // positions to start tiling in *screen pixel space*
-    float pixelLeft = (left - parallaxScreenLeft) * parallaxPixels[0] - parallaxOffset[0];
-    float pixelBottom = (bottom - parallaxScreenBottom) * parallaxPixels[1] - parallaxOffset[1];
-
-    // vertical top and bottom cutoff points in *parallax space*
-    float tileLimitTop = top;
-    if (layer.tileLimitTop)
-      tileLimitTop = (layer.parallaxOffset[1] - layer.tileLimitTop.value_or(0.0f)) / parallaxSize[1];
-    float tileLimitBottom = bottom;
-    if (layer.tileLimitBottom)
-      tileLimitBottom = (layer.parallaxOffset[1] - layer.tileLimitBottom.value_or(0.0f)) / parallaxSize[1];
-
-    float lightMapMultiplier = (!layer.unlit && layer.lightMapped) ? 1.0f : 0.0f;
-
-    for (int y = bottom; y <= top; ++y) {
-      if (!(parallaxRepeat[1] || y == 0) || y > tileLimitTop || y + 1 < tileLimitBottom)
+    auto frame = animated ? layer.animation_frame(sky.epochTime) : 0u;
+    String frame_name;
+    if (animated)
+      frame_name = Star::to_string(frame);
+    textures.clear();
+    for (auto source = layer.textures.begin(); source != layer.textures.end(); ++source) {
+      bool first = source == layer.textures.begin();
+      if (first && !frame) {
+        textures.emplace_back(std::move(*sizing_texture));
         continue;
-      for (int x = left; x <= right; ++x) {
-        if (!(parallaxRepeat[0] || x == 0))
-          continue;
-        float pixelTileLeft = pixelLeft + (x - left) * parallaxPixels[0];
-        float pixelTileBottom = pixelBottom + (y - bottom) * parallaxPixels[1];
+      }
+      AssetPath path = first ? std::move(first_path) : AssetPath(*source);
+      if (!first)
+        path.directives += layer.directives;
+      if (animated)
+        path.sub_path.emplace(frame_name);
+      auto texture = m_textureGroup->tryTexture(path);
+      if (!texture) return std::unexpected(std::move(texture.error()));
+      // Do not pin a missing texture: the next presentation retries it.
+      if (*texture)
+        textures.emplace_back(std::move(*texture));
+    }
+    if (textures.empty())
+      continue;
 
-        Vec2F anchorPoint(pixelTileLeft, pixelTileBottom);
+    auto alpha = static_cast<std::uint8_t>(std::floor(255 * std::clamp(sample.alpha, 0.0f, 1.0f)));
+    Vec4B color(layer.unlit || layer.light_mapped ? Vec3B(255, 255, 255) : sky.environmentLight.to_rgb(), alpha);
+    float light_multiplier = !layer.unlit && layer.light_mapped ? 1.0f : 0.0f;
+    // Keep the shipped floating-point grouping at seams: X adds the grid
+    // displacement before scaling; Y offsets the pixel-space row origin.
+    float grid_left = float(screen_x) - screen_left;
+    float pixel_bottom = (float(screen_y) - screen_bottom) * tile_size[1] - pixel_offset[1];
 
-        RectF subImage = RectF::with_size(Vec2F(), parallaxSize);
-        if (tileLimitTop != top && y + 1 > tileLimitTop)
-          subImage.set_y_min(parallaxSize[1] * (1.0f - fractional_part(tileLimitTop)));
-        if (tileLimitBottom != bottom && y < tileLimitBottom)
-          anchorPoint[1] += fractional_part(tileLimitBottom) * parallaxPixels[1];
+    // Submission order matters for translucent textures: row, column, then
+    // source texture. Vertical geometry and UVs do not vary within a row.
+    for (auto y = min_y; y <= max_y; ++y) {
+      float row_origin = pixel_bottom;
+      RectF sub_image = RectF::with_size(Vec2F(), texture_size);
+      if (tile_limit_top != top && float(y + 1) > tile_limit_top)
+        sub_image.set_y_min(texture_size[1] * (1.0f - fractional_part(tile_limit_top)));
+      if (tile_limit_bottom != bottom && float(y) < tile_limit_bottom)
+        row_origin += fractional_part(tile_limit_bottom) * tile_size[1];
+      float row_bottom = row_origin + (y - screen_y) * tile_size[1];
+      auto draw_size = sub_image.size() * pixel_ratio;
 
-        for (auto const& textureImage : layer.textures) {
-          AssetPath withDirectives = textureImage;
-          withDirectives.directives += layer.directives;
-          if (layer.frameNumber > 1) {
-            float time_within_cycle = (float)std::fmod(sky.epochTime, (double)layer.animationCycle);
-            float time_per_frame = layer.animationCycle / layer.frameNumber;
-            float frame_number = time_within_cycle / time_per_frame;
-            int frame = (layer.frameOffset + clamp<int>(frame_number, 0, layer.frameNumber - 1)) % layer.frameNumber;
-            withDirectives.sub_path.emplace(Star::to_string(frame));
-          }
-          auto texture = m_textureGroup->tryTexture(withDirectives);
-          if (!texture) return std::unexpected(std::move(texture.error()));
-          if (*texture) {
-            RectF drawRect = RectF::with_size(anchorPoint, subImage.size() * camera.pixelRatio());
-            primitives.emplace_back(std::in_place_type_t<RenderQuad>(), std::move(*texture),
-                RenderVertex{drawRect.min(), subImage.min(), drawColor, lightMapMultiplier},
-                RenderVertex{{drawRect.x_max(), drawRect.y_min()}, {subImage.x_max(), subImage.y_min()}, drawColor, lightMapMultiplier},
-                RenderVertex{drawRect.max(), subImage.max(), drawColor, lightMapMultiplier},
-                RenderVertex{{drawRect.x_min(), drawRect.y_max()}, {subImage.x_min(), subImage.y_max()}, drawColor, lightMapMultiplier});
-          }
-        }
+      for (auto x = min_x; x <= max_x; ++x) {
+        float tile_left = (grid_left + (x - screen_x)) * tile_size[0] - pixel_offset[0];
+        auto draw_rect = RectF::with_size(Vec2F(tile_left, row_bottom), draw_size);
+        RenderVertex bottom_left{draw_rect.min(), sub_image.min(), color, light_multiplier};
+        RenderVertex bottom_right{{draw_rect.x_max(), draw_rect.y_min()}, {sub_image.x_max(), sub_image.y_min()}, color, light_multiplier};
+        RenderVertex top_right{draw_rect.max(), sub_image.max(), color, light_multiplier};
+        RenderVertex top_left{{draw_rect.x_min(), draw_rect.y_max()}, {sub_image.x_min(), sub_image.y_max()}, color, light_multiplier};
+        for (auto const& texture : textures)
+          primitives.emplace_back(std::in_place_type_t<RenderQuad>(), texture, bottom_left, bottom_right, top_right, top_left);
       }
     }
   }

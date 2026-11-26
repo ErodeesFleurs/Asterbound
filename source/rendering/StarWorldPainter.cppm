@@ -143,8 +143,8 @@ private:
   std::shared_ptr<ImageMetadataDatabase const> m_image_metadata;
   RectF m_worldScreenRect;
 
-  Vec2F m_previousCameraCenter;
-  Vec2F m_parallaxWorldPosition;
+  Vec2F m_previous_camera_center;
+  Vec2F m_parallax_world_position;
 
   RandomSource m_preloadRandom{0};
   float m_preloadTextureChance;

@@ -1422,7 +1422,7 @@ std::expected<void, StarException> WorldLayout::finalize(Color mainSkyColor) {
   // Post-process all parallaxes
   for (auto const& biome : m_biomes) {
     if (biome->parallax) {
-      auto faded = biome->parallax->fadeToSkyColor(mainSkyColor);
+      auto faded = biome->parallax->fade_to_sky_color(mainSkyColor);
       if (!faded) return std::unexpected(std::move(faded.error()));
     }
   }
