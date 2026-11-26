@@ -110,12 +110,23 @@ public:
 private:
   explicit WorldPainter(Root& root);
   [[nodiscard]] std::expected<void, StarException> initialize();
-  [[nodiscard]] std::expected<void, StarException> renderParticles(WorldRenderData& render_data, Particle::Layer layer);
+
+  struct ParticleDrawState {
+    RectF viewport;
+    RectF render_window;
+    float pixel_ratio;
+    float text_pixel_size;
+  };
+
+  [[nodiscard]] std::expected<void, StarException> render_particles(
+      List<Particle> const& particles, Particle::Layer layer, ParticleDrawState const& state);
   [[nodiscard]] std::expected<void, StarException> renderBars(WorldRenderData& render_data);
 
   [[nodiscard]] std::expected<void, StarException> draw_entity_layer(List<Drawable> const& drawables, EntityHighlightEffect highlight_effect);
 
   [[nodiscard]] std::expected<void, StarException> draw_drawable(Drawable const& drawable);
+  [[nodiscard]] std::expected<void, StarException> draw_projected_drawable(
+      Drawable const& drawable, Vec2F position, float pixel_ratio, RectF const& viewport);
   [[nodiscard]] std::expected<void, StarException> draw_drawable_set(List<Drawable> const& drawables);
 
   Root& m_root;

@@ -2943,7 +2943,7 @@ String Humanoid::default_death_particles() const {
 }
 
 std::expected<List<Particle>, StarException> Humanoid::particles(String const& name) const {
-  auto checked650 = m_root.particleDatabase();
+  auto checked650 = m_root.particle_database();
 if (!checked650) return std::unexpected(std::move(checked650.error()));
 auto particle_database = std::move(*checked650);
   List<Particle> res;

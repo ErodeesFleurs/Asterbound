@@ -656,11 +656,11 @@ std::expected<void, StarException> NetworkedAnimator::load_config(Json config, S
     auto particles = particles_json->iterate_array();
     if (!particles) return std::unexpected(std::move(particles.error()));
     for (auto const& particle_config : *particles) {
-      auto database = root.particleDatabase();
+      auto database = root.particle_database();
       if (!database) return std::unexpected(std::move(database.error()));
       auto particle = particle_config.get("particle");
       if (!particle) return std::unexpected(std::move(particle.error()));
-      auto creator = (*database)->particleCreator(*particle, relative_path);
+      auto creator = (*database)->particle_creator(*particle, relative_path);
       if (!creator) return std::unexpected(std::move(creator.error()));
       auto count = particle_config.get_uint("count", 1);
       if (!count) return std::unexpected(std::move(count.error()));
@@ -670,7 +670,7 @@ std::expected<void, StarException> NetworkedAnimator::load_config(Json config, S
       if (!offset) return std::unexpected(std::move(offset.error()));
       auto flip = particle_config.get_bool("flip", false);
       if (!flip) return std::unexpected(std::move(flip.error()));
-      emitter.particle_list.push_back({*creator, static_cast<unsigned>(*count), *offset, *flip});
+      emitter.particle_list.push_back({std::move(*creator), static_cast<unsigned>(*count), *offset, *flip});
     }
     auto burst_count = particle_emitter_config.get_uint("burstCount", 1);
     if (!burst_count) return std::unexpected(std::move(burst_count.error()));

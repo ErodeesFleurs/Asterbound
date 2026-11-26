@@ -267,7 +267,7 @@ std::expected<std::shared_ptr<MaterialDatabase>, StarException> load_material_fi
   }
 
   auto& root = fixture.root();
-  auto particles = root.particleDatabase();
+  auto particles = root.particle_database();
   if (!particles) return std::unexpected(std::move(particles.error()));
   auto image_metadata = root.image_metadata_database();
   if (!image_metadata) return std::unexpected(std::move(image_metadata.error()));

@@ -157,6 +157,8 @@ if(STAR_BUILD_GUI AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
     ${STAR_EXTERN_INCLUDES} ${STAR_CORE_INCLUDES} ${STAR_BASE_INCLUDES}
     ${STAR_PLATFORM_INCLUDES} ${STAR_APPLICATION_INCLUDES}
     ${CMAKE_CURRENT_SOURCE_DIR})
+  target_compile_definitions(renderer_regression_tests PRIVATE
+    "STAR_BUNDLED_FONTS=\"${PROJECT_SOURCE_DIR}/../assets/asterbound\"")
   target_link_libraries(renderer_regression_tests PRIVATE
     star_test_gtest star_base_modules star_rendering_modules star_application_modules star_build_config
     star_vorbis_dependencies star_lua

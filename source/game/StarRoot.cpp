@@ -402,7 +402,7 @@ std::expected<void, StarException> Root::reload() {
     std::lock_guard questTemplateDatabaseLock(m_questTemplateDatabaseMutex);
     std::lock_guard emoteProcessorLock(m_emoteProcessorMutex);
     std::lock_guard terrainDatabaseLock(m_terrainDatabaseMutex);
-    std::lock_guard particleDatabaseLock(m_particleDatabaseMutex);
+    std::lock_guard particle_database_lock(m_particle_database_mutex);
     std::lock_guard versioningDatabaseLock(m_versioningDatabaseMutex);
     std::lock_guard functionDatabaseLock(m_functionDatabaseMutex);
     std::lock_guard image_metadata_database_lock(m_image_metadata_database_mutex);
@@ -449,7 +449,7 @@ std::expected<void, StarException> Root::reload() {
     m_questTemplateDatabase.reset();
     m_emoteProcessor.reset();
     m_terrainDatabase.reset();
-    m_particleDatabase.reset();
+    m_particle_database.reset();
     m_versioningDatabase.reset();
     m_functionDatabase.reset();
     m_image_metadata_database.reset();
@@ -507,7 +507,7 @@ std::expected<void, StarException> Root::fullyLoad() {
   add(&Root::questTemplateDatabase);
   add(&Root::emoteProcessor);
   add(&Root::terrainDatabase);
-  add(&Root::particleDatabase);
+  add(&Root::particle_database);
   add(&Root::versioningDatabase);
   add(&Root::functionDatabase);
   add(&Root::image_metadata_database);
@@ -791,7 +791,7 @@ std::expected<std::shared_ptr<MaterialDatabase const>, StarException> Root::mate
     [this]() -> std::expected<std::shared_ptr<MaterialDatabase>, StarException> {
       auto asset_database = assets();
       if (!asset_database) return std::unexpected(std::move(asset_database.error()));
-      auto particles = particleDatabase();
+      auto particles = particle_database();
       if (!particles) return std::unexpected(std::move(particles.error()));
       auto metadata = image_metadata_database();
       if (!metadata) return std::unexpected(std::move(metadata.error()));
@@ -832,8 +832,8 @@ std::expected<std::shared_ptr<DamageDatabase const>, StarException> Root::damage
   });
 }
 
-std::expected<std::shared_ptr<ParticleDatabase const>, StarException> Root::particleDatabase() {
-  return loadMember(m_particleDatabase, m_particleDatabaseMutex, "ParticleDatabase", *this);
+std::expected<std::shared_ptr<ParticleDatabase const>, StarException> Root::particle_database() {
+  return loadMember(m_particle_database, m_particle_database_mutex, "ParticleDatabase", *this);
 }
 
 std::expected<std::shared_ptr<EffectSourceDatabase const>, StarException> Root::effectSourceDatabase() {

@@ -549,7 +549,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
     ASSERT_NO_FATAL_FAILURE(expectCatalog("liquids_database", root.liquids_database()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("statusEffectDatabase", root.statusEffectDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("damageDatabase", root.damageDatabase()));
-    ASSERT_NO_FATAL_FAILURE(expectCatalog("particleDatabase", root.particleDatabase()));
+    ASSERT_NO_FATAL_FAILURE(expectCatalog("particle_database", root.particle_database()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("effectSourceDatabase", root.effectSourceDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("functionDatabase", root.functionDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("treasureDatabase", root.treasureDatabase()));

@@ -36,9 +36,18 @@ import star.math_common;
 
 namespace Star {
 
-#pragma float_control(precise, on, push)
 std::expected<Animation, StarException> Animation::create(Root& root, Json config, String const& directory) {
-  Animation animation(root);
+  auto prepared = prepare(root, std::move(config), directory);
+  if (!prepared)
+    return std::unexpected(std::move(prepared.error()));
+  prepared->initialize_variant();
+  return std::move(prepared->animation);
+}
+
+#pragma float_control(precise, on, push)
+std::expected<Animation::Preparation, StarException> Animation::prepare(Root& root, Json config, String const& directory) {
+  std::expected<Preparation, StarException> prepared(std::in_place, root);
+  auto& animation = prepared->animation;
   String source_directory;
   if (directory.empty()) {
     if (config.is_type(Json::Type::String)) {
@@ -147,14 +156,16 @@ std::expected<Animation, StarException> Animation::create(Root& root, Json confi
   auto variants = positive_count("variants", frame_limit / *frame_count);
   if (!variants)
     return std::unexpected(std::move(variants.error()));
-  auto variant = root.random().uniform_int(*variants - 1);
-  if (!variant)
-    return std::unexpected(std::move(variant.error()));
-  animation.m_variant_offset = static_cast<int>(*variant * *frame_count);
-  animation.reset();
-  return animation;
+  prepared->max_variant = static_cast<std::uint64_t>(*variants - 1);
+  return prepared;
 }
 #pragma float_control(pop)
+
+void Animation::Preparation::initialize_variant() {
+  auto variant = animation.m_root.get().random().uniform_uint(max_variant);
+  animation.m_variant_offset = static_cast<int>(variant * animation.m_frame_count);
+  animation.reset();
+}
 
 void Animation::set_angle(float angle) {
   m_angle = angle;

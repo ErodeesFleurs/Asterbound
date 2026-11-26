@@ -847,12 +847,12 @@ auto blockDamageVariance = std::move(*result890);
       auto result892 = material_database->material_particle_color(material, hueShift);
 if (!result892) return std::unexpected(std::move(result892.error()));
 particle.color = std::move(*result892);
-      particle.applyVariance(rootContext, blockDamageVariance);
+      particle.apply_variance(rootContext, blockDamageVariance);
 
       particle.approach += Vec2F(0.0f, 5.0f);
       particle.velocity += Vec2F(rootContext.random().uniform_float() - 0.5f, 5.0f + rootContext.random().uniform_float());
       particle.velocity += 10.0f * Vec2F(1.0f - 2.0f * rootContext.random().uniform_float(), 1.0f - 2.0f * rootContext.random().uniform_float());
-      particle.finalVelocity = 0.5f * (particle.finalVelocity + Vec2F(rootContext.random().uniform_float() - 0.5f, -20.0f + rootContext.random().uniform_float()));
+      particle.final_velocity = 0.5f * (particle.final_velocity + Vec2F(rootContext.random().uniform_float() - 0.5f, -20.0f + rootContext.random().uniform_float()));
       particle.trail = true;
 
       result.push_back(std::move(particle));
@@ -1313,7 +1313,7 @@ for (auto& particle : std::move(*result824)) {
       particle.approach += Vec2F(0.0f, 5.0f);
       particle.velocity += Vec2F(this->root().random().uniform_float() - 0.5f, 5.0f + this->root().random().uniform_float());
       particle.velocity += 10.0f * Vec2F(1.0f - 2.0f * this->root().random().uniform_float(), 1.0f - 2.0f * this->root().random().uniform_float());
-      particle.finalVelocity = 0.5f * (particle.finalVelocity + Vec2F(this->root().random().uniform_float() - 0.5f, -20.0f + this->root().random().uniform_float()));
+      particle.final_velocity = 0.5f * (particle.final_velocity + Vec2F(this->root().random().uniform_float() - 0.5f, -20.0f + this->root().random().uniform_float()));
       particle.trail = true;
 
       m_pendingRenderables.push_back(std::move(particle));
@@ -1325,7 +1325,7 @@ if (!result825) return std::unexpected(std::move(result825.error()));
 if (!result825->get().isClient())
       return {};
 
-    auto result826 = this->root().particleDatabase();
+    auto result826 = this->root().particle_database();
 if (!result826) return std::unexpected(std::move(result826.error()));
 auto result827 = parameters.get("specification");
 if (!result827) return std::unexpected(std::move(result827.error()));

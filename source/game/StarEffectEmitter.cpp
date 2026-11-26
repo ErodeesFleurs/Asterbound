@@ -85,7 +85,7 @@ struct EffectEmitter::PendingEvents {
           rejected_particle.reset();
         } else {
           if (!database) {
-            auto loaded = root.particleDatabase();
+            auto loaded = root.particle_database();
             if (!loaded)
               return std::unexpected(std::move(loaded.error()));
             database = std::move(*loaded);
@@ -98,10 +98,10 @@ struct EffectEmitter::PendingEvents {
             particle.flip = true;
             particle.position[0] = -particle.position[0];
             particle.velocity[0] = -particle.velocity[0];
-            particle.finalVelocity[0] = -particle.finalVelocity[0];
+            particle.final_velocity[0] = -particle.final_velocity[0];
           }
           particle.velocity += base_velocity;
-          particle.finalVelocity += base_velocity;
+          particle.final_velocity += base_velocity;
           particle.position += position;
           auto added = sink.add_particle(std::move(particle));
           if (!added) {

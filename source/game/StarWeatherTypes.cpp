@@ -131,7 +131,7 @@ std::expected<WeatherType, StarException> WeatherType::create(Root& root, Json c
 std::expected<Json, StarException> WeatherType::toJson() const {
   JsonArray particleConfigs;
   for (auto const& pc : particles) {
-    auto particle = pc.particle.toJson();
+    auto particle = pc.particle.to_json();
     if (!particle) return std::unexpected(std::move(particle.error()));
     particleConfigs.push_back(
       JsonObject{{"particle", std::move(*particle)}, {"density", pc.density}, {"autoRotate", pc.autoRotate}});

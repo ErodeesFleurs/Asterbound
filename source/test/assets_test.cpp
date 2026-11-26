@@ -39,6 +39,7 @@ import star.effect_source_database;
 import star.effect_emitter;
 import star.entity_rendering;
 import star.particle;
+import star.particle_database;
 import star.emote_processor;
 import star.humanoid;
 import star.set;
@@ -2249,6 +2250,122 @@ const GameTestRegistration effect_duplicate_kinds("EffectSourceTest", "RejectsCa
   }
 });
 
+const GameTestRegistration particle_catalog_duplicate_kinds(
+  "ParticleDatabase", "CaseAliasesAttributeDuplicatesToTheSecondDefinition", [](GameTest& fixture) {
+    for (bool reversed : {false, true}) {
+      SCOPED_TRACE(reversed);
+      auto directory = File::temporary_directory(fixture.root().random());
+      ASSERT_TRUE(directory);
+      auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+      String mixed = R"({"kind":"Spark","definition":{}})";
+      String lower = R"({"kind":"spark","definition":{}})";
+      auto root = effect_test_root(fixture, *directory, {
+          {"first.particle", reversed ? mixed : lower}, {"second.particle", reversed ? lower : mixed}});
+      ASSERT_TRUE(root) << root.error().what();
+      auto assets = (*root)->assets();
+      ASSERT_TRUE(assets) << assets.error().what();
+      auto files = (*assets)->scan_extension("particle");
+      ASSERT_TRUE(files) << files.error().what();
+      ASSERT_EQ(files->get().size(), 2u);
+      auto const& duplicate_path = std::next(files->get().begin())->string();
+      auto duplicate = (*assets)->json(duplicate_path);
+      ASSERT_TRUE(duplicate) << duplicate.error().what();
+      auto duplicate_kind = duplicate->get_string("kind");
+      ASSERT_TRUE(duplicate_kind) << duplicate_kind.error().what();
+
+      auto database = (*root)->particle_database();
+      ASSERT_FALSE(database);
+      auto const& summary = database.error().diagnostic_summary();
+      ASSERT_TRUE(summary);
+      EXPECT_EQ(summary->asset, duplicate_path.utf8());
+      EXPECT_EQ(summary->operation, "Loading particle");
+      EXPECT_TRUE(summary->asset_provider.contains(File::relative_to(*directory, "assets").utf8()));
+      EXPECT_TRUE(summary->reason.contains(Star::format("Duplicate particle asset kind Name {}.", *duplicate_kind)));
+    }
+  });
+
+const GameTestRegistration particle_catalog_variants(
+  "ParticleDatabase", "NamedAndInlineDirectAndReusableParticlesMatchEveryDraw", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    ASSERT_TRUE(directory);
+    auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+    String definition = R"({
+      "type":"textured","image":"spark.png","size":20,"position":[21,22],
+      "initialVelocity":[23,24],"finalVelocity":[25,26],"rotation":60,"angularVelocity":120,
+      "approach":[27,28],"length":29,"timeToLive":30,
+      "variance":{"size":1,"position":[2,3],"initialVelocity":[4,5],"finalVelocity":[6,7],
+        "rotation":30,"angularVelocity":45,"length":10,"timeToLive":11}
+    })";
+    auto root = effect_test_root(fixture, *directory, {
+        {"spark.particle", String(R"({"kind":"SpArK","definition":)") + definition + "}"}});
+    ASSERT_TRUE(root) << root.error().what();
+    auto database = (*root)->particle_database();
+    ASSERT_TRUE(database) << database.error().what();
+    auto mixed_config = (*database)->config("SpArK");
+    ASSERT_TRUE(mixed_config) << mixed_config.error().what();
+    EXPECT_EQ((*mixed_config)->kind(), String("SpArK"));
+    for (String const& spelling : {String("spark"), String("SPARK"), String("sPaRk")}) {
+      auto config = (*database)->config(spelling);
+      ASSERT_TRUE(config) << config.error().what();
+      EXPECT_EQ(*config, *mixed_config);
+    }
+    EXPECT_FALSE((*database)->config("missing"));
+
+    auto inline_config = Json::parse(definition);
+    ASSERT_TRUE(inline_config) << inline_config.error().what();
+    auto zero_variance_config = Json::parse(R"({"type":"ember","size":20,"variance":{"length":0}})");
+    ASSERT_TRUE(zero_variance_config) << zero_variance_config.error().what();
+    Json const name("sPaRk");
+    constexpr std::uint64_t seed = 0x535041524bull;
+    auto& random = (*root)->random();
+    struct VariantCase {
+      Json const& specification;
+      Json const& definition;
+      String relative_path;
+      bool zero_variance = false;
+    };
+    for (auto const& test : std::array{
+        VariantCase{name, *inline_config, ""},
+        VariantCase{*inline_config, *inline_config, "/local/definition.animation"},
+        VariantCase{*zero_variance_config, *zero_variance_config, "", true}}) {
+      auto base = Particle::create(**root, test.definition, test.relative_path);
+      ASSERT_TRUE(base) << base.error().what();
+      random.seed(seed);
+      RandomSource oracle(seed);
+      auto creator = (*database)->particle_creator(test.specification, test.relative_path);
+      ASSERT_TRUE(creator) << creator.error().what();
+      for (unsigned trial = 0; trial != 4; ++trial) {
+        std::array<float, 11> draws;
+        for (auto& draw : draws)
+          draw = oracle.uniform_float() * 2.0f - 1.0f;
+        Particle actual;
+        if ((trial & 1) == 0) {
+          auto direct = (*database)->particle(test.specification, test.relative_path);
+          ASSERT_TRUE(direct) << direct.error().what();
+          actual = std::move(*direct);
+        } else {
+          actual = (*creator)();
+        }
+        auto delta = [&](std::size_t index, float scale) { return test.zero_variance ? 0.0f : draws[index] * scale; };
+        EXPECT_FLOAT_EQ(actual.size, base->size + delta(0, 1));
+        EXPECT_FLOAT_EQ(actual.position[0], base->position[0] + delta(1, 2));
+        EXPECT_FLOAT_EQ(actual.position[1], base->position[1] + delta(2, 3));
+        EXPECT_FLOAT_EQ(actual.velocity[0], base->velocity[0] + delta(3, 4));
+        EXPECT_FLOAT_EQ(actual.velocity[1], base->velocity[1] + delta(4, 5));
+        EXPECT_FLOAT_EQ(actual.final_velocity[0], base->final_velocity[0] + delta(5, 6));
+        EXPECT_FLOAT_EQ(actual.final_velocity[1], base->final_velocity[1] + delta(6, 7));
+        EXPECT_FLOAT_EQ(actual.rotation, base->rotation + delta(7, 30 * std::numbers::pi / 180.0f));
+        EXPECT_FLOAT_EQ(actual.angular_velocity, base->angular_velocity + delta(8, 45 * std::numbers::pi / 180.0f));
+        EXPECT_FLOAT_EQ(actual.length, base->length + delta(9, 10));
+        EXPECT_FLOAT_EQ(actual.time_to_live, base->time_to_live + delta(10, 11));
+        EXPECT_EQ(actual.base_size, base->base_size);
+        EXPECT_EQ(actual.approach, base->approach);
+        EXPECT_EQ(actual.string, base->string);
+        EXPECT_EQ(random.next_u64(), oracle.next_u64());
+      }
+    }
+  });
+
 const GameTestRegistration effect_identity_wire("EffectSourceTest", "CanonicalRunningIdentityPreservesRawWireAndDisk", [](GameTest& fixture) {
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory);
@@ -2323,7 +2440,7 @@ const GameTestRegistration effect_emission_retry("EffectSourceTest", "RetriesOnl
   ASSERT_TRUE(root) << root.error().what();
   // Database construction is outside the compared RNG sequences.
   ASSERT_TRUE((*root)->effectSourceDatabase());
-  ASSERT_TRUE((*root)->particleDatabase());
+  ASSERT_TRUE((*root)->particle_database());
   List<Vec2F> baseline_particles;
   std::uint64_t baseline_rng = 0;
   for (auto failure : std::array<std::optional<std::size_t>, 4>{std::nullopt, 1u, 3u, 4u}) {
@@ -2440,7 +2557,7 @@ const GameTestRegistration object_event_retry("ObjectRenderTest", "RetriesReject
   auto assets = game.assets();
   ASSERT_TRUE(assets) << assets.error().what();
   ASSERT_TRUE((*assets)->audio("/loop.wav"));
-  ASSERT_TRUE(game.particleDatabase());
+  ASSERT_TRUE(game.particle_database());
 
   // Start a real headless client world by pumping its handshake without running a
   // background simulation that could consume the fixture's seeded random stream.

@@ -258,7 +258,7 @@ std::expected<List<Particle>, StarException> particlesFromDefinition(Root& root,
       auto name = entry.to_string();
       if (!name)
         return std::unexpected(std::move(name.error()));
-      auto database = root.particleDatabase();
+      auto database = root.particle_database();
       if (!database)
         return std::unexpected(std::move(database.error()));
       auto particle = (*database)->particle(*name);
@@ -275,7 +275,7 @@ std::expected<List<Particle>, StarException> particlesFromDefinition(Root& root,
       auto variance = Particle::create(root, *varianceConfig);
       if (!variance)
         return std::unexpected(std::move(variance.error()));
-      particle->applyVariance(root, *variance);
+      particle->apply_variance(root, *variance);
       particle->position += position;
       result.push_back(std::move(*particle));
     }

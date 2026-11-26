@@ -205,6 +205,12 @@ higher sampling does not remove that spatial quantization.
 
 Timers, one-shot audio/particle collection and beam transitions belong to ticks, including offscreen entities. Resource-cache jitter and native cosmetic noise use a separate presentation random service rather than consuming gameplay randomness. Display sampling does not write interpolated coordinates back to movement controllers. Camera conversions and overlay anchors use the displayed transform; input between frames retains the last displayed camera.
 
+Particle kinds are matched case-insensitively at both registration and lookup.
+Creating one instance and invoking a retained particle factory use the same
+variance draws, including fields with zero variance. A tick publishes each
+new trail immediately before its surviving source particle; rendering samples
+those identities without advancing either the animation or the random stream.
+
 Lua pane `render()` may run several times without an intervening `update(dt)`, or less often than updates. Keep gameplay changes, timers, effect drains and unseeded gameplay-backed random draws out of render hooks. Rebuild ImGui widgets in the render hook only; the engine owns ImGui frame begin/end. See the [script pane lifecycle](lua/openstarbound/scriptpane.md#shared-script-pane-runtime) and [camera API](lua/openstarbound/camera.md). Arbitrary mod render hooks are not made read-only automatically.
 
 ### Command transport and GPU resources

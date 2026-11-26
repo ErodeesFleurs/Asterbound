@@ -518,7 +518,6 @@ private:
   List<LightSource> m_gather_lights;
   List<LightSource> m_pending_lights;
   List<LightSource> m_calculation_lights;
-  List<std::pair<Vec2F, Vec3F>> m_pending_particle_lights;
   RectI m_pending_light_range;
   std::atomic<bool> m_pending_light_ready;
   List<PreviewTile> m_preview_tiles;

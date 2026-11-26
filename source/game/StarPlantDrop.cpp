@@ -552,7 +552,7 @@ if (!result300) return std::unexpected(std::move(result300.error()));
       return std::unexpected(std::move(configResult.error()));
     auto config = std::move(*configResult);
 
-    auto result302 = this->root().particleDatabase();
+    auto result302 = this->root().particle_database();
 if (!result302) return std::unexpected(std::move(result302.error()));
 auto result303 = std::move(*result302)->particle(config);
 if (!result303) return std::unexpected(std::move(result303.error()));

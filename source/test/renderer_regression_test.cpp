@@ -8,6 +8,7 @@
 import std;
 import star.algorithm;
 import star.assets;
+import star.animation;
 import star.asset_path;
 import star.buffer;
 import star.byte_array;
@@ -32,6 +33,7 @@ import star.line;
 import star.list;
 import star.material_types;
 import star.parallax;
+import star.particle;
 import star.poly;
 import star.random;
 import star.ref_ptr;
@@ -40,6 +42,7 @@ import star.sky_render_data;
 import star.tile_painter;
 import star.world_camera;
 import star.world_geometry;
+import star.world_painter;
 import star.world_render_data;
 import star.world_tiles;
 
@@ -651,6 +654,135 @@ TEST_F(OpenGlRendererRegression, ParallaxTilesPreserveFrameZeroGeometryAndRetryT
   auto integer_bottom = draw();
   expectPixel(integer_bottom, Width, 50, 14, black);
   expectPixel(integer_bottom, Width, 50, 17, {95, 0, 64, 255});
+}
+
+TEST_F(OpenGlRendererRegression, ParticleLayersKeepSubmissionOrderAndWrappedGeometry) {
+  RandomService random(0);
+  auto directory = checked(File::temporary_directory(random));
+  auto cleanup = make_scope_exit([&] { checked(File::remove_all(directory)); });
+  auto overlay = File::relative_to(directory, "assets");
+  checked(File::create_directory(overlay));
+  auto write_asset = [&](String const& name, String const& text) {
+    checked(File::write_file(text, File::relative_to(overlay, name)));
+  };
+  write_asset("preload.config", "[]");
+  write_asset("metamaterials.config", "[]");
+  write_asset("client.config", R"({"defaultFootstepSound":""})");
+  write_asset("highlights.config", R"({"highlightDirectives":{}})");
+  write_asset("interface.config", R"({"font":{"defaultFont":"pixelhobo","fallbackFont":"","emojiFont":""}})");
+  checked(File::copy(STAR_BUNDLED_FONTS "/font/pixelhobo.woff2", File::relative_to(overlay, "pixelhobo.woff2")));
+  write_asset("rendering.config", R"({
+    "backgroundLayerColor":[255,255,255,255], "foregroundLayerColor":[255,255,255,255],
+    "liquidDrawLevels":[0,1], "chunkCacheTimeout":600000, "textureTimeout":600000,
+    "entityBarOffset":[0,0], "entityBarSpacing":[0,0], "entityBarSize":[0,0], "entityBarIconOffset":[0,0],
+    "preloadTextureChance":0, "textParticleFontSize":10, "particleRenderWindowPadding":8
+  })");
+  write_asset("liquids.config", R"({
+    "liquidEngineParameters":{
+      "lateralMoveFactor":0, "spreadOverfillUpFactor":0, "spreadOverfillLateralFactor":0,
+      "spreadOverfillDownFactor":0, "pressureEqualizeFactor":0, "pressureMoveFactor":0,
+      "maximumPressureLevelImbalance":0, "minimumLivenPressureChange":0, "minimumLivenLevelChange":0,
+      "minimumLiquidLevel":0, "interactTransformationLevel":0
+    }, "backgroundDrain":0
+  })");
+  write_asset("particle.frames", R"({"frameList":{"0":[0,0,8,4]}})");
+  auto png = std::make_shared<Buffer>();
+  checked(Image::filled({8, 4}, {255, 255, 255, 255}).write_png(logger, png));
+  checked(File::write_file(png->take_data(), File::relative_to(overlay, "particle.png")));
+  Root::Settings settings{};
+  settings.assetSources = {overlay};
+  settings.assetsSettings.asset_time_to_live = 600;
+  settings.assetsSettings.allow_remote_assets = false;
+  settings.defaultConfiguration = JsonObject{};
+  settings.storageDirectory = File::relative_to(directory, "storage");
+  settings.logLevel = LogLevel::Error;
+  auto root = checked(Root::create(std::move(settings)));
+  auto painter = checked(WorldPainter::create(*root));
+  checked(painter->renderInit(renderer));
+
+  WorldRenderData frame{};
+  frame.geometry = WorldGeometry(128, 128);
+  frame.is_fullbright = true;
+  auto& sky = frame.sky_render_data;
+  sky.dayLevel = sky.skyAlpha = 1;
+  sky.topRectColor = sky.bottomRectColor = Color::palette_black;
+  sky.flashColor = Color::palette_clear;
+  painter->camera().setScreenSize({Width, Height});
+  painter->setCameraPosition(frame.geometry, {0, 24});
+  using Layer = Particle::Layer;
+  using Type = Particle::Type;
+  auto particle = [](Type type, Layer layer, Vec2F position, float size, Color color) {
+    Particle value;
+    value.type = type;
+    value.layer = layer;
+    value.position = position;
+    value.size = size;
+    value.color = color;
+    return value;
+  };
+  Vec2F const wrapped{127, 24}; // x = 40, y = 32 in the viewport.
+  auto ember = [&](Layer layer, float size, Color color) { return particle(Type::Ember, layer, wrapped, size, color); };
+  auto const red = Color::rgb(255, 0, 0);
+  auto const orange = Color::rgb(255, 128, 0);
+  auto const green = Color::rgb(0, 255, 0);
+  auto const cyan = Color::rgb(0, 255, 255);
+  auto const blue = Color::rgb(0, 0, 255);
+  auto const white = Color::palette_white;
+  frame.particles = {
+      ember(Layer::Front, 16, blue), ember(Layer::Middle, 24, green), ember(Layer::Back, 36, red),
+      ember(Layer::Front, 8, white), ember(Layer::Back, 32, orange), ember(Layer::Middle, 20, cyan)};
+  auto texture = particle(Type::Textured, Layer::Middle, {123.5f, 21.5f}, 1, white);
+  texture.image = AssetPath("/particle.png");
+  frame.particles.push_back(std::move(texture));
+  auto animated = particle(Type::Animated, Layer::Front, {2, 24}, 1, Color::rgb(128, 0, 255));
+  animated.animation = checked(Animation::create(*root, json(R"({"frames":"/particle.png","offset":[2,1]})")));
+  frame.particles.push_back(std::move(animated));
+  auto streak = particle(Type::Streak, Layer::Back, {4.5f, 22}, 4, Color::rgb(255, 0, 255));
+  streak.velocity = {1, 0};
+  streak.length = 8;
+  frame.particles.push_back(std::move(streak));
+  auto text = particle(Type::Text, Layer::Front, {124.75f, 27}, 1, white);
+  text.string = "X";
+  frame.particles.push_back(std::move(text));
+  auto outside = particle(Type::Textured, Layer::Back, {112, 24}, 1, white);
+  outside.image = AssetPath("/not-visible.png"); // Must be culled before asset access.
+  frame.particles.push_back(std::move(outside));
+  std::array<std::pair<unsigned, Color>, 6> const rings{{
+      {18, red}, {16, orange}, {12, green}, {10, cyan}, {8, blue}, {4, white}}};
+
+  checked(renderer->loadConfig(json(R"({})")));
+  std::vector<Pixel> first_frame;
+  for (unsigned pass = 0; pass != 2; ++pass) {
+    checked(renderer->startFrame());
+    select("internal");
+    checked(painter->render(frame, {}));
+    auto image = pixels();
+    // The complete row checks all six nested edges and the topmost color
+    // at every overlap, independent of the interleaved source order.
+    for (unsigned x = 0; x < Width; ++x) {
+      Color expected = Color::palette_black;
+      for (auto const& [radius, color] : rings) {
+        if (x >= 40 - radius && x < 40 + radius)
+          expected = color;
+      }
+      auto rgba = expected.to_rgba();
+      expectPixel(image, Width, x, 32, {rgba[0], rgba[1], rgba[2], rgba[3]}, 0);
+    }
+    expectPixel(image, Width, 8, 10, {255, 255, 255, 255}, 0);
+    expectPixel(image, Width, 16, 12, {0, 0, 0, 255}, 0);
+    expectPixel(image, Width, 76, 38, {128, 0, 255, 255}, 0);
+    expectPixel(image, Width, 84, 40, {0, 0, 0, 255}, 0);
+    expectPixel(image, Width, 64, 32, {0, 0, 0, 255}, 0); // Untranslated animation anchor.
+    expectPixel(image, Width, 76, 14, {255, 0, 255, 255}, 0);
+    expectPixel(image, Width, 84, 16, {0, 0, 0, 255}, 0);
+    auto text_region = std::span(image).subspan(51 * Width, 12 * Width);
+    EXPECT_TRUE(std::ranges::any_of(text_region, [](Pixel const& pixel) { return pixel[0] != 0; }));
+    if (pass == 0)
+      first_frame = std::move(image);
+    else
+      EXPECT_EQ(first_frame, image);
+    checked(renderer->finishFrame());
+  }
 }
 
 TEST_F(OpenGlRendererRegression, RekeyedLayersPreserveOverlappingPixelsAndEntityOrder) {

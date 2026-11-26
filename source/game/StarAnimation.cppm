@@ -20,6 +20,7 @@ namespace Star {
 
 struct Drawable;
 class Root;
+struct Particle;
 
 class Animation {
 public:
@@ -53,6 +54,10 @@ public:
   void reset();
 
 private:
+  friend struct Particle;
+  struct Preparation;
+  [[nodiscard]] static std::expected<Preparation, StarException> prepare(Root& root, Json config, String const& directory = {});
+
   explicit Animation(Root& root) : m_root(root) {}
   enum class Mode { Stop, EndAndDisappear, LoopForever };
   inline static constexpr auto mode_names = sorted_enum_names(
@@ -67,7 +72,7 @@ private:
 
   Mode m_mode;
   int m_frame_count;
-  int m_variant_offset;
+  int m_variant_offset = 0;
   float m_cycle;
   float m_frame_duration;
   float m_duration;
@@ -87,6 +92,15 @@ private:
   int m_frame = -1;
   float m_timer = 0;
   bool m_completed = false;
+};
+
+struct Animation::Preparation {
+  explicit Preparation(Root& root) : animation(root) {}
+
+  Animation animation;
+  std::uint64_t max_variant;
+
+  void initialize_variant();
 };
 
 }

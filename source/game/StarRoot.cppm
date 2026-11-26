@@ -185,7 +185,7 @@ public:
   [[nodiscard]] std::expected<std::shared_ptr<LiquidsDatabase const>, StarException> liquids_database();
   [[nodiscard]] std::expected<std::shared_ptr<StatusEffectDatabase const>, StarException> statusEffectDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<DamageDatabase const>, StarException> damageDatabase();
-  [[nodiscard]] std::expected<std::shared_ptr<ParticleDatabase const>, StarException> particleDatabase();
+  [[nodiscard]] std::expected<std::shared_ptr<ParticleDatabase const>, StarException> particle_database();
   [[nodiscard]] std::expected<std::shared_ptr<EffectSourceDatabase const>, StarException> effectSourceDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<FunctionDatabase const>, StarException> functionDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<TreasureDatabase const>, StarException> treasureDatabase();
@@ -333,8 +333,8 @@ private:
   std::shared_ptr<DamageDatabase> m_damageDatabase;
   std::mutex m_damageDatabaseMutex;
 
-  std::shared_ptr<ParticleDatabase> m_particleDatabase;
-  std::mutex m_particleDatabaseMutex;
+  std::shared_ptr<ParticleDatabase> m_particle_database;
+  std::mutex m_particle_database_mutex;
 
   std::shared_ptr<EffectSourceDatabase> m_effectSourceDatabase;
   std::mutex m_effectSourceDatabaseMutex;

@@ -25,6 +25,7 @@ import star.ref_ptr;
 import star.logging;
 import star.algorithm;
 import star.file;
+import star.light_source;
 import star.listener;
 import std;
 import star.format;
@@ -60,6 +61,7 @@ import star.world;
 import star.byte_array;
 import star.world_render_data;
 import star.world_geometry;
+import star.cellular_lighting;
 import star.collision_block;
 import star.liquid_types;
 import star.material_types;
@@ -369,8 +371,10 @@ public:
   explicit PresentationLifecycleEntity(Root& root) : Entity(root) {}
   EntityType entity_type() const override { return EntityType::Stagehand; }
   Vec2F position() const override { return current_position; }
-  std::expected<void, StarException> render_light_sources(RenderCallback&) override {
+  std::expected<void, StarException> render_light_sources(RenderCallback& renderer) override {
     ++light_collections;
+    if (light)
+      return renderer.add_light_source(*light);
     return {};
   }
   static constexpr EntityRenderLayer fixture_layer = render_layer_effect + 101;
@@ -418,6 +422,7 @@ public:
   Vec2F current_position{1024, 1024};
   std::optional<Vec2F> next_position;
   std::optional<Drawable> image;
+  std::optional<LightSource> light;
   unsigned light_collections = 0;
   bool dying = false;
   bool fail_collection = false;
@@ -485,15 +490,15 @@ const GameTestRegistration presentation_removal_lifecycle(
     ASSERT_TRUE(world->addEntity(emitter));
     Particle newborn;
     newborn.type = Particle::Type::Text;
-    newborn.size = newborn.baseSize = 1;
+    newborn.size = newborn.base_size = 1;
     newborn.string = "presentation-birth-fixture";
     newborn.position = Vec2F(world->clientWindow().center());
-    newborn.velocity = newborn.finalVelocity = {60, 0};
+    newborn.velocity = newborn.final_velocity = {60, 0};
     newborn.approach = {};
-    newborn.ignoreWind = true;
-    newborn.collidesForeground = false;
-    newborn.collidesLiquid = false;
-    newborn.timeToLive = 2.0f;
+    newborn.ignore_wind = true;
+    newborn.collides_foreground = false;
+    newborn.collides_liquid = false;
+    newborn.time_to_live = 2.0f;
     emitter->next_particle = newborn;
     ASSERT_TRUE(world->update(dt));
     WorldRenderData display;
@@ -503,13 +508,14 @@ const GameTestRegistration presentation_removal_lifecycle(
           return std::cref(particle);
       return {};
     };
+    world->setAsyncLighting(false);
     world->setFullBright(true);
     for (float alpha : {0.0f, 0.5f, 1.0f, 0.25f}) {
       ASSERT_TRUE(world->render(display, 0, std::nullopt, PresentationContext(alpha)));
       auto sampled = find_newborn();
       ASSERT_TRUE(sampled);
       EXPECT_EQ(sampled->get().position, newborn.position);
-      EXPECT_FLOAT_EQ(sampled->get().timeToLive, 2.0f);
+      EXPECT_FLOAT_EQ(sampled->get().time_to_live, 2.0f);
     }
     EXPECT_EQ(emitter->light_collections, 0u);
     world->setFullBright(false);
@@ -536,7 +542,59 @@ const GameTestRegistration presentation_removal_lifecycle(
     auto travel = world->geometry().diff(advanced->get().position, newborn.position);
     EXPECT_NEAR(travel[0], 1.0f, 1e-4f);
     EXPECT_NEAR(travel[1], 0.0f, 1e-4f);
-    EXPECT_NEAR(advanced->get().timeToLive, 2.0f - dt, 1e-6f);
+    EXPECT_NEAR(advanced->get().time_to_live, 2.0f - dt, 1e-6f);
+
+    // Pick a dark cell in the real Outpost, not a fixed pixel whose ambient
+    // color could mask the two sources after an asset change.
+    auto published = world->waitForLighting(std::ref(display));
+    ASSERT_TRUE(published && *published);
+    auto light_at = [&](Vec2I cell) {
+      auto index = cell - display.light_min_position;
+      return display.light_map.get(index[0], index[1]);
+    };
+    auto interior = world->clientWindow().padded(-4);
+    std::optional<Vec2I> probe_cell;
+    Vec3F baseline = Vec3F::filled(1.0f);
+    for (int x = interior.x_min(); x < interior.x_max(); ++x) {
+      for (int y = interior.y_min(); y < interior.y_max(); ++y) {
+        auto light = light_at({x, y});
+        ASSERT_TRUE(light) << light.error().what();
+        if (light->max() < baseline.max()) {
+          probe_cell = Vec2I(x, y);
+          baseline = *light;
+        }
+      }
+    }
+    ASSERT_TRUE(probe_cell);
+    auto light_position = center_of_tile(*probe_cell);
+    Particle flash = newborn;
+    flash.string = "particle-light-fixture";
+    flash.position = light_position;
+    flash.light = Color::rgb(255, 0, 0);
+    flash.fade = 2.0f / dt;
+    emitter->light = LightSource{.position = light_position, .color = Vec3F(0, 0, 1)};
+    emitter->next_particle = flash;
+    ASSERT_TRUE(world->update(dt)); // Birth is collected after the tick.
+    ASSERT_TRUE(world->update(dt)); // Move and fade the logical particle to clear.
+
+    std::array<Vec3F, 2> colors;
+    for (unsigned endpoint = 0; endpoint != colors.size(); ++endpoint) {
+      ASSERT_TRUE(world->render(display, 0, std::nullopt, PresentationContext(static_cast<float>(endpoint))));
+      auto particle = std::ranges::find(display.particles, flash.string, &Particle::string);
+      ASSERT_NE(particle, display.particles.end());
+      auto sampled_position = light_position + Vec2F(static_cast<float>(endpoint), 0);
+      EXPECT_EQ(particle->position, sampled_position);
+      EXPECT_EQ(particle->light, endpoint == 0 ? flash.light : Color::palette_clear);
+      auto available = world->waitForLighting(std::ref(display));
+      ASSERT_TRUE(available && *available);
+      auto light = light_at(*probe_cell);
+      ASSERT_TRUE(light) << light.error().what();
+      colors[endpoint] = *light;
+    }
+    EXPECT_GT(colors[0][0], colors[1][0]); // Only the sampled red spread light faded.
+    EXPECT_GT(colors[1][2], baseline[2]);  // The co-located blue entity light survived.
+    EXPECT_FLOAT_EQ(colors[0][2], colors[1][2]);
+
     ASSERT_TRUE(world->removeEntity(emitter->entityId(), false));
 
     auto parameters_data = net_store_visitable_world_parameters(world->currentTemplate()->worldParameters());

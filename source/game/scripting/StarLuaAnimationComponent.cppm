@@ -76,7 +76,7 @@ private:
   }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("spawnParticle", [&self = *this](Json const& config, std::optional<Vec2F> const& position) -> std::expected<void, StarException> {
-    auto database = self.m_host.root().particleDatabase();
+    auto database = self.m_host.root().particle_database();
     if (!database)
       return std::unexpected(std::move(database.error()));
     auto particle = (*database)->particle(config);

@@ -1318,7 +1318,7 @@ condition1282 = static_cast<bool>(std::move(*result1281) == 0);
 }
 if (condition1282)
           continue;
-        auto result610 = this->root().particleDatabase();
+        auto result610 = this->root().particle_database();
 if (!result610) return std::unexpected(std::move(result610.error()));
 auto result611 = std::move(*result610)->particle(config);
 if (!result611) return std::unexpected(std::move(result611.error()));

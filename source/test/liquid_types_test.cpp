@@ -230,9 +230,9 @@ const GameTestRegistration splash_world_cases("EntitySplashTest", "WorldSensorsP
       expected.position = position;
       expected.velocity = {3, std::fabs(speed) * 2};
       expected.color = Color::rgba(settings->get().liquid_color);
-      expected.applyVariance(root, config->splash_particle_variance);
-      auto expected_json = expected.toJson();
-      auto actual_json = particle.toJson();
+      expected.apply_variance(root, config->splash_particle_variance);
+      auto expected_json = expected.to_json();
+      auto actual_json = particle.to_json();
       ASSERT_TRUE(expected_json && actual_json);
       EXPECT_EQ(*actual_json, *expected_json);
     }
@@ -360,7 +360,7 @@ const GameTestRegistration liquid_material_config("LiquidConfigTest", "Consumpti
       !fixture.check(bool(File::write_file(
           String(R"({"damageFactors":{},"damageRecovery":0})"), File::relative_to(tiles, "defaultDamage.config"))),
           "write material damage defaults")) return;
-  auto particles = root.particleDatabase();
+  auto particles = root.particle_database();
   auto image_metadata = root.image_metadata_database();
   if (!fixture.check(particles && image_metadata, "load material catalog dependencies")) return;
   auto with_interactions = [](String const& header, std::string_view second) {

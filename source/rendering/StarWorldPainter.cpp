@@ -303,17 +303,34 @@ std::expected<void, StarException> WorldPainter::render(WorldRenderData& render_
   if (auto r = render_entities_until(render_layer_platform); !r) return std::unexpected(std::move(r.error()));
   if (auto r = m_tilePainter->renderMidground(m_camera); !r) return std::unexpected(std::move(r.error()));
   if (auto r = render_entities_until(render_layer_back_particle); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = renderParticles(render_data, Particle::Layer::Back); !r) return std::unexpected(std::move(r.error()));
+
+  auto font_size_json = m_assets->json("/rendering.config:textParticleFontSize");
+  if (!font_size_json) return std::unexpected(std::move(font_size_json.error()));
+  auto font_size = font_size_json->to_int();
+  if (!font_size) return std::unexpected(std::move(font_size.error()));
+  auto padding_json = m_assets->json("/rendering.config:particleRenderWindowPadding");
+  if (!padding_json) return std::unexpected(std::move(padding_json.error()));
+  auto padding = padding_json->to_int();
+  if (!padding) return std::unexpected(std::move(padding.error()));
+  auto viewport = RectF::with_size({}, Vec2F(m_camera.screenSize()));
+  auto pixel_ratio = m_camera.pixelRatio();
+  ParticleDrawState const particle_draw{
+      viewport, viewport.padded(*padding), pixel_ratio, static_cast<int>(*font_size) * pixel_ratio};
+
+  if (auto r = render_particles(render_data.particles, Particle::Layer::Back, particle_draw); !r)
+    return std::unexpected(std::move(r.error()));
   if (auto r = render_entities_until(render_layer_liquid); !r) return std::unexpected(std::move(r.error()));
   if (auto r = m_tilePainter->renderLiquid(m_camera); !r) return std::unexpected(std::move(r.error()));
   if (auto r = render_entities_until(render_layer_middle_particle); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = renderParticles(render_data, Particle::Layer::Middle); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = render_particles(render_data.particles, Particle::Layer::Middle, particle_draw); !r)
+    return std::unexpected(std::move(r.error()));
   if (auto r = render_entities_until(render_layer_foreground_tile); !r) return std::unexpected(std::move(r.error()));
   if (auto r = m_tilePainter->renderForeground(m_camera); !r) return std::unexpected(std::move(r.error()));
   if (auto r = render_entities_until(render_layer_foreground_overlay); !r) return std::unexpected(std::move(r.error()));
   if (auto r = draw_drawable_set(render_data.foreground_overlays); !r) return std::unexpected(std::move(r.error()));
   if (auto r = render_entities_until(render_layer_front_particle); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = renderParticles(render_data, Particle::Layer::Front); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = render_particles(render_data.particles, Particle::Layer::Front, particle_draw); !r)
+    return std::unexpected(std::move(r.error()));
   if (auto r = render_entities_until(render_layer_overlay); !r) return std::unexpected(std::move(r.error()));
   if (auto r = draw_drawable_set(render_data.nametags); !r) return std::unexpected(std::move(r.error()));
   if (auto r = renderBars(render_data); !r) return std::unexpected(std::move(r.error()));
@@ -339,30 +356,20 @@ std::expected<void, StarException> WorldPainter::adjustLighting(WorldRenderData&
   return m_tilePainter->adjustLighting(render_data);
 }
 
-std::expected<void, StarException> WorldPainter::renderParticles(WorldRenderData& render_data, Particle::Layer layer) {
-  auto fontSizeJson = m_assets->json("/rendering.config:textParticleFontSize");
-  if (!fontSizeJson) return std::unexpected(std::move(fontSizeJson.error()));
-  auto fontSize = fontSizeJson->to_int();
-  if (!fontSize) return std::unexpected(std::move(fontSize.error()));
-  const int textParticleFontSize = *fontSize;
-  auto paddingJson = m_assets->json("/rendering.config:particleRenderWindowPadding");
-  if (!paddingJson) return std::unexpected(std::move(paddingJson.error()));
-  auto padding = paddingJson->to_int();
-  if (!padding) return std::unexpected(std::move(padding.error()));
-  const RectF particleRenderWindow = RectF::with_size(Vec2F(), Vec2F(m_camera.screenSize())).padded(*padding);
-
-  for (Particle const& particle : render_data.particles) {
+std::expected<void, StarException> WorldPainter::render_particles(
+    List<Particle> const& particles, Particle::Layer layer, ParticleDrawState const& state) {
+  // Scan in submission order without moving samples or rebuilding a per-layer index.
+  for (Particle const& particle : particles) {
     if (layer != particle.layer)
       continue;
 
     Vec2F position = m_camera.worldToScreen(particle.position);
 
-    if (!particleRenderWindow.contains(position))
+    if (!state.render_window.contains(position))
       continue;
 
-    Vec2F size = Vec2F::filled(particle.size * m_camera.pixelRatio());
-
     if (particle.type == Particle::Type::Ember) {
+      Vec2F size = Vec2F::filled(particle.size * state.pixel_ratio);
       m_renderer->immediatePrimitives().emplace_back(std::in_place_type_t<RenderQuad>(),
         RectF(position - size / 2, position + size / 2),
         particle.color.to_rgba(),
@@ -372,23 +379,23 @@ std::expected<void, StarException> WorldPainter::renderParticles(WorldRenderData
       // Draw a rotated quad streaking in the direction the particle is coming from.
       // Sadly this looks awful.
       Vec2F dir = particle.velocity.normalized();
-      Vec2F sideHalf = dir.rot90() * m_camera.pixelRatio() * particle.size / 2;
-      float length = particle.length * m_camera.pixelRatio();
+      Vec2F side_half = dir.rot90() * state.pixel_ratio * particle.size / 2;
+      float length = particle.length * state.pixel_ratio;
       Vec4B color = particle.color.to_rgba();
-      float lightMapMultiplier = particle.fullbright ? 0.0f : 1.0f;
+      float light_map_multiplier = particle.fullbright ? 0.0f : 1.0f;
       m_renderer->immediatePrimitives().emplace_back(std::in_place_type_t<RenderQuad>(),
-        position - sideHalf,
-        position + sideHalf,
-        position - dir * length + sideHalf,
-        position - dir * length - sideHalf,
-        color, lightMapMultiplier);
+        position - side_half,
+        position + side_half,
+        position - dir * length + side_half,
+        position - dir * length - side_half,
+        color, light_map_multiplier);
 
     } else if (particle.type == Particle::Type::Textured || particle.type == Particle::Type::Animated) {
-      auto drawableResult = particle.type == Particle::Type::Textured
+      auto drawable_result = particle.type == Particle::Type::Textured
           ? Drawable::make_image(*m_image_metadata, particle.image, 1.0f / tile_pixels, true, Vec2F(0, 0))
           : particle.animation->drawable(1.0f / tile_pixels);
-      if (!drawableResult) return std::unexpected(std::move(drawableResult.error()));
-      Drawable drawable = std::move(*drawableResult);
+      if (!drawable_result) return std::unexpected(std::move(drawable_result.error()));
+      Drawable drawable = std::move(*drawable_result);
 
       if (particle.flip && particle.flippable)
         drawable.scale(Vec2F(-1, 1));
@@ -401,11 +408,14 @@ std::expected<void, StarException> WorldPainter::renderParticles(WorldRenderData
       drawable.rotate(particle.rotation);
       drawable.scale(particle.size);
       drawable.translate(particle.position);
-      if (auto result = draw_drawable(drawable); !result) return std::unexpected(std::move(result.error()));
+      // Animated drawables can carry an offset, which may select another
+      // wrapped image of the world even if the particle itself is visible.
+      Vec2F drawable_position = drawable.position == particle.position ? position : m_camera.worldToScreen(drawable.position);
+      if (auto result = draw_projected_drawable(drawable, drawable_position, state.pixel_ratio, state.viewport); !result)
+        return std::unexpected(std::move(result.error()));
 
     } else if (particle.type == Particle::Type::Text) {
-      Vec2F position = m_camera.worldToScreen(particle.position);
-      int size = std::min(128.0f, std::round((float)textParticleFontSize * m_camera.pixelRatio() * particle.size));
+      int size = std::min(128.0f, std::round(state.text_pixel_size * particle.size));
       if (size > 0) {
         m_textPainter->setFontSize(size);
         m_textPainter->setFontColor(particle.color.to_rgba());
@@ -492,10 +502,13 @@ std::expected<void, StarException> WorldPainter::draw_entity_layer(List<Drawable
 }
 
 std::expected<void, StarException> WorldPainter::draw_drawable(Drawable const& drawable) {
-  Vec2F position = m_camera.worldToScreen(drawable.position);
-  float pixel_ratio = m_camera.pixelRatio();
+  return draw_projected_drawable(drawable, m_camera.worldToScreen(drawable.position), m_camera.pixelRatio(),
+      RectF::with_size({}, Vec2F(m_camera.screenSize())));
+}
+
+std::expected<void, StarException> WorldPainter::draw_projected_drawable(
+    Drawable const& drawable, Vec2F position, float pixel_ratio, RectF const& viewport) {
   float scale = pixel_ratio * tile_pixels;
-  RectF viewport = RectF::with_size({}, Vec2F(m_camera.screenSize()));
   if (drawable.is_line()) {
     m_drawablePainter->draw_projected_line(drawable.line_part(), drawable.color, drawable.fullbright,
         position, scale, pixel_ratio, std::cref(viewport));

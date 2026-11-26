@@ -255,11 +255,11 @@ std::expected<void, StarException> BeamItem::updateBeamEffects(bool visible) {
     randomColor.set_saturation(randomColor.saturation() / *saturationScale);
     beamParticle.color = randomColor;
     beamParticle.velocity = Vec2F::filled(beamRoot().random().uniform_float());
-    beamParticle.finalVelocity = Vec2F(0.0f, -20.0f);
+    beamParticle.final_velocity = Vec2F(0.0f, -20.0f);
     beamParticle.approach = Vec2F(0.0f, 5.0f);
-    beamParticle.timeToLive = 0.25f;
-    beamParticle.destructionAction = Particle::DestructionAction::Shrink;
-    beamParticle.destructionTime = 0.2f;
+    beamParticle.time_to_live = 0.25f;
+    beamParticle.destruction_action = Particle::DestructionAction::Shrink;
+    beamParticle.destruction_time = 0.2f;
     beamLeftovers.push_back(std::move(beamParticle));
   }
   // Capture world positions at the producing tick, not at display sampling or

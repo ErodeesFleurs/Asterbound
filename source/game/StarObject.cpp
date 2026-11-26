@@ -1241,7 +1241,7 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
       return std::unexpected(std::move(operation9.error()));
   }
   if (render_callback && do_smash && !m_config->smash_particles.empty()) {
-    auto particles_database_result = root().particleDatabase();
+    auto particles_database_result = root().particle_database();
     if (!particles_database_result)
       return std::unexpected(std::move(particles_database_result.error()));
     auto particles_database = std::move(*particles_database_result);
@@ -1251,7 +1251,7 @@ std::expected<void, StarException> Object::destroy(std::optional<std::reference_
       if (!particle_config_result)
         return std::unexpected(std::move(particle_config_result.error()));
       auto particle_config = std::move(*particle_config_result);
-      auto creator_result = particles_database->particleCreator(particle_config, m_config->path);
+      auto creator_result = particles_database->particle_creator(particle_config, m_config->path);
       if (!creator_result)
         return std::unexpected(std::move(creator_result.error()));
       auto creator = std::move(*creator_result);
@@ -2418,7 +2418,7 @@ std::expected<void, StarException> Object::collect_particles(RenderCallback& ren
       if (emitter.place_in_spaces && orientation->spaces.empty())
         return std::unexpected(ObjectException("Cannot emit a particle in an empty object space list"));
       auto particle = emitter.particle;
-      particle.applyVariance(root(), emitter.particle_variance);
+      particle.apply_variance(root(), emitter.particle_variance);
       if (emitter.place_in_spaces) {
         auto space = root().random().sample_ref(orientation->spaces);
         if (!space)

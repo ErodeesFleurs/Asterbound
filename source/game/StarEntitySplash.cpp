@@ -138,7 +138,7 @@ std::expected<List<Particle>, StarException> EntitySplashConfig::generate_partic
     particle.position = position;
     particle.velocity[1] = y_velocity;
     particle.color = color;
-    particle.applyVariance(root, splash_particle_variance);
+    particle.apply_variance(root, splash_particle_variance);
   }
   return particles;
 }

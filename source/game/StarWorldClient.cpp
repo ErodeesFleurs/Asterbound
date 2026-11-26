@@ -635,7 +635,7 @@ std::expected<void, StarException> WorldClient::removeEntity(EntityId entityId, 
       for (auto& particle : render_callback.particles)
         particle.directives.append(selected->get());
 
-    m_particles->addParticles(std::move(render_callback.particles));
+    m_particles->add_particles(std::move(render_callback.particles));
     m_samples.append_range(std::move(render_callback.audios));
   }
 
@@ -992,7 +992,7 @@ void WorldClient::resetPresentation() {
   m_entityPresentation.clear();
   m_parallax_wind_time.reset_presentation();
   if (m_particles)
-    m_particles->resetPresentation();
+    m_particles->reset_presentation();
   if (m_sky)
     m_sky->resetPresentation();
 }
@@ -1047,7 +1047,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
   m_preview_tiles.clear();
   
   render_data.geometry = m_geometry;
-  m_particles->sampleParticles(interpolation, render_data.particles);
+  m_particles->sample_particles(interpolation, render_data.particles);
   
   RectI window = m_clientState->window();
   RectI tileRange = window.padded(buffer_tiles);
@@ -1067,17 +1067,18 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
     });
     if (!lights)
       return std::unexpected(std::move(lights.error()));
+    // Particle lights are spread lights in sampled order, after all entity lights.
+    for (auto const& particle : render_data.particles)
+      if (particle.light != Color::palette_clear)
+        lighting_callback.light_sources.push_back({.position = particle.position, .color = particle.light.to_rgb_f()});
+    // Pad by one tile so lights spread correctly across the frame's edges.
+    auto light_range = window.padded(1);
     {
       std::lock_guard prep_lock(m_light_map_prep_mutex);
       m_gather_lights = std::exchange(m_pending_lights, std::move(lighting_callback.light_sources));
-      m_pending_particle_lights.clear();
-      for (auto const& particle : render_data.particles)
-        if (particle.light != Color::palette_clear)
-          m_pending_particle_lights.push_back({particle.position, particle.light.to_rgb_f()});
-      m_pending_light_range = window.padded(1);
+      m_pending_light_range = light_range;
       m_pending_light_ready = true;
     }
-    //Kae: Padded by one to fix light spread issues at the edges of the frame.
     
     if (m_asyncLighting) {
       m_lightingCond.notify_one();
@@ -2263,7 +2264,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
     if (!result176)
       return std::unexpected(std::move(result176.error()));
     
-    m_particles->addParticles(m_weather->pullNewParticles());
+    m_particles->add_particles(m_weather->pullNewParticles());
     auto result177 = m_particles->update(dt, RectF(particleRegion), m_weather->wind());
     if (!result177)
       return std::unexpected(std::move(result177.error()));
@@ -2313,7 +2314,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
       if (auto selected = select_directive(directives, entity->entityId()))
         for (auto& particle : m_event_render_callback.particles)
           particle.directives.append(selected->get());
-      m_particles->addParticles(std::move(m_event_render_callback.particles));
+      m_particles->add_particles(std::move(m_event_render_callback.particles));
       m_samples.append_range(std::move(m_event_render_callback.audios));
       return {};
     });
@@ -2806,7 +2807,7 @@ std::expected<void, StarException> WorldClient::handleDamageNotifications() {
     if (displayValue <= 0) {
       return {};
     }
-    auto result211 = self.root().particleDatabase();
+    auto result211 = self.root().particle_database();
     if (!result211)
       return std::unexpected(std::move(result211.error()));
     auto result212 = (std::move(*result211))->particle(damageNumberParticleKind);
@@ -2818,7 +2819,7 @@ std::expected<void, StarException> WorldClient::handleDamageNotifications() {
     if (!result213)
       return std::unexpected(std::move(result213.error()));
     particle.string = (std::move(*result213));
-    self.m_particles->add(particle);
+    self.m_particles->add(std::move(particle));
     return {};
   };
 
@@ -2920,7 +2921,7 @@ std::expected<void, StarException> WorldClient::handleDamageNotifications() {
       if (auto selected = select_directive(directive_parameters(), damageNotification.target_entity_id))
         for (auto& particle : hitParticles)
           particle.directives.append(selected->get());
-      m_particles->addParticles(std::move(hitParticles));
+      m_particles->add_particles(std::move(hitParticles));
     }
   }
   return {};
@@ -2956,8 +2957,8 @@ std::expected<void, StarException> WorldClient::sparkDamagedBlocks() {
         particle.position += center_of_tile(pos);
         particle.velocity = particle.velocity.magnitude()
             * vnorm(m_geometry.diff(tile->get().foregroundDamage.source_position(), particle.position));
-        particle.applyVariance(this->root(), m_blockDamageParticleVariance);
-        m_particles->add(particle);
+        particle.apply_variance(this->root(), m_blockDamageParticleVariance);
+        m_particles->add(std::move(particle));
       }
       
       if (is_real_material(tile->get().background) && tile->get().backgroundDamage.damage_effect_percentage() - this->root().random().uniform_float() > 0.0f
@@ -2974,8 +2975,8 @@ std::expected<void, StarException> WorldClient::sparkDamagedBlocks() {
         particle.position += center_of_tile(pos);
         particle.velocity = particle.velocity.magnitude()
             * vnorm(m_geometry.diff(tile->get().backgroundDamage.source_position(), particle.position));
-        particle.applyVariance(this->root(), m_blockDamageParticleVariance);
-        m_particles->add(particle);
+        particle.apply_variance(this->root(), m_blockDamageParticleVariance);
+        m_particles->add(std::move(particle));
       }
     }
   }
@@ -3113,7 +3114,6 @@ std::expected<void, StarException> WorldClient::calculate_lighting() {
   m_pending_light_ready = false;
   RectI light_range = m_pending_light_range;
   m_calculation_lights.swap(m_pending_lights);
-  List<std::pair<Vec2F, Vec3F>> particle_lights = std::move(m_pending_particle_lights);
   auto& root = this->root();
   auto configuration = root.configuration();
   if (!configuration)
@@ -3165,9 +3165,6 @@ std::expected<void, StarException> WorldClient::calculate_lighting() {
       m_lighting_calculator.add_spread_light(position, light.color * 0.85f);
     m_lighting_calculator.add_point_light(position, light.color, light.point_beam, light.beam_angle, light.beam_ambience, hybrid);
   }
-  
-  for (auto const& [position, color] : particle_lights)
-    m_lighting_calculator.add_spread_light(resolve_position(position), color);
   
   auto result249 = m_lighting_calculator.calculate(m_pending_light_map);
   if (!result249)
@@ -3261,7 +3258,6 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
     m_geometry = WorldGeometry(m_worldTemplate->size());
     
     m_particles = std::make_shared<ParticleManager>(this->root(), m_geometry, m_tileArray);
-    m_particles->setUndergroundLevel(m_worldTemplate->undergroundLevel());
     
     if (auto result = setup_force_regions(); !result)
       return std::unexpected(std::move(result.error()));
@@ -3429,7 +3425,6 @@ std::expected<void, StarException> WorldClient::clearWorld() {
     m_gather_lights = List<LightSource>{};
     m_pending_lights = List<LightSource>{};
     m_calculation_lights = List<LightSource>{};
-    m_pending_particle_lights.clear();
     m_lightMap.reset();
   }
   resetPresentation();
