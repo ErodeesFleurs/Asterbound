@@ -868,7 +868,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::spawnNpc(Vec2F const& 
   }(); !condition85)
     return std::unexpected(std::move(condition85.error()));
   else if (*condition85) {
-    auto autonpcDatabaseResult1 = generationRoot.npcDatabase();
+    auto autonpcDatabaseResult1 = generationRoot.npc_database();
     if (!autonpcDatabaseResult1) return std::unexpected(std::move(autonpcDatabaseResult1.error()));
     auto npcDatabase = std::move((*autonpcDatabaseResult1));
     auto stduint64_tseedResult1 = parameters.get_uint("seed", generationRoot.random().next_u64());
@@ -887,15 +887,15 @@ std::expected<void, StarException> DungeonGeneratorWorld::spawnNpc(Vec2F const& 
       uniqueParameters["persistent"] = true;
     auto autonpcResult1 = m_worldServer.threatLevel();
     if (!autonpcResult1) return std::unexpected(std::move(autonpcResult1.error()));
-    auto autonpcResult2 = npcDatabase->generateNpcVariant(species, typeName, (*autonpcResult1), seed, uniqueParameters);
+    auto autonpcResult2 = npcDatabase->generate_npc_variant(species, typeName, (*autonpcResult1), seed, uniqueParameters);
     if (!autonpcResult2) return std::unexpected(std::move(autonpcResult2.error()));
-    auto autonpcResult3 = npcDatabase->createNpc((*autonpcResult2));
+    auto autonpcResult3 = npcDatabase->create_npc(std::move(*autonpcResult2));
     if (!autonpcResult3) return std::unexpected(std::move(autonpcResult3.error()));
     auto npc = std::move((*autonpcResult3));
     {
-      auto operationResult1 = npc->feetOffset();
+      auto operationResult1 = npc->feet_offset();
       if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
-      npc->setPosition(position - (*operationResult1));
+      npc->set_position(position - (*operationResult1));
     }
     {
       auto operationResult1 = m_worldServer.addEntity(npc);

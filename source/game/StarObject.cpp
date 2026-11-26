@@ -303,7 +303,7 @@ std::expected<void, StarException> Object::initialize(std::shared_ptr<ObjectConf
   if (!uniqueIdResult)
     return std::unexpected(std::move(uniqueIdResult.error()));
   auto uniqueId = std::move(*uniqueIdResult);
-  setUniqueId(std::move(uniqueId));
+  set_unique_id(std::move(uniqueId));
   auto operation2 = m_netGroup.add_net_element(m_parameters);
   if (!operation2)
     return std::unexpected(std::move(operation2.error()));
@@ -884,7 +884,7 @@ std::expected<void, StarException> Object::update(float dt, std::uint64_t) {
   return {};
 }
 
-std::expected<void, StarException> Object::collectRenderEvents(RenderCallback& render_callback) {
+std::expected<void, StarException> Object::collect_render_events(RenderCallback& render_callback) {
   for (auto const& pair : m_imageKeys)
     m_networkedAnimator->set_global_tag(pair.first, pair.second);
   auto shake = computeDamageShake();
@@ -1342,7 +1342,7 @@ std::expected<List<Drawable>, StarException> Object::cursorHintDrawables() const
 }
 
 std::expected<void, StarException> Object::getNetStates(bool initial) {
-  setUniqueId(m_uniqueIdNetState.get());
+  set_unique_id(m_uniqueIdNetState.get());
   if (m_orientationIndex != m_orientationIndexNetState.get()) {
     auto operation1 = setOrientationIndex(m_orientationIndexNetState.get());
     if (!operation1)
@@ -1372,15 +1372,15 @@ std::expected<void, StarException> Object::setNetStates() {
   return {};
 }
 
-std::expected<List<QuestArcDescriptor>, StarException> Object::offeredQuests() const {
+std::expected<List<QuestArcDescriptor>, StarException> Object::offered_quests() const {
   return m_offeredQuests.get();
 }
 
-std::expected<StringSet, StarException> Object::turnInQuests() const {
+std::expected<StringSet, StarException> Object::turn_in_quests() const {
   return m_turnInQuests.get();
 }
 
-std::expected<Vec2F, StarException> Object::questIndicatorPosition() const {
+std::expected<Vec2F, StarException> Object::quest_indicator_position() const {
   if (auto orientation = currentOrientation()) {
     auto pos = position() + Vec2F(orientation->boundBox.center()[0], orientation->boundBox.max()[1] + 2.5);
     if (!(orientation->boundBox.size()[0] % 2))
@@ -1427,7 +1427,7 @@ std::expected<void, StarException> Object::readStoredData(Json const& diskStore)
   if (!idResult)
     return std::unexpected(std::move(idResult.error()));
   auto id = std::move(*idResult);
-  setUniqueId(std::move(id));
+  set_unique_id(std::move(id));
   auto positionConfigResult = diskStore.get("tilePosition");
   if (!positionConfigResult)
     return std::unexpected(std::move(positionConfigResult.error()));
@@ -1871,7 +1871,7 @@ std::expected<LuaCallbacks, StarException> Object::makeObjectCallbacks() {
   if (!operation11)
     return std::unexpected(std::move(operation11.error()));
   auto operation12 = callbacks.register_callback("setUniqueId", [this](std::optional<String> id) {
-  setUniqueId(std::move(id));
+  set_unique_id(std::move(id));
 });
   if (!operation12)
     return std::unexpected(std::move(operation12.error()));
@@ -2190,7 +2190,7 @@ PolyF Object::statusEffectArea() const {
   return volume();
 }
 
-std::expected<std::optional<HitType>, StarException> Object::queryHit(DamageSource const& source) const {
+std::expected<std::optional<HitType>, StarException> Object::query_hit(DamageSource const& source) const {
   if (!m_config->smashable || !inWorld() || m_health.get() <= 0.0f || m_unbreakable)
     return std::nullopt;
   auto currentWorldResult = world();
@@ -2208,13 +2208,13 @@ std::expected<std::optional<HitType>, StarException> Object::queryHit(DamageSour
   return std::nullopt;
 }
 
-std::expected<std::optional<PolyF>, StarException> Object::hitPoly() const {
+std::expected<std::optional<PolyF>, StarException> Object::hit_poly() const {
   auto poly = volume();
   poly.translate(position());
   return poly;
 }
 
-std::expected<List<DamageNotification>, StarException> Object::applyDamage(DamageRequest const& damage) {
+std::expected<List<DamageNotification>, StarException> Object::apply_damage(DamageRequest const& damage) {
   if (!m_config->smashable || !inWorld() || m_health.get() <= 0.0f)
     return List<DamageNotification>();
   auto notificationsResult = recover_lua_script_error(m_scriptComponent.invoke<List<DamageNotification>>("applyDamageRequest", damage));
@@ -2234,7 +2234,7 @@ std::expected<List<DamageNotification>, StarException> Object::applyDamage(Damag
   return List<DamageNotification>{{damage.source_entity_id, entityId(), position(), damage.damage, dmg, m_health.get() <= 0 ? HitType::Kill : HitType::Hit, damage.damage_source_kind, m_config->damageMaterialKind}};
 }
 
-RectF Object::interactiveBoundBox() const {
+RectF Object::interactive_bound_box() const {
   if (auto orientation = currentOrientation()) {
     auto rect = RectF(orientation->boundBox);
     rect.set_max(Vec2F(orientation->boundBox.x_max() + 1, orientation->boundBox.y_max() + 1));
@@ -2244,7 +2244,7 @@ RectF Object::interactiveBoundBox() const {
   }
 }
 
-bool Object::isInteractive() const {
+bool Object::is_interactive() const {
   return m_interactive.get();
 }
 

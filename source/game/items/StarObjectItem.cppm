@@ -253,7 +253,7 @@ std::expected<bool, StarException> ObjectItem::placeInWorld(FireMode, bool shift
   auto itemWorld = world();
   if (!itemWorld)
     return std::unexpected(std::move(itemWorld.error()));
-  auto aimPosition = itemOwner->get().aimPosition();
+  auto aimPosition = itemOwner->get().aim_position();
   if (!aimPosition)
     return std::unexpected(std::move(aimPosition.error()));
   auto pos = Vec2I(aimPosition->floor());
@@ -267,7 +267,7 @@ std::expected<bool, StarException> ObjectItem::placeInWorld(FireMode, bool shift
     auto parameters = objectParameters();
     if (!parameters)
       return std::unexpected(std::move(parameters.error()));
-    auto object = (*database)->createForPlacement(itemWorld->get(), *name, pos, itemOwner->get().walkingDirection(), *parameters);
+    auto object = (*database)->createForPlacement(itemWorld->get(), *name, pos, itemOwner->get().walking_direction(), *parameters);
     if (!object)
       return std::unexpected(std::move(object.error()));
     if (*object && consume(1)) {
@@ -305,15 +305,15 @@ std::expected<bool, StarException> ObjectItem::canPlace(bool) const {
     auto itemOwner = owner();
     if (!itemOwner)
       return std::unexpected(std::move(itemOwner.error()));
-    bool inRange = itemOwner->get().isAdmin();
+    bool inRange = itemOwner->get().is_admin();
     if (!inRange) {
-      auto range = itemOwner->get().inToolRange();
+      auto range = itemOwner->get().in_tool_range();
       if (!range)
         return std::unexpected(std::move(range.error()));
       inRange = *range;
     }
     if (inRange) {
-      auto aimPosition = itemOwner->get().aimPosition();
+      auto aimPosition = itemOwner->get().aim_position();
       if (!aimPosition)
         return std::unexpected(std::move(aimPosition.error()));
       auto pos = Vec2I(aimPosition->floor());

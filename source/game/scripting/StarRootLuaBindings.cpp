@@ -953,9 +953,9 @@ std::expected<RectU, StarException> LuaBindings::RootCallbacks::non_empty_region
 }
 
 std::expected<Json, StarException> LuaBindings::RootCallbacks::npcConfig(Root& root, String const& arg1) {
-  auto database = root.npcDatabase();
+  auto database = root.npc_database();
   if (!database) return std::unexpected(std::move(database.error()));
-  return (*database)->buildConfig(arg1);
+  return (*database)->build_config(arg1);
 }
 
 std::expected<float, StarException> LuaBindings::RootCallbacks::projectileGravityMultiplier(Root& root, String const& arg1) {
@@ -1083,13 +1083,13 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::npcPortrait(
     float level,
     std::optional<std::uint64_t> seed,
     std::optional<JsonObject> const& parameters) {
-  auto database = root.npcDatabase();
+  auto database = root.npc_database();
   if (!database) return std::unexpected(std::move(database.error()));
-  auto variant = (*database)->generateNpcVariant(species, typeName, level, seed.value_or(root.random().next_u64()), parameters.value_or(JsonObject{}), itemCatalog);
+  auto variant = (*database)->generate_npc_variant(species, typeName, level, seed.value_or(root.random().next_u64()), parameters.value_or(JsonObject{}), itemCatalog);
   if (!variant) return std::unexpected(std::move(variant.error()));
   auto mode = enum_value<portrait_mode_names>(portraitMode);
   if (!mode) return std::unexpected(std::move(mode.error()));
-  auto drawables = (*database)->npcPortrait(*variant, *mode, itemCatalog);
+  auto drawables = (*database)->npc_portrait(*variant, *mode, itemCatalog);
   if (!drawables) return std::unexpected(std::move(drawables.error()));
   JsonArray result;
   result.reserve(drawables->size());
@@ -1102,11 +1102,11 @@ std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::npcPortrait(
 }
 
 std::expected<Json, StarException> LuaBindings::RootCallbacks::npcVariant(Root& root, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog, String const& species, String const& typeName, float level, std::optional<std::uint64_t> seed, std::optional<JsonObject> const& parameters) {
-  auto database = root.npcDatabase();
+  auto database = root.npc_database();
   if (!database) return std::unexpected(std::move(database.error()));
-  auto variant = (*database)->generateNpcVariant(species, typeName, level, seed.value_or(root.random().next_u64()), parameters.value_or(JsonObject{}), itemCatalog);
+  auto variant = (*database)->generate_npc_variant(species, typeName, level, seed.value_or(root.random().next_u64()), parameters.value_or(JsonObject{}), itemCatalog);
   if (!variant) return std::unexpected(std::move(variant.error()));
-  return (*database)->writeNpcVariantToJson(*variant);
+  return (*database)->write_npc_variant_to_json(*variant);
 }
 
 std::expected<JsonArray, StarException> LuaBindings::RootCallbacks::monster_portrait(Root& root, String const& type_name, std::optional<JsonObject> const& parameters) {

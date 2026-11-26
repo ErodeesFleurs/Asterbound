@@ -95,7 +95,7 @@ public:
 
   std::uint64_t presentation_epoch() const override;
 
-  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& render_callback) override;
+  [[nodiscard]] std::expected<void, StarException> collect_render_events(RenderCallback& render_callback) override;
 
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback) override;
   

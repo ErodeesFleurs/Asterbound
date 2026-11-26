@@ -533,7 +533,7 @@ std::expected<std::shared_ptr<InteractiveEntity>, StarException> EntityMap::inte
   auto result = for_each_entity(rect, [&](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
     if (auto interactive = as_ref<InteractiveEntity>(*entity)) {
       auto& ie = interactive->get();
-      if (ie.isInteractive()) {
+      if (ie.is_interactive()) {
         if (auto tile = as_ref<TileEntity>(*entity)) {
           auto& tile_entity = tile->get();
           auto spaces = tile_entity.interactiveSpaces();
@@ -550,7 +550,7 @@ std::expected<std::shared_ptr<InteractiveEntity>, StarException> EntityMap::inte
             }
           }
         } else {
-          auto box = ie.interactiveBoundBox().translated(entity->position());
+          auto box = ie.interactive_bound_box().translated(entity->position());
           auto dist = m_geometry.diff_to_nearest_coord_in_box(box, pos).magnitude();
           auto center_dist = m_geometry.diff(box.center(), pos).magnitude();
           if ((dist < best_distance) || ((dist == best_distance) && (center_dist < best_center_distance))) {

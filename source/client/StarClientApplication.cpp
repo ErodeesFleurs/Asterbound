@@ -2116,7 +2116,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
         if (tag == "playerHealth")
           return Star::to_string(m_player->health());
         if (tag == "playerMaxHealth")
-          return m_player->maxHealth().transform([](float value) { return Star::to_string(value); });
+          return m_player->max_health().transform([](float value) { return Star::to_string(value); });
         if (tag == "playerEnergy")
           return m_player->energy().transform([](float value) { return Star::to_string(value); });
         if (tag == "playerMaxEnergy")
@@ -2456,7 +2456,7 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
         return std::unexpected(std::move(pause.error()));
     }
 
-    auto aimResult = m_player->aimPosition();
+    auto aimResult = m_player->aim_position();
     if (!aimResult)
       return std::unexpected(std::move(aimResult.error()));
     Vec2F aimPosition = *aimResult;

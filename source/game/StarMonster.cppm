@@ -158,14 +158,14 @@ public:
 
   [[nodiscard]] std::expected<List<LightSource>, StarException> light_sources() const override;
 
-  [[nodiscard]] std::expected<std::optional<HitType>, StarException> queryHit(DamageSource const& source) const override;
-  [[nodiscard]] std::expected<std::optional<PolyF>, StarException> hitPoly() const override;
+  [[nodiscard]] std::expected<std::optional<HitType>, StarException> query_hit(DamageSource const& source) const override;
+  [[nodiscard]] std::expected<std::optional<PolyF>, StarException> hit_poly() const override;
 
   [[nodiscard]] std::expected<void, StarException> hitOther(EntityId targetEntityId, DamageRequest const& damageRequest) override;
-  [[nodiscard]] std::expected<void, StarException> damagedOther(DamageNotification const& damage) override;
+  [[nodiscard]] std::expected<void, StarException> damaged_other(DamageNotification const& damage) override;
 
-  [[nodiscard]] std::expected<List<DamageNotification>, StarException> applyDamage(DamageRequest const& damage) override;
-  [[nodiscard]] std::expected<List<DamageNotification>, StarException> selfDamageNotifications() override;
+  [[nodiscard]] std::expected<List<DamageNotification>, StarException> apply_damage(DamageRequest const& damage) override;
+  [[nodiscard]] std::expected<List<DamageNotification>, StarException> self_damage_notifications() override;
 
   [[nodiscard]] std::expected<List<DamageSource>, StarException> damage_sources() const override;
 
@@ -179,7 +179,7 @@ public:
 
   std::uint64_t presentation_epoch() const override;
 
-  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& render_callback) override;
+  [[nodiscard]] std::expected<void, StarException> collect_render_events(RenderCallback& render_callback) override;
 
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback) override;
 
@@ -189,9 +189,9 @@ public:
 
   [[nodiscard]] MessageResponseResult receive_message(ConnectionId sending_connection, String const& message, JsonArray const& args) override;
 
-  [[nodiscard]] std::expected<float, StarException> maxHealth() const override;
+  [[nodiscard]] std::expected<float, StarException> max_health() const override;
   float health() const override;
-  DamageBarType damageBar() const override;
+  DamageBarType damage_bar() const override;
 
   [[nodiscard]] std::expected<float, StarException> monster_level() const;
   [[nodiscard]] std::expected<SkillInfo, StarException> activeSkillInfo() const;
@@ -200,10 +200,10 @@ public:
   String type_name() const;
   MonsterVariant monster_variant() const;
 
-  std::optional<String> statusText() const override;
-  bool displayNametag() const override;
-  [[nodiscard]] std::expected<Vec3B, StarException> nametagColor() const override;
-  [[nodiscard]] std::expected<Vec2F, StarException> nametagOrigin() const override;
+  std::optional<String> status_text() const override;
+  bool display_nametag() const override;
+  [[nodiscard]] std::expected<Vec3B, StarException> nametag_color() const override;
+  [[nodiscard]] std::expected<Vec2F, StarException> nametag_origin() const override;
   [[nodiscard]] std::expected<String, StarException> nametag() const override;
 
   bool aggressive() const override;
@@ -218,15 +218,15 @@ public:
   [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> force_regions() const override;
 
   [[nodiscard]] std::expected<InteractAction, StarException> interact(InteractRequest const& request) override;
-  bool isInteractive() const override;
+  bool is_interactive() const override;
 
-  [[nodiscard]] std::expected<Vec2F, StarException> questIndicatorPosition() const override;
+  [[nodiscard]] std::expected<Vec2F, StarException> quest_indicator_position() const override;
 
   ActorMovementController& movement_controller() override;
-  StatusController& statusController() override;
+  StatusController& status_controller() override;
 
   using Entity::setKeepAlive;
-  using Entity::setUniqueId;
+  using Entity::set_unique_id;
 
 private:
   [[nodiscard]] std::expected<void, StarException> initialize(std::optional<float> level);

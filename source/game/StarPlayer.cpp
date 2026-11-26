@@ -315,7 +315,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
 
   m_aimPosition = Vec2F();
 
-  setUniqueId(uuid.hex());
+  set_unique_id(uuid.hex());
   m_identity = m_config->defaultIdentity;
   m_identityUpdated = true;
 
@@ -702,7 +702,7 @@ std::expected<void, StarException> Player::net_load(ByteArray const& net_store, 
   if (!idResult)
     return std::unexpected(std::move(idResult.error()));
   auto id = std::move(*idResult);
-  setUniqueId(std::move(id));
+  set_unique_id(std::move(id));
   if (auto result = ds.read(m_description); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = ds.read(m_modeType); !result)
@@ -753,7 +753,7 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
   if (!idResult)
     return std::unexpected(std::move(idResult.error()));
   auto id = std::move(*idResult);
-  setUniqueId(std::move(id));
+  set_unique_id(std::move(id));
   auto descriptionResult = diskStore.get_string("description");
   if (!descriptionResult)
     return std::unexpected(std::move(descriptionResult.error()));
@@ -1234,11 +1234,11 @@ std::expected<List<Drawable>, StarException> Player::drawables(float interpolati
       return std::unexpected(std::move(statusResult.error()));
     auto status = std::move(*statusResult);
     drawables.append_range(std::move(status));
-    auto rangeResult = inToolRange();
+    auto rangeResult = in_tool_range();
     if (!rangeResult)
       return std::unexpected(std::move(rangeResult.error()));
     auto range = std::move(*rangeResult);
-    auto previewsResult = m_tools->renderObjectPreviews(m_aimPosition, walkingDirection(), range, favoriteColor());
+    auto previewsResult = m_tools->renderObjectPreviews(m_aimPosition, walking_direction(), range, favorite_color());
     if (!previewsResult)
       return std::unexpected(std::move(previewsResult.error()));
     auto previews = std::move(*previewsResult);
@@ -1269,27 +1269,27 @@ std::expected<List<Particle>, StarException> Player::particles() {
   return particles;
 }
 
-std::expected<void, StarException> Player::addParticles(List<Particle> const& particles) {
+std::expected<void, StarException> Player::add_particles(List<Particle> const& particles) {
   m_callbackParticles.append_range(particles);
   return {};
 }
 
-std::expected<void, StarException> Player::addSound(String const& sound, float volume, float pitch) {
+std::expected<void, StarException> Player::add_sound(String const& sound, float volume, float pitch) {
   m_callbackSounds.emplace_back(sound, volume, pitch);
   return {};
 }
 
-std::expected<void, StarException> Player::addEphemeralStatusEffects(List<EphemeralStatusEffect> const& statusEffects) {
+std::expected<void, StarException> Player::add_ephemeral_status_effects(List<EphemeralStatusEffect> const& statusEffects) {
   if (isSlave())
     return std::unexpected(PlayerException("Adding status effects to an entity can only be done directly on the master entity."));
   return m_statusController->addEphemeralEffects(statusEffects);
 }
 
-std::expected<ActiveUniqueStatusEffectSummary, StarException> Player::activeUniqueStatusEffectSummary() const {
+std::expected<ActiveUniqueStatusEffectSummary, StarException> Player::active_unique_status_effect_summary() const {
   return m_statusController->activeUniqueStatusEffectSummary();
 }
 
-std::expected<float, StarException> Player::powerMultiplier() const {
+std::expected<float, StarException> Player::power_multiplier() const {
   return m_statusController->stat("powerMultiplier");
 }
 
@@ -1352,7 +1352,7 @@ RectF Player::meta_bound_box() const {
   return m_config->meta_bound_box;
 }
 
-std::expected<std::optional<HitType>, StarException> Player::queryHit(DamageSource const& source) const {
+std::expected<std::optional<HitType>, StarException> Player::query_hit(DamageSource const& source) const {
   if (!inWorld() || isDead() || m_isAdmin || isTeleporting() || m_statusController->statPositive("invulnerable"))
     return std::optional<HitType>{};
   auto shieldResult = m_tools->queryShieldHit(source);
@@ -1374,18 +1374,18 @@ std::expected<std::optional<HitType>, StarException> Player::queryHit(DamageSour
   return std::optional<HitType>{};
 }
 
-std::expected<std::optional<PolyF>, StarException> Player::hitPoly() const {
+std::expected<std::optional<PolyF>, StarException> Player::hit_poly() const {
   return m_movement_controller->collision_body();
 }
 
-std::expected<List<DamageNotification>, StarException> Player::applyDamage(DamageRequest const& request) {
+std::expected<List<DamageNotification>, StarException> Player::apply_damage(DamageRequest const& request) {
   if (!inWorld() || isDead() || m_isAdmin)
     return {};
 
   return m_statusController->apply_damage_request(request);
 }
 
-std::expected<List<DamageNotification>, StarException> Player::selfDamageNotifications() {
+std::expected<List<DamageNotification>, StarException> Player::self_damage_notifications() {
   return m_statusController->pull_self_damage_notifications();
 }
 
@@ -1404,7 +1404,7 @@ std::expected<void, StarException> Player::hitOther(EntityId targetEntityId, Dam
   return {};
 }
 
-std::expected<void, StarException> Player::damagedOther(DamageNotification const& damage) {
+std::expected<void, StarException> Player::damaged_other(DamageNotification const& damage) {
   if (isMaster())
     m_statusController->damaged_other(damage);
   return {};
@@ -1475,7 +1475,7 @@ std::expected<void, StarException> Player::destroy(std::optional<std::reference_
   return {};
 }
 
-std::optional<EntityAnchorState> Player::loungingIn() const {
+std::optional<EntityAnchorState> Player::lounging_in() const {
   if (is<LoungeAnchor>(m_movement_controller->entity_anchor()))
     return m_movement_controller->anchor_state();
   return {};
@@ -1510,7 +1510,7 @@ std::expected<bool, StarException> Player::lounge(EntityId loungeableEntityId, s
 }
 
 std::expected<void, StarException> Player::stopLounging() {
-  if (loungingIn()) {
+  if (lounging_in()) {
     {
       if (auto result = m_movement_controller->reset_anchor_state(); !result)
         return std::unexpected(std::move(result.error()));
@@ -1537,7 +1537,7 @@ std::expected<Vec2F, StarException> Player::mouthOffset(bool ignoreAdjustments) 
   if (!offsetResult)
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
-  return Vec2F(offset[0] * numerical_direction(facingDirection()), offset[1]);
+  return Vec2F(offset[0] * numerical_direction(facing_direction()), offset[1]);
 }
 
 std::expected<Vec2F, StarException> Player::feetOffset() const {
@@ -1545,7 +1545,7 @@ std::expected<Vec2F, StarException> Player::feetOffset() const {
   if (!offsetResult)
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
-  return Vec2F(offset[0] * numerical_direction(facingDirection()), offset[1]);
+  return Vec2F(offset[0] * numerical_direction(facing_direction()), offset[1]);
 }
 
 std::expected<Vec2F, StarException> Player::headArmorOffset() const {
@@ -1553,7 +1553,7 @@ std::expected<Vec2F, StarException> Player::headArmorOffset() const {
   if (!offsetResult)
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
-  return Vec2F(offset[0] * numerical_direction(facingDirection()), offset[1]);
+  return Vec2F(offset[0] * numerical_direction(facing_direction()), offset[1]);
 }
 
 std::expected<Vec2F, StarException> Player::chestArmorOffset() const {
@@ -1561,7 +1561,7 @@ std::expected<Vec2F, StarException> Player::chestArmorOffset() const {
   if (!offsetResult)
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
-  return Vec2F(offset[0] * numerical_direction(facingDirection()), offset[1]);
+  return Vec2F(offset[0] * numerical_direction(facing_direction()), offset[1]);
 }
 
 std::expected<Vec2F, StarException> Player::backArmorOffset() const {
@@ -1569,7 +1569,7 @@ std::expected<Vec2F, StarException> Player::backArmorOffset() const {
   if (!offsetResult)
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
-  return Vec2F(offset[0] * numerical_direction(facingDirection()), offset[1]);
+  return Vec2F(offset[0] * numerical_direction(facing_direction()), offset[1]);
 }
 
 std::expected<Vec2F, StarException> Player::legsArmorOffset() const {
@@ -1577,7 +1577,7 @@ std::expected<Vec2F, StarException> Player::legsArmorOffset() const {
   if (!offsetResult)
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
-  return Vec2F(offset[0] * numerical_direction(facingDirection()), offset[1]);
+  return Vec2F(offset[0] * numerical_direction(facing_direction()), offset[1]);
 }
 
 std::expected<Vec2F, StarException> Player::mouth_position() const {
@@ -2026,12 +2026,12 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
               return std::unexpected(std::move(result.error()));
           }
           {
-            if (auto result = addEffectEmitters(loungeAnchor->effectEmitters); !result)
+            if (auto result = add_effect_emitters(loungeAnchor->effectEmitters); !result)
               return std::unexpected(std::move(result.error()));
           }
           if (loungeAnchor->emote)
             {
-              if (auto result = requestEmote(*loungeAnchor->emote); !result)
+              if (auto result = request_emote(*loungeAnchor->emote); !result)
                 return std::unexpected(std::move(result.error()));
             }
 
@@ -2283,7 +2283,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
   if (!overrideFacingDirectionResult)
     return std::unexpected(std::move(overrideFacingDirectionResult.error()));
   auto overrideFacingDirection = std::move(*overrideFacingDirectionResult);
-  if (!loungingIn() && overrideFacingDirection)
+  if (!lounging_in() && overrideFacingDirection)
     m_movement_controller->control_face(facingDirection = *overrideFacingDirection);
 
   humanoid()->set_facing_direction(facingDirection);
@@ -2495,7 +2495,7 @@ std::uint64_t Player::presentation_epoch() const {
   return Entity::presentation_epoch() + m_movement_controller->presentation_epoch();
 }
 
-std::expected<void, StarException> Player::collectRenderEvents(RenderCallback& callback) {
+std::expected<void, StarException> Player::collect_render_events(RenderCallback& callback) {
   NullRenderCallback discard(m_hiddenLoopAudios);
   bool hidden = invisible();
   RenderCallback& render_callback = hidden ? static_cast<RenderCallback&>(discard) : callback;
@@ -2639,7 +2639,7 @@ std::expected<void, StarException> Player::render(RenderCallback& render_callbac
     if (auto result = render_callback.add_overhead_bars(m_presentation_bars, position()); !result)
       return std::unexpected(std::move(result.error()));
   }
-  auto rangeResult = inToolRange();
+  auto rangeResult = in_tool_range();
   if (!rangeResult)
     return std::unexpected(std::move(rangeResult.error()));
   auto range = std::move(*rangeResult);
@@ -2985,7 +2985,7 @@ std::expected<bool, StarException> Player::addBlueprint(ItemDescriptor const& de
     if (!formattedResult)
       return std::unexpected(std::move(formattedResult.error()));
     auto formatted = std::move(*formattedResult);
-    if (auto result = queueUIMessage(formatted); !result)
+    if (auto result = queue_ui_message(formatted); !result)
       return std::unexpected(std::move(result.error()));
     return true;
   }
@@ -3002,7 +3002,7 @@ std::expected<bool, StarException> Player::addBlueprint(ItemDescriptor const& de
     if (!formattedResult)
       return std::unexpected(std::move(formattedResult.error()));
     auto formatted = std::move(*formattedResult);
-    if (auto result = queueUIMessage(formatted); !result)
+    if (auto result = queue_ui_message(formatted); !result)
       return std::unexpected(std::move(result.error()));
   }
   return false;
@@ -3033,7 +3033,7 @@ std::expected<bool, StarException> Player::add_collectable(String const& collect
   if (!message) return std::unexpected(std::move(message.error()));
   if (!m_log->add_collectable(collection_name, collectable_name))
     return false;
-  if (auto queued = queueUIMessage(*message); !queued) return std::unexpected(std::move(queued.error()));
+  if (auto queued = queue_ui_message(*message); !queued) return std::unexpected(std::move(queued.error()));
   return true;
 }
 
@@ -3082,13 +3082,13 @@ std::expected<std::shared_ptr<InteractiveEntity>, StarException> Player::bestInt
   if (!currentWorldResult)
     return std::unexpected(std::move(currentWorldResult.error()));
   auto& currentWorld = currentWorldResult->get();
-  auto entityResult = currentWorld.getInteractiveInRange(m_aimPosition, isAdmin() ? m_aimPosition : position(), m_interactRadius);
+  auto entityResult = currentWorld.getInteractiveInRange(m_aimPosition, is_admin() ? m_aimPosition : position(), m_interactRadius);
   if (!entityResult)
     return std::unexpected(std::move(entityResult.error()));
   auto entity = std::move(*entityResult);
   if (!entity && includeNearby) {
     Vec2F bias = m_walkIntoInteractBias;
-    if (facingDirection() == Direction::Left)
+    if (facing_direction() == Direction::Left)
       bias[0] *= -1;
     auto nearbyResult = currentWorld.getInteractiveInRange(position() + bias, position(), m_interactRadius);
     if (!nearbyResult)
@@ -3098,7 +3098,7 @@ std::expected<std::shared_ptr<InteractiveEntity>, StarException> Player::bestInt
   }
   if (!entity)
     return std::shared_ptr<InteractiveEntity>{};
-  if (isAdmin())
+  if (is_admin())
     return entity;
   auto reachableResult = currentWorld.canReachEntity(position(), m_interactRadius, entity->entityId());
   if (!reachableResult)
@@ -3119,7 +3119,7 @@ std::expected<void, StarException> Player::interact_with_entity(std::shared_ptr<
   if (quest_intercepted)
     return {};
   bool any_turned_in = false;
-  auto turn_ins = entity->turnInQuests();
+  auto turn_ins = entity->turn_in_quests();
   if (!turn_ins)
     return std::unexpected(std::move(turn_ins.error()));
   for (auto const& quest_id : *turn_ins) {
@@ -3136,7 +3136,7 @@ std::expected<void, StarException> Player::interact_with_entity(std::shared_ptr<
   }
   if (any_turned_in)
     return {};
-  auto offers = entity->offeredQuests();
+  auto offers = entity->offered_quests();
   if (!offers)
     return std::unexpected(std::move(offers.error()));
   for (auto const& arc : *offers) {
@@ -3169,7 +3169,7 @@ void Player::aim(Vec2F const& position) {
   m_aimPosition = position;
 }
 
-std::expected<Vec2F, StarException> Player::aimPosition() const {
+std::expected<Vec2F, StarException> Player::aim_position() const {
   return m_aimPosition;
 }
 
@@ -3185,22 +3185,22 @@ std::expected<Vec2F, StarException> Player::hand_position(ToolHand hand, Vec2F c
   return humanoid()->hand_position(hand, hand_offset);
 }
 
-std::shared_ptr<Item> Player::handItem(ToolHand hand) const {
+std::shared_ptr<Item> Player::hand_item(ToolHand hand) const {
   if (hand == ToolHand::Primary)
     return m_tools->primaryHandItem();
   else
     return m_tools->altHandItem();
 }
 
-std::expected<Vec2F, StarException> Player::armAdjustment() const {
+std::expected<Vec2F, StarException> Player::arm_adjustment() const {
   return humanoid()->arm_adjustment();
 }
 
-void Player::setCameraFocusEntity(std::optional<EntityId> const& cameraFocusEntity) {
+void Player::set_camera_focus_entity(std::optional<EntityId> const& cameraFocusEntity) {
   m_cameraFocusEntity = cameraFocusEntity;
 }
 
-std::expected<void, StarException> Player::playEmote(HumanoidEmote emote) {
+std::expected<void, StarException> Player::play_emote(HumanoidEmote emote) {
   addEmote(emote);
   return {};
 }
@@ -3255,7 +3255,7 @@ std::expected<float, StarException> Player::toolRadius() const {
   return m_interactRadius;
 }
 
-std::expected<float, StarException> Player::interactRadius() const {
+std::expected<float, StarException> Player::interact_radius() const {
   return m_interactRadius;
 }
 
@@ -3311,7 +3311,7 @@ float Player::health() const {
   return m_statusController->resource("health");
 }
 
-std::expected<float, StarException> Player::maxHealth() const {
+std::expected<float, StarException> Player::max_health() const {
   auto valueResult = m_statusController->resourceMax("health");
   if (!valueResult)
     return std::unexpected(std::move(valueResult.error()));
@@ -3321,7 +3321,7 @@ std::expected<float, StarException> Player::maxHealth() const {
   return *value;
 }
 
-DamageBarType Player::damageBar() const {
+DamageBarType Player::damage_bar() const {
   return DamageBarType::Default;
 }
 
@@ -3369,7 +3369,7 @@ std::expected<float, StarException> Player::energyRegenBlockPercent() const {
   return *value;
 }
 
-std::expected<bool, StarException> Player::fullEnergy() const {
+std::expected<bool, StarException> Player::full_energy() const {
   auto maximumResult = maxEnergy();
   if (!maximumResult)
     return std::unexpected(std::move(maximumResult.error()));
@@ -3377,11 +3377,11 @@ std::expected<bool, StarException> Player::fullEnergy() const {
   return m_statusController->resource("energy") >= maximum;
 }
 
-std::expected<bool, StarException> Player::energyLocked() const {
+std::expected<bool, StarException> Player::energy_locked() const {
   return m_statusController->resourceLocked("energy");
 }
 
-std::expected<bool, StarException> Player::consumeEnergy(float energy) {
+std::expected<bool, StarException> Player::consume_energy(float energy) {
   if (m_isAdmin)
     return true;
   return m_statusController->overConsumeResource("energy", energy);
@@ -3427,11 +3427,11 @@ void Player::setDescription(String const& description) {
   m_description = description;
 }
 
-Direction Player::walkingDirection() const {
+Direction Player::walking_direction() const {
   return m_movement_controller->moving_direction();
 }
 
-Direction Player::facingDirection() const {
+Direction Player::facing_direction() const {
   return m_movement_controller->facing_direction();
 }
 
@@ -3855,7 +3855,7 @@ std::expected<bool, StarException> Player::inInteractionRange() const {
 }
 
 std::expected<bool, StarException> Player::inInteractionRange(Vec2F aimPos) const {
-  if (isAdmin())
+  if (is_admin())
     return true;
   auto currentWorldResult = world();
   if (!currentWorldResult)
@@ -3864,12 +3864,12 @@ std::expected<bool, StarException> Player::inInteractionRange(Vec2F aimPos) cons
   return currentWorld.geometry().diff(aimPos, position()).magnitude() < m_interactRadius;
 }
 
-std::expected<bool, StarException> Player::inToolRange() const {
-  return inToolRange(center_of_tile(m_aimPosition));
+std::expected<bool, StarException> Player::in_tool_range() const {
+  return in_tool_range(center_of_tile(m_aimPosition));
 }
 
-std::expected<bool, StarException> Player::inToolRange(Vec2F const& aimPos) const {
-  if (isAdmin())
+std::expected<bool, StarException> Player::in_tool_range(Vec2F const& aimPos) const {
+  if (is_admin())
     return true;
   auto currentWorldResult = world();
   if (!currentWorldResult)
@@ -4058,7 +4058,7 @@ void Player::setAdmin(bool isAdmin) {
   m_isAdmin = isAdmin;
 }
 
-bool Player::isAdmin() const {
+bool Player::is_admin() const {
   return m_isAdmin;
 }
 
@@ -4067,7 +4067,7 @@ std::expected<void, StarException> Player::setFavoriteColor(Color color) {
   return updateIdentity();
 }
 
-Color Player::favoriteColor() const {
+Color Player::favorite_color() const {
   return Color::rgba(m_identity.color);
 }
 
@@ -4268,15 +4268,15 @@ std::expected<void, StarException> Player::setName(String const& name) {
   return updateIdentity();
 }
 
-std::optional<String> Player::statusText() const {
+std::optional<String> Player::status_text() const {
   return {};
 }
 
-bool Player::displayNametag() const {
+bool Player::display_nametag() const {
   return true;
 }
 
-std::expected<Vec3B, StarException> Player::nametagColor() const {
+std::expected<Vec3B, StarException> Player::nametag_color() const {
   auto assetsResult = root().assets();
   if (!assetsResult)
     return std::unexpected(std::move(assetsResult.error()));
@@ -4288,7 +4288,7 @@ std::expected<Vec3B, StarException> Player::nametagColor() const {
   return json_to_vec3b(color);
 }
 
-std::expected<Vec2F, StarException> Player::nametagOrigin() const {
+std::expected<Vec2F, StarException> Player::nametag_origin() const {
   return mouth_position(false);
 }
 
@@ -4447,7 +4447,7 @@ List<String> Player::pullQueuedMessages() { return std::exchange(m_queuedMessage
 
 List<std::shared_ptr<Item>> Player::pullQueuedItemDrops() { return std::exchange(m_queuedItemPickups, {}); }
 
-std::expected<void, StarException> Player::queueUIMessage(String const& message) {
+std::expected<void, StarException> Player::queue_ui_message(String const& message) {
   if (!isSlave())
     m_queuedMessages.push_back(message);
   return {};
@@ -4511,15 +4511,15 @@ std::expected<std::optional<String>, StarException> Player::inspectionDescriptio
   return m_description;
 }
 
-std::expected<float, StarException> Player::beamGunRadius() const {
+std::expected<float, StarException> Player::beam_gun_radius() const {
   return m_tools->beamGunRadius();
 }
 
-std::expected<bool, StarException> Player::instrumentPlaying() {
+std::expected<bool, StarException> Player::instrument_playing() {
   return m_songbook->instrumentPlaying();
 }
 
-std::expected<void, StarException> Player::instrumentEquipped(String const& instrumentKind) {
+std::expected<void, StarException> Player::instrument_equipped(String const& instrumentKind) {
   if (canUseTool()) {
     auto mouthResult = mouth_position();
     if (!mouthResult)
@@ -4538,7 +4538,7 @@ std::expected<void, StarException> Player::interact(InteractAction action) {
   return {};
 }
 
-std::expected<void, StarException> Player::addEffectEmitters(StringSet const& emitters) {
+std::expected<void, StarException> Player::add_effect_emitters(StringSet const& emitters) {
   if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((!isSlave()));
   }
@@ -4546,7 +4546,7 @@ std::expected<void, StarException> Player::addEffectEmitters(StringSet const& em
   return {};
 }
 
-std::expected<void, StarException> Player::requestEmote(String const& emote) {
+std::expected<void, StarException> Player::request_emote(String const& emote) {
   if (!humanoid_emote_names)
     return std::unexpected(humanoid_emote_names.error());
   auto stateResult = humanoid_emote_names->get_left(emote);
@@ -4562,7 +4562,7 @@ ActorMovementController& Player::movement_controller() {
   return *m_movement_controller;
 }
 
-StatusController& Player::statusController() {
+StatusController& Player::status_controller() {
   return *m_statusController;
 }
 

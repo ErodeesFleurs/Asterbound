@@ -218,7 +218,7 @@ std::expected<void, StarException> TillingTool::fire(FireMode mode, bool shiftin
   auto database = root().material_database();
   if (!database)
     return std::unexpected(std::move(database.error()));
-  auto aimPosition = itemOwner->get().aimPosition();
+  auto aimPosition = itemOwner->get().aim_position();
   if (!aimPosition)
     return std::unexpected(std::move(aimPosition.error()));
   Vec2I pos(aimPosition->floor());
@@ -230,9 +230,9 @@ std::expected<void, StarException> TillingTool::fire(FireMode mode, bool shiftin
       pos = pos - Vec2I(0, 1);
     if (layer == TileLayer::Background && itemWorld->get().material(pos + Vec2I(0, 1), TileLayer::Background) != empty_material_id)
       continue;
-    bool inRange = itemOwner->get().isAdmin();
+    bool inRange = itemOwner->get().is_admin();
     if (!inRange) {
-      auto range = itemOwner->get().inToolRange();
+      auto range = itemOwner->get().in_tool_range();
       if (!range)
         return std::unexpected(std::move(range.error()));
       inRange = *range;
@@ -268,7 +268,7 @@ std::expected<void, StarException> TillingTool::fire(FireMode mode, bool shiftin
     }
   }
   if (used) {
-    auto sound = itemOwner->get().addSound(strikeSound, m_toolVolume);
+    auto sound = itemOwner->get().add_sound(strikeSound, m_toolVolume);
     if (!sound)
       return std::unexpected(std::move(sound.error()));
     return SwingableItem::fire(mode, shifting, edgeTriggered);

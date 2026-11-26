@@ -116,10 +116,114 @@ import star.entity_splash;
 import star.net_compatibility;
 namespace Star {
 
-NpcDatabase::NpcDatabase(Root& root) : m_root(root) {}
+namespace {
+
+std::expected<void, StarException> read_script_config(NpcVariant& variant, Json const& config, bool generating = false) {
+  auto scripts = config.get("scripts").and_then(json_to_string_list);
+  if (!scripts) return std::unexpected(std::move(scripts.error()));
+  if (generating) {
+    auto initial_script_delta = config.get_uint("initialScriptDelta", 5);
+    if (!initial_script_delta) return std::unexpected(std::move(initial_script_delta.error()));
+    variant.initial_script_delta = *initial_script_delta;
+  }
+  auto script_config = config.get("scriptConfig");
+  if (!script_config) return std::unexpected(std::move(script_config.error()));
+  variant.scripts = std::move(*scripts);
+  variant.script_config = std::move(*script_config);
+  return {};
+}
+
+std::expected<void, StarException> read_movement_and_status(Root& root, NpcVariant& variant, Json const& config, bool disk = false) {
+  auto movement = config.get("movementParameters", {});
+  if (!movement) return std::unexpected(std::move(movement.error()));
+  auto status = disk ? config.get("statusControllerSettings", {}) : config.get("statusControllerSettings");
+  if (!status) return std::unexpected(std::move(status.error()));
+  auto functions = root.functionDatabase();
+  if (!functions) return std::unexpected(std::move(functions.error()));
+  auto multiplier = [&](String const& name) -> std::expected<float, StarException> {
+    auto function = (*functions)->function(name);
+    if (!function) return std::unexpected(std::move(function.error()));
+    return (*function)->evaluate(variant.level);
+  };
+  auto power = multiplier("npcLevelPowerMultiplierModifier");
+  if (!power) return std::unexpected(std::move(power.error()));
+  auto protection = multiplier("npcLevelProtectionMultiplier");
+  if (!protection) return std::unexpected(std::move(protection.error()));
+  auto health = multiplier("npcLevelHealthMultiplier");
+  if (!health) return std::unexpected(std::move(health.error()));
+  auto energy = multiplier("npcLevelEnergyMultiplier");
+  if (!energy) return std::unexpected(std::move(energy.error()));
+  auto effects = config.get("innateStatusEffects", JsonArray()).and_then([](Json const& effects) {
+    return json_to_list<PersistentStatusEffect>(effects, jsonToPersistentStatusEffect);
+  });
+  if (!effects) return std::unexpected(std::move(effects.error()));
+  auto touch_damage = config.get("touchDamage", {});
+  if (!touch_damage) return std::unexpected(std::move(touch_damage.error()));
+
+  effects->push_back(StatModifier(StatValueModifier{"powerMultiplier", *power}));
+  effects->push_back(StatModifier(StatBaseMultiplier{"protection", *protection}));
+  effects->push_back(StatModifier(StatBaseMultiplier{"maxHealth", *health}));
+  effects->push_back(StatModifier(StatBaseMultiplier{"maxEnergy", *energy}));
+  variant.movement_parameters = std::move(*movement);
+  variant.status_controller_settings = std::move(*status);
+  variant.innate_status_effects = std::move(*effects);
+  variant.touch_damage_config = std::move(*touch_damage);
+  return {};
+}
+
+std::expected<void, StarException> read_appearance(NpcVariant& variant, Json const& config) {
+  auto disable_worn_armor = config.get_bool("disableWornArmor", true);
+  if (!disable_worn_armor) return std::unexpected(std::move(disable_worn_armor.error()));
+  auto drop_pools = config.get("dropPools", JsonArray{}).and_then(json_to_string_list);
+  if (!drop_pools) return std::unexpected(std::move(drop_pools.error()));
+  variant.disable_worn_armor = *disable_worn_armor;
+  variant.drop_pools = std::move(*drop_pools);
+  return {};
+}
+
+std::expected<void, StarException> read_display(Root& root, NpcVariant& variant, Json const& config) {
+  auto color = config.get("nametagColor", JsonArray{255, 255, 255}).and_then(json_to_vec3b);
+  if (!color) return std::unexpected(std::move(color.error()));
+  auto splash_config = config.get("splashConfig");
+  if (!splash_config) return std::unexpected(std::move(splash_config.error()));
+  auto splash = EntitySplashConfig::create(root, std::move(*splash_config));
+  if (!splash) return std::unexpected(std::move(splash.error()));
+  variant.nametag_color = *color;
+  variant.splash_config = std::move(*splash);
+  return {};
+}
+
+std::expected<void, StarException> read_humanoid_config(Root& root, NpcVariant& variant, Json const& config) {
+  auto species_database = root.speciesDatabase();
+  if (!species_database) return std::unexpected(std::move(species_database.error()));
+  auto species = (*species_database)->species(variant.species);
+  if (!species) return std::unexpected(std::move(species.error()));
+  auto unique = config.contains("humanoidConfig");
+  if (!unique) return std::unexpected(std::move(unique.error()));
+  auto humanoid_config = [&]() -> std::expected<Json, StarException> {
+    if (!*unique)
+      return (*species)->humanoid_config();
+    auto assets = root.assets();
+    if (!assets) return std::unexpected(std::move(assets.error()));
+    auto path = config.get_string("humanoidConfig");
+    if (!path) return std::unexpected(std::move(path.error()));
+    auto value = (*assets)->json(*path);
+    if (!value)
+      return std::unexpected((*assets)->with_asset_context(std::move(value.error()), *path, "Loading NPC humanoid configuration"));
+    return value;
+  }();
+  if (!humanoid_config) return std::unexpected(std::move(humanoid_config.error()));
+  variant.unique_humanoid_config = *unique;
+  variant.humanoid_config = std::move(*humanoid_config);
+  return {};
+}
+
+}
+
+NpcDatabase::NpcDatabase(ConstructionKey, Root& root) : m_root(root) {}
 
 std::expected<std::shared_ptr<NpcDatabase>, StarException> NpcDatabase::create(Root& root) {
-  auto database = std::shared_ptr<NpcDatabase>(new NpcDatabase(root));
+  auto database = std::make_shared<NpcDatabase>(ConstructionKey{}, root);
   auto initialized = database->initialize();
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
@@ -140,20 +244,21 @@ if (!result2) return std::unexpected(std::move(result2.error()));
 auto& files = result2->get();
   auto result3 = assets->queue_jsons(files);
 if (!result3) return std::unexpected(std::move(result3.error()));
-  for (auto const& assetFile : files) {
-    auto const& file = assetFile.string();
-    auto loaded = [&, &types = m_npcTypes]() -> std::expected<void, StarException> {
+  for (auto const& asset_file : files) {
+    auto const& file = asset_file.string();
+    auto loaded = [&, &types = m_npc_types]() -> std::expected<void, StarException> {
       auto result4 = assets->json(file);
 if (!result4) return std::unexpected(std::move(result4.error()));
 auto config = std::move(*result4);
       auto result5 = config.get_string("type");
 if (!result5) return std::unexpected(std::move(result5.error()));
-String typeName = std::move(*result5);
+String type_name = std::move(*result5);
 
-      if (types.contains(typeName))
-        return std::unexpected(NpcException(Star::format("Repeat npc type name '{}'", typeName)));
+      if (types.contains(type_name))
+        return std::unexpected(NpcException(Star::format("Repeat npc type name '{}'", type_name)));
 
-      types[typeName] = config;
+      auto base_type = config.get_string("baseType", "");
+      types.emplace(std::move(type_name), TypeConfig{std::move(config), std::move(base_type)});
 
       return {};
     }();
@@ -163,21 +268,21 @@ String typeName = std::move(*result5);
   return {};
 }
 
-std::expected<NpcVariant, StarException> NpcDatabase::generateNpcVariant(String const& species, String const& typeName, float level, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog) const {
-  return generateNpcVariant(species, typeName, level, m_root.random().next_u64(), {}, itemCatalog);
+std::expected<NpcVariant, StarException> NpcDatabase::generate_npc_variant(String const& species, String const& type_name, float level, std::optional<std::reference_wrapper<ItemDatabase const>> item_catalog) const {
+  return generate_npc_variant(species, type_name, level, m_root.random().next_u64(), {}, item_catalog);
 }
 
-std::expected<NpcVariant, StarException> NpcDatabase::generateNpcVariant(
-    String const& species, String const& typeName, float level, std::uint64_t seed, Json const& overrides, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog) const {
+std::expected<NpcVariant, StarException> NpcDatabase::generate_npc_variant(
+    String const& species, String const& type_name, float level, std::uint64_t seed, Json const& overrides, std::optional<std::reference_wrapper<ItemDatabase const>> item_catalog) const {
   NpcVariant variant;
   variant.species = species;
-  variant.typeName = typeName;
+  variant.type_name = type_name;
   variant.seed = seed;
   variant.overrides = overrides;
 
-  RandomSource randSource(seed);
+  RandomSource rand_source(seed);
 
-  auto result6 = buildConfig(typeName, overrides);
+  auto result6 = build_config(type_name, overrides);
 if (!result6) return std::unexpected(std::move(result6.error()));
 auto config = std::move(*result6);
 
@@ -189,37 +294,28 @@ variant.description = std::move(*result7);
 if (!result8) return std::unexpected(std::move(result8.error()));
 auto result9 = json_to_vec2f(std::move(*result8));
 if (!result9) return std::unexpected(std::move(result9.error()));
-auto levelVariance = std::move(*result9);
-  auto result10 = randSource.uniform_float(level + levelVariance[0], level + levelVariance[1]);
+auto level_variance = std::move(*result9);
+  auto result10 = rand_source.uniform_float(level + level_variance[0], level + level_variance[1]);
 if (!result10) return std::unexpected(std::move(result10.error()));
 variant.level = std::max(std::move(*result10), 0.0f);
 
-  auto result11 = config.get("scripts");
-if (!result11) return std::unexpected(std::move(result11.error()));
-auto result12 = json_to_string_list(std::move(*result11));
-if (!result12) return std::unexpected(std::move(result12.error()));
-variant.scripts = std::move(*result12);
-  auto result13 = config.get_uint("initialScriptDelta", 5);
-if (!result13) return std::unexpected(std::move(result13.error()));
-variant.initialScriptDelta = std::move(*result13);
-  auto result14 = config.get("scriptConfig");
-if (!result14) return std::unexpected(std::move(result14.error()));
-variant.scriptConfig = std::move(*result14);
+  auto scripts = read_script_config(variant, config, true);
+  if (!scripts) return std::unexpected(std::move(scripts.error()));
 
   auto result15 = m_root.speciesDatabase();
 if (!result15) return std::unexpected(std::move(result15.error()));
-auto speciesDatabase = std::move(*result15);
-  auto result16 = speciesDatabase->species(species);
+auto species_database = std::move(*result15);
+  auto result16 = species_database->species(species);
 if (!result16) return std::unexpected(std::move(result16.error()));
-auto speciesDefinition = std::move(*result16);
-  auto result17 = speciesDatabase->generate_humanoid(species, seed, {}, itemCatalog);
+auto species_definition = std::move(*result16);
+  auto result17 = species_database->generate_humanoid(species, seed, {}, item_catalog);
 if (!result17) return std::unexpected(std::move(result17.error()));
 auto result = std::move(*result17);
   HumanoidIdentity identity = result.identity;
 
   auto result18 = config.get_object("humanoidParameters", JsonObject());
 if (!result18) return std::unexpected(std::move(result18.error()));
-auto result19 = json_merge(result.humanoid_parameters, std::move(*result18)).to_object();
+auto result19 = json_merge_object(result.humanoid_parameters, *result18);
 if (!result19) return std::unexpected(std::move(result19.error()));
 variant.humanoid_parameters = std::move(*result19);
 
@@ -241,8 +337,8 @@ variant.humanoid_parameters = std::move(*result19);
       if (!rules_by_gender) return std::unexpected(std::move(rules_by_gender.error()));
       auto gender_index = static_cast<std::size_t>(identity.gender);
       if (gender_index >= rules_by_gender->size())
-        return std::unexpected(NpcException::format("NPC type '{}' nameGen has no entry for gender index {}", typeName, gender_index));
-      auto name = (*generator)->generate_name((*rules_by_gender)[gender_index], randSource);
+        return std::unexpected(NpcException::format("NPC type '{}' nameGen has no entry for gender index {}", type_name, gender_index));
+      auto name = (*generator)->generate_name((*rules_by_gender)[gender_index], rand_source);
       if (!name) return std::unexpected(std::move(name.error()));
       identity.name = std::move(*name);
     }
@@ -274,27 +370,27 @@ variant.unique_humanoid_config = std::move(*result31);
 if (!result32) return std::unexpected(std::move(result32.error()));
 auto result33 = config.get_string("humanoidConfig");
 if (!result33) return std::unexpected(std::move(result33.error()));
-    auto humanoidLoaded = [&]() -> std::expected<void, StarException> {
+    auto humanoid_loaded = [&]() -> std::expected<void, StarException> {
 auto result34 = (*result32)->json(*result33);
 if (!result34) return std::unexpected(std::move(result34.error()));
 variant.humanoid_config = std::move(*result34);
-    auto result35 = speciesDatabase->humanoid_config(identity, variant.humanoid_parameters, variant.humanoid_config, itemCatalog);
+    auto result35 = species_database->humanoid_config(identity, variant.humanoid_parameters, variant.humanoid_config, item_catalog);
 if (!result35) return std::unexpected(std::move(result35.error()));
-auto usedHumanoidConfig = std::move(*result35);
+auto used_humanoid_config = std::move(*result35);
     // this only needs to be done if the npc has a unique humanoid config, otherwise the output from generateHumanoid should be fine
-    auto result36 = usedHumanoidConfig.get_array("personalities");
+    auto result36 = used_humanoid_config.get_array("personalities");
 if (!result36) return std::unexpected(std::move(result36.error()));
-auto result37 = randSource.sample_ref(*result36);
+auto result37 = rand_source.sample_ref(*result36);
 if (!result37) return std::unexpected(std::move(result37.error()));
 auto result38 = parse_personality_array(result37->get());
 if (!result38) return std::unexpected(std::move(result38.error()));
 identity.personality = std::move(*result38);
     return {};
     }();
-    if (!humanoidLoaded)
-      return std::unexpected((*result32)->with_asset_context(std::move(humanoidLoaded.error()), *result33, "Loading NPC humanoid configuration"));
+    if (!humanoid_loaded)
+      return std::unexpected((*result32)->with_asset_context(std::move(humanoid_loaded.error()), *result33, "Loading NPC humanoid configuration"));
   } else {
-    auto result39 = speciesDefinition->humanoid_config();
+    auto result39 = species_definition->humanoid_config();
 if (!result39) return std::unexpected(std::move(result39.error()));
 variant.humanoid_config = std::move(*result39);
   }
@@ -315,113 +411,71 @@ variant.humanoid_config = std::move(*result39);
   }
 }
 
-  variant.humanoid_identity = identity;
+  variant.humanoid_identity = std::move(identity);
 
-  auto result44 = config.get("movementParameters", {});
-if (!result44) return std::unexpected(std::move(result44.error()));
-variant.movementParameters = std::move(*result44);
-  auto result45 = config.get("statusControllerSettings");
-if (!result45) return std::unexpected(std::move(result45.error()));
-variant.statusControllerSettings = std::move(*result45);
-
-  auto result46 = m_root.functionDatabase();
-if (!result46) return std::unexpected(std::move(result46.error()));
-auto functionDatabase = std::move(*result46);
-  auto result47 = functionDatabase->function("npcLevelPowerMultiplierModifier");
-if (!result47) return std::unexpected(std::move(result47.error()));
-auto result48 = std::move(*result47)->evaluate(variant.level);
-if (!result48) return std::unexpected(std::move(result48.error()));
-float powerMultiplierModifier = std::move(*result48);
-  auto result49 = functionDatabase->function("npcLevelProtectionMultiplier");
-if (!result49) return std::unexpected(std::move(result49.error()));
-auto result50 = std::move(*result49)->evaluate(variant.level);
-if (!result50) return std::unexpected(std::move(result50.error()));
-float protectionMultiplier = std::move(*result50);
-  auto result51 = functionDatabase->function("npcLevelHealthMultiplier");
-if (!result51) return std::unexpected(std::move(result51.error()));
-auto result52 = std::move(*result51)->evaluate(variant.level);
-if (!result52) return std::unexpected(std::move(result52.error()));
-float maxHealthMultiplier = std::move(*result52);
-  auto result53 = functionDatabase->function("npcLevelEnergyMultiplier");
-if (!result53) return std::unexpected(std::move(result53.error()));
-auto result54 = std::move(*result53)->evaluate(variant.level);
-if (!result54) return std::unexpected(std::move(result54.error()));
-float maxEnergyMultiplier = std::move(*result54);
-
-  auto result55 = config.get("innateStatusEffects", JsonArray());
-if (!result55) return std::unexpected(std::move(result55.error()));
-auto result56 = json_to_list<PersistentStatusEffect>(std::move(*result55), jsonToPersistentStatusEffect);
-if (!result56) return std::unexpected(std::move(result56.error()));
-variant.innateStatusEffects = std::move(*result56);
-variant.innateStatusEffects.push_back(StatModifier(StatValueModifier{"powerMultiplier", powerMultiplierModifier}));
-variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"protection", protectionMultiplier}));
-variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"maxHealth", maxHealthMultiplier}));
-variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"maxEnergy", maxEnergyMultiplier}));
-
-auto result57 = config.get("touchDamage", {});
-if (!result57) return std::unexpected(std::move(result57.error()));
-variant.touchDamageConfig = std::move(*result57);
+  auto movement_and_status = read_movement_and_status(m_root, variant, config);
+  if (!movement_and_status) return std::unexpected(std::move(movement_and_status.error()));
 
   auto result58 = config.get("items", {});
 if (!result58) return std::unexpected(std::move(result58.error()));
-auto itemsConfig = std::move(*result58);
-  if (!itemsConfig.is_null()) {
-    auto result59 = itemsConfig.get("override", {});
+auto items_config = std::move(*result58);
+  if (!items_config.is_null()) {
+    auto result59 = items_config.get("override", {});
 if (!result59) return std::unexpected(std::move(result59.error()));
-auto speciesItemsConfig = std::move(*result59);
-    if (speciesItemsConfig.is_null())
+auto species_items_config = std::move(*result59);
+    if (species_items_config.is_null())
       {
-  auto result60 = itemsConfig.get(species, {});
+  auto result60 = items_config.get(species, {});
   if (!result60) return std::unexpected(std::move(result60.error()));
-  speciesItemsConfig = std::move(*result60);
+  species_items_config = std::move(*result60);
 }
-    if (speciesItemsConfig.is_null())
+    if (species_items_config.is_null())
       {
-  auto result61 = itemsConfig.get("default", {});
+  auto result61 = items_config.get("default", {});
   if (!result61) return std::unexpected(std::move(result61.error()));
-  speciesItemsConfig = std::move(*result61);
+  species_items_config = std::move(*result61);
 }
 
-    if (!speciesItemsConfig.is_null()) {
-      Json highestLevelItemsConfig;
+    if (!species_items_config.is_null()) {
+      Json highest_level_items_config;
       {
-        auto result62 = speciesItemsConfig.iterate_array();
+        auto result62 = species_items_config.iterate_array();
         if (!result62)
           return std::unexpected(std::move(result62.error()));
-        for (auto const& levelItemsConfig : *result62) {
+        for (auto const& level_items_config : *result62) {
           {
-    auto result63 = levelItemsConfig.get_float(0);
+    auto result63 = level_items_config.get_float(0);
     if (!result63) return std::unexpected(std::move(result63.error()));
     if (variant.level >= std::move(*result63)) {
-              auto result64 = levelItemsConfig.get(1);
+              auto result64 = level_items_config.get(1);
     if (!result64) return std::unexpected(std::move(result64.error()));
-    highestLevelItemsConfig = std::move(*result64);
+    highest_level_items_config = std::move(*result64);
             }
   }
         }
 }
 
-      if (!highestLevelItemsConfig.is_null()) {
-        int randomColorIndex = -1;
+      if (!highest_level_items_config.is_null()) {
+        int random_color_index = -1;
         auto result65 = config.get_bool("matchColorIndices", false);
 if (!result65) return std::unexpected(std::move(result65.error()));
-bool matchColorIndices = std::move(*result65);
+bool match_color_indices = std::move(*result65);
 
         {
-          auto result66 = highestLevelItemsConfig.array_ptr();
+          auto result66 = highest_level_items_config.array_ptr();
           if (!result66)
             return std::unexpected(std::move(result66.error()));
-          auto result67 = randSource.sample_ref(**result66);
+          auto result67 = rand_source.sample_ref(**result66);
           if (!result67)
             return std::unexpected(std::move(result67.error()));
-          auto result68 = result67->get().to_object();
+          auto result68 = result67->get().iterate_object();
           if (!result68)
             return std::unexpected(std::move(result68.error()));
-          for (auto const& itemSlotConfig : std::move(*result68)) {
-            auto result69 = itemSlotConfig.second.array_ptr();
+          for (auto const& item_slot_config : *result68) {
+            auto result69 = item_slot_config.second.array_ptr();
             if (!result69)
               return std::unexpected(std::move(result69.error()));
-            auto result70 = randSource.sample_ref(**result69);
+            auto result70 = rand_source.sample_ref(**result69);
             if (!result70)
               return std::unexpected(std::move(result70.error()));
             auto result71 = ItemDescriptor::create(result70->get());
@@ -436,86 +490,70 @@ bool matchColorIndices = std::move(*result65);
     if (std::move(*result72)) {
                 auto result73 = item.parameters().get("colorIndex");
     if (!result73) return std::unexpected(std::move(result73.error()));
-    auto colorIndex = std::move(*result73);
-                if (colorIndex.is_type(Json::Type::Array)) {
-                  if (!matchColorIndices || randomColorIndex == -1)
+    auto color_index = std::move(*result73);
+                if (color_index.is_type(Json::Type::Array)) {
+                  if (!match_color_indices || random_color_index == -1)
                     {
-                    auto result74 = colorIndex.array_ptr();
+                    auto result74 = color_index.array_ptr();
                     if (!result74)
                       return std::unexpected(std::move(result74.error()));
-                    auto result75 = randSource.sample_ref(**result74);
+                    auto result75 = rand_source.sample_ref(**result74);
                     if (!result75)
                       return std::unexpected(std::move(result75.error()));
                     auto result76 = result75->get().to_int();
                     if (!result76)
                       return std::unexpected(std::move(result76.error()));
-                    randomColorIndex = std::move(*result76);
+                    random_color_index = std::move(*result76);
     }
 
-                  auto result77 = item.apply_parameters({{"colorIndex", randomColorIndex}});
+                  auto result77 = item.apply_parameters({{"colorIndex", random_color_index}});
     if (!result77) return std::unexpected(std::move(result77.error()));
     item = std::move(*result77);
                 }
               }
   }
 
-            variant.items[itemSlotConfig.first] = std::move(item);
+            variant.items[item_slot_config.first] = std::move(item);
           }
 }
       }
     }
   }
 
-  auto result78 = config.get_bool("disableWornArmor", true);
-if (!result78) return std::unexpected(std::move(result78.error()));
-variant.disableWornArmor = std::move(*result78);
-
-  auto result79 = config.get("dropPools", JsonArray{});
-if (!result79) return std::unexpected(std::move(result79.error()));
-auto result80 = json_to_string_list(std::move(*result79));
-if (!result80) return std::unexpected(std::move(result80.error()));
-variant.dropPools = std::move(*result80);
+  auto appearance = read_appearance(variant, config);
+  if (!appearance) return std::unexpected(std::move(appearance.error()));
 
   auto result81 = config.get_bool("persistent", false);
 if (!result81) return std::unexpected(std::move(result81.error()));
 variant.persistent = std::move(*result81);
   auto result82 = config.get_bool("keepAlive", false);
 if (!result82) return std::unexpected(std::move(result82.error()));
-variant.keepAlive = std::move(*result82);
+variant.keep_alive = std::move(*result82);
 
   auto result83 = config.get_uint("damageTeam", 0);
 if (!result83) return std::unexpected(std::move(result83.error()));
-variant.damageTeam = std::move(*result83);
+variant.damage_team = std::move(*result83);
   auto result84 = config.get_string("damageTeamType", "enemy");
 if (!result84) return std::unexpected(std::move(result84.error()));
-auto damageTeamType = enum_value<TeamTypeNames>(*result84);
-if (!damageTeamType)
-  return std::unexpected(std::move(damageTeamType.error()));
-variant.damageTeamType = *damageTeamType;
+auto damage_team_type = enum_value<TeamTypeNames>(*result84);
+if (!damage_team_type)
+  return std::unexpected(std::move(damage_team_type.error()));
+variant.damage_team_type = *damage_team_type;
 
-auto result86 = config.get("nametagColor", JsonArray{255, 255, 255});
-if (!result86) return std::unexpected(std::move(result86.error()));
-auto result87 = json_to_vec3b(std::move(*result86));
-if (!result87) return std::unexpected(std::move(result87.error()));
-variant.nametagColor = std::move(*result87);
-
-  auto result88 = config.get("splashConfig");
-if (!result88) return std::unexpected(std::move(result88.error()));
-auto result89 = EntitySplashConfig::create(m_root, std::move(*result88));
-if (!result89) return std::unexpected(std::move(result89.error()));
-  variant.splash_config = std::move(*result89);
+  auto display = read_display(m_root, variant, config);
+  if (!display) return std::unexpected(std::move(display.error()));
 
   return variant;
 }
 
-std::expected<ByteArray, StarException> NpcDatabase::writeNpcVariant(NpcVariant const& variant, NetCompatibilityRules rules) const {
+std::expected<ByteArray, StarException> NpcDatabase::write_npc_variant(NpcVariant const& variant, NetCompatibilityRules rules) const {
   DataStreamBuffer ds;
   ds.set_stream_compatibility_version(rules);
 
   auto result90 = ds.write(variant.species);
 if (!result90) return std::unexpected(std::move(result90.error()));
 
-  auto result91 = ds.write(variant.typeName);
+  auto result91 = ds.write(variant.type_name);
 if (!result91) return std::unexpected(std::move(result91.error()));
 
   auto result92 = ds.write(variant.level);
@@ -528,7 +566,7 @@ if (!result93) return std::unexpected(std::move(result93.error()));
 if (!result94) return std::unexpected(std::move(result94.error()));
 
 
-  auto result95 = ds.write(variant.initialScriptDelta);
+  auto result95 = ds.write(variant.initial_script_delta);
 if (!result95) return std::unexpected(std::move(result95.error()));
 
   auto result96 = ds.write(variant.humanoid_identity);
@@ -550,19 +588,19 @@ if (!result98) return std::unexpected(std::move(result98.error()));
   auto result100 = ds.write(variant.persistent);
 if (!result100) return std::unexpected(std::move(result100.error()));
 
-  auto result101 = ds.write(variant.keepAlive);
+  auto result101 = ds.write(variant.keep_alive);
 if (!result101) return std::unexpected(std::move(result101.error()));
 
-  auto result102 = ds.write(variant.damageTeam);
+  auto result102 = ds.write(variant.damage_team);
 if (!result102) return std::unexpected(std::move(result102.error()));
 
-  auto result103 = ds.write(variant.damageTeamType);
+  auto result103 = ds.write(variant.damage_team_type);
 if (!result103) return std::unexpected(std::move(result103.error()));
 
 return ds.take_data();
 }
 
-std::expected<NpcVariant, StarException> NpcDatabase::readNpcVariant(ByteArray const& data, NetCompatibilityRules rules) const {
+std::expected<NpcVariant, StarException> NpcDatabase::read_npc_variant(ByteArray const& data, NetCompatibilityRules rules) const {
   DataStreamReader ds(data.span());
   ds.set_stream_compatibility_version(rules);
 
@@ -571,7 +609,7 @@ std::expected<NpcVariant, StarException> NpcDatabase::readNpcVariant(ByteArray c
   auto result104 = ds.read(variant.species);
 if (!result104) return std::unexpected(std::move(result104.error()));
 
-  auto result105 = ds.read(variant.typeName);
+  auto result105 = ds.read(variant.type_name);
 if (!result105) return std::unexpected(std::move(result105.error()));
 
   auto result106 = ds.read(variant.level);
@@ -584,21 +622,15 @@ if (!result107) return std::unexpected(std::move(result107.error()));
 if (!result108) return std::unexpected(std::move(result108.error()));
 
 
-  auto result109 = buildConfig(variant.typeName, variant.overrides);
+  auto result109 = build_config(variant.type_name, variant.overrides);
 if (!result109) return std::unexpected(std::move(result109.error()));
 auto config = std::move(*result109);
 
 
-  auto result110 = config.get("scripts");
-if (!result110) return std::unexpected(std::move(result110.error()));
-auto result111 = json_to_string_list(std::move(*result110));
-if (!result111) return std::unexpected(std::move(result111.error()));
-variant.scripts = std::move(*result111);
-  auto result112 = config.get("scriptConfig");
-if (!result112) return std::unexpected(std::move(result112.error()));
-variant.scriptConfig = std::move(*result112);
+  auto scripts = read_script_config(variant, config);
+  if (!scripts) return std::unexpected(std::move(scripts.error()));
 
-  auto result113 = ds.read(variant.initialScriptDelta);
+  auto result113 = ds.read(variant.initial_script_delta);
 if (!result113) return std::unexpected(std::move(result113.error()));
 
   auto result114 = ds.read(variant.humanoid_identity);
@@ -620,152 +652,70 @@ if (!result118) return std::unexpected(std::move(result118.error()));
 variant.description = std::move(*result118);
   }
 
-  auto result119 = m_root.speciesDatabase();
-if (!result119) return std::unexpected(std::move(result119.error()));
-auto speciesDatabase = std::move(*result119);
-  auto result120 = speciesDatabase->species(variant.species);
-if (!result120) return std::unexpected(std::move(result120.error()));
-auto speciesDefinition = std::move(*result120);
-  auto result121 = config.contains("humanoidConfig");
-if (!result121) return std::unexpected(std::move(result121.error()));
-variant.unique_humanoid_config = std::move(*result121);
-  if (variant.unique_humanoid_config)
-    {
-  auto result122 = m_root.assets();
-  if (!result122) return std::unexpected(std::move(result122.error()));
-  auto result123 = config.get_string("humanoidConfig");
-  if (!result123) return std::unexpected(std::move(result123.error()));
-  auto result124 = (*result122)->json(*result123);
-  if (!result124) return std::unexpected((*result122)->with_asset_context(std::move(result124.error()), *result123, "Loading NPC humanoid configuration"));
-  variant.humanoid_config = std::move(*result124);
-}
-  else
-    {
-  auto result125 = speciesDefinition->humanoid_config();
-  if (!result125) return std::unexpected(std::move(result125.error()));
-  variant.humanoid_config = std::move(*result125);
-}
+  auto humanoid_config = read_humanoid_config(m_root, variant, config);
+  if (!humanoid_config) return std::unexpected(std::move(humanoid_config.error()));
 
-  auto result126 = config.get("movementParameters", {});
-if (!result126) return std::unexpected(std::move(result126.error()));
-variant.movementParameters = std::move(*result126);
-  auto result127 = config.get("statusControllerSettings");
-if (!result127) return std::unexpected(std::move(result127.error()));
-variant.statusControllerSettings = std::move(*result127);
-
-  auto result128 = m_root.functionDatabase();
-if (!result128) return std::unexpected(std::move(result128.error()));
-auto functionDatabase = std::move(*result128);
-  auto result129 = functionDatabase->function("npcLevelPowerMultiplierModifier");
-if (!result129) return std::unexpected(std::move(result129.error()));
-auto result130 = std::move(*result129)->evaluate(variant.level);
-if (!result130) return std::unexpected(std::move(result130.error()));
-float powerMultiplierModifier =
-      std::move(*result130);
-  auto result131 = functionDatabase->function("npcLevelProtectionMultiplier");
-if (!result131) return std::unexpected(std::move(result131.error()));
-auto result132 = std::move(*result131)->evaluate(variant.level);
-if (!result132) return std::unexpected(std::move(result132.error()));
-float protectionMultiplier = std::move(*result132);
-  auto result133 = functionDatabase->function("npcLevelHealthMultiplier");
-if (!result133) return std::unexpected(std::move(result133.error()));
-auto result134 = std::move(*result133)->evaluate(variant.level);
-if (!result134) return std::unexpected(std::move(result134.error()));
-float maxHealthMultiplier = std::move(*result134);
-  auto result135 = functionDatabase->function("npcLevelEnergyMultiplier");
-if (!result135) return std::unexpected(std::move(result135.error()));
-auto result136 = std::move(*result135)->evaluate(variant.level);
-if (!result136) return std::unexpected(std::move(result136.error()));
-float maxEnergyMultiplier = std::move(*result136);
-
-  auto result137 = config.get("innateStatusEffects", JsonArray());
-if (!result137) return std::unexpected(std::move(result137.error()));
-auto result138 = json_to_list<PersistentStatusEffect>(std::move(*result137), jsonToPersistentStatusEffect);
-if (!result138) return std::unexpected(std::move(result138.error()));
-variant.innateStatusEffects = std::move(*result138);
-
-variant.innateStatusEffects.push_back(StatModifier(StatValueModifier{"powerMultiplier", powerMultiplierModifier}));
-variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"protection", protectionMultiplier}));
-variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"maxHealth", maxHealthMultiplier}));
-variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"maxEnergy", maxEnergyMultiplier}));
-
-auto result139 = config.get("touchDamage", {});
-if (!result139) return std::unexpected(std::move(result139.error()));
-variant.touchDamageConfig = std::move(*result139);
+  auto movement_and_status = read_movement_and_status(m_root, variant, config);
+  if (!movement_and_status) return std::unexpected(std::move(movement_and_status.error()));
 
 auto result140 = ds.read_map_container(variant.items);
 if (!result140) return std::unexpected(std::move(result140.error()));
 
 
-  auto result141 = config.get_bool("disableWornArmor", true);
-if (!result141) return std::unexpected(std::move(result141.error()));
-variant.disableWornArmor = std::move(*result141);
-  auto result142 = config.get("dropPools", JsonArray{});
-if (!result142) return std::unexpected(std::move(result142.error()));
-auto result143 = json_to_string_list(std::move(*result142));
-if (!result143) return std::unexpected(std::move(result143.error()));
-variant.dropPools = std::move(*result143);
+  auto appearance = read_appearance(variant, config);
+  if (!appearance) return std::unexpected(std::move(appearance.error()));
 
   auto result144 = ds.read(variant.persistent);
 if (!result144) return std::unexpected(std::move(result144.error()));
 
-  auto result145 = ds.read(variant.keepAlive);
+  auto result145 = ds.read(variant.keep_alive);
 if (!result145) return std::unexpected(std::move(result145.error()));
 
-  auto result146 = ds.read(variant.damageTeam);
+  auto result146 = ds.read(variant.damage_team);
 if (!result146) return std::unexpected(std::move(result146.error()));
 
-  auto result147 = ds.read(variant.damageTeamType);
+  auto result147 = ds.read(variant.damage_team_type);
 if (!result147) return std::unexpected(std::move(result147.error()));
 
 
-  auto result148 = config.get("nametagColor", JsonArray{255, 255, 255});
-if (!result148) return std::unexpected(std::move(result148.error()));
-auto result149 = json_to_vec3b(std::move(*result148));
-if (!result149) return std::unexpected(std::move(result149.error()));
-variant.nametagColor = std::move(*result149);
-
-  auto result150 = config.get("splashConfig");
-if (!result150) return std::unexpected(std::move(result150.error()));
-auto result151 = EntitySplashConfig::create(m_root, std::move(*result150));
-if (!result151) return std::unexpected(std::move(result151.error()));
-  variant.splash_config = std::move(*result151);
+  auto display = read_display(m_root, variant, config);
+  if (!display) return std::unexpected(std::move(display.error()));
 
   return variant;
 }
 
-std::expected<Json, StarException> NpcDatabase::writeNpcVariantToJson(NpcVariant const& variant) const {
+std::expected<Json, StarException> NpcDatabase::write_npc_variant_to_json(NpcVariant const& variant) const {
   auto result152 = m_root.versioningDatabase();
 if (!result152) return std::unexpected(std::move(result152.error()));
-auto versioningDatabase = std::move(*result152);
+auto versioning_database = std::move(*result152);
   auto result153 = variant.humanoid_identity.to_json();
 if (!result153) return std::unexpected(std::move(result153.error()));
-auto result154 = json_from_map_v<StringMap<ItemDescriptor>>(variant.items, [&versioningDatabase](ItemDescriptor const& descriptor) {
-      return descriptor.disk_store(*versioningDatabase);
+auto result154 = json_from_map_v<StringMap<ItemDescriptor>>(variant.items, [&versioning_database](ItemDescriptor const& descriptor) {
+      return descriptor.disk_store(*versioning_database);
     });
 if (!result154) return std::unexpected(std::move(result154.error()));
-auto damageTeamName = enum_name<TeamTypeNames>(variant.damageTeamType);
-if (!damageTeamName)
-  return std::unexpected(std::move(damageTeamName.error()));
+auto damage_team_name = enum_name<TeamTypeNames>(variant.damage_team_type);
+if (!damage_team_name)
+  return std::unexpected(std::move(damage_team_name.error()));
 JsonObject store{{"species", variant.species},
-                 {"typeName", variant.typeName},
+                 {"typeName", variant.type_name},
                  {"level", variant.level},
                  {"seed", variant.seed},
                  {"overrides", variant.overrides},
-                 {"initialScriptDelta", variant.initialScriptDelta},
+                 {"initialScriptDelta", variant.initial_script_delta},
                  {"humanoidIdentity", std::move(*result153)},
                  {"items", std::move(*result154)},
                  {"persistent", variant.persistent},
-                 {"keepAlive", variant.keepAlive},
-                 {"damageTeam", variant.damageTeam},
-                 {"damageTeamType", String(*damageTeamName)},
+                 {"keepAlive", variant.keep_alive},
+                 {"damageTeam", variant.damage_team},
+                 {"damageTeamType", String(*damage_team_name)},
                  {"humanoidParameters", variant.humanoid_parameters}};
 if (variant.description.has_value())
   store.set("description", variant.description.value_or(String{}));
 return store;
 }
 
-std::expected<NpcVariant, StarException> NpcDatabase::readNpcVariantFromJson(Json const& data) const {
+std::expected<NpcVariant, StarException> NpcDatabase::read_npc_variant_from_json(Json const& data) const {
   NpcVariant variant;
 
   auto result156 = data.get_string("species");
@@ -773,7 +723,7 @@ if (!result156) return std::unexpected(std::move(result156.error()));
 variant.species = std::move(*result156);
   auto result157 = data.get_string("typeName");
 if (!result157) return std::unexpected(std::move(result157.error()));
-variant.typeName = std::move(*result157);
+variant.type_name = std::move(*result157);
   auto result158 = data.get_float("level");
 if (!result158) return std::unexpected(std::move(result158.error()));
 variant.level = std::move(*result158);
@@ -784,7 +734,7 @@ variant.seed = std::move(*result159);
 if (!result160) return std::unexpected(std::move(result160.error()));
 variant.overrides = std::move(*result160);
 
-  auto result161 = buildConfig(variant.typeName, variant.overrides);
+  auto result161 = build_config(variant.type_name, variant.overrides);
 if (!result161) return std::unexpected(std::move(result161.error()));
 auto config = std::move(*result161);
 
@@ -792,18 +742,12 @@ auto config = std::move(*result161);
 if (!result162) return std::unexpected(std::move(result162.error()));
 variant.description = std::move(*result162);
 
-  auto result163 = config.get("scripts");
-if (!result163) return std::unexpected(std::move(result163.error()));
-auto result164 = json_to_string_list(std::move(*result163));
-if (!result164) return std::unexpected(std::move(result164.error()));
-variant.scripts = std::move(*result164);
-  auto result165 = config.get("scriptConfig");
-if (!result165) return std::unexpected(std::move(result165.error()));
-variant.scriptConfig = std::move(*result165);
+  auto scripts = read_script_config(variant, config);
+  if (!scripts) return std::unexpected(std::move(scripts.error()));
 
   auto result166 = data.get_int("initialScriptDelta");
 if (!result166) return std::unexpected(std::move(result166.error()));
-variant.initialScriptDelta = std::move(*result166);
+variant.initial_script_delta = std::move(*result166);
   auto result167 = data.get("humanoidIdentity");
 if (!result167) return std::unexpected(std::move(result167.error()));
 auto result168 = HumanoidIdentity::create(std::move(*result167));
@@ -813,152 +757,70 @@ variant.humanoid_identity = std::move(*result168);
 if (!result169) return std::unexpected(std::move(result169.error()));
 variant.humanoid_parameters = std::move(*result169);
 
-  auto result170 = m_root.speciesDatabase();
-if (!result170) return std::unexpected(std::move(result170.error()));
-auto speciesDatabase = std::move(*result170);
-  auto result171 = speciesDatabase->species(variant.species);
-if (!result171) return std::unexpected(std::move(result171.error()));
-auto speciesDefinition = std::move(*result171);
-  auto result172 = config.contains("humanoidConfig");
-if (!result172) return std::unexpected(std::move(result172.error()));
-variant.unique_humanoid_config = std::move(*result172);
-  if (variant.unique_humanoid_config)
-    {
-  auto result173 = m_root.assets();
-  if (!result173) return std::unexpected(std::move(result173.error()));
-  auto result174 = config.get_string("humanoidConfig");
-  if (!result174) return std::unexpected(std::move(result174.error()));
-  auto result175 = (*result173)->json(*result174);
-  if (!result175) return std::unexpected((*result173)->with_asset_context(std::move(result175.error()), *result174, "Loading NPC humanoid configuration"));
-  variant.humanoid_config = std::move(*result175);
-}
-  else
-    {
-  auto result176 = speciesDefinition->humanoid_config();
-  if (!result176) return std::unexpected(std::move(result176.error()));
-  variant.humanoid_config = std::move(*result176);
-}
+  auto humanoid_config = read_humanoid_config(m_root, variant, config);
+  if (!humanoid_config) return std::unexpected(std::move(humanoid_config.error()));
 
 
-  auto result177 = config.get("movementParameters", {});
-if (!result177) return std::unexpected(std::move(result177.error()));
-variant.movementParameters = std::move(*result177);
-  auto result178 = config.get("statusControllerSettings", {});
-if (!result178) return std::unexpected(std::move(result178.error()));
-variant.statusControllerSettings = std::move(*result178);
-
-  auto result179 = m_root.functionDatabase();
-if (!result179) return std::unexpected(std::move(result179.error()));
-auto functionDatabase = std::move(*result179);
-  auto result180 = functionDatabase->function("npcLevelPowerMultiplierModifier");
-if (!result180) return std::unexpected(std::move(result180.error()));
-auto result181 = std::move(*result180)->evaluate(variant.level);
-if (!result181) return std::unexpected(std::move(result181.error()));
-float powerMultiplierModifier =
-      std::move(*result181);
-  auto result182 = functionDatabase->function("npcLevelProtectionMultiplier");
-if (!result182) return std::unexpected(std::move(result182.error()));
-auto result183 = std::move(*result182)->evaluate(variant.level);
-if (!result183) return std::unexpected(std::move(result183.error()));
-float protectionMultiplier = std::move(*result183);
-  auto result184 = functionDatabase->function("npcLevelHealthMultiplier");
-if (!result184) return std::unexpected(std::move(result184.error()));
-auto result185 = std::move(*result184)->evaluate(variant.level);
-if (!result185) return std::unexpected(std::move(result185.error()));
-float maxHealthMultiplier = std::move(*result185);
-  auto result186 = functionDatabase->function("npcLevelEnergyMultiplier");
-if (!result186) return std::unexpected(std::move(result186.error()));
-auto result187 = std::move(*result186)->evaluate(variant.level);
-if (!result187) return std::unexpected(std::move(result187.error()));
-float maxEnergyMultiplier = std::move(*result187);
-
-  auto result188 = config.get("innateStatusEffects", JsonArray());
-if (!result188) return std::unexpected(std::move(result188.error()));
-auto result189 = json_to_list<PersistentStatusEffect>(std::move(*result188), jsonToPersistentStatusEffect);
-if (!result189) return std::unexpected(std::move(result189.error()));
-variant.innateStatusEffects = std::move(*result189);
-
-variant.innateStatusEffects.push_back(StatModifier(StatValueModifier{"powerMultiplier", powerMultiplierModifier}));
-variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"protection", protectionMultiplier}));
-variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"maxHealth", maxHealthMultiplier}));
-variant.innateStatusEffects.push_back(StatModifier(StatBaseMultiplier{"maxEnergy", maxEnergyMultiplier}));
-
-auto result190 = config.get("touchDamage", {});
-if (!result190) return std::unexpected(std::move(result190.error()));
-variant.touchDamageConfig = std::move(*result190);
+  auto movement_and_status = read_movement_and_status(m_root, variant, config, true);
+  if (!movement_and_status) return std::unexpected(std::move(movement_and_status.error()));
 
   auto result191 = m_root.versioningDatabase();
 if (!result191) return std::unexpected(std::move(result191.error()));
-auto versioningDatabase = std::move(*result191);
+auto versioning_database = std::move(*result191);
   auto result192 = data.get("items");
 if (!result192) return std::unexpected(std::move(result192.error()));
-auto result193 = json_to_map_v<StringMap<ItemDescriptor>>(std::move(*result192), [&versioningDatabase](Json const& descriptor) {
-    return ItemDescriptor::load_store(*versioningDatabase, descriptor);
+auto result193 = json_to_map_v<StringMap<ItemDescriptor>>(std::move(*result192), [&versioning_database](Json const& descriptor) {
+    return ItemDescriptor::load_store(*versioning_database, descriptor);
   });
 if (!result193) return std::unexpected(std::move(result193.error()));
 variant.items = std::move(*result193);
 
-  auto result194 = config.get_bool("disableWornArmor", true);
-if (!result194) return std::unexpected(std::move(result194.error()));
-variant.disableWornArmor = std::move(*result194);
-  auto result195 = config.get("dropPools", JsonArray{});
-if (!result195) return std::unexpected(std::move(result195.error()));
-auto result196 = json_to_string_list(std::move(*result195));
-if (!result196) return std::unexpected(std::move(result196.error()));
-variant.dropPools = std::move(*result196);
+  auto appearance = read_appearance(variant, config);
+  if (!appearance) return std::unexpected(std::move(appearance.error()));
 
   auto result197 = data.get_bool("persistent");
 if (!result197) return std::unexpected(std::move(result197.error()));
 variant.persistent = std::move(*result197);
   auto result198 = data.get_bool("keepAlive");
 if (!result198) return std::unexpected(std::move(result198.error()));
-variant.keepAlive = std::move(*result198);
+variant.keep_alive = std::move(*result198);
   auto result199 = data.get_uint("damageTeam");
 if (!result199) return std::unexpected(std::move(result199.error()));
-variant.damageTeam = std::move(*result199);
+variant.damage_team = std::move(*result199);
   auto result200 = data.get_string("damageTeamType");
 if (!result200) return std::unexpected(std::move(result200.error()));
-auto damageTeamType = enum_value<TeamTypeNames>(*result200);
-if (!damageTeamType)
-  return std::unexpected(std::move(damageTeamType.error()));
-variant.damageTeamType = *damageTeamType;
+auto damage_team_type = enum_value<TeamTypeNames>(*result200);
+if (!damage_team_type)
+  return std::unexpected(std::move(damage_team_type.error()));
+variant.damage_team_type = *damage_team_type;
 
-auto result202 = config.get("nametagColor", JsonArray{255, 255, 255});
-if (!result202) return std::unexpected(std::move(result202.error()));
-auto result203 = json_to_vec3b(std::move(*result202));
-if (!result203) return std::unexpected(std::move(result203.error()));
-variant.nametagColor = std::move(*result203);
-
-  auto result204 = config.get("splashConfig");
-if (!result204) return std::unexpected(std::move(result204.error()));
-auto result205 = EntitySplashConfig::create(m_root, std::move(*result204));
-if (!result205) return std::unexpected(std::move(result205.error()));
-  variant.splash_config = std::move(*result205);
+  auto display = read_display(m_root, variant, config);
+  if (!display) return std::unexpected(std::move(display.error()));
 
   return variant;
 }
 
-std::expected<std::shared_ptr<Npc>, StarException> NpcDatabase::createNpc(NpcVariant const& npcVariant) const {
-  return Npc::create(m_root, npcVariant);
+std::expected<std::shared_ptr<Npc>, StarException> NpcDatabase::create_npc(NpcVariant variant) const {
+  return Npc::create(m_root, std::move(variant));
 }
 
-std::expected<std::shared_ptr<Npc>, StarException> NpcDatabase::diskLoadNpc(Json const& diskStore) const {
+std::expected<std::shared_ptr<Npc>, StarException> NpcDatabase::disk_load_npc(Json const& disk_store) const {
   auto attempt = [&, &database = *this](Json const& store) -> std::expected<std::shared_ptr<Npc>, StarException> {
     auto encoded = store.get("npcVariant");
     if (!encoded) return std::unexpected(std::move(encoded.error()));
-    auto variant = database.readNpcVariantFromJson(*encoded);
+    auto variant = database.read_npc_variant_from_json(*encoded);
     if (!variant) return std::unexpected(std::move(variant.error()));
-    return Npc::create(database.m_root, *variant, store);
+    return Npc::create(database.m_root, std::move(*variant), store);
   };
-  auto npc = attempt(diskStore);
+  auto npc = attempt(disk_store);
   if (npc)
     return npc;
-  StarException lastError = std::move(npc.error());
-  auto rebuilt = m_rebuilder->rebuild(diskStore, lastError, [&](Json const& store) -> std::expected<void, StarException> {
+  StarException last_error = std::move(npc.error());
+  auto rebuilt = m_rebuilder->rebuild(disk_store, last_error, [&](Json const& store) -> std::expected<void, StarException> {
     auto replacement = attempt(store);
     if (!replacement) {
-      lastError = std::move(replacement.error());
-      return std::unexpected(lastError);
+      last_error = std::move(replacement.error());
+      return std::unexpected(last_error);
     }
     npc = std::move(replacement);
     return {};
@@ -966,47 +828,47 @@ std::expected<std::shared_ptr<Npc>, StarException> NpcDatabase::diskLoadNpc(Json
   if (!rebuilt)
     return std::unexpected(std::move(rebuilt.error()));
   if (!*rebuilt)
-    return std::unexpected(std::move(lastError));
+    return std::unexpected(std::move(last_error));
   return npc;
 }
 
 std::expected<std::shared_ptr<Npc>, StarException> NpcDatabase::net_load_npc(ByteArray const& net_store, NetCompatibilityRules rules) const {
-  auto result206 = readNpcVariant(net_store, rules);
+  auto result206 = read_npc_variant(net_store, rules);
 if (!result206) return std::unexpected(std::move(result206.error()));
 return Npc::create(m_root, std::move(*result206));
 }
 
-std::expected<List<Drawable>, StarException> NpcDatabase::npcPortrait(NpcVariant const& npcVariant, PortraitMode mode, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog) const {
-  auto result207 = Humanoid::create(m_root, npcVariant.humanoid_identity, npcVariant.humanoid_parameters, npcVariant.unique_humanoid_config ? npcVariant.humanoid_config : Json(), itemCatalog);
+std::expected<List<Drawable>, StarException> NpcDatabase::npc_portrait(NpcVariant const& npc_variant, PortraitMode mode, std::optional<std::reference_wrapper<ItemDatabase const>> item_catalog) const {
+  auto result207 = Humanoid::create(m_root, npc_variant.humanoid_identity, npc_variant.humanoid_parameters, npc_variant.unique_humanoid_config ? npc_variant.humanoid_config : Json(), item_catalog);
 if (!result207) return std::unexpected(std::move(result207.error()));
 auto humanoid = std::move(*result207);
 
-  std::shared_ptr<ItemDatabase const> itemDatabase;
-  if (!itemCatalog) {
+  std::shared_ptr<ItemDatabase const> item_database;
+  if (!item_catalog) {
     auto result208 = m_root.itemDatabase();
 if (!result208) return std::unexpected(std::move(result208.error()));
-itemDatabase = std::move(*result208);
-    itemCatalog = std::cref(*itemDatabase);
+item_database = std::move(*result208);
+    item_catalog = std::cref(*item_database);
   }
 
-  auto makeItem = [&npcVariant,
-                   itemCatalog](ItemDescriptor itemDescriptor) -> std::expected<std::shared_ptr<Item>, StarException> {
-    return itemCatalog->get().item(std::move(itemDescriptor), npcVariant.level, npcVariant.seed);
+  auto make_item = [&npc_variant,
+                   item_catalog](ItemDescriptor item_descriptor) -> std::expected<std::shared_ptr<Item>, StarException> {
+    return item_catalog->get().item(std::move(item_descriptor), npc_variant.level, npc_variant.seed);
   };
 
   auto result209 = ArmorWearer::create(m_root);
 if (!result209) return std::unexpected(std::move(result209.error()));
 auto armor = std::move(*result209);
-for (auto const& item : npcVariant.items) {
+for (auto const& item : npc_variant.items) {
   {
     auto result210 = maybe_enum_value<equipment_slot_names>(item.first);
     if (!result210)
       return std::unexpected(std::move(result210.error()));
-    if (auto equipmentSlot = std::move(*result210)) {
-      auto result211 = makeItem(item.second);
+    if (auto equipment_slot = std::move(*result210)) {
+      auto result211 = make_item(item.second);
       if (!result211)
         return std::unexpected(std::move(result211.error()));
-      armor->set_item(static_cast<std::uint8_t>(*equipmentSlot), as<ArmorItem>(std::move(*result211)));
+      armor->set_item(static_cast<std::uint8_t>(*equipment_slot), as<ArmorItem>(std::move(*result211)));
     }
   }
 }
@@ -1018,46 +880,31 @@ if (!result212) return std::unexpected(std::move(result212.error()));
   return humanoid->render_portrait(mode);
 }
 
-std::expected<Json, StarException> NpcDatabase::buildConfig(String const& typeName, Json const& overrides) const {
-  auto result213 = m_npcTypes.get(typeName);
-if (!result213) return std::unexpected(std::move(result213.error()));
-auto const& baseConfig = result213->get();
-  auto result214 = mergeConfigValues(baseConfig, overrides);
-if (!result214) return std::unexpected(std::move(result214.error()));
-auto config = std::move(*result214);
+std::expected<Json, StarException> NpcDatabase::build_config(String const& type_name, Json const& overrides) const {
+  // Inheritance is right-associated: each parent receives the already merged
+  // child as its override. Flattening first changes object/scalar transitions.
+  Json config = overrides;
+  auto current = std::cref(type_name);
+  auto checkpoint = current;
+  std::size_t stride = 1;
+  std::size_t distance = 0;
+  for (;;) {
+    auto type = m_npc_types.get(current.get());
+    if (!type) return std::unexpected(std::move(type.error()));
+    auto const& [base, parent] = type->get();
+    config = json_merge(base, config);
+    if (!parent) return std::unexpected(parent.error());
+    if (parent->empty()) return config;
 
-  auto result215 = baseConfig.get_string("baseType", "");
-if (!result215) return std::unexpected(std::move(result215.error()));
-String baseTypeName = std::move(*result215);
-  if (baseTypeName.empty()) {
-    return config;
-  } else {
-    return buildConfig(baseTypeName, config);
-  }
-}
-
-std::expected<Json, StarException> NpcDatabase::mergeConfigValues(Json const& base, Json const& merger) const {
-  if (base.type() == Json::Type::Object && merger.type() == Json::Type::Object) {
-    auto result216 = base.to_object();
-if (!result216) return std::unexpected(std::move(result216.error()));
-auto map = std::move(*result216);
-    {
-      auto result217 = merger.iterate_object();
-      if (!result217)
-        return std::unexpected(std::move(result217.error()));
-      for (auto const& entry : std::move(*result217)) {
-        if (!map.insert(entry.first, entry.second).second) {
-          auto result218 = mergeConfigValues(map[entry.first], entry.second);
-  if (!result218) return std::unexpected(std::move(result218.error()));
-  map[entry.first] = std::move(*result218);
-        }
-      }
-}
-    return map;
-  } else if (merger.is_null()) {
-    return base;
-  } else {
-    return merger;
+    // Brent's cycle detection avoids a visited allocation on every lookup.
+    current = std::cref(*parent);
+    if (current.get() == checkpoint.get())
+      return std::unexpected(NpcException::format("NPC type '{}' has a baseType inheritance cycle at '{}'", type_name, current.get()));
+    if (++distance == stride) {
+      checkpoint = current;
+      stride *= 2;
+      distance = 0;
+    }
   }
 }
 

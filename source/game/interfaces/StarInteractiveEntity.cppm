@@ -42,17 +42,17 @@ public:
   [[nodiscard]] virtual std::expected<InteractAction, StarException> interact(InteractRequest const& request) = 0;
 
   // Defaults to meta_bound_box
-  virtual RectF interactiveBoundBox() const;
+  virtual RectF interactive_bound_box() const;
 
   // Defaults to true
-  virtual bool isInteractive() const;
+  virtual bool is_interactive() const;
 
   // Defaults to empty
-  [[nodiscard]] virtual std::expected<List<QuestArcDescriptor>, StarException> offeredQuests() const;
-  [[nodiscard]] virtual std::expected<StringSet, StarException> turnInQuests() const;
+  [[nodiscard]] virtual std::expected<List<QuestArcDescriptor>, StarException> offered_quests() const;
+  [[nodiscard]] virtual std::expected<StringSet, StarException> turn_in_quests() const;
 
   // Defaults to position()
-  [[nodiscard]] virtual std::expected<Vec2F, StarException> questIndicatorPosition() const;
+  [[nodiscard]] virtual std::expected<Vec2F, StarException> quest_indicator_position() const;
 };
 
 }

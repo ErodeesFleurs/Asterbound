@@ -71,6 +71,7 @@ import star.player_log;
 import star.radio_message_database;
 import star.npc;
 import star.npc_database;
+import star.net_compatibility;
 import star.name_generator;
 import star.species_database;
 import star.item_descriptor;
@@ -537,7 +538,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
     ASSERT_NO_FATAL_FAILURE(expectCatalog("plantDatabase", root.plantDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("projectileDatabase", root.projectileDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("monsterDatabase", root.monster_database()));
-    ASSERT_NO_FATAL_FAILURE(expectCatalog("npcDatabase", root.npcDatabase()));
+    ASSERT_NO_FATAL_FAILURE(expectCatalog("npcDatabase", root.npc_database()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("playerFactory", root.playerFactory()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("entityFactory", root.entityFactory()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("nameGenerator", root.name_generator()));
@@ -1954,13 +1955,13 @@ const GameTestRegistration status_lifecycle("StatusControllerTest", "ReentrantLu
   auto world = WorldServer::create(**root, Vec2U(2048, 2048), *storage);
   ASSERT_TRUE(world) << world.error().what();
   auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
-  auto npcs = (*root)->npcDatabase();
+  auto npcs = (*root)->npc_database();
   ASSERT_TRUE(npcs) << npcs.error().what();
-  auto variant = (*npcs)->generateNpcVariant("human", "villager", 1.0f, 1234, JsonObject{});
+  auto variant = (*npcs)->generate_npc_variant("human", "villager", 1.0f, 1234, JsonObject{});
   ASSERT_TRUE(variant) << variant.error().what();
-  auto npc = (*npcs)->createNpc(*variant);
+  auto npc = (*npcs)->create_npc(std::move(*variant));
   ASSERT_TRUE(npc) << npc.error().what();
-  (*npc)->setPosition(Vec2F(100, 100));
+  (*npc)->set_position(Vec2F(100, 100));
   ASSERT_TRUE((*world)->addEntity(*npc));
   auto installed = (*npc)->eval_script(R"(
     status.addEphemeralEffect("reply-fallback")
@@ -1973,7 +1974,7 @@ const GameTestRegistration status_lifecycle("StatusControllerTest", "ReentrantLu
   auto first = handled->result();
   auto second = fallback->result();
   if (!fixture.check(first && *first && (**first).is_null() && second && *second && **second == Json("fallback")
-          && (*npc)->statusController().statusProperty("fallbackVisits") == Json(1),
+          && (*npc)->status_controller().statusProperty("fallbackVisits") == Json(1),
       "handled nil stops dispatch; only an unhandled message visits the status script")) return;
   Json config = JsonObject{{"stats", JsonObject{{"probePower", JsonObject{}}}}, {"minimumLiquidStatusEffectPercentage", 1},
       {"appliesEnvironmentStatusEffects", false}, {"appliesWeatherStatusEffects", false}, {"environmentStatusEffectUpdateTimer", 100}};
@@ -2259,11 +2260,11 @@ const GameTestRegistration gender_name_rules("NameGeneratorConsumerTest", "Speci
   ASSERT_TRUE(root) << root.error().what();
   auto species = (*root)->speciesDatabase();
   ASSERT_TRUE(species) << species.error().what();
-  auto npcs = (*root)->npcDatabase();
+  auto npcs = (*root)->npc_database();
   ASSERT_TRUE(npcs) << npcs.error().what();
 
   auto generate_npc = [&](std::uint64_t seed, JsonObject overrides) {
-    return (*npcs)->generateNpcVariant("human", "villager", 1.0f, seed, std::move(overrides));
+    return (*npcs)->generate_npc_variant("human", "villager", 1.0f, seed, std::move(overrides));
   };
   constexpr std::uint64_t male_seed = 1;
   constexpr std::uint64_t female_seed = 0;
@@ -2303,7 +2304,7 @@ const GameTestRegistration gender_name_rules("NameGeneratorConsumerTest", "Speci
 });
 
 const GameTestRegistration npcEquipmentBoundaries("RootTest", "NpcEquipmentBoundaries", [](GameTest& fixture) {
-  auto database = fixture.root().npcDatabase();
+  auto database = fixture.root().npc_database();
   ASSERT_TRUE(database) << database.error().what();
   auto overrides = Json::parse_json(R"JSON({
     "levelVariance":[0,0], "npcname":"Borrowed", "matchColorIndices":true,
@@ -2318,7 +2319,7 @@ const GameTestRegistration npcEquipmentBoundaries("RootTest", "NpcEquipmentBound
     ]}
   })JSON");
   ASSERT_TRUE(overrides) << overrides.error().what();
-  auto variant = (*database)->generateNpcVariant("human", "villager", 10.0f, 0x12345678, *overrides);
+  auto variant = (*database)->generate_npc_variant("human", "villager", 10.0f, 0x12345678, *overrides);
   ASSERT_TRUE(variant) << variant.error().what();
   auto head = variant->items.get("head");
   auto chest = variant->items.get("chest");
@@ -2341,16 +2342,16 @@ const GameTestRegistration npcEquipmentBoundaries("RootTest", "NpcEquipmentBound
   ASSERT_TRUE(lastSelected) << lastSelected.error().what();
   auto collapsed = overrides->set("items", JsonObject{{"override", JsonArray{*lastSelected}}});
   ASSERT_TRUE(collapsed) << collapsed.error().what();
-  auto expected = (*database)->generateNpcVariant("human", "villager", 10.0f, 0x12345678, *collapsed);
+  auto expected = (*database)->generate_npc_variant("human", "villager", 10.0f, 0x12345678, *collapsed);
   ASSERT_TRUE(expected) << expected.error().what();
   expected->overrides = *overrides;
-  auto actualJson = (*database)->writeNpcVariantToJson(*variant);
-  auto expectedJson = (*database)->writeNpcVariantToJson(*expected);
+  auto actualJson = (*database)->write_npc_variant_to_json(*variant);
+  auto expectedJson = (*database)->write_npc_variant_to_json(*expected);
   ASSERT_TRUE(actualJson) << actualJson.error().what();
   ASSERT_TRUE(expectedJson) << expectedJson.error().what();
   EXPECT_EQ(*actualJson, *expectedJson);
-  auto actualBytes = (*database)->writeNpcVariant(*variant);
-  auto expectedBytes = (*database)->writeNpcVariant(*expected);
+  auto actualBytes = (*database)->write_npc_variant(*variant);
+  auto expectedBytes = (*database)->write_npc_variant(*expected);
   ASSERT_TRUE(actualBytes) << actualBytes.error().what();
   ASSERT_TRUE(expectedBytes) << expectedBytes.error().what();
   EXPECT_EQ(*actualBytes, *expectedBytes);
@@ -2360,8 +2361,84 @@ const GameTestRegistration npcEquipmentBoundaries("RootTest", "NpcEquipmentBound
         R"JSON({"items":{"override":[[0,[{"head":[{"name":"empty-color","parameters":{"colorIndex":[]}}]}]]]}})JSON"}) {
     auto invalid = Json::parse_json(String(std::string_view(source)));
     ASSERT_TRUE(invalid) << invalid.error().what();
-    EXPECT_FALSE((*database)->generateNpcVariant("human", "villager", 10.0f, 0x12345678, *invalid));
+    EXPECT_FALSE((*database)->generate_npc_variant("human", "villager", 10.0f, 0x12345678, *invalid));
   }
+});
+
+const GameTestRegistration npc_inheritance_and_legacy_variant("RootTest", "NpcInheritanceAndLegacyVariant", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto settings = isolationSettings(fixture.rootSettings(), *directory, "npc-inheritance");
+  ASSERT_TRUE(settings) << settings.error().what();
+  auto written = writeIsolationModules(File::relative_to(*directory, "assets"), {
+    {"npc-fixture-base.npctype", R"JSON({"type":"npc-fixture-base","baseType":"villager",
+      "probe":{"grandparent":1,"preserve":2},"description":"configured description",
+      "humanoidParameters":{"fixtureConfigured":true},"items":{"override":[]}})JSON"},
+    {"npc-fixture-mid.npctype", R"JSON({"type":"npc-fixture-mid","baseType":"npc-fixture-base","probe":5})JSON"},
+    {"npc-fixture-child.npctype", R"JSON({"type":"npc-fixture-child","baseType":"npc-fixture-mid","probe":{"child":3}})JSON"},
+    {"npc-cycle-a.npctype", R"JSON({"type":"npc-cycle-a","baseType":"npc-cycle-b"})JSON"},
+    {"npc-cycle-b.npctype", R"JSON({"type":"npc-cycle-b","baseType":"npc-cycle-a"})JSON"},
+    {"npc-cycle-tail.npctype", R"JSON({"type":"npc-cycle-tail","baseType":"npc-cycle-a"})JSON"},
+    {"npc-self-cycle.npctype", R"JSON({"type":"npc-self-cycle","baseType":"npc-self-cycle"})JSON"},
+  });
+  ASSERT_TRUE(written) << written.error().what();
+  auto root = Root::create(std::move(*settings));
+  ASSERT_TRUE(root) << root.error().what();
+  auto database = (*root)->npc_database();
+  ASSERT_TRUE(database) << database.error().what();
+  auto const& catalog = **database;
+  for (String const& name : StringList{"npc-cycle-a", "npc-cycle-tail", "npc-self-cycle"}) {
+    auto result = catalog.build_config(name, JsonObject{{"baseType", "villager"}});
+    ASSERT_FALSE(result);
+    EXPECT_TRUE(result.error().is<NpcException>());
+    EXPECT_NE(std::string_view(result.error().what()).find("inheritance cycle"), std::string_view::npos);
+  }
+
+  Json overrides = JsonObject{{"probe", JsonObject{{"preserve", Json()}, {"override", 4}}}};
+  auto config = catalog.build_config("npc-fixture-child", overrides);
+  ASSERT_TRUE(config) << config.error().what();
+  auto probe = config->get("probe");
+  ASSERT_TRUE(probe) << probe.error().what();
+  EXPECT_EQ(*probe, Json(JsonObject{{"grandparent", 1}, {"preserve", 2}, {"child", 3}, {"override", 4}}));
+  auto mid = catalog.build_config("npc-fixture-mid");
+  ASSERT_TRUE(mid) << mid.error().what();
+  EXPECT_EQ(mid->get_int("probe"), 5);
+
+  auto generated = catalog.generate_npc_variant("human", "npc-fixture-child", 1.0f, 1234, overrides);
+  ASSERT_TRUE(generated) << generated.error().what();
+  generated->description = "encoded description";
+  generated->humanoid_parameters = JsonObject{{"fixtureEncoded", true}};
+  generated->initial_script_delta = 42;
+  generated->persistent = true;
+  generated->keep_alive = true;
+  generated->damage_team = 7;
+  for (unsigned version : {10u, 11u}) {
+    SCOPED_TRACE(version);
+    NetCompatibilityRules rules(version);
+    auto bytes = catalog.write_npc_variant(*generated, rules);
+    ASSERT_TRUE(bytes) << bytes.error().what();
+    auto result = catalog.read_npc_variant(*bytes, rules);
+    ASSERT_TRUE(result) << result.error().what();
+    auto description = version == 10 ? String("configured description") : String("encoded description");
+    auto parameter = version == 10 ? String("fixtureConfigured") : String("fixtureEncoded");
+    EXPECT_EQ(result->description, std::optional<String>(std::move(description)));
+    EXPECT_EQ(result->humanoid_parameters, (JsonObject{{std::move(parameter), true}}));
+    EXPECT_EQ(result->initial_script_delta, 42u);
+    EXPECT_TRUE(result->persistent);
+    EXPECT_TRUE(result->keep_alive);
+    EXPECT_EQ(result->damage_team, 7u);
+    EXPECT_EQ(result->damage_team_type, generated->damage_team_type);
+    EXPECT_EQ(catalog.write_npc_variant(*result, rules), *bytes);
+  }
+  auto store = catalog.write_npc_variant_to_json(*generated);
+  ASSERT_TRUE(store) << store.error().what();
+  auto old_store = store->erase("description").and_then([](Json const& json) { return json.erase("humanoidParameters"); });
+  ASSERT_TRUE(old_store) << old_store.error().what();
+  auto disk = catalog.read_npc_variant_from_json(*old_store);
+  ASSERT_TRUE(disk) << disk.error().what();
+  EXPECT_FALSE(disk->description);
+  EXPECT_TRUE(disk->humanoid_parameters.empty());
 });
 
 const GameTestRegistration monster_numeric_fields("RootTest", "MonsterNumericFieldBounds", [](GameTest& fixture) {
@@ -4134,16 +4211,16 @@ const GameTestRegistration hudWorldViews("HudDomainTest", "WorldPortraitDeltasFo
   auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
   ASSERT_TRUE(world) << world.error().what();
   auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
-  auto database = root.npcDatabase();
+  auto database = root.npc_database();
   ASSERT_TRUE(database) << database.error().what();
-  auto variant = (*database)->generateNpcVariant("human", "villager", 1.0f, 1234, JsonObject());
+  auto variant = (*database)->generate_npc_variant("human", "villager", 1.0f, 1234, JsonObject());
   ASSERT_TRUE(variant) << variant.error().what();
-  auto first = (*database)->createNpc(*variant);
-  auto second = (*database)->createNpc(*variant);
+  auto first = (*database)->create_npc(*variant);
+  auto second = (*database)->create_npc(*variant);
   ASSERT_TRUE(first) << first.error().what();
   ASSERT_TRUE(second) << second.error().what();
-  (*first)->setPosition(Vec2F(2046, 1024));
-  (*second)->setPosition(Vec2F(100, 1024));
+  (*first)->set_position(Vec2F(2046, 1024));
+  (*second)->set_position(Vec2F(100, 1024));
   ASSERT_TRUE((*world)->addEntity(*first));
   ASSERT_TRUE((*world)->addEntity(*second));
   auto luaRoot = LuaRoot::create(root);
@@ -4176,7 +4253,7 @@ const GameTestRegistration hudWorldViews("HudDomainTest", "WorldPortraitDeltasFo
   )LUA");
   ASSERT_TRUE(initial) << initial.error().what();
   EXPECT_TRUE(*initial);
-  ASSERT_TRUE((*first)->statusController().setResourcePercentage("health", 0.25f));
+  ASSERT_TRUE((*first)->status_controller().setResourcePercentage("health", 0.25f));
   auto health = context->eval<bool>(R"LUA(
     local bar = world.entityDamageBar(firstId)
     assert(bar.maxHealth > 0 and math.abs(bar.health / bar.maxHealth - 0.25) < 0.00001)
@@ -4185,7 +4262,7 @@ const GameTestRegistration hudWorldViews("HudDomainTest", "WorldPortraitDeltasFo
   )LUA");
   ASSERT_TRUE(health) << health.error().what();
   EXPECT_TRUE(*health);
-  ASSERT_TRUE((*first)->setBodyDirectives("?multiply=ff0000"));
+  ASSERT_TRUE((*first)->set_body_directives("?multiply=ff0000"));
   auto changed = context->eval<bool>(R"LUA(
     changed = world.entityPortraitView(firstId, "full", initial.revision)
     assert(changed.revision ~= initial.revision and changed.drawables and changed.bounds)
@@ -4206,9 +4283,9 @@ const GameTestRegistration hudWorldViews("HudDomainTest", "WorldPortraitDeltasFo
       "return world.entityDamageBar(firstId) == nil and world.entityPortraitView(firstId, 'full') == nil");
   ASSERT_TRUE(missing) << missing.error().what();
   EXPECT_TRUE(*missing);
-  auto replacement = (*database)->createNpc(*variant);
+  auto replacement = (*database)->create_npc(std::move(*variant));
   ASSERT_TRUE(replacement) << replacement.error().what();
-  (*replacement)->setPosition(Vec2F(2046, 1024));
+  (*replacement)->set_position(Vec2F(2046, 1024));
   ASSERT_TRUE((*world)->addEntity(*replacement, firstId));
   // The two allocations have identical authored portraits; switching providers
   // must still invalidate the token, including a reused entity ID.

@@ -219,17 +219,18 @@ std::expected<Json, StarException> object_argument(StringList const& arguments, 
   return parsed;
 }
 
-template <typename T>
+template <typename T, auto SetPosition>
 concept aim_placeable = std::derived_from<T, Entity> && requires(T& entity, Vec2F const& position) {
-  { entity.setPosition(position) } -> std::same_as<void>;
+  { std::invoke(SetPosition, entity, position) } -> std::same_as<void>;
 };
 
-template <aim_placeable T>
+template <auto SetPosition, typename T>
+  requires aim_placeable<T, SetPosition>
 std::expected<String, StarException> place_at_aim(UniverseServer& universe, ConnectionId connection_id, std::shared_ptr<T> entity) {
   auto done = universe.executeForClient(connection_id, [&entity](WorldServer& world, std::shared_ptr<Player> const& player) -> std::expected<void, StarException> {
-    auto position = player->aimPosition();
+    auto position = player->aim_position();
     if (!position) return std::unexpected(std::move(position.error()));
-    entity->setPosition(*position);
+    std::invoke(SetPosition, *entity, *position);
     return world.addEntity(std::move(entity));
   });
   if (!done) return std::unexpected(std::move(done.error()));
@@ -642,7 +643,7 @@ std::expected<String, StarException> CommandProcessor::set_dungeon_id(Connection
     DungeonId dungeon_id = *dungeon_id_result;
 
     auto done = m_universe.executeForClient(connection_id, [dungeon_id](WorldServer& world, std::shared_ptr<Player> const& player) -> std::expected<void, StarException> {
-        auto aim_position = player->aimPosition();
+        auto aim_position = player->aim_position();
         if (!aim_position) return std::unexpected(std::move(aim_position.error()));
         return world.setDungeonId(RectI::with_size(Vec2I((*aim_position)), Vec2I(1, 1)), dungeon_id);
       });
@@ -713,7 +714,7 @@ std::expected<String, StarException> CommandProcessor::spawn_item(ConnectionId c
         if (!descriptor) return std::unexpected(std::move(descriptor.error()));
         auto item = item_database->item(*descriptor, *level, *seed, true);
         if (!item) return std::unexpected(std::move(item.error()));
-        auto aim_position = player->aimPosition();
+        auto aim_position = player->aim_position();
         if (!aim_position) return std::unexpected(std::move(aim_position.error()));
         auto drop = ItemDrop::create_randomized_drop(m_root, *item, (*aim_position));
         if (!drop) return std::unexpected(std::move(drop.error()));
@@ -746,7 +747,7 @@ std::expected<String, StarException> CommandProcessor::spawn_treasure(Connection
         auto treasure = treasure_database->createTreasure(arguments[0], level->value_or(1), m_root.random().next_u64());
         if (!treasure) return std::unexpected(std::move(treasure.error()));
         for (auto const& treasure_item : *treasure) {
-          auto aim_position = player->aimPosition();
+          auto aim_position = player->aim_position();
           if (!aim_position) return std::unexpected(std::move(aim_position.error()));
           auto drop = ItemDrop::create_randomized_drop(m_root, treasure_item, (*aim_position));
           if (!drop) return std::unexpected(std::move(drop.error()));
@@ -783,7 +784,7 @@ std::expected<String, StarException> CommandProcessor::spawn_monster(ConnectionI
     if (!variant) return std::unexpected(std::move(variant.error()));
     auto created = monster_database->create_monster(std::move(*variant), level->value_or(1));
     if (!created) return std::unexpected(std::move(created.error()));
-    return place_at_aim(m_universe, connection_id, std::move(*created));
+    return place_at_aim<&Monster::setPosition>(m_universe, connection_id, std::move(*created));
   }();
   if (result) return std::move(*result);
   auto const& exception = result.error();
@@ -800,7 +801,7 @@ std::expected<String, StarException> CommandProcessor::spawn_npc(ConnectionId co
   auto& arguments = *parsed_arguments;
 
   auto result = [&]() -> std::expected<String, StarException> {
-    auto npc_database_result = m_root.npcDatabase();
+    auto npc_database_result = m_root.npc_database();
     if (!npc_database_result) return std::unexpected(std::move(npc_database_result.error()));
     auto npc_database = std::move(*npc_database_result);
     auto default_seed = m_root.random().next_u64();
@@ -814,11 +815,11 @@ std::expected<String, StarException> CommandProcessor::spawn_npc(ConnectionId co
     if (!seed) return std::unexpected(std::move(seed.error()));
     auto overrides = arguments.size() > 4 ? object_argument(arguments, 4) : std::expected<Json, StarException>(Json());
     if (!overrides) return std::unexpected(std::move(overrides.error()));
-    auto variant = npc_database->generateNpcVariant(arguments[0], arguments[1], level->value_or(1), seed->value_or(default_seed), *overrides);
+    auto variant = npc_database->generate_npc_variant(arguments[0], arguments[1], level->value_or(1), seed->value_or(default_seed), *overrides);
     if (!variant) return std::unexpected(std::move(variant.error()));
-    auto npc_result = npc_database->createNpc(*variant);
+    auto npc_result = npc_database->create_npc(std::move(*variant));
     if (!npc_result) return std::unexpected(std::move(npc_result.error()));
-    return place_at_aim(m_universe, connection_id, std::move(*npc_result));
+    return place_at_aim<&Npc::set_position>(m_universe, connection_id, std::move(*npc_result));
   }();
   if (result) return std::move(*result);
   auto const& exception = result.error();
@@ -844,7 +845,7 @@ std::expected<String, StarException> CommandProcessor::spawn_vehicle(ConnectionI
     if (!parameters) return std::unexpected(std::move(parameters.error()));
     auto created = vehicle_database->create(arguments[0], *parameters);
     if (!created) return std::unexpected(std::move(created.error()));
-    return place_at_aim(m_universe, connection_id, std::move(*created));
+    return place_at_aim<&Vehicle::setPosition>(m_universe, connection_id, std::move(*created));
   }();
   if (result) return std::move(*result);
   auto const& exception = result.error();
@@ -870,7 +871,7 @@ std::expected<String, StarException> CommandProcessor::spawn_stagehand(Connectio
     if (!parameters) return std::unexpected(std::move(parameters.error()));
     auto created = stagehand_database->createStagehand(arguments[0], *parameters);
     if (!created) return std::unexpected(std::move(created.error()));
-    return place_at_aim(m_universe, connection_id, std::move(*created));
+    return place_at_aim<&Stagehand::setPosition>(m_universe, connection_id, std::move(*created));
   }();
   if (result) return std::move(*result);
   auto const& exception = result.error();
@@ -885,7 +886,7 @@ std::expected<String, StarException> CommandProcessor::clear_stagehand(Connectio
   unsigned removed = 0;
   auto done = m_universe.executeForClient(connection_id,
       [&](WorldServer& world, std::shared_ptr<Player> player) -> std::expected<void, StarException> {
-        auto aim_position = player->aimPosition();
+        auto aim_position = player->aim_position();
         if (!aim_position) return std::unexpected(std::move(aim_position.error()));
         auto query_rect = RectF::with_center((*aim_position), Vec2F{2, 2});
         auto stagehands = world.query<Stagehand>(query_rect);
@@ -930,7 +931,7 @@ std::expected<String, StarException> CommandProcessor::spawn_liquid(ConnectionId
     }
 
     auto done = m_universe.executeForClient(connection_id, [&](WorldServer& world, std::shared_ptr<Player> const& player) -> std::expected<void, StarException> {
-        auto aim_position = player->aimPosition();
+        auto aim_position = player->aim_position();
         if (!aim_position) return std::unexpected(std::move(aim_position.error()));
         auto modified = world.modifyTile(Vec2I((*aim_position).floor()), PlaceLiquid{liquid, quantity}, true);
         if (!modified) return std::unexpected(std::move(modified.error()));
@@ -1129,7 +1130,7 @@ std::expected<String, StarException> CommandProcessor::entity_eval(ConnectionId 
   String message;
   auto done = m_universe.executeForClient(connection_id,
       [&lua, &message](WorldServer& world, std::shared_ptr<Player> const& player) -> std::expected<void, StarException> {
-        auto aim_position = player->aimPosition();
+        auto aim_position = player->aim_position();
         if (!aim_position) return std::unexpected(std::move(aim_position.error()));
         auto query_rect = RectF::with_center((*aim_position), Vec2F{2, 2});
         auto query = world.query<ScriptedEntity>(query_rect);
@@ -1200,7 +1201,7 @@ std::expected<String, StarException> CommandProcessor::place_dungeon(ConnectionI
 
   auto done = m_universe.executeForClient(connection_id,
       [dungeon_name, target_position](WorldServer& world, std::shared_ptr<Player> const& player) -> std::expected<void, StarException> {
-        auto aim_position = player->aimPosition();
+        auto aim_position = player->aim_position();
         if (!aim_position) return std::unexpected(std::move(aim_position.error()));
         auto placed = world.placeDungeon(dungeon_name, target_position.value_or(Vec2I::floor((*aim_position))), true);
         if (!placed) return std::unexpected(std::move(placed.error()));
@@ -1247,7 +1248,7 @@ std::expected<String, StarException> CommandProcessor::add_biome_region(Connecti
 
   auto done = m_universe.executeForClient(connection_id,
       [biome_name, width, sub_block_selector](WorldServer& world, std::shared_ptr<Player> const& player) -> std::expected<void, StarException> {
-        auto aim_position = player->aimPosition();
+        auto aim_position = player->aim_position();
         if (!aim_position) return std::unexpected(std::move(aim_position.error()));
         return world.addBiomeRegion(Vec2I::floor((*aim_position)), biome_name, sub_block_selector, width);
       });
@@ -1269,7 +1270,7 @@ std::expected<String, StarException> CommandProcessor::expand_biome_region(Conne
 
   auto done = m_universe.executeForClient(connection_id,
       [new_width](WorldServer& world, std::shared_ptr<Player> const& player) -> std::expected<void, StarException> {
-        auto aim_position = player->aimPosition();
+        auto aim_position = player->aim_position();
         if (!aim_position) return std::unexpected(std::move(aim_position.error()));
         return world.expandBiomeRegion(Vec2I::floor((*aim_position)), new_width);
       });
@@ -1343,7 +1344,7 @@ std::expected<String, StarException> CommandProcessor::set_weather(ConnectionId 
 std::expected<String, StarException> CommandProcessor::set_environment_biome(ConnectionId connection_id, String const&) {
   auto done = m_universe.executeForClient(connection_id,
       [](WorldServer& world, std::shared_ptr<Player> const& player) -> std::expected<void, StarException> {
-        auto aim_position = player->aimPosition();
+        auto aim_position = player->aim_position();
         if (!aim_position) return std::unexpected(std::move(aim_position.error()));
         return world.setLayerEnvironmentBiome(Vec2I::floor((*aim_position)));
       });

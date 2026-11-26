@@ -525,7 +525,7 @@ std::expected<void, StarException> TeamClient::writePlayerData(JsonObject& reque
   request["version"] = TeamClientVersion;
   request["playerUuid"] = m_client_context->player_uuid().hex();
   request["entity"] = player->entityId();
-  auto maximumHealth = player->maxHealth();
+  auto maximumHealth = player->max_health();
   if (!maximumHealth) return std::unexpected(std::move(maximumHealth.error()));
   request["health"] = player->health() / *maximumHealth;
   auto maximumEnergy = player->maxEnergy();

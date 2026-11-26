@@ -554,7 +554,7 @@ std::expected<void, StarException> CraftingPane::upgrade_table() {
   if (m_source_entity_id == null_entity_id || !m_upgrade_recipe)
     return {};
 
-  if (!m_player->isAdmin()) {
+  if (!m_player->is_admin()) {
     auto consumed = m_player->inventory()->consume_recipe(*m_upgrade_recipe, 1);
     if (!consumed)
       return std::unexpected(std::move(consumed.error()));
@@ -581,7 +581,7 @@ std::expected<void, StarException> CraftingPane::update(float dt) {
       auto reachable = m_world_client->playerCanReachEntity(m_source_entity_id);
       if (!reachable)
         return std::unexpected(std::move(reachable.error()));
-      can_reach = *reachable && source_entity->isInteractive();
+      can_reach = *reachable && source_entity->is_interactive();
     }
     if (!can_reach) {
       dismiss();
@@ -658,7 +658,7 @@ std::expected<CraftingPane::RecipeInventory, StarException> CraftingPane::captur
   auto stock = inventory->available_items();
   if (!stock)
     return std::unexpected(std::move(stock.error()));
-  return RecipeInventory{std::move(*stock), inventory->available_currencies(), m_player->isAdmin()};
+  return RecipeInventory{std::move(*stock), inventory->available_currencies(), m_player->is_admin()};
 }
 
 std::expected<void, StarException> CraftingPane::update_craft_buttons(RecipeInventory const& inventory, bool selected_available) {
@@ -1232,7 +1232,7 @@ std::expected<int, StarException> CraftingPane::max_craft(RecipeInventoryView in
   auto recipe = selected_recipe();
   if (!recipe)
     return std::unexpected(std::move(recipe.error()));
-  bool admin = inventory ? inventory->get().admin : m_player->isAdmin();
+  bool admin = inventory ? inventory->get().admin : m_player->is_admin();
   if (!*recipe)
     return admin ? m_max_spin_count : 0;
 

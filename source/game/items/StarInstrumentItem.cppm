@@ -227,12 +227,12 @@ std::expected<void, StarException> InstrumentItem::update(float, FireMode, bool,
       return std::unexpected(std::move(isActive.error()));
     if (*isActive) {
       m_activeCooldown--;
-      auto emitted = itemOwner->get().addEffectEmitters({"music"});
+      auto emitted = itemOwner->get().add_effect_emitters({"music"});
       if (!emitted)
         return std::unexpected(std::move(emitted.error()));
     }
   }
-  return itemOwner->get().instrumentEquipped(m_kind);
+  return itemOwner->get().instrument_equipped(m_kind);
 }
 
 std::expected<bool, StarException> InstrumentItem::active() const {
@@ -243,7 +243,7 @@ std::expected<bool, StarException> InstrumentItem::active() const {
   auto itemOwner = owner();
   if (!itemOwner)
     return std::unexpected(std::move(itemOwner.error()));
-  return itemOwner->get().instrumentPlaying();
+  return itemOwner->get().instrument_playing();
 }
 
 void InstrumentItem::setActive(bool active) {

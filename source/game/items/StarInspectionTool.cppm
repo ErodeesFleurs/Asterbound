@@ -385,7 +385,7 @@ std::expected<InspectionTool::InspectionResult, StarException> InspectionTool::i
       return std::unexpected(std::move(contained.error()));
     if (!*contained)
       return false;
-    auto hitPoly = entity->hitPoly();
+    auto hitPoly = entity->hit_poly();
     if (!hitPoly)
       return std::unexpected(std::move(hitPoly.error()));
     if (!*hitPoly)

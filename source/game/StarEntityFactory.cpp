@@ -156,7 +156,7 @@ std::expected<std::shared_ptr<EntityFactory>, StarException> EntityFactory::crea
   auto projectile = root.projectileDatabase();
   if (!projectile) return std::unexpected(std::move(projectile.error()));
   factory->m_projectile_database = std::move(*projectile);
-  auto npc = root.npcDatabase();
+  auto npc = root.npc_database();
   if (!npc) return std::unexpected(std::move(npc.error()));
   factory->m_npc_database = std::move(*npc);
   auto vehicle = root.vehicleDatabase();
@@ -277,8 +277,11 @@ std::expected<Json, StarException> EntityFactory::disk_store_entity_locked(std::
       if (!drop) return std::unexpected(std::move(drop.error()));
       return drop->get().disk_store();
     }
-    case EntityType::Npc:
-      return store.template operator()<Npc>();
+    case EntityType::Npc: {
+      auto npc = convert_ref<Npc>(*entity);
+      if (!npc) return std::unexpected(std::move(npc.error()));
+      return npc->get().disk_store();
+    }
     case EntityType::Stagehand:
       return store.template operator()<Stagehand>();
     case EntityType::Vehicle: {
@@ -315,7 +318,7 @@ std::expected<std::shared_ptr<Entity>, StarException> EntityFactory::disk_load_e
     case EntityType::ItemDrop:
       return ItemDrop::create(m_root, disk_store);
     case EntityType::Npc:
-      return m_npc_database->diskLoadNpc(disk_store);
+      return m_npc_database->disk_load_npc(disk_store);
     case EntityType::Stagehand:
       return Stagehand::create(m_root, disk_store);
     case EntityType::Vehicle:

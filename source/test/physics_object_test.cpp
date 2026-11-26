@@ -466,7 +466,7 @@ const GameTestRegistration
           EXPECT_TRUE(output->empty());
         }
 
-        object->setUniqueId(String("indexed-object"));
+        object->set_unique_id(String("indexed-object"));
         auto added = entities.add_entity(object);
         ASSERT_TRUE(added) << added.error().what();
         auto expectQuery = [&](Vec2F localPoint, bool present) {
@@ -513,10 +513,10 @@ const GameTestRegistration
             entities.remove_entity(*other_id);
             EXPECT_TRUE((*other)->uninit());
           });
-          (*other)->setUniqueId(String("second-object"));
+          (*other)->set_unique_id(String("second-object"));
           ASSERT_TRUE(entities.add_entity(*other));
           ASSERT_TRUE((*other)->setTilePosition(Vec2I(512, 256)));
-          (*other)->setUniqueId(String("indexed-object"));
+          (*other)->set_unique_id(String("indexed-object"));
           auto conflict = entities.update_all_entities();
           ASSERT_FALSE(conflict);
           EXPECT_TRUE(conflict.error().is<EntityMapException>());
@@ -529,7 +529,7 @@ const GameTestRegistration
           auto new_hits = entities.entity_query(RectF(512, 256, 512, 256));
           ASSERT_TRUE(new_hits);
           EXPECT_TRUE(new_hits->empty());
-          (*other)->setUniqueId(String("second-object"));
+          (*other)->set_unique_id(String("second-object"));
           ASSERT_TRUE(entities.update_all_entities());
           new_hits = entities.entity_query(RectF(512, 256, 512, 256));
           ASSERT_TRUE(new_hits);

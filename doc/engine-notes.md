@@ -289,6 +289,18 @@ renderer owns its image copy before returning. Buffer reuse does not change the
 spread/point algorithms, liquid correction, or independent CPU `world.lightLevel`
 queries used by gameplay and headless servers.
 
+### NPC variants and contact damage
+
+NPC type inheritance applies instance overrides to the child first, then merges
+that result into each parent. Do not flatten the parent chain before applying
+overrides: alternating object and scalar values can produce a different result.
+Network variants before version 11 read humanoid parameters and description
+from configuration rather than from the packet.
+
+Contact damage configuration is parsed on demand. A source with no explicit
+shape uses the current movement collision polygon; rotation, damage multiplier
+and team are runtime values, not part of the cached configuration.
+
 ### Shutdown order
 
 Shutdown stops audio callbacks and client services first, releases SDK/GL owners

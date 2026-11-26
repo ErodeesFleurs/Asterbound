@@ -770,7 +770,7 @@ std::expected<LuaCallbacks, StarException> TechController::makeTechCallbacks(Tec
   if (auto result = callbacks.register_callback("parentLounging",
                                                [this]() {
                                                  if (auto entity = as_ref<LoungingEntity>(m_parentEntity->get()))
-                                                   return entity->get().loungingIn().has_value();
+                                                   return entity->get().lounging_in().has_value();
                                                  return false;
                                                });
       !result)

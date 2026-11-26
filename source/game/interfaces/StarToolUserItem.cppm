@@ -168,7 +168,7 @@ protected:
       return std::unexpected(std::move(hand_result.error()));
 
     auto const& tool_owner = owner_result->get();
-    auto aim_position = tool_owner.aimPosition();
+    auto aim_position = tool_owner.aim_position();
     if (!aim_position)
       return std::unexpected(std::move(aim_position.error()));
     auto position = tool_owner.hand_position(*hand_result, offset);

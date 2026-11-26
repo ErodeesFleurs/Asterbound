@@ -393,7 +393,7 @@ std::expected<std::optional<QuestIndicator>, StarException> QuestManager::getQue
   Vec2F position = entity->position() + Vec2F(0, 2.75);
   auto giver = as<InteractiveEntity>(entity);
   if (giver) {
-    auto turnIns = giver->turnInQuests();
+    auto turnIns = giver->turn_in_quests();
     if (!turnIns) return std::unexpected(std::move(turnIns.error()));
     for (auto const& id : *turnIns) {
       if (!isActive(id)) continue;
@@ -409,7 +409,7 @@ std::expected<std::optional<QuestIndicator>, StarException> QuestManager::getQue
     if (!type) {
       auto templates = m_root.questTemplateDatabase();
       if (!templates) return std::unexpected(std::move(templates.error()));
-      auto arcs = giver->offeredQuests();
+      auto arcs = giver->offered_quests();
       if (!arcs) return std::unexpected(std::move(arcs.error()));
       for (auto const& arc : *arcs) {
         auto start = canStart(arc);
@@ -434,7 +434,7 @@ std::expected<std::optional<QuestIndicator>, StarException> QuestManager::getQue
     auto image = indicator->get_string("image");
     if (!image) return std::unexpected(std::move(image.error()));
     if (giver) {
-      auto indicatorPosition = giver->questIndicatorPosition();
+      auto indicatorPosition = giver->quest_indicator_position();
       if (!indicatorPosition) return std::unexpected(std::move(indicatorPosition.error()));
       position = *indicatorPosition;
     }
@@ -446,7 +446,7 @@ std::expected<std::optional<QuestIndicator>, StarException> QuestManager::getQue
     if (!image) return std::unexpected(std::move(image.error()));
     if (*image) {
       if (giver) {
-        auto indicatorPosition = giver->questIndicatorPosition();
+        auto indicatorPosition = giver->quest_indicator_position();
         if (!indicatorPosition) return std::unexpected(std::move(indicatorPosition.error()));
         position = *indicatorPosition;
       }

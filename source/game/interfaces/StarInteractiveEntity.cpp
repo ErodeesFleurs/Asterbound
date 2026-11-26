@@ -25,23 +25,23 @@ import star.interactive_entity;
 import star.rect;
 namespace Star {
 
-RectF InteractiveEntity::interactiveBoundBox() const {
+RectF InteractiveEntity::interactive_bound_box() const {
   return meta_bound_box();
 }
 
-bool InteractiveEntity::isInteractive() const {
+bool InteractiveEntity::is_interactive() const {
   return true;
 }
 
-std::expected<List<QuestArcDescriptor>, StarException> InteractiveEntity::offeredQuests() const {
+std::expected<List<QuestArcDescriptor>, StarException> InteractiveEntity::offered_quests() const {
   return List<QuestArcDescriptor>{};
 }
 
-std::expected<StringSet, StarException> InteractiveEntity::turnInQuests() const {
+std::expected<StringSet, StarException> InteractiveEntity::turn_in_quests() const {
   return StringSet{};
 }
 
-std::expected<Vec2F, StarException> InteractiveEntity::questIndicatorPosition() const {
+std::expected<Vec2F, StarException> InteractiveEntity::quest_indicator_position() const {
   return position();
 }
 

@@ -15,12 +15,18 @@ import star.configuration;
 import star.collection_database;
 import star.casting;
 import star.collision_block;
+import star.damage;
+import star.drawable;
 import star.entity;
+import star.entity_rendering;
+import star.entity_rendering_types;
 import star.file;
 import star.game_test;
 import star.game_types;
 import star.message_types;
+import star.humanoid;
 import star.json;
+import star.json_extra;
 import star.input;
 import star.input_event;
 import star.map;
@@ -32,15 +38,20 @@ import star.lua_converters;
 import star.lua_game_converters;
 import star.lua_root;
 import star.npc;
+import star.net_compatibility;
+import star.networked_animator;
 import star.net_packets;
 import star.npc_database;
 import star.object;
 import star.object_database;
+import star.poly;
 import star.root;
 import star.rpc_promise;
 import star.scripted_entity;
 import star.scriptable_thread;
 import star.string;
+import star.status_controller;
+import star.status_types;
 import star.test_universe;
 import star.vector;
 import star.thread;
@@ -600,30 +611,230 @@ struct NpcRecoveryWorld {
   std::shared_ptr<Npc> npc;
 };
 
-std::expected<NpcRecoveryWorld, StarException> npcRecoveryWorld(Root& root) {
+std::expected<NpcRecoveryWorld, StarException> npcRecoveryWorld(Root& root, std::optional<Json> touch_damage = std::nullopt) {
   auto storage = File::ephemeral_file(root.random());
   if (!storage)
     return std::unexpected(std::move(storage.error()));
   auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
   if (!world)
     return std::unexpected(std::move(world.error()));
-  auto database = root.npcDatabase();
+  auto database = root.npc_database();
   if (!database)
     return std::unexpected(std::move(database.error()));
-  auto variant = (*database)->generateNpcVariant("human", "villager", 1.0f, 1234, JsonObject{});
+  auto variant = (*database)->generate_npc_variant("human", "villager", 1.0f, 1234, JsonObject{});
   if (!variant)
     return std::unexpected(std::move(variant.error()));
   variant->scripts.clear();
-  variant->initialScriptDelta = 1;
-  variant->dropPools.clear();
-  auto npc = (*database)->createNpc(*variant);
+  variant->initial_script_delta = 1;
+  variant->drop_pools.clear();
+  if (touch_damage)
+    variant->touch_damage_config = std::move(*touch_damage);
+  auto npc = (*database)->create_npc(std::move(*variant));
   if (!npc)
     return std::unexpected(std::move(npc.error()));
-  (*npc)->setPosition(Vec2F(1024, 1024));
+  (*npc)->set_position(Vec2F(1024, 1024));
   if (auto added = (*world)->addEntity(*npc); !added)
     return std::unexpected(std::move(added.error()));
   return NpcRecoveryWorld{std::move(*world), std::move(*npc)};
 }
+
+const GameTestRegistration npc_contact_damage("RootTest", "NpcContactDamageUsesCurrentShapeAndStats", [](GameTest& fixture) {
+  std::array<Json, 3> const shapes{
+    JsonObject{{"damage", 3}, {"line", JsonArray{JsonArray{1, 2}, JsonArray{4, 8}}}},
+    JsonObject{{"damage", 3}, {"poly", JsonArray{JsonArray{1, 3}, JsonArray{4, 7}, JsonArray{9, 3}}}},
+    JsonObject{{"damage", 3}, {"damageArea", false}}
+  };
+  for (auto const& config : shapes) {
+    auto setup = npcRecoveryWorld(fixture.root(), config);
+    ASSERT_TRUE(setup) << setup.error().what();
+    auto closed = make_scope_exit([&] { EXPECT_TRUE(setup->world->close()); });
+    auto& npc = *setup->npc;
+    ASSERT_TRUE(npc.eval_script("npc.setDamageOnTouch(true)"));
+    auto& movement = npc.movement_controller();
+    float initial_power = npc.status_controller().stat("powerMultiplier");
+    for (int step : {1, 2}) {
+      if (step == 1)
+        movement.set_collision_poly({{0, 1}, {1, -1}, {2, 3}});
+      else
+        movement.set_collision_poly({{0, 1}, {3, 4}, {2, -1}});
+      movement.set_rotation(float(step) * 0.25f);
+      ASSERT_TRUE(npc.eval_script(step == 1 ? "npc.setDamageTeam({type='friendly', team=1})"
+                                           : "npc.setDamageTeam({type='friendly', team=2})"));
+      ASSERT_TRUE(npc.status_controller().setPersistentEffects("contact-test",
+        {StatModifier(StatValueModifier{"powerMultiplier", float(step)})}));
+      auto expected_config = config;
+      if (config == shapes.back()) {
+        auto with_poly = config.set("poly", json_from_polyf(movement.collision_poly()));
+        ASSERT_TRUE(with_poly) << with_poly.error().what();
+        expected_config = std::move(*with_poly);
+      }
+      auto expected = DamageSource::create(expected_config);
+      ASSERT_TRUE(expected) << expected.error().what();
+      if (std::holds_alternative<PolyF>(expected->damage_area))
+        std::get<PolyF>(expected->damage_area).rotate(movement.rotation());
+      auto power = npc.status_controller().stat("powerMultiplier");
+      EXPECT_NE(power, initial_power);
+      initial_power = power;
+      expected->damage *= power;
+      expected->team = npc.getTeam();
+      EXPECT_EQ(expected->team.team, step);
+      expected->source_entity_id = npc.entityId();
+      auto actual = npc.damage_sources();
+      ASSERT_TRUE(actual) << actual.error().what();
+      ASSERT_FALSE(actual->empty());
+      EXPECT_EQ(actual->back(), *expected);
+      auto repeated = npc.damage_sources();
+      ASSERT_TRUE(repeated) << repeated.error().what();
+      EXPECT_EQ(*repeated, *actual);
+    }
+  }
+
+  auto invalid = npcRecoveryWorld(fixture.root(), JsonObject{{"line", false}});
+  ASSERT_TRUE(invalid) << invalid.error().what();
+  auto closed = make_scope_exit([&] { EXPECT_TRUE(invalid->world->close()); });
+  EXPECT_TRUE(invalid->npc->damage_sources());
+  ASSERT_TRUE(invalid->npc->eval_script("npc.setDamageOnTouch(true)"));
+  EXPECT_FALSE(invalid->npc->damage_sources());
+  ASSERT_TRUE(invalid->npc->eval_script("npc.setDamageOnTouch(false)"));
+  EXPECT_TRUE(invalid->npc->damage_sources());
+});
+
+const GameTestRegistration npc_ordered_drawables("RootTest", "NpcDrawablesPreserveOrderAndWorldPosition", [](GameTest& fixture) {
+  struct Drawables : NullRenderCallback {
+    std::expected<void, StarException> add_drawable(Drawable drawable, EntityRenderLayer layer) override {
+      parts.emplace_back(std::move(drawable), layer);
+      return {};
+    }
+    List<std::pair<Drawable, EntityRenderLayer>> parts;
+  };
+  auto setup = npcRecoveryWorld(fixture.root());
+  ASSERT_TRUE(setup) << setup.error().what();
+  auto closed = make_scope_exit([&] { EXPECT_TRUE(setup->world->close()); });
+  auto& npc = *setup->npc;
+  Drawables first;
+  ASSERT_TRUE(npc.render(first));
+  auto pose = npc.humanoid();
+  ASSERT_TRUE(pose) << pose.error().what();
+  auto expected = (*pose)->render(true, true, first.presentation().interpolation());
+  ASSERT_TRUE(expected) << expected.error().what();
+  ASSERT_FALSE(expected->empty());
+  ASSERT_GE(first.parts.size(), expected->size());
+  for (std::size_t i = 0; i < expected->size(); ++i) {
+    (*expected)[i].translate(npc.position());
+    EXPECT_EQ(first.parts[i].first, (*expected)[i]);
+    EXPECT_EQ(first.parts[i].second, render_layer_npc);
+  }
+  Drawables repeated;
+  ASSERT_TRUE(npc.render(repeated));
+  EXPECT_EQ(repeated.parts, first.parts);
+});
+
+const GameTestRegistration npc_appearance_transaction(
+    "RootTest", "NpcAppearanceReplacementRetainsLiveStateOnFailure", [](GameTest& fixture) {
+  auto setup = npcRecoveryWorld(fixture.root());
+  ASSERT_TRUE(setup) << setup.error().what();
+  auto closed = make_scope_exit([&] { EXPECT_TRUE(setup->world->close()); });
+  auto& npc = *setup->npc;
+  auto script = npc.eval_script(R"LUA(
+    -- Keep vanilla body sprites but do not carry species-specific hair
+    -- sprites through setSpecies, which deliberately changes only species.
+    local appearance = npc.humanoidIdentity()
+    appearance.hairType = ""
+    appearance.facialHairType = ""
+    appearance.facialMaskType = ""
+    npc.setHumanoidIdentity(appearance)
+    storage.refreshes = 0
+    function refreshHumanoidParameters()
+      storage.refreshes = storage.refreshes + 1
+      local species = npc.humanoidIdentity().species
+      assert(species == "apex" or species == "floran")
+      animator.setAnimationRate(species == "apex" and 0.5 or 1.25)
+    end
+    npc.setSpecies("apex")
+    assert(storage.refreshes == 1 and animator.animationRate() == 0.5)
+    return true
+  )LUA");
+  ASSERT_TRUE(script && *script);
+  auto body = npc.humanoid();
+  ASSERT_TRUE(body) << body.error().what();
+  ASSERT_EQ((*body)->identity().species, "apex");
+  ASSERT_EQ(npc.identity().species, "apex");
+  auto portrait = npc.portrait(PortraitMode::Full);
+  ASSERT_TRUE(portrait) << portrait.error().what();
+  ASSERT_FALSE(portrait->empty());
+  auto disk = npc.disk_store();
+  ASSERT_TRUE(disk) << disk.error().what();
+
+  NetCompatibilityRules rules(open_protocol_version);
+  auto initial = npc.net_store(rules);
+  ASSERT_TRUE(initial) << initial.error().what();
+  auto replica = Npc::create(fixture.root(), *initial, rules);
+  ASSERT_TRUE(replica) << replica.error().what();
+  ASSERT_TRUE((*replica)->init(*setup->world, 101, EntityMode::Slave));
+  auto uninit = make_scope_exit([&] { EXPECT_TRUE((*replica)->uninit()); });
+  auto full = npc.write_net_state(0, rules);
+  ASSERT_TRUE(full) << full.error().what();
+  ASSERT_TRUE((*replica)->read_net_state(full->first, 0.0f, rules));
+  ASSERT_EQ((*replica)->identity().species, "apex");
+  ASSERT_TRUE((*replica)->enable_interpolation(0.0f));
+
+  auto rejected = npc.identity();
+  rejected.name = "unpublished";
+  rejected.gender = static_cast<Gender>(255);
+  EXPECT_FALSE(npc.set_identity(rejected)); // Same-body update.
+  rejected.species = "floran";
+  EXPECT_FALSE(npc.set_identity(std::move(rejected))); // Replacement build.
+  auto failed_script = npc.eval_script(R"LUA(
+    local ok = pcall(npc.setSpecies, "missing-appearance-test-species")
+    assert(not ok and storage.refreshes == 1)
+    assert(npc.humanoidIdentity().species == "apex" and animator.animationRate() == 0.5)
+    return true
+  )LUA");
+  ASSERT_TRUE(failed_script && *failed_script);
+  auto retained_body = npc.humanoid();
+  ASSERT_TRUE(retained_body) << retained_body.error().what();
+  EXPECT_EQ(*retained_body, *body);
+  auto retained_portrait = npc.portrait(PortraitMode::Full);
+  ASSERT_TRUE(retained_portrait) << retained_portrait.error().what();
+  EXPECT_EQ(*retained_portrait, *portrait);
+  auto retained_disk = npc.disk_store();
+  ASSERT_TRUE(retained_disk) << retained_disk.error().what();
+  EXPECT_EQ(*retained_disk, *disk);
+  auto unchanged = npc.write_net_state(full->second, rules);
+  ASSERT_TRUE(unchanged) << unchanged.error().what();
+  EXPECT_TRUE(unchanged->first.empty());
+  ASSERT_TRUE((*replica)->read_net_state(unchanged->first, 0.0f, rules));
+  EXPECT_EQ((*replica)->identity().species, "apex");
+
+  auto recovered = npc.eval_script(R"LUA(
+    local previous = animator.animationRate
+    npc.setSpecies("floran")
+    assert(storage.refreshes == 2 and npc.humanoidIdentity().species == "floran")
+    assert(animator.animationRate() == 1.25 and not pcall(previous))
+    return true
+  )LUA");
+  ASSERT_TRUE(recovered && *recovered);
+  auto current = npc.humanoid();
+  ASSERT_TRUE(current) << current.error().what();
+  EXPECT_NE(*current, *body);
+  EXPECT_EQ((*body)->identity().species, "apex");
+  EXPECT_EQ((*body)->networked_animator()->get().animation_rate(), 0.5f);
+  EXPECT_EQ(npc.identity().species, "floran");
+  EXPECT_EQ((*current)->networked_animator()->get().animation_rate(), 1.25f);
+  auto delta = npc.write_net_state(unchanged->second, rules);
+  ASSERT_TRUE(delta) << delta.error().what();
+  ASSERT_TRUE((*replica)->read_net_state(delta->first, 0.25f, rules));
+  auto replica_body = (*replica)->humanoid();
+  ASSERT_TRUE(replica_body) << replica_body.error().what();
+  EXPECT_EQ((*replica_body)->identity().species, "floran");
+  EXPECT_EQ((*replica)->identity().species, "floran");
+  ASSERT_TRUE((*replica)->disable_interpolation());
+  auto finalized_replica_body = (*replica)->humanoid();
+  ASSERT_TRUE(finalized_replica_body) << finalized_replica_body.error().what();
+  EXPECT_EQ(*finalized_replica_body, *replica_body);
+  EXPECT_EQ((*replica)->identity().species, "floran");
+  EXPECT_TRUE((*replica)->portrait(PortraitMode::Full));
+});
 
 const GameTestRegistration npcUpdateRecovery(
   "LuaHostRecovery", "NpcUpdateFailureRemovesNpcWithoutFailingWorld", [](GameTest& fixture) {
@@ -1487,15 +1698,15 @@ const GameTestRegistration luaEntityIdentifiers(
     auto world = WorldServer::create(fixture.root(), Vec2U(2048, 2048), *storage);
     ASSERT_TRUE(world);
     auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
-    auto database = fixture.root().npcDatabase();
+    auto database = fixture.root().npc_database();
     ASSERT_TRUE(database);
-    auto variant = (*database)->generateNpcVariant("human", "villager", 1.0f, 1234, JsonObject());
+    auto variant = (*database)->generate_npc_variant("human", "villager", 1.0f, 1234, JsonObject());
     ASSERT_TRUE(variant);
-    auto npc = (*database)->createNpc(*variant);
+    auto npc = (*database)->create_npc(std::move(*variant));
     ASSERT_TRUE(npc);
     ASSERT_TRUE((*world)->addEntity(*npc));
     String identifier(std::string_view("\0before\0\0after\0", 15));
-    (*npc)->setUniqueId(identifier);
+    (*npc)->set_unique_id(identifier);
     auto luaRoot = LuaRoot::create(fixture.root());
     ASSERT_TRUE(luaRoot);
     for (bool restart : {false, true}) {

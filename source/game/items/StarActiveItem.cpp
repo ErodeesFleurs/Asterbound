@@ -228,7 +228,7 @@ std::expected<void, StarException> ActiveItem::init(ToolUserEntity& owner, ToolH
     auto animatorCallbacks = LuaBindings::make_networked_animator_callbacks(*m_itemAnimator).and_then([&](LuaCallbacks callbacks) { return m_script.add_callbacks("animator", std::move(callbacks)); });
     if (!animatorCallbacks)
       return std::unexpected(std::move(animatorCallbacks.error()));
-    auto statusCallbacks = LuaBindings::makeStatusControllerCallbacks(owner.statusController()).and_then([&](LuaCallbacks callbacks) { return m_script.add_callbacks("status", std::move(callbacks)); });
+    auto statusCallbacks = LuaBindings::makeStatusControllerCallbacks(owner.status_controller()).and_then([&](LuaCallbacks callbacks) { return m_script.add_callbacks("status", std::move(callbacks)); });
     if (!statusCallbacks)
       return std::unexpected(std::move(statusCallbacks.error()));
     auto movementCallbacks = m_script.add_actor_movement_callbacks(owner.movement_controller());
@@ -439,7 +439,7 @@ std::expected<List<DamageSource>, StarException> ActiveItem::damageSources() con
       auto itemOwner = owner();
       if (!itemOwner)
         return std::unexpected(std::move(itemOwner.error()));
-      if (itemOwner->get().facingDirection() == Direction::Left)
+      if (itemOwner->get().facing_direction() == Direction::Left)
         poly.flip_horizontal(0.0f);
       auto position = handPosition(Vec2F());
       if (!position)
@@ -451,7 +451,7 @@ std::expected<List<DamageSource>, StarException> ActiveItem::damageSources() con
       auto itemOwner = owner();
       if (!itemOwner)
         return std::unexpected(std::move(itemOwner.error()));
-      if (itemOwner->get().facingDirection() == Direction::Left)
+      if (itemOwner->get().facing_direction() == Direction::Left)
         line.flip_horizontal(0.0f);
       auto position = handPosition(Vec2F());
       if (!position)
@@ -470,7 +470,7 @@ std::expected<List<PolyF>, StarException> ActiveItem::shieldPolys() const {
     auto itemOwner = owner();
     if (!itemOwner)
       return std::unexpected(std::move(itemOwner.error()));
-    if (itemOwner->get().facingDirection() == Direction::Left)
+    if (itemOwner->get().facing_direction() == Direction::Left)
       sp.flip_horizontal(0.0f);
     auto position = handPosition(Vec2F());
     if (!position)
@@ -494,7 +494,7 @@ std::expected<List<PhysicsForceRegion>, StarException> ActiveItem::force_regions
   if (!item_hand)
     return std::unexpected(std::move(item_hand.error()));
   auto const& actor = item_owner->get();
-  auto facing = actor.facingDirection();
+  auto facing = actor.facing_direction();
   float angle = m_armAngle.get();
   auto hand_offset = active_hand_position(actor, *item_hand, facing, angle, {});
   if (!hand_offset)
@@ -599,7 +599,7 @@ std::expected<void, StarException> ActiveItem::append_light_sources(List<LightSo
       return std::unexpected(std::move(offset.error()));
     light.position = item_owner->get().position() + *offset;
     light.beam_angle += m_armAngle.get();
-    if (item_owner->get().facingDirection() == Direction::Left) {
+    if (item_owner->get().facing_direction() == Direction::Left) {
       if (light.beam_angle > 0)
         light.beam_angle = std::numbers::pi / 2 + normalize_angle(std::numbers::pi / 2 - light.beam_angle);
       else
@@ -647,7 +647,7 @@ std::expected<List<Particle>, StarException> ActiveItem::pullNewParticles() {
       return std::unexpected(std::move(position.error()));
     particle.position = itemOwner->get().position() + *position;
     particle.velocity = particle.velocity.rotate(m_armAngle.get());
-    if (itemOwner->get().facingDirection() == Direction::Left) {
+    if (itemOwner->get().facing_direction() == Direction::Left) {
       particle.velocity[0] *= -1;
       particle.flip = !particle.flip;
     }
@@ -685,7 +685,7 @@ std::expected<Vec2F, StarException> ActiveItem::armPosition(Vec2F const& offset)
   auto itemHand = hand();
   if (!itemHand)
     return std::unexpected(std::move(itemHand.error()));
-  return itemOwner->get().arm_position(*itemHand, itemOwner->get().facingDirection(), m_armAngle.get(), offset);
+  return itemOwner->get().arm_position(*itemHand, itemOwner->get().facing_direction(), m_armAngle.get(), offset);
 }
 
 std::expected<Vec2F, StarException> ActiveItem::handPosition(Vec2F const& offset) const {
@@ -695,7 +695,7 @@ std::expected<Vec2F, StarException> ActiveItem::handPosition(Vec2F const& offset
   auto item_hand = hand();
   if (!item_hand)
     return std::unexpected(std::move(item_hand.error()));
-  return active_hand_position(item_owner->get(), *item_hand, item_owner->get().facingDirection(), m_armAngle.get(), offset);
+  return active_hand_position(item_owner->get(), *item_hand, item_owner->get().facing_direction(), m_armAngle.get(), offset);
 }
 
 std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks() {
@@ -709,11 +709,11 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
     }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("ownerAimPosition", [this]() {
-      return owner().and_then([](std::reference_wrapper<ToolUserEntity> owner) { return owner.get().aimPosition(); });
+      return owner().and_then([](std::reference_wrapper<ToolUserEntity> owner) { return owner.get().aim_position(); });
     }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("ownerPowerMultiplier", [this]() {
-      return owner().and_then([](std::reference_wrapper<ToolUserEntity> owner) { return owner.get().powerMultiplier(); });
+      return owner().and_then([](std::reference_wrapper<ToolUserEntity> owner) { return owner.get().power_multiplier(); });
     }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback(
@@ -745,7 +745,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       auto item_hand = hand();
       if (!item_hand)
         return std::unexpected(std::move(item_hand.error()));
-      auto rotation_center = item_owner->get().arm_position(*item_hand, item_owner->get().facingDirection(), 0.0f, Vec2F());
+      auto rotation_center = item_owner->get().arm_position(*item_hand, item_owner->get().facing_direction(), 0.0f, Vec2F());
       if (!rotation_center)
         return std::unexpected(std::move(rotation_center.error()));
       Vec2F hand_rotation_center = *rotation_center;
@@ -755,7 +755,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
         return std::unexpected(std::move(item_world.error()));
       Vec2F to_target = item_world->get().geometry().diff(target_position, owner_position);
       // Keep the target beyond the hand's rotation center to avoid rapid flips.
-      auto dir = numerical_direction(item_owner->get().facingDirection());
+      auto dir = numerical_direction(item_owner->get().facing_direction());
       auto target_x = to_target[0] * dir;
       auto center_x = hand_rotation_center[0] * dir;
       if (center_x >= 0 && target_x >= 0 && target_x < center_x)
@@ -775,7 +775,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       auto item_hand = hand();
       if (!item_hand)
         return std::unexpected(std::move(item_hand.error()));
-      auto rotation_center = item_owner->get().arm_position(*item_hand, item_owner->get().facingDirection(), 0.0f, Vec2F());
+      auto rotation_center = item_owner->get().arm_position(*item_hand, item_owner->get().facing_direction(), 0.0f, Vec2F());
       if (!rotation_center)
         return std::unexpected(std::move(rotation_center.error()));
       Vec2F hand_rotation_center = *rotation_center;
@@ -933,7 +933,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       auto itemHand = hand();
       if (!itemHand)
         return std::unexpected(std::move(itemHand.error()));
-      if (auto otherHandItem = itemOwner->get().handItem(*itemHand == ToolHand::Primary ? ToolHand::Alt : ToolHand::Primary)) {
+      if (auto otherHandItem = itemOwner->get().hand_item(*itemHand == ToolHand::Primary ? ToolHand::Alt : ToolHand::Primary)) {
         if (auto otherActiveItem = as<ActiveItem>(otherHandItem))
           return recover_lua_script_error(otherActiveItem->m_script.invoke(function, args)).transform([](std::optional<LuaValue> value) {
             return std::move(value).value_or(LuaValue{});
@@ -964,7 +964,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       if (!itemOwner)
         return std::unexpected(std::move(itemOwner.error()));
       if (auto entity = as_ref<EmoteEntity>(itemOwner->get()))
-        return entity->get().playEmote(emote->get());
+        return entity->get().play_emote(emote->get());
       return {};
     }); !added)
     return std::unexpected(std::move(added.error()));
@@ -972,7 +972,7 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeActiveItemCallbacks()
       auto itemOwner = owner();
       if (!itemOwner)
         return std::unexpected(std::move(itemOwner.error()));
-      itemOwner->get().setCameraFocusEntity(entity);
+      itemOwner->get().set_camera_focus_entity(entity);
       return {};
     }); !added)
     return std::unexpected(std::move(added.error()));
@@ -1002,13 +1002,13 @@ std::expected<LuaCallbacks, StarException> ActiveItem::makeScriptedAnimationCall
     }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("ownerAimPosition", [this]() {
-      return owner().and_then([](std::reference_wrapper<ToolUserEntity> owner) { return owner.get().aimPosition(); });
+      return owner().and_then([](std::reference_wrapper<ToolUserEntity> owner) { return owner.get().aim_position(); });
     }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("ownerArmAngle", [this]() { return m_armAngle.get(); }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("ownerFacingDirection", [this]() {
-      return owner().transform([](std::reference_wrapper<ToolUserEntity> owner) { return numerical_direction(owner.get().facingDirection()); });
+      return owner().transform([](std::reference_wrapper<ToolUserEntity> owner) { return numerical_direction(owner.get().facing_direction()); });
     }); !added)
     return std::unexpected(std::move(added.error()));
   if (auto added = callbacks.register_callback("handPosition", [this](std::optional<Vec2F> offset) { return handPosition(offset.value_or(Vec2F{})); }); !added)

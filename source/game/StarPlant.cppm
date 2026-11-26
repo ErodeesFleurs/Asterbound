@@ -142,7 +142,7 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
 
-  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& render_callback) override;
+  [[nodiscard]] std::expected<void, StarException> collect_render_events(RenderCallback& render_callback) override;
 
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback) override;
 
@@ -154,7 +154,7 @@ public:
   bool ceiling() const;
 
   List<PlantPiece> pieces() const;
-  RectF interactiveBoundBox() const override;
+  RectF interactive_bound_box() const override;
 
 private:
   [[nodiscard]] std::expected<void, StarException> initialize(ByteArray const& net_store, NetCompatibilityRules rules);

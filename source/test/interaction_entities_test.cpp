@@ -69,12 +69,12 @@ const GameTestRegistration entity_scripts("InteractionEntities", "ObjectNpcAndMo
   ASSERT_TRUE((*object)->eval_script("function onInteraction(r) return {'Message', {r.sourceId, r.source}} end"));
   expect_action(**object, request, InteractActionType::Message, JsonArray{37, JsonArray{3, 4}});
 
-  auto npcs = root.npcDatabase();
+  auto npcs = root.npc_database();
   ASSERT_TRUE(npcs);
-  auto villager = (*npcs)->generateNpcVariant("human", "villager", 1, 1234, JsonObject{});
+  auto villager = (*npcs)->generate_npc_variant("human", "villager", 1, 1234, JsonObject{});
   ASSERT_TRUE(villager) << villager.error().what();
   villager->scripts.clear();
-  auto npc = (*npcs)->createNpc(*villager);
+  auto npc = (*npcs)->create_npc(std::move(*villager));
   ASSERT_TRUE(npc) << npc.error().what();
   ASSERT_TRUE((*npc)->init(**world, 2, EntityMode::Master));
   auto release_npc = make_scope_exit([&] { EXPECT_TRUE((*npc)->uninit()); });

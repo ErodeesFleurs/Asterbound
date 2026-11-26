@@ -138,21 +138,21 @@ public:
   // Return the damage that would result from being hit by the given damage
   // source.  Will be called on master and slave entities.  Culling based on
   // team damage and self damage will be done outside of this query.
-  [[nodiscard]] virtual std::expected<std::optional<HitType>, StarException> queryHit(DamageSource const& source) const;
+  [[nodiscard]] virtual std::expected<std::optional<HitType>, StarException> query_hit(DamageSource const& source) const;
 
   // Return the polygonal area in which the entity can be hit. Not used for
   // actual hit computation, only for determining more precisely where a
   // hit intersection occurred (e.g. by projectiles)
-  [[nodiscard]] virtual std::expected<std::optional<PolyF>, StarException> hitPoly() const;
+  [[nodiscard]] virtual std::expected<std::optional<PolyF>, StarException> hit_poly() const;
 
   // Apply a request to damage this entity. Will only be called on Master
   // entities. DamageRequest might be adjusted based on protection and other
   // effects
-  [[nodiscard]] virtual std::expected<List<DamageNotification>, StarException> applyDamage(DamageRequest const& damage);
+  [[nodiscard]] virtual std::expected<List<DamageNotification>, StarException> apply_damage(DamageRequest const& damage);
 
   // Pull any pending damage notifications applied internally, only called on
   // Master entities.
-  [[nodiscard]] virtual std::expected<List<DamageNotification>, StarException> selfDamageNotifications();
+  [[nodiscard]] virtual std::expected<List<DamageNotification>, StarException> self_damage_notifications();
 
   // Called on master entities when a DamageRequest has been generated due to a
   // DamageSource from this entity being applied to another entity.  Will be
@@ -162,7 +162,7 @@ public:
   // Called on master entities when this entity has damaged another entity.
   // Only called on the *source entity* of the damage, which may be different
   // than the causing entity.
-  [[nodiscard]] virtual std::expected<void, StarException> damagedOther(DamageNotification const& damage);
+  [[nodiscard]] virtual std::expected<void, StarException> damaged_other(DamageNotification const& damage);
 
   // Returning true here indicates that this entity should be removed from the
   // world, default returns false.
@@ -182,7 +182,7 @@ public:
 
   // Once-only client presentation effects, collected after each fixed tick even
   // when the entity is outside the display window.
-  [[nodiscard]] virtual std::expected<void, StarException> collectRenderEvents(RenderCallback& renderer);
+  [[nodiscard]] virtual std::expected<void, StarException> collect_render_events(RenderCallback& renderer);
 
   virtual std::uint64_t presentation_epoch() const;
   void resetPresentation();
@@ -230,7 +230,7 @@ protected:
 
   void setPersistent(bool persistent);
   void setKeepAlive(bool keepAlive);
-  void setUniqueId(std::optional<String> uniqueId);
+  void set_unique_id(std::optional<String> uniqueId);
   void setTeam(EntityDamageTeam newTeam);
 
 private:

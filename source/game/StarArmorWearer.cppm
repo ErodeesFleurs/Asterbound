@@ -66,7 +66,6 @@ private:
   struct Armor {
     std::shared_ptr<ArmorItem> item;
     bool visible = true;
-    bool needs_sync = true;
     bool needs_store = true;
     NetElementData<ItemDescriptor> net_state;
   };
@@ -76,17 +75,31 @@ private:
   static constexpr std::uint8_t slot_count = 20;
   static constexpr std::uint32_t all_slots = (std::uint32_t{1} << slot_count) - 1;
 
+public:
+  class Appearance {
+    friend class ArmorWearer;
+
+    Array<std::uint8_t, 4> worn_cosmetic_types{};
+    std::uint32_t visible_slots = 0;
+    std::uint32_t flipping_slots = 0;
+    std::uint32_t pending_wearables = all_slots;
+    std::uint32_t changed_items = all_slots;
+    bool dirty = true;
+    bool config_dirty = true;
+    Gender last_gender{};
+    Direction last_direction{};
+    bool last_nude = false;
+  };
+
+  // Prepare a fresh body without changing what the live wearer has applied.
+  [[nodiscard]] std::expected<Appearance, StarException> prepare_humanoid_replacement(Humanoid& humanoid, bool force_nude) const;
+  void commit_humanoid_replacement(Appearance appearance);
+
+private:
+  [[nodiscard]] std::expected<bool, StarException> apply_humanoid_appearance(Humanoid& humanoid, bool force_nude, Appearance& appearance) const;
+
   Array<Armor, slot_count> m_armors;
-  Array<std::uint8_t, 4> m_worn_cosmetic_types;
-  // Derived from equipment; pending writes target the wearer's single Humanoid.
-  std::uint32_t m_visible_slots = 0;
-  std::uint32_t m_flipping_slots = 0;
-  std::uint32_t m_pending_wearables = all_slots;
-  bool m_appearance_dirty = true;
-  bool m_config_dirty = true;
-  Gender m_last_gender{};
-  Direction m_last_direction{};
-  bool m_last_nude = false;
+  Appearance m_appearance;
 };
 
 // Commit armor before querying tools; failures preserve earlier category updates.

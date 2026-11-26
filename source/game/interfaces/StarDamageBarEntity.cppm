@@ -49,8 +49,8 @@ public:
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<DamageBarEntity>(); }
 
   virtual float health() const = 0;
-  [[nodiscard]] virtual std::expected<float, StarException> maxHealth() const = 0;
-  virtual DamageBarType damageBar() const = 0;
+  [[nodiscard]] virtual std::expected<float, StarException> max_health() const = 0;
+  virtual DamageBarType damage_bar() const = 0;
 };
 
 }

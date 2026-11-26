@@ -904,7 +904,7 @@ std::expected<void, StarException> Quest::initScriptBindings() {
   if (!entity) return std::unexpected(std::move(entity.error()));
   auto addedEntity = m_scriptComponent.add_callbacks("entity", std::move(*entity));
   if (!addedEntity) return std::unexpected(std::move(addedEntity.error()));
-  auto status = LuaBindings::makeStatusControllerCallbacks(m_player->get().statusController());
+  auto status = LuaBindings::makeStatusControllerCallbacks(m_player->get().status_controller());
   if (!status) return std::unexpected(std::move(status.error()));
   auto addedStatus = m_scriptComponent.add_callbacks("status", std::move(*status));
   if (!addedStatus) return std::unexpected(std::move(addedStatus.error()));

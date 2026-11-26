@@ -1542,7 +1542,7 @@ const GameTestRegistration crafting_batch_accounting("ItemTest", "CraftingBatchA
   Entity& entity = player;
   ASSERT_TRUE(entity.init(**world, 100, EntityMode::Master));
   auto uninit = make_scope_exit([&] { EXPECT_TRUE(entity.uninit()); });
-  ASSERT_FALSE(player.isAdmin());
+  ASSERT_FALSE(player.is_admin());
   auto& inventory = *player.inventory();
   auto plain = inventory_test_item(**db, "perfectlygenericitem", 4);
   auto marked = inventory_test_item(**db, "perfectlygenericitem", 7, JsonObject{{"grade", 1}});
@@ -2544,7 +2544,7 @@ const GameTestRegistration
       ASSERT_GT(stripes, 3);
       auto const vertex = point_at(start, end, 1.f / static_cast<float>(stripes / 3 + 1));
       EXPECT_LT((first->line_part().line.max() - vertex).magnitude(), .001f);
-      ASSERT_TRUE(player.collectRenderEvents(discard));
+      ASSERT_TRUE(player.collect_render_events(discard));
 
       // This private Root has no UniverseServer/background simulation threads.
       constexpr std::uint64_t seed = 0x4245414d5449434b;
@@ -2571,7 +2571,7 @@ const GameTestRegistration
         EXPECT_FALSE(sampled->empty());
       }
       Events events;
-      ASSERT_TRUE(player.collectRenderEvents(events));
+      ASSERT_TRUE(player.collect_render_events(events));
       EXPECT_TRUE(events.particles.empty());
       EXPECT_EQ(root.random().next_u64(), untouched.next_u64());
 
@@ -2581,7 +2581,7 @@ const GameTestRegistration
         ASSERT_TRUE(sampled);
         EXPECT_TRUE(sampled->empty());
       }
-      ASSERT_TRUE(player.collectRenderEvents(events));
+      ASSERT_TRUE(player.collect_render_events(events));
       ASSERT_GT(events.particles.size(), 4u);
       // At targetSegmentRun=1 the broken beam deposits approximately two
       // particles per tile of arc. Chords may shorten across the turnaround.
@@ -2597,10 +2597,10 @@ const GameTestRegistration
       EXPECT_GT(furthest_x, player.position()[0] + far_end[0] + 4);
       EXPECT_NEAR((previous_particle - (player.position() + far_end)).magnitude(), 1.f, .05f);
       auto count = events.particles.size();
-      ASSERT_TRUE(player.collectRenderEvents(events));
+      ASSERT_TRUE(player.collect_render_events(events));
       EXPECT_EQ(events.particles.size(), count);
       ASSERT_TRUE((*tools)->tick(dt, false, {}));
-      ASSERT_TRUE(player.collectRenderEvents(events));
+      ASSERT_TRUE(player.collect_render_events(events));
       EXPECT_EQ(events.particles.size(), count);
       auto nextRandom = root.random().next_u64();
       if (displayCalls == 0) {
@@ -2621,7 +2621,7 @@ const GameTestRegistration
       (*tools)->suppressItems(false);
       ASSERT_TRUE((*tools)->tick(dt, false, {}));
       Events revealed;
-      ASSERT_TRUE(player.collectRenderEvents(revealed));
+      ASSERT_TRUE(player.collect_render_events(revealed));
       EXPECT_TRUE(revealed.particles.empty());
     }
   });
@@ -2706,7 +2706,7 @@ end
       auto directed = state->set("facingDirection", facing == Direction::Left ? Json("left") : Json("right"));
       ASSERT_TRUE(directed);
       ASSERT_TRUE(movement.load_state(*directed));
-      ASSERT_EQ(player.facingDirection(), facing);
+      ASSERT_EQ(player.facing_direction(), facing);
       auto offset = player.hand_offset(ToolHand::Primary, facing);
       ASSERT_TRUE(offset);
       auto arm = player.arm_position(ToolHand::Primary, facing, 0.7f, *offset);

@@ -107,11 +107,11 @@ public:
   ClientEntityMode client_entity_mode() const override;
 
   [[nodiscard]] std::expected<List<DamageSource>, StarException> damage_sources() const override;
-  [[nodiscard]] std::expected<std::optional<HitType>, StarException> queryHit(DamageSource const& source) const override;
-  [[nodiscard]] std::expected<std::optional<PolyF>, StarException> hitPoly() const override;
+  [[nodiscard]] std::expected<std::optional<HitType>, StarException> query_hit(DamageSource const& source) const override;
+  [[nodiscard]] std::expected<std::optional<PolyF>, StarException> hit_poly() const override;
 
-  [[nodiscard]] std::expected<List<DamageNotification>, StarException> applyDamage(DamageRequest const& damage) override;
-  [[nodiscard]] std::expected<List<DamageNotification>, StarException> selfDamageNotifications() override;
+  [[nodiscard]] std::expected<List<DamageNotification>, StarException> apply_damage(DamageRequest const& damage) override;
+  [[nodiscard]] std::expected<List<DamageNotification>, StarException> self_damage_notifications() override;
 
   [[nodiscard]] std::expected<void, StarException> init(World& world, EntityId entityId, EntityMode mode) override;
   [[nodiscard]] std::expected<void, StarException> uninit() override;
@@ -131,7 +131,7 @@ public:
 
   std::uint64_t presentation_epoch() const override;
 
-  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& renderer) override;
+  [[nodiscard]] std::expected<void, StarException> collect_render_events(RenderCallback& renderer) override;
 
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& renderer) override;
 
@@ -144,8 +144,8 @@ public:
 
   [[nodiscard]] MessageResponseResult receive_message(ConnectionId sending_connection, String const& message, JsonArray const& args) override;
 
-  RectF interactiveBoundBox() const override;
-  bool isInteractive() const override;
+  RectF interactive_bound_box() const override;
+  bool is_interactive() const override;
   [[nodiscard]] std::expected<InteractAction, StarException> interact(InteractRequest const& request) override;
 
   std::size_t anchorCount() const override;

@@ -101,7 +101,7 @@ public:
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<LoungingEntity>(); }
 
-  virtual std::optional<EntityAnchorState> loungingIn() const = 0;
+  virtual std::optional<EntityAnchorState> lounging_in() const = 0;
   // Returns true if the entity is in a lounge achor, but other entities are
   // also reporting being in that lounge anchor.
   [[nodiscard]] std::expected<bool, StarException> inConflictingLoungeAnchor() const;

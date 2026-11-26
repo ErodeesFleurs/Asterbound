@@ -363,7 +363,7 @@ std::expected<void, StarException> Root::reload() {
     // These databases depend on various things below, but not the item database
     std::lock_guard objectDatabaseLock(m_objectDatabaseMutex);
     std::lock_guard playerFactoryLock(m_playerFactoryMutex);
-    std::lock_guard npcDatabaseLock(m_npcDatabaseMutex);
+    std::lock_guard npc_database_lock(m_npc_database_mutex);
     std::lock_guard stagehandDatabaseLock(m_stagehandDatabaseMutex);
     std::lock_guard vehicleDatabaseLock(m_vehicleDatabaseMutex);
     std::lock_guard monster_database_lock(m_monster_database_mutex);
@@ -426,7 +426,7 @@ std::expected<void, StarException> Root::reload() {
     m_playerFactory.reset();
     m_stagehandDatabase.reset();
     m_vehicleDatabase.reset();
-    m_npcDatabase.reset();
+    m_npc_database.reset();
     m_monster_database.reset();
     m_plantDatabase.reset();
     m_projectileDatabase.reset();
@@ -525,7 +525,7 @@ std::expected<void, StarException> Root::fullyLoad() {
   add(&Root::treasureDatabase);
   add(&Root::material_database);
   add(&Root::objectDatabase);
-  add(&Root::npcDatabase);
+  add(&Root::npc_database);
   add(&Root::plantDatabase);
   add(&Root::itemDatabase);
   add(&Root::monster_database);
@@ -756,8 +756,8 @@ std::expected<std::shared_ptr<MonsterDatabase const>, StarException> Root::monst
   return loadMember(m_monster_database, m_monster_database_mutex, "MonsterDatabase", *this);
 }
 
-std::expected<std::shared_ptr<NpcDatabase const>, StarException> Root::npcDatabase() {
-  return loadMember(m_npcDatabase, m_npcDatabaseMutex, "NpcDatabase", *this);
+std::expected<std::shared_ptr<NpcDatabase const>, StarException> Root::npc_database() {
+  return loadMember(m_npc_database, m_npc_database_mutex, "NpcDatabase", *this);
 }
 
 std::expected<std::shared_ptr<StagehandDatabase const>, StarException> Root::stagehandDatabase() {

@@ -169,7 +169,7 @@ public:
   [[nodiscard]] std::expected<std::shared_ptr<PlantDatabase const>, StarException> plantDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<ProjectileDatabase const>, StarException> projectileDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<MonsterDatabase const>, StarException> monster_database();
-  [[nodiscard]] std::expected<std::shared_ptr<NpcDatabase const>, StarException> npcDatabase();
+  [[nodiscard]] std::expected<std::shared_ptr<NpcDatabase const>, StarException> npc_database();
   [[nodiscard]] std::expected<std::shared_ptr<StagehandDatabase const>, StarException> stagehandDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<VehicleDatabase const>, StarException> vehicleDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<PlayerFactory const>, StarException> playerFactory();
@@ -291,8 +291,8 @@ private:
   std::shared_ptr<MonsterDatabase> m_monster_database;
   std::mutex m_monster_database_mutex;
 
-  std::shared_ptr<NpcDatabase> m_npcDatabase;
-  std::mutex m_npcDatabaseMutex;
+  std::shared_ptr<NpcDatabase> m_npc_database;
+  std::mutex m_npc_database_mutex;
 
   std::shared_ptr<StagehandDatabase> m_stagehandDatabase;
   std::mutex m_stagehandDatabaseMutex;

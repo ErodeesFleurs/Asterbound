@@ -56,15 +56,15 @@ using NpcException = StarError<NpcExceptionTag, StarException>;
 
 struct NpcVariant {
   String species;
-  String typeName;
+  String type_name;
   float level;
   std::uint64_t seed;
 
   Json overrides;
 
   StringList scripts;
-  unsigned initialScriptDelta;
-  Json scriptConfig;
+  unsigned initial_script_delta;
+  Json script_config;
 
   std::optional<String> description;
 
@@ -73,61 +73,67 @@ struct NpcVariant {
   bool unique_humanoid_config;
   JsonObject humanoid_parameters;
 
-  Json movementParameters;
-  Json statusControllerSettings;
-  List<PersistentStatusEffect> innateStatusEffects;
-  Json touchDamageConfig;
+  Json movement_parameters;
+  Json status_controller_settings;
+  List<PersistentStatusEffect> innate_status_effects;
+  Json touch_damage_config;
 
   StringMap<ItemDescriptor> items;
 
-  StringList dropPools;
-  bool disableWornArmor;
+  StringList drop_pools;
+  bool disable_worn_armor;
 
   bool persistent;
-  bool keepAlive;
+  bool keep_alive;
 
-  TeamType damageTeamType;
-  std::uint8_t damageTeam;
+  TeamType damage_team_type;
+  std::uint8_t damage_team;
 
-  Vec3B nametagColor;
+  Vec3B nametag_color;
 
   EntitySplashConfig splash_config;
 };
 
 class NpcDatabase {
+  class ConstructionKey {
+    friend class NpcDatabase;
+    ConstructionKey() = default;
+  };
+
 public:
+  explicit NpcDatabase(ConstructionKey, Root& root);
   [[nodiscard]] static std::expected<std::shared_ptr<NpcDatabase>, StarException> create(Root& root);
 
-  [[nodiscard]] std::expected<NpcVariant, StarException> generateNpcVariant(String const& species, String const& typeName, float level, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog = std::nullopt) const;
-  [[nodiscard]] std::expected<NpcVariant, StarException> generateNpcVariant(String const& species, String const& typeName, float level, std::uint64_t seed, Json const& overrides, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog = std::nullopt) const;
+  [[nodiscard]] std::expected<NpcVariant, StarException> generate_npc_variant(String const& species, String const& type_name, float level, std::optional<std::reference_wrapper<ItemDatabase const>> item_catalog = std::nullopt) const;
+  [[nodiscard]] std::expected<NpcVariant, StarException> generate_npc_variant(String const& species, String const& type_name, float level, std::uint64_t seed, Json const& overrides, std::optional<std::reference_wrapper<ItemDatabase const>> item_catalog = std::nullopt) const;
 
-  [[nodiscard]] std::expected<ByteArray, StarException> writeNpcVariant(NpcVariant const& variant, NetCompatibilityRules rules = {}) const;
-  [[nodiscard]] std::expected<NpcVariant, StarException> readNpcVariant(ByteArray const& data, NetCompatibilityRules rules = {}) const;
+  [[nodiscard]] std::expected<ByteArray, StarException> write_npc_variant(NpcVariant const& variant, NetCompatibilityRules rules = {}) const;
+  [[nodiscard]] std::expected<NpcVariant, StarException> read_npc_variant(ByteArray const& data, NetCompatibilityRules rules = {}) const;
 
-  [[nodiscard]] std::expected<Json, StarException> writeNpcVariantToJson(NpcVariant const& variant) const;
-  [[nodiscard]] std::expected<NpcVariant, StarException> readNpcVariantFromJson(Json const& data) const;
+  [[nodiscard]] std::expected<Json, StarException> write_npc_variant_to_json(NpcVariant const& variant) const;
+  [[nodiscard]] std::expected<NpcVariant, StarException> read_npc_variant_from_json(Json const& data) const;
 
-  [[nodiscard]] std::expected<std::shared_ptr<Npc>, StarException> createNpc(NpcVariant const& npcVariant) const;
-  [[nodiscard]] std::expected<std::shared_ptr<Npc>, StarException> diskLoadNpc(Json const& diskStore) const;
+  [[nodiscard]] std::expected<std::shared_ptr<Npc>, StarException> create_npc(NpcVariant variant) const;
+  [[nodiscard]] std::expected<std::shared_ptr<Npc>, StarException> disk_load_npc(Json const& disk_store) const;
   [[nodiscard]] std::expected<std::shared_ptr<Npc>, StarException> net_load_npc(ByteArray const& net_store, NetCompatibilityRules rules = {}) const;
 
-  [[nodiscard]] std::expected<List<Drawable>, StarException> npcPortrait(NpcVariant const& npcVariant, PortraitMode mode, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog = std::nullopt) const;
+  [[nodiscard]] std::expected<List<Drawable>, StarException> npc_portrait(NpcVariant const& npc_variant, PortraitMode mode, std::optional<std::reference_wrapper<ItemDatabase const>> item_catalog = std::nullopt) const;
 
-  [[nodiscard]] std::expected<Json, StarException> buildConfig(String const& typeName, Json const& overrides = Json()) const;
+  [[nodiscard]] std::expected<Json, StarException> build_config(String const& type_name, Json const& overrides = Json()) const;
 
 private:
-  explicit NpcDatabase(Root& root);
   [[nodiscard]] std::expected<void, StarException> initialize();
 
-  // Recursively merges maps and lets any non-null merger (including lists)
-  // override any base value
-  [[nodiscard]] std::expected<Json, StarException> mergeConfigValues(Json const& base, Json const& merger) const;
+  struct TypeConfig {
+    Json config;
+    std::expected<String, StarException> base_type;
+  };
 
   Root& m_root;
 
   std::shared_ptr<Rebuilder> m_rebuilder;
 
-  StringMap<Json> m_npcTypes;
+  StringMap<TypeConfig> m_npc_types;
 };
 
 }

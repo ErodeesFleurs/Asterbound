@@ -220,7 +220,7 @@ const GameTestRegistration self_damage_history(
     ASSERT_TRUE(lua) << lua.error().what();
     auto context = (*lua)->create_context(StringList{});
     ASSERT_TRUE(context) << context.error().what();
-    auto callbacks = LuaBindings::makeStatusControllerCallbacks(player.statusController());
+    auto callbacks = LuaBindings::makeStatusControllerCallbacks(player.status_controller());
     ASSERT_TRUE(callbacks) << callbacks.error().what();
     ASSERT_TRUE(context->set_callbacks("status", *callbacks));
     ASSERT_TRUE(context->set_path("player_id", player.entityId()));
@@ -245,11 +245,11 @@ const GameTestRegistration self_damage_history(
     ASSERT_TRUE(observed) << observed.error().what();
     EXPECT_EQ(observed->get_int("targetEntityId"), player.entityId());
     EXPECT_EQ(observed->get_string("damageSourceKind"), "falling");
-    auto pending = player.selfDamageNotifications();
+    auto pending = player.self_damage_notifications();
     ASSERT_TRUE(pending) << pending.error().what();
     ASSERT_EQ(pending->size(), 1u);
     EXPECT_EQ(pending->front().to_json(), *observed);
-    auto drained = player.selfDamageNotifications();
+    auto drained = player.self_damage_notifications();
     ASSERT_TRUE(drained) << drained.error().what();
     EXPECT_TRUE(drained->empty());
 
@@ -257,7 +257,7 @@ const GameTestRegistration self_damage_history(
     ASSERT_TRUE(request) << request.error().what();
     ASSERT_TRUE(player.hitOther(41, *request));
     ASSERT_TRUE(player.hitOther(42, *request));
-    ASSERT_TRUE(player.damagedOther(pending->front()));
+    ASSERT_TRUE(player.damaged_other(pending->front()));
     auto inflicted = context->eval<Json>(R"LUA(
       local hits, cursor = status.inflictedHitsSince()
       assert(#hits == 2 and hits[1].targetEntityId == 41 and hits[2].targetEntityId == 42)
@@ -1325,7 +1325,7 @@ const GameTestRegistration playerPresentationEvents(
       }
     } events;
     NullRenderCallback discard;
-    ASSERT_TRUE(player.collectRenderEvents(discard));
+    ASSERT_TRUE(player.collect_render_events(discard));
     Particle particle;
     particle.string = "presentation-event-fixture";
     auto assets = root.assets();
@@ -1334,8 +1334,8 @@ const GameTestRegistration playerPresentationEvents(
     ASSERT_TRUE(sounds);
     ASSERT_FALSE(sounds->empty());
     std::sort(sounds->begin(), sounds->end());
-    ASSERT_TRUE(player.addParticles({particle}));
-    ASSERT_TRUE(player.addSound(sounds->front()));
+    ASSERT_TRUE(player.add_particles({particle}));
+    ASSERT_TRUE(player.add_sound(sounds->front()));
     constexpr std::uint64_t gameplaySeed = 0x50524553454e54;
     root.random().seed(gameplaySeed);
     RandomSource untouchedGameplay(gameplaySeed);
@@ -1350,32 +1350,32 @@ const GameTestRegistration playerPresentationEvents(
     }
     EXPECT_EQ(events.particles, 0u);
     EXPECT_EQ(events.audios, 0u);
-    ASSERT_TRUE(player.collectRenderEvents(events));
+    ASSERT_TRUE(player.collect_render_events(events));
     EXPECT_EQ(events.particles, 1u);
     EXPECT_EQ(events.audios, 1u);
     ASSERT_TRUE(player.render(events));
-    ASSERT_TRUE(player.collectRenderEvents(events));
+    ASSERT_TRUE(player.collect_render_events(events));
     EXPECT_EQ(events.particles, 1u);
     EXPECT_EQ(events.audios, 1u);
 
     // A tick with no display render still delivers its effects exactly once.
-    ASSERT_TRUE(player.addParticles({particle}));
-    ASSERT_TRUE(player.addSound(sounds->front()));
-    ASSERT_TRUE(player.collectRenderEvents(events));
+    ASSERT_TRUE(player.add_particles({particle}));
+    ASSERT_TRUE(player.add_sound(sounds->front()));
+    ASSERT_TRUE(player.collect_render_events(events));
     EXPECT_EQ(events.particles, 2u);
     EXPECT_EQ(events.audios, 2u);
-    ASSERT_TRUE(player.statusController().setPersistentEffects(
+    ASSERT_TRUE(player.status_controller().setPersistentEffects(
       "presentationFixture", {StatModifier{StatValueModifier{"invisible", 1.0f}}}));
     ASSERT_TRUE(player.invisible());
-    ASSERT_TRUE(player.addParticles({particle}));
-    ASSERT_TRUE(player.addSound(sounds->front()));
-    ASSERT_TRUE(player.collectRenderEvents(events));
+    ASSERT_TRUE(player.add_particles({particle}));
+    ASSERT_TRUE(player.add_sound(sounds->front()));
+    ASSERT_TRUE(player.collect_render_events(events));
     EXPECT_EQ(events.particles, 2u);
     EXPECT_EQ(events.audios, 2u);
-    ASSERT_TRUE(player.statusController().clearPersistentEffects("presentationFixture"));
+    ASSERT_TRUE(player.status_controller().clearPersistentEffects("presentationFixture"));
     ASSERT_FALSE(player.invisible());
     ASSERT_TRUE(player.render(events));
-    ASSERT_TRUE(player.collectRenderEvents(events));
+    ASSERT_TRUE(player.collect_render_events(events));
     EXPECT_EQ(events.particles, 2u);
     EXPECT_EQ(events.audios, 2u);
 

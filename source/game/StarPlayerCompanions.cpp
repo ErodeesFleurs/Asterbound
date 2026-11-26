@@ -236,7 +236,7 @@ std::expected<void, StarException> PlayerCompanions::init(Player& player, World&
       return std::unexpected(std::move(result.error()));
     if (auto result = add("player", LuaBindings::makePlayerCallbacks(m_root, player)); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = add("status", LuaBindings::makeStatusControllerCallbacks(player.statusController())); !result)
+    if (auto result = add("status", LuaBindings::makeStatusControllerCallbacks(player.status_controller())); !result)
       return std::unexpected(std::move(result.error()));
     if (auto result = add("playerCompanions", makeCompanionsCallbacks()); !result)
       return std::unexpected(std::move(result.error()));

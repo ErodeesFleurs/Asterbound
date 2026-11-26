@@ -760,7 +760,7 @@ std::expected<void, StarException> MainInterface::synchronizeUiSession() {
     auto callbacks = LuaBindings::makePlayerCallbacks(context().root(), *m_uiPlayer);
     if (!callbacks) return std::unexpected(std::move(callbacks.error()));
     m_uiCapabilities.set("player", std::move(*callbacks));
-    auto status = LuaBindings::makeStatusControllerCallbacks(m_uiPlayer->statusController());
+    auto status = LuaBindings::makeStatusControllerCallbacks(m_uiPlayer->status_controller());
     if (!status) return std::unexpected(std::move(status.error()));
     m_uiCapabilities.set("status", std::move(*status));
   }
@@ -1823,7 +1823,7 @@ std::expected<void, StarException> MainInterface::update(float dt) {
     auto reachable = m_client->worldClient()->playerCanReachEntity(container->entityId());
     if (!reachable)
       return std::unexpected(std::move(reachable.error()));
-    if (!*reachable || !container->isInteractive()) {
+    if (!*reachable || !container->is_interactive()) {
       auto closed = m_containerInteractor->closeContainer();
       if (!closed)
         return std::unexpected(std::move(closed.error()));
@@ -2168,7 +2168,7 @@ std::expected<void, StarException> MainInterface::updateCursor() {
       cursorOverride = std::move(*override);
     } else {
       auto player = m_client->mainPlayer();
-      if (auto anchorState = m_client->mainPlayer()->loungingIn()) {
+      if (auto anchorState = m_client->mainPlayer()->lounging_in()) {
         if (auto loungeable = m_client->worldClient()->get<LoungeableEntity>(anchorState->entityId)) {
           auto loungeAnchor = loungeable->loungeAnchor(anchorState->positionIndex);
           if (!loungeAnchor) return std::unexpected(std::move(loungeAnchor.error()));

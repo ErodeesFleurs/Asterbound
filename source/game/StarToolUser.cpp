@@ -871,7 +871,7 @@ void ToolUser::suppressItems(bool suppress) {
 }
 
 [[nodiscard]] std::expected<float, StarException> ToolUser::beamGunRadius() const {
-  auto bonus = m_user->get().statusController().statusProperty("bonusBeamGunRadius", 0).to_float();
+  auto bonus = m_user->get().status_controller().statusProperty("bonusBeamGunRadius", 0).to_float();
   if (!bonus) return std::unexpected(std::move(bonus.error()));
   return m_beamGunRadius + *bonus;
 }

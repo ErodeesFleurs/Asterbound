@@ -67,7 +67,7 @@ std::expected<std::shared_ptr<Stagehand>, StarException> Stagehand::create(Root&
   auto uniqueId = config.opt_string("uniqueId");
   if (!uniqueId)
     return std::unexpected(std::move(uniqueId.error()));
-  stagehand->setUniqueId(std::move(*uniqueId));
+  stagehand->set_unique_id(std::move(*uniqueId));
   if (auto result = stagehand->readConfig(config); !result)
     return std::unexpected(std::move(result.error()));
   return stagehand;
@@ -236,7 +236,7 @@ Stagehand::Stagehand(Root& rootContext) : Entity(rootContext), m_scriptComponent
 
 
   m_netGroup.set_needs_load_callback([&self = *this](bool) -> std::expected<void, StarException> {
-      self.setUniqueId(self.m_uniqueIdNetState.get());
+      self.set_unique_id(self.m_uniqueIdNetState.get());
       return {};
     });
 
@@ -323,7 +323,7 @@ std::expected<LuaCallbacks, StarException> Stagehand::makeStagehandCallbacks() {
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("typeName", [&self = *this]() { return self.typeName(); }); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = callbacks.register_callback("setUniqueId", [&self = *this](std::optional<String> const& uniqueId) { self.setUniqueId(uniqueId); }); !result)
+  if (auto result = callbacks.register_callback("setUniqueId", [&self = *this](std::optional<String> const& uniqueId) { self.set_unique_id(uniqueId); }); !result)
     return std::unexpected(std::move(result.error()));
   return callbacks;
 }

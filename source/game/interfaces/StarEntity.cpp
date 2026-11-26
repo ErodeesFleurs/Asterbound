@@ -112,21 +112,21 @@ std::expected<List<DamageSource>, StarException> Entity::damage_sources() const 
 
 std::expected<void, StarException> Entity::hitOther(EntityId, DamageRequest const&) { return {}; }
 
-std::expected<void, StarException> Entity::damagedOther(DamageNotification const&) { return {}; }
+std::expected<void, StarException> Entity::damaged_other(DamageNotification const&) { return {}; }
 
-std::expected<std::optional<HitType>, StarException> Entity::queryHit(DamageSource const&) const {
+std::expected<std::optional<HitType>, StarException> Entity::query_hit(DamageSource const&) const {
   return {};
 }
 
-std::expected<std::optional<PolyF>, StarException> Entity::hitPoly() const {
+std::expected<std::optional<PolyF>, StarException> Entity::hit_poly() const {
   return {};
 }
 
-std::expected<List<DamageNotification>, StarException> Entity::applyDamage(DamageRequest const&) {
+std::expected<List<DamageNotification>, StarException> Entity::apply_damage(DamageRequest const&) {
   return List<DamageNotification>{};
 }
 
-std::expected<List<DamageNotification>, StarException> Entity::selfDamageNotifications() {
+std::expected<List<DamageNotification>, StarException> Entity::self_damage_notifications() {
   return List<DamageNotification>{};
 }
 
@@ -142,7 +142,7 @@ MessageResponseResult Entity::receive_message(ConnectionId, String const&, JsonA
 
 std::expected<void, StarException> Entity::update(float, std::uint64_t) { return {}; }
 
-std::expected<void, StarException> Entity::collectRenderEvents(RenderCallback&) { return {}; }
+std::expected<void, StarException> Entity::collect_render_events(RenderCallback&) { return {}; }
 
 std::uint64_t Entity::presentation_epoch() const { return m_presentation_epoch; }
 
@@ -242,7 +242,7 @@ void Entity::setKeepAlive(bool keepAlive) {
   m_keepAlive = keepAlive;
 }
 
-void Entity::setUniqueId(std::optional<String> uniqueId) { m_uniqueId = std::move(uniqueId); }
+void Entity::set_unique_id(std::optional<String> uniqueId) { m_uniqueId = std::move(uniqueId); }
 
 void Entity::setTeam(EntityDamageTeam newTeam) {
   m_team = newTeam;

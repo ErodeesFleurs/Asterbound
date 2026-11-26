@@ -156,7 +156,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeFireableItemCallback
       auto owner = fireableItem.owner();
       if (!owner)
         return std::unexpected(std::move(owner.error()));
-      return owner->get().aimPosition();
+      return owner->get().aim_position();
     }); !registration)
     return std::unexpected(std::move(registration.error()));
 
@@ -283,7 +283,7 @@ std::expected<bool, StarException> LuaBindings::FireableItemCallbacks::ownerFull
   auto owner = fireableItem.owner();
   if (!owner)
     return std::unexpected(std::move(owner.error()));
-  return owner->get().fullEnergy();
+  return owner->get().full_energy();
 }
 
 // Determine the amount of energy that the item's owner currently has
@@ -306,7 +306,7 @@ std::expected<bool, StarException> LuaBindings::FireableItemCallbacks::ownerEner
   auto owner = fireableItem.owner();
   if (!owner)
     return std::unexpected(std::move(owner.error()));
-  return owner->get().energyLocked();
+  return owner->get().energy_locked();
 }
 
 // Attempt to consume the specified amount of the owner's energy
@@ -317,7 +317,7 @@ std::expected<bool, StarException> LuaBindings::FireableItemCallbacks::ownerCons
   auto owner = fireableItem.owner();
   if (!owner)
     return std::unexpected(std::move(owner.error()));
-  return owner->get().consumeEnergy(energy);
+  return owner->get().consume_energy(energy);
 }
 
 }

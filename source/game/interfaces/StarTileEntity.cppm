@@ -93,16 +93,16 @@ public:
 
   // If the entity accepts interaction through right clicking, by default,
   // returns false.
-  bool isInteractive() const override;
+  bool is_interactive() const override;
   // By default, does nothing.  Will be called only on the server.
   [[nodiscard]] std::expected<InteractAction, StarException> interact(InteractRequest const& request) override;
   // Specific subset spaces that are interactive, by default, just returns
   // spaces()
   virtual List<Vec2I> interactiveSpaces() const;
 
-  [[nodiscard]] std::expected<List<QuestArcDescriptor>, StarException> offeredQuests() const override;
-  [[nodiscard]] std::expected<StringSet, StarException> turnInQuests() const override;
-  [[nodiscard]] std::expected<Vec2F, StarException> questIndicatorPosition() const override;
+  [[nodiscard]] std::expected<List<QuestArcDescriptor>, StarException> offered_quests() const override;
+  [[nodiscard]] std::expected<StringSet, StarException> turn_in_quests() const override;
+  [[nodiscard]] std::expected<Vec2F, StarException> quest_indicator_position() const override;
 
 protected:
   // Checks whether any of a given spaces list (relative to current tile

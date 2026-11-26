@@ -216,7 +216,7 @@ std::expected<String, StarException> ItemDatabase::gui_filter_string(std::shared
 std::expected<bool, StarException> ItemDatabase::craft_recipe(Player& player, ItemRecipe const& recipe, std::uint64_t batches) const {
   if (!batches || recipe.output.is_empty() || recipe.output.count() > std::numeric_limits<std::uint64_t>::max() / batches)
     return false;
-  if (!player.isAdmin()) {
+  if (!player.is_admin()) {
     auto consumed = player.inventory()->consume_recipe(recipe, batches);
     if (!consumed || !*consumed)
       return consumed;

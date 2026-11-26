@@ -146,8 +146,8 @@ std::expected<void, StarException> BeamItem::init(ToolUserEntity& owner, ToolHan
   m_lastUpdateColor = m_color;
   if (!this->initialized())
     return std::unexpected(ItemException("BeamItem::init: Beam Gun not init'd properly, or user not recognized as Tool User."));
-  m_color = owner.favoriteColor();
-  auto radius = owner.beamGunRadius();
+  m_color = owner.favorite_color();
+  auto radius = owner.beam_gun_radius();
   if (!radius)
     return std::unexpected(std::move(radius.error()));
   m_range = *radius;
@@ -170,7 +170,7 @@ std::expected<void, StarException> BeamItem::update(float, FireMode, bool, HashS
   auto origin = user.hand_position(*item_hand, (m_firePosition - m_handPosition) / tile_pixels);
   if (!origin)
     return std::unexpected(std::move(origin.error()));
-  auto aim = user.aimPosition();
+  auto aim = user.aim_position();
   if (!aim)
     return std::unexpected(std::move(aim.error()));
   auto const endpoint = m_endType == EndType::TileGroup ? aim->round()
@@ -189,7 +189,7 @@ std::expected<void, StarException> BeamItem::update(float, FireMode, bool, HashS
     far_control = far + (dest - far) * m_farControlPointElasticity;
     auto const desired = (dest - *origin) * m_nearControlPointDistance;
     auto const& near = m_beam_curve[1];
-    near_control = user.facingDirection() != get_angle_side(near.angle()).second
+    near_control = user.facing_direction() != get_angle_side(near.angle()).second
         ? desired : near + (desired - near) * m_nearControlPointElasticity;
   }
 
@@ -264,7 +264,7 @@ std::expected<void, StarException> BeamItem::updateBeamEffects(bool visible) {
   }
   // Capture world positions at the producing tick, not at display sampling or
   // a later owner position.
-  return item_owner->get().addParticles(beamLeftovers);
+  return item_owner->get().add_particles(beamLeftovers);
 }
 
 bool BeamItem::beamActive() const {

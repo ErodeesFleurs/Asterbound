@@ -141,7 +141,7 @@ std::expected<void, StarException> PlayerDeployment::init(Player& player, World&
       return std::unexpected(std::move(result.error()));
     if (auto result = add("player", LuaBindings::makePlayerCallbacks(m_root, player)); !result)
       return std::unexpected(std::move(result.error()));
-    if (auto result = add("status", LuaBindings::makeStatusControllerCallbacks(player.statusController())); !result)
+    if (auto result = add("status", LuaBindings::makeStatusControllerCallbacks(player.status_controller())); !result)
       return std::unexpected(std::move(result.error()));
     if (auto result = add("config", LuaBindings::makeConfigCallbacks(
         [this](String const& name, Json const& def) { return m_config.query(name, def); })); !result)

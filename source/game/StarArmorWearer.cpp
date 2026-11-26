@@ -50,60 +50,76 @@ std::expected<std::shared_ptr<ArmorWearer>, StarException> ArmorWearer::create(R
 }
 
 std::expected<bool, StarException> ArmorWearer::setup_humanoid(Humanoid& humanoid, bool force_nude) {
-  if (m_appearance_dirty) {
+  return apply_humanoid_appearance(humanoid, force_nude, m_appearance);
+}
+
+std::expected<ArmorWearer::Appearance, StarException> ArmorWearer::prepare_humanoid_replacement(Humanoid& humanoid, bool force_nude) const {
+  Appearance appearance;
+  appearance.pending_wearables = 0; // Fresh bodies have no wearable slots to clear.
+  if (auto applied = apply_humanoid_appearance(humanoid, force_nude, appearance); !applied)
+    return std::unexpected(std::move(applied.error()));
+  return appearance;
+}
+
+void ArmorWearer::commit_humanoid_replacement(Appearance appearance) {
+  m_appearance = appearance;
+}
+
+std::expected<bool, StarException> ArmorWearer::apply_humanoid_appearance(Humanoid& humanoid, bool force_nude, Appearance& appearance) const {
+  if (appearance.dirty) {
     // Cosmetic blockers are counted even when force_nude hides their own wearable.
-    m_worn_cosmetic_types.fill(0);
+    appearance.worn_cosmetic_types.fill(0);
     for (std::uint8_t i = cosmetic_begin; i != slot_count; ++i) {
       auto const& armor = m_armors[i];
       if (armor.visible && armor.item && armor.item->visible(i >= extra_cosmetic_begin))
         for (auto type : armor.item->armorTypesToHide())
-          ++m_worn_cosmetic_types[static_cast<std::uint8_t>(type)];
+          ++appearance.worn_cosmetic_types[static_cast<std::uint8_t>(type)];
     }
   }
 
-  if (m_appearance_dirty || m_last_nude != force_nude) {
-    auto previous_slots = m_visible_slots;
-    m_visible_slots = 0;
-    m_flipping_slots = 0;
+  if (appearance.dirty || appearance.last_nude != force_nude) {
+    auto previous_slots = appearance.visible_slots;
+    appearance.visible_slots = 0;
+    appearance.flipping_slots = 0;
     for (std::uint8_t i = 0; i != slot_count; ++i) {
-      auto& armor = m_armors[i];
+      auto const& armor = m_armors[i];
       auto const& item = armor.item;
       if (armor.visible && item && item->visible(i >= extra_cosmetic_begin)
           && (!force_nude || item->bypassNude())
-          && (i >= cosmetic_begin || !m_worn_cosmetic_types[static_cast<std::uint8_t>(item->armorType())])) {
+          && (i >= cosmetic_begin || !appearance.worn_cosmetic_types[static_cast<std::uint8_t>(item->armorType())])) {
         auto bit = std::uint32_t{1} << i;
-        m_visible_slots |= bit;
+        appearance.visible_slots |= bit;
         if (item->flipping())
-          m_flipping_slots |= bit;
-        if (armor.needs_sync) {
-          m_pending_wearables |= bit;
-          m_config_dirty = true;
+          appearance.flipping_slots |= bit;
+        if (appearance.changed_items & bit) {
+          appearance.pending_wearables |= bit;
+          appearance.config_dirty = true;
         }
       }
-      armor.needs_sync = false;
     }
-    auto changed_slots = previous_slots ^ m_visible_slots;
-    m_pending_wearables |= changed_slots;
-    m_config_dirty |= changed_slots != 0;
-    m_last_nude = force_nude;
-    m_appearance_dirty = false;
+    auto changed_slots = previous_slots ^ appearance.visible_slots;
+    appearance.pending_wearables |= changed_slots;
+    appearance.config_dirty |= changed_slots != 0;
+    appearance.last_nude = force_nude;
+    appearance.changed_items = 0;
+    appearance.dirty = false;
   }
 
   auto gender = humanoid.identity().gender;
-  if (gender != m_last_gender) {
-    m_pending_wearables |= m_visible_slots;
-    m_last_gender = gender;
+  if (gender != appearance.last_gender) {
+    appearance.pending_wearables |= appearance.visible_slots;
+    appearance.last_gender = gender;
   }
   auto direction = humanoid.facing_direction();
-  if (direction != m_last_direction) {
-    m_pending_wearables |= m_flipping_slots;
-    m_last_direction = direction;
+  if (direction != appearance.last_direction) {
+    appearance.pending_wearables |= appearance.flipping_slots;
+    appearance.last_direction = direction;
   }
 
-  while (m_pending_wearables) {
-    auto slot = static_cast<std::uint8_t>(std::countr_zero(m_pending_wearables));
+  while (appearance.pending_wearables) {
+    auto slot = static_cast<std::uint8_t>(std::countr_zero(appearance.pending_wearables));
     std::expected<void, StarException> applied;
-    if (m_visible_slots & (std::uint32_t{1} << slot)) {
+    if (appearance.visible_slots & (std::uint32_t{1} << slot)) {
       auto const& item = *m_armors[slot].item;
       if (auto head = as_ref<HeadArmor>(item))
         applied = humanoid.set_wearable_from_head(slot, head->get(), gender);
@@ -118,14 +134,14 @@ std::expected<bool, StarException> ArmorWearer::setup_humanoid(Humanoid& humanoi
     }
     if (!applied)
       return std::unexpected(std::move(applied.error()));
-    m_pending_wearables &= m_pending_wearables - 1;
+    appearance.pending_wearables &= appearance.pending_wearables - 1;
   }
 
-  if (!m_config_dirty)
+  if (!appearance.config_dirty)
     return false;
   bool body_hidden = false;
   Json merged_config;
-  for (auto slots = m_visible_slots; slots; slots &= slots - 1) {
+  for (auto slots = appearance.visible_slots; slots; slots &= slots - 1) {
     auto const& item = *m_armors[std::countr_zero(slots)].item;
     body_hidden |= item.hideBody();
     auto config = item.instance_value("humanoidConfig");
@@ -137,7 +153,7 @@ std::expected<bool, StarException> ArmorWearer::setup_humanoid(Humanoid& humanoi
   auto loaded = humanoid.load_config(std::move(merged_config), body_hidden);
   if (!loaded)
     return std::unexpected(std::move(loaded.error()));
-  m_config_dirty = false;
+  appearance.config_dirty = false;
   return *loaded;
 }
 
@@ -150,7 +166,7 @@ std::expected<void, StarException> ArmorWearer::effects(EffectEmitter& effect_em
       continue;
     auto item = armor.item;
     auto type = std::to_underlying(item->armorType());
-    if (i < cosmetic_begin && type < groups.size() && m_worn_cosmetic_types[type] != 0)
+    if (i < cosmetic_begin && type < groups.size() && m_appearance.worn_cosmetic_types[type] != 0)
       continue;
     auto sources = item->effectSources();
     if (!sources)
@@ -174,13 +190,9 @@ std::expected<void, StarException> ArmorWearer::effects(EffectEmitter& effect_em
 void ArmorWearer::reset() {
   for (auto& armor : m_armors) {
     armor.item.reset();
-    armor.needs_store = armor.needs_sync = true;
+    armor.needs_store = true;
   }
-  m_worn_cosmetic_types.fill(0);
-  m_visible_slots = 0;
-  m_flipping_slots = 0;
-  m_pending_wearables = all_slots;
-  m_appearance_dirty = m_config_dirty = true;
+  m_appearance = {};
 }
 
 std::expected<Json, StarException> ArmorWearer::disk_store() const {
@@ -239,7 +251,7 @@ std::expected<List<PersistentStatusEffect>, StarException> ArmorWearer::status_e
       else
         result.append_range(std::move(*effects));
     }
-    if (m_visible_slots & (std::uint32_t{1} << i))
+    if (m_appearance.visible_slots & (std::uint32_t{1} << i))
       result.append_range(item->cosmetic_status_effects());
   }
   return result;
@@ -272,8 +284,8 @@ bool ArmorWearer::set_item(std::size_t slot, std::shared_ptr<ArmorItem> item, bo
     armor.item = std::move(item);
   armor.visible = visible;
   armor.needs_store = true;
-  armor.needs_sync = true;
-  m_appearance_dirty = true;
+  m_appearance.changed_items |= std::uint32_t{1} << slot;
+  m_appearance.dirty = true;
   return true;
 }
 
@@ -293,7 +305,8 @@ std::expected<void, StarException> ArmorWearer::net_elements_need_load(bool) {
   auto database = m_root.itemDatabase();
   if (!database)
     return std::unexpected(std::move(database.error()));
-  for (auto& armor : m_armors) {
+  for (std::size_t slot = 0; slot != m_armors.size(); ++slot) {
+    auto& armor = m_armors[slot];
     if (!armor.net_state.pull_updated())
       continue;
     auto loaded = (*database)->load_item(armor.net_state.get(), armor.item);
@@ -301,8 +314,8 @@ std::expected<void, StarException> ArmorWearer::net_elements_need_load(bool) {
       return std::unexpected(std::move(loaded.error()));
     if (*loaded) {
       armor.needs_store = true;
-      armor.needs_sync = true;
-      m_appearance_dirty = true;
+      m_appearance.changed_items |= std::uint32_t{1} << slot;
+      m_appearance.dirty = true;
     }
   }
   return {};

@@ -134,7 +134,7 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
 
-  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& render_callback) override;
+  [[nodiscard]] std::expected<void, StarException> collect_render_events(RenderCallback& render_callback) override;
 
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback) override;
 
@@ -171,19 +171,19 @@ public:
   [[nodiscard]] std::expected<List<DamageSource>, StarException> damage_sources() const override;
 
   [[nodiscard]] std::expected<std::optional<HitType>, StarException>
-  queryHit(DamageSource const& source) const override;
-  [[nodiscard]] std::expected<std::optional<PolyF>, StarException> hitPoly() const override;
+  query_hit(DamageSource const& source) const override;
+  [[nodiscard]] std::expected<std::optional<PolyF>, StarException> hit_poly() const override;
 
   [[nodiscard]] std::expected<List<DamageNotification>, StarException>
-  applyDamage(DamageRequest const& damage) override;
+  apply_damage(DamageRequest const& damage) override;
 
   [[nodiscard]] std::expected<bool, StarException> damageTiles(List<Vec2I> const& position, Vec2F const& sourcePosition,
                                                                TileDamage const& tileDamage) override;
   [[nodiscard]] std::expected<bool, StarException> canBeDamaged() const override;
 
-  RectF interactiveBoundBox() const override;
+  RectF interactive_bound_box() const override;
 
-  bool isInteractive() const override;
+  bool is_interactive() const override;
   [[nodiscard]] std::expected<InteractAction, StarException> interact(InteractRequest const& request) override;
   List<Vec2I> interactiveSpaces() const override;
 
@@ -211,9 +211,9 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> evaluate(WireCoordinator& coordinator) override;
 
-  [[nodiscard]] std::expected<List<QuestArcDescriptor>, StarException> offeredQuests() const override;
-  [[nodiscard]] std::expected<StringSet, StarException> turnInQuests() const override;
-  [[nodiscard]] std::expected<Vec2F, StarException> questIndicatorPosition() const override;
+  [[nodiscard]] std::expected<List<QuestArcDescriptor>, StarException> offered_quests() const override;
+  [[nodiscard]] std::expected<StringSet, StarException> turn_in_quests() const override;
+  [[nodiscard]] std::expected<Vec2F, StarException> quest_indicator_position() const override;
 
   [[nodiscard]] MessageResponseResult receive_message(ConnectionId sending_connection, String const& message, JsonArray const& args = {}) override;
 
@@ -228,7 +228,7 @@ public:
 
   bool biomePlaced() const;
 
-  using Entity::setUniqueId;
+  using Entity::set_unique_id;
 
 protected:
   friend class ObjectDatabase;

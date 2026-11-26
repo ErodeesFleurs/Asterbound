@@ -1322,7 +1322,7 @@ namespace LuaBindings {
     // interpolation belong to the caller, not to the world service.
     auto damageBarView = [](DamageBarEntity const& entity, bool details) -> std::expected<Json, StarException> {
       if (!DamageBarTypeNames) return std::unexpected(DamageBarTypeNames.error());
-      auto type = DamageBarTypeNames->get_right(entity.damageBar());
+      auto type = DamageBarTypeNames->get_right(entity.damage_bar());
       if (!type) return std::unexpected(std::move(type.error()));
       JsonObject view;
       view.reserve(details ? 7 : 4);
@@ -1333,7 +1333,7 @@ namespace LuaBindings {
       if (!team) return std::unexpected(std::move(team.error()));
       view.set("team", std::move(*team));
       if (details) {
-        auto maximum = entity.maxHealth();
+        auto maximum = entity.max_health();
         if (!maximum) return std::unexpected(std::move(maximum.error()));
         auto name = entity.name();
         if (!name) return std::unexpected(std::move(name.error()));
@@ -1360,7 +1360,7 @@ namespace LuaBindings {
       }
       JsonArray views;
       auto append = [&](std::shared_ptr<Entity> const& value) -> std::expected<void, StarException> {
-        if (auto entity = as<DamageBarEntity>(value); entity && (!type || entity->damageBar() == *type)) {
+        if (auto entity = as<DamageBarEntity>(value); entity && (!type || entity->damage_bar() == *type)) {
           auto view = damageBarView(*entity, false);
           if (!view) return std::unexpected(std::move(view.error()));
           views.emplace_back(std::move(*view));
@@ -1864,13 +1864,13 @@ namespace LuaBindings {
       return std::unexpected(std::move(result.error()));
     if (auto result = callbacks.register_callback("isEntityInteractive", [&world](EntityId entityId) -> std::optional<bool> {
         if (auto entity = world.get<InteractiveEntity>(entityId))
-          return entity->isInteractive();
+          return entity->is_interactive();
         return {};
       }); !result)
       return std::unexpected(std::move(result.error()));
     if (auto result = callbacks.register_callback("entityAimPosition", [&world](EntityId entityId) -> std::expected<std::optional<Vec2F>, StarException> {
         if (auto entity = world.get<ToolUserEntity>(entityId)) {
-          auto position = entity->aimPosition();
+          auto position = entity->aim_position();
           if (!position)
             return std::unexpected(std::move(position.error()));
           return *position;
@@ -1894,7 +1894,7 @@ namespace LuaBindings {
         if (auto monster = as<Monster>(entity))
           return monster->type_name();
         if (auto npc = as<Npc>(entity))
-          return npc->npcType();
+          return npc->npc_type();
         if (auto vehicle = as<Vehicle>(entity))
           return vehicle->name();
         if (auto object = as<Object>(entity))
@@ -2658,20 +2658,19 @@ namespace LuaBindings {
       std::optional<std::uint64_t> arg5,
       Json const& arg6) {
     auto seed = arg5 ? *arg5 : world.root().random().next_u64();
-    auto npcDatabaseResult = world.root().npcDatabase();
+    auto npcDatabaseResult = world.root().npc_database();
     if (!npcDatabaseResult)
       return std::unexpected(std::move(npcDatabaseResult.error()));
     auto npcDatabase = std::move(*npcDatabaseResult);
     auto spawn = [&]() -> std::expected<std::optional<EntityId>, StarException> {
-      auto variantResult = npcDatabase->generateNpcVariant(arg2, arg3, arg4, seed, arg6 ? arg6 : JsonObject());
+      auto variantResult = npcDatabase->generate_npc_variant(arg2, arg3, arg4, seed, arg6 ? arg6 : JsonObject());
       if (!variantResult)
         return std::unexpected(std::move(variantResult.error()));
-      auto variant = std::move(*variantResult);
-      auto npcResult = npcDatabase->createNpc(variant);
+      auto npcResult = npcDatabase->create_npc(std::move(*variantResult));
       if (!npcResult)
         return std::unexpected(std::move(npcResult.error()));
       auto npc = std::move(*npcResult);
-      npc->setPosition(arg1);
+      npc->set_position(arg1);
       if (auto operation = world.addEntity(npc); !operation)
         return std::unexpected(std::move(operation.error()));
       return npc->inWorld() ? std::optional<EntityId>(npc->entityId()) : std::nullopt;
@@ -2914,13 +2913,13 @@ namespace LuaBindings {
     if (!entity)
       return std::unexpected(StarException::format("No such entity with id {}", entityId));
     if (auto npc = as_ref<Npc>(*entity))
-      npc->get().setUniqueId(uniqueId);
+      npc->get().set_unique_id(uniqueId);
     else if (auto monster = as_ref<Monster>(*entity))
-      monster->get().setUniqueId(uniqueId);
+      monster->get().set_unique_id(uniqueId);
     else if (auto object = as_ref<Object>(*entity))
-      object->get().setUniqueId(uniqueId);
+      object->get().set_unique_id(uniqueId);
     else if (auto stagehand = as_ref<Stagehand>(*entity))
-      stagehand->get().setUniqueId(uniqueId);
+      stagehand->get().set_unique_id(uniqueId);
     else {
       if (!EntityTypeNames)
         return std::unexpected(EntityTypeNames.error());
@@ -3270,7 +3269,7 @@ namespace LuaBindings {
 
   std::expected<std::optional<Vec2F>, StarException> WorldEntityCallbacks::entityHealth(World& world, EntityId entityId) {
     if (auto entity = world.get<DamageBarEntity>(entityId)) {
-      auto maximumResult = entity->maxHealth();
+      auto maximumResult = entity->max_health();
       if (!maximumResult)
         return std::unexpected(std::move(maximumResult.error()));
       auto maximum = std::move(*maximumResult);
@@ -3324,19 +3323,19 @@ namespace LuaBindings {
       auto nametag = nametagEntity->nametag();
       if (!nametag)
         return std::unexpected(std::move(nametag.error()));
-      auto color = nametagEntity->nametagColor();
+      auto color = nametagEntity->nametag_color();
       if (!color)
         return std::unexpected(std::move(color.error()));
-      auto origin = nametagEntity->nametagOrigin();
+      auto origin = nametagEntity->nametag_origin();
       if (!origin)
         return std::unexpected(std::move(origin.error()));
       result = JsonObject{
         {"nametag", std::move(*nametag)},
-        {"displayed", nametagEntity->displayNametag()},
+        {"displayed", nametagEntity->display_nametag()},
         {"color", json_from_color(Color::rgb(*color))},
         {"origin", json_from_vec2f(*origin)},
       };
-      if (auto status = nametagEntity->statusText())
+      if (auto status = nametagEntity->status_text())
         {
         auto updated = result.set("status", *status);
         if (!updated)
@@ -3398,7 +3397,7 @@ namespace LuaBindings {
     }
 
     if (auto entity = world.get<ToolUserEntity>(entityId)) {
-      if (auto item = entity->handItem(toolHand)) {
+      if (auto item = entity->hand_item(toolHand)) {
         return item->name();
       }
     }
@@ -3417,7 +3416,7 @@ namespace LuaBindings {
     }
 
     if (auto entity = world.get<ToolUserEntity>(entityId)) {
-      if (auto item = entity->handItem(toolHand)) {
+      if (auto item = entity->hand_item(toolHand)) {
         return item->descriptor().to_json();
       }
     }
@@ -3452,7 +3451,7 @@ namespace LuaBindings {
     Json val = Json();
 
     if (auto npcEntity = as<Npc>(world.entity(entityId))) {
-      auto parameterResult = npcEntity->scriptConfigParameter(parameterName);
+      auto parameterResult = npcEntity->script_config_parameter(parameterName);
       if (!parameterResult)
         return std::unexpected(std::move(parameterResult.error()));
       auto parameter = std::move(*parameterResult);
@@ -3910,7 +3909,7 @@ auto slotsResult = json_from_list<std::size_t>(res.slots);
 
   std::expected<std::optional<String>, StarException> WorldEntityCallbacks::npcType(World& world, EntityId entityId) {
     if (auto npc = world.get<Npc>(entityId))
-      return npc->npcType();
+      return npc->npc_type();
 
     return {};
   }

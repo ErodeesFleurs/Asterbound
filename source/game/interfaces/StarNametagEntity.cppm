@@ -31,10 +31,10 @@ public:
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<NametagEntity>(); }
 
   [[nodiscard]] virtual std::expected<String, StarException> nametag() const = 0;
-  virtual std::optional<String> statusText() const = 0;
-  virtual bool displayNametag() const = 0;
-  [[nodiscard]] virtual std::expected<Vec3B, StarException> nametagColor() const = 0;
-  [[nodiscard]] virtual std::expected<Vec2F, StarException> nametagOrigin() const = 0;
+  virtual std::optional<String> status_text() const = 0;
+  virtual bool display_nametag() const = 0;
+  [[nodiscard]] virtual std::expected<Vec3B, StarException> nametag_color() const = 0;
+  [[nodiscard]] virtual std::expected<Vec2F, StarException> nametag_origin() const = 0;
 };
 
 }

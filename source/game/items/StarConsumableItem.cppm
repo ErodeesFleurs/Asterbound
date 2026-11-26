@@ -210,7 +210,7 @@ std::expected<void, StarException> ConsumableItem::update(float dt, FireMode fir
       auto itemOwner = owner();
       if (!itemOwner)
         return std::unexpected(std::move(itemOwner.error()));
-      auto emitted = itemOwner->get().addEffectEmitters(m_emitters);
+      auto emitted = itemOwner->get().add_effect_emitters(m_emitters);
       if (!emitted)
         return std::unexpected(std::move(emitted.error()));
     }
@@ -255,7 +255,7 @@ std::expected<bool, StarException> ConsumableItem::canUse() const {
   auto itemOwner = owner();
   if (!itemOwner)
     return std::unexpected(std::move(itemOwner.error()));
-  for (auto const& pair : itemOwner->get().statusController().activeUniqueStatusEffectSummary()) {
+  for (auto const& pair : itemOwner->get().status_controller().activeUniqueStatusEffectSummary()) {
     if (m_blockingEffects.contains(pair.first))
       return false;
   }
@@ -283,24 +283,24 @@ std::expected<void, StarException> ConsumableItem::triggerEffects() {
         return std::unexpected(std::move(effect.error()));
       effects.push_back(std::move(*effect));
     }
-    auto added = itemOwner->get().statusController().addEphemeralEffects(effects);
+    auto added = itemOwner->get().status_controller().addEphemeralEffects(effects);
     if (!added)
       return std::unexpected(std::move(added.error()));
   }
   if (m_foodValue) {
-    itemOwner->get().statusController().giveResource("food", *m_foodValue);
-    auto percentage = itemOwner->get().statusController().resourcePercentage("food");
+    itemOwner->get().status_controller().giveResource("food", *m_foodValue);
+    auto percentage = itemOwner->get().status_controller().resourcePercentage("food");
     if (!percentage)
       return std::unexpected(std::move(percentage.error()));
     if (*percentage == 1.0f) {
-      auto added = itemOwner->get().statusController().addEphemeralEffect(
+      auto added = itemOwner->get().status_controller().addEphemeralEffect(
         EphemeralStatusEffect{.uniqueEffect = UniqueStatusEffect("wellfed"), .duration = {}});
       if (!added)
         return std::unexpected(std::move(added.error()));
     }
   }
   if (!m_emote.empty()) {
-    auto emote = itemOwner->get().requestEmote(m_emote);
+    auto emote = itemOwner->get().request_emote(m_emote);
     if (!emote)
       return std::unexpected(std::move(emote.error()));
   }

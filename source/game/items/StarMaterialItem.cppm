@@ -394,7 +394,7 @@ std::expected<void, StarException> MaterialItem::init(ToolUserEntity& owner, Too
   auto selectedSound = root().random().sample_value(m_placeSounds);
   if (!selectedSound)
     return std::unexpected(std::move(selectedSound.error()));
-  auto sound = owner.addSound(*selectedSound, 1.0f, 2.0f);
+  auto sound = owner.add_sound(*selectedSound, 1.0f, 2.0f);
   if (!sound)
     return std::unexpected(std::move(sound.error()));
   if (auto player = as_ref<Player>(owner))
@@ -453,7 +453,7 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
         auto pitch = root().random().uniform_float(0.9f, 1.1f);
         if (!pitch)
           return std::unexpected(std::move(pitch.error()));
-        auto sound = itemOwner->get().addSound("/sfx/tools/cyclematcollision.ogg", 1.0f, *pitch);
+        auto sound = itemOwner->get().add_sound("/sfx/tools/cyclematcollision.ogg", 1.0f, *pitch);
         if (!sound)
           return std::unexpected(std::move(sound.error()));
       }
@@ -463,7 +463,7 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
         auto stored = player->get().setSecretProperty(BlockRadiusPropertyKey, m_blockRadius);
         if (!stored)
           return std::unexpected(std::move(stored.error()));
-        auto sound = itemOwner->get().addSound("/sfx/tools/buildradiusgrow.wav", 1.0f, 1.0f + m_blockRadius / BlockRadiusLimit);
+        auto sound = itemOwner->get().add_sound("/sfx/tools/buildradiusgrow.wav", 1.0f, 1.0f + m_blockRadius / BlockRadiusLimit);
         if (!sound)
           return std::unexpected(std::move(sound.error()));
       }
@@ -473,7 +473,7 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
         auto stored = player->get().setSecretProperty(BlockRadiusPropertyKey, m_blockRadius);
         if (!stored)
           return std::unexpected(std::move(stored.error()));
-        auto sound = itemOwner->get().addSound("/sfx/tools/buildradiusshrink.wav", 1.0f, 1.0f + m_blockRadius / BlockRadiusLimit);
+        auto sound = itemOwner->get().add_sound("/sfx/tools/buildradiusshrink.wav", 1.0f, 1.0f + m_blockRadius / BlockRadiusLimit);
         if (!sound)
           return std::unexpected(std::move(sound.error()));
       }
@@ -487,7 +487,7 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
         auto pitch = root().random().uniform_float(0.9f, 1.1f);
         if (!pitch)
           return std::unexpected(std::move(pitch.error()));
-        auto sound = itemOwner->get().addSound(m_blockSwap ? std::string_view("/sfx/interface/button/click.wav") : std::string_view("/sfx/interface/button/release.wav"), 1.0f, *pitch);
+        auto sound = itemOwner->get().add_sound(m_blockSwap ? std::string_view("/sfx/interface/button/click.wav") : std::string_view("/sfx/interface/button/release.wav"), 1.0f, *pitch);
         if (!sound)
           return std::unexpected(std::move(sound.error()));
       }
@@ -510,7 +510,7 @@ std::expected<void, StarException> MaterialItem::render(RenderCallback& render_c
                    .count()));
     float pulseA = 0.85 - pulse * 0.15f;
     float pulseB = 0.85 + pulse * 0.15f;
-    Color color = itemOwner->get().favoriteColor().mix(Color::palette_white);
+    Color color = itemOwner->get().favorite_color().mix(Color::palette_white);
     float alpha = color.alpha_f();
     color.set_alpha_f(alpha * pulseA * 0.95f);
     auto addIndicator = [&](String const& path) -> std::expected<void, StarException> {
@@ -523,7 +523,7 @@ std::expected<void, StarException> MaterialItem::render(RenderCallback& render_c
         return std::unexpected(std::move(indicator.error()));
       indicator->fullbright = true;
       indicator->color = color;
-      auto aimPosition = itemOwner->get().aimPosition();
+      auto aimPosition = itemOwner->get().aim_position();
       if (!aimPosition)
         return std::unexpected(std::move(aimPosition.error()));
       for (auto const& tile_pos : tile_area(calc_radius(m_shifting), *aimPosition)) {
@@ -583,7 +583,7 @@ std::expected<void, StarException> MaterialItem::fire(FireMode mode, bool shifti
   if (!item_owner)
     return std::unexpected(std::move(item_owner.error()));
   auto geo = item_world->get().geometry();
-  auto aim = item_owner->get().aimPosition();
+  auto aim = item_owner->get().aim_position();
   if (!aim)
     return std::unexpected(std::move(aim.error()));
   auto aim_position = *aim;
@@ -622,7 +622,7 @@ std::expected<void, StarException> MaterialItem::fire(FireMode mode, bool shifti
   std::optional<PlacementHue> placement_hue;
 
   if (m_blockSwap) {
-    auto range = item_owner->get().inToolRange(aim_position);
+    auto range = item_owner->get().in_tool_range(aim_position);
     if (!range)
       return std::unexpected(std::move(range.error()));
     if (*range) {
@@ -635,7 +635,7 @@ std::expected<void, StarException> MaterialItem::fire(FireMode mode, bool shifti
   
   for (unsigned i = 0; i != steps; ++i) {
     auto placement_origin = aim_position + diff * (1.0f - (static_cast<float>(i) / steps));
-    auto range = item_owner->get().inToolRange(placement_origin);
+    auto range = item_owner->get().in_tool_range(placement_origin);
     if (!range)
       return std::unexpected(std::move(range.error()));
     if (!*range)
@@ -680,7 +680,7 @@ std::expected<void, StarException> MaterialItem::fire(FireMode mode, bool shifti
     auto pitch = root().random().uniform_float(0.9f, 1.1f);
     if (!pitch)
       return std::unexpected(std::move(pitch.error()));
-    auto played = item_owner->get().addSound(sound, 1.0f + intensity, (1.125f - intensity * 0.75f) * *pitch);
+    auto played = item_owner->get().add_sound(sound, 1.0f + intensity, (1.125f - intensity * 0.75f) * *pitch);
     if (!played)
       return std::unexpected(std::move(played.error()));
     auto fired = FireableItem::fire(mode, shifting, edge_triggered);
@@ -715,7 +715,7 @@ std::expected<std::size_t, StarException> MaterialItem::block_swap(float radius,
     return std::unexpected(std::move(item_world.error()));
 
   List<Vec2I> swap_positions;
-  auto aim_position = item_owner->get().aimPosition();
+  auto aim_position = item_owner->get().aim_position();
   if (!aim_position)
     return std::unexpected(std::move(aim_position.error()));
   for (auto const& pos : tile_area(radius, *aim_position)) {
@@ -835,7 +835,7 @@ std::expected<std::size_t, StarException> MaterialItem::block_swap(float radius,
   auto blockVolume = (*assets)->json("/sfx.config:miningBlockVolume").and_then([](Json const& value) { return value.to_float(); });
   if (!blockVolume)
     return std::unexpected(std::move(blockVolume.error()));
-  auto played = item_owner->get().addSound(blockSound, *blockVolume);
+  auto played = item_owner->get().add_sound(blockSound, *blockVolume);
   if (!played)
     return std::unexpected(std::move(played.error()));
   auto strikeSounds = beamAxe.instance_value("strikeSounds");
@@ -852,7 +852,7 @@ std::expected<std::size_t, StarException> MaterialItem::block_swap(float radius,
     auto toolVolume = (*assets)->json("/sfx.config:miningToolVolume").and_then([](Json const& value) { return value.to_float(); });
     if (!toolVolume)
       return std::unexpected(std::move(toolVolume.error()));
-    auto played = item_owner->get().addSound(sound, *toolVolume);
+    auto played = item_owner->get().add_sound(sound, *toolVolume);
     if (!played)
       return std::unexpected(std::move(played.error()));
   }
@@ -1006,7 +1006,7 @@ std::expected<bool, StarException> MaterialItem::can_place(bool shifting) const 
       return std::unexpected(std::move(item_world.error()));
     MaterialId material = material_id();
     float radius = calc_radius(shifting);
-    auto aim_position = item_owner->get().aimPosition();
+    auto aim_position = item_owner->get().aim_position();
     if (!aim_position)
       return std::unexpected(std::move(aim_position.error()));
     auto const& positions = tile_area(radius, *aim_position);
@@ -1062,11 +1062,11 @@ std::expected<List<PreviewTile>, StarException> MaterialItem::preview_tiles(bool
     auto item_world = world();
     if (!item_world)
       return std::unexpected(std::move(item_world.error()));
-    Vec3B light = item_owner->get().favoriteColor().to_rgb();
+    Vec3B light = item_owner->get().favorite_color().to_rgb();
     auto material = material_id();
     auto color = default_material_color_variant;
     std::size_t placeable_count = 0;
-    auto aim_position = item_owner->get().aimPosition();
+    auto aim_position = item_owner->get().aim_position();
     if (!aim_position)
       return std::unexpected(std::move(aim_position.error()));
     auto const& positions = tile_area(calc_radius(shifting), *aim_position);

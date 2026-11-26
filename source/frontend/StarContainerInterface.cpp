@@ -268,7 +268,7 @@ std::expected<void, StarException> ContainerPane::initialize(std::shared_ptr<Wor
     auto addCallbacksResult236 = m_script->add_callbacks("player", std::move(*makePlayerCallbacksResult235));
     if (!addCallbacksResult236)
       return std::unexpected(std::move(addCallbacksResult236.error()));
-    auto makeStatusControllerCallbacksResult237 = LuaBindings::makeStatusControllerCallbacks(m_player->statusController());
+    auto makeStatusControllerCallbacksResult237 = LuaBindings::makeStatusControllerCallbacks(m_player->status_controller());
     if (!makeStatusControllerCallbacksResult237)
       return std::unexpected(std::move(makeStatusControllerCallbacksResult237.error()));
     auto addCallbacksResult238 = m_script->add_callbacks("status", std::move(*makeStatusControllerCallbacksResult237));
@@ -767,7 +767,7 @@ std::expected<void, StarException> ContainerPane::update(float dt) {
       
     }
 
-  if (container->isInteractive()) {
+  if (container->is_interactive()) {
     {
       auto fetchChildResult318 = fetchChild<ItemGridWidget>("itemGrid");
       if (!fetchChildResult318)

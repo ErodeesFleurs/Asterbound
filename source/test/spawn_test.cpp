@@ -394,7 +394,7 @@ public:
     return Entity::init(world, id, EntityMode::Master);
   }
   std::expected<bool, StarException> should_destroy() const override { return dying; }
-  std::expected<void, StarException> collectRenderEvents(RenderCallback& renderer) override {
+  std::expected<void, StarException> collect_render_events(RenderCallback& renderer) override {
     ++collections;
     if (next_position)
       current_position = *std::exchange(next_position, std::nullopt);

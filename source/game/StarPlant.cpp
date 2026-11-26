@@ -1199,7 +1199,7 @@ List<Plant::PlantPiece> Plant::pieces() const {
   return m_pieces;
 }
 
-RectF Plant::interactiveBoundBox() const {
+RectF Plant::interactive_bound_box() const {
   return RectF(m_boundBox);
 }
 
@@ -1283,7 +1283,7 @@ if (!result623) return std::unexpected(std::move(result623.error()));
   return {};
 }
 
-std::expected<void, StarException> Plant::collectRenderEvents(RenderCallback& render_callback) {
+std::expected<void, StarException> Plant::collect_render_events(RenderCallback& render_callback) {
   auto damageOffset = this->root().random().uniform_float(-0.1f, 0.1f);
   if (!damageOffset)
     return std::unexpected(std::move(damageOffset.error()));

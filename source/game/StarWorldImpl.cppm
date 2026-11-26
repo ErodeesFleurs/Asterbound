@@ -828,7 +828,7 @@ namespace WorldImpl {
           return std::unexpected(std::move(inRange.error()));
         if (*inRange)
           return std::move(*entity);
-      } else if (geometry.diff_to_nearest_coord_in_box((*entity)->interactiveBoundBox().translated((*entity)->position()), sourcePosition).magnitude() <= maxRange) {
+      } else if (geometry.diff_to_nearest_coord_in_box((*entity)->interactive_bound_box().translated((*entity)->position()), sourcePosition).magnitude() <= maxRange) {
         return std::move(*entity);
       }
     }
@@ -880,7 +880,7 @@ namespace WorldImpl {
         }
       }
     } else if (auto interactive_entity = prefer_interactive ? as_ref<InteractiveEntity>(*entity) : std::nullopt) {
-      auto entity_bounds = interactive_entity->get().interactiveBoundBox().translated(entity->position());
+      auto entity_bounds = interactive_entity->get().interactive_bound_box().translated(entity->position());
       auto contains = geometry.rect_contains(entity_bounds, source_position);
       if (!contains)
         return std::unexpected(std::move(contains.error()));

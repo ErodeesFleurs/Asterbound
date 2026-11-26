@@ -173,7 +173,7 @@ std::expected<void, StarException> ThrownItem::fire_triggered() {
   auto itemWorld = world();
   if (!itemWorld)
     return std::unexpected(std::move(itemWorld.error()));
-  auto aimPosition = itemOwner->get().aimPosition();
+  auto aimPosition = itemOwner->get().aim_position();
   if (!aimPosition)
     return std::unexpected(std::move(aimPosition.error()));
   Vec2F direction = itemWorld->get().geometry().diff(*aimPosition, itemOwner->get().position()).normalized();
@@ -196,7 +196,7 @@ std::expected<void, StarException> ThrownItem::fire_triggered() {
     (*projectile)->setInitialPosition(firePosition);
     (*projectile)->setInitialDirection(direction);
     (*projectile)->setSourceEntity(itemOwner->get().entityId(), false);
-    auto multiplier = itemOwner->get().powerMultiplier();
+    auto multiplier = itemOwner->get().power_multiplier();
     if (!multiplier)
       return std::unexpected(std::move(multiplier.error()));
     (*projectile)->setPowerMultiplier(*multiplier);

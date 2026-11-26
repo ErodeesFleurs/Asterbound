@@ -210,21 +210,21 @@ public:
   [[nodiscard]] std::expected<void, StarException> enable_interpolation(float extrapolation_hint = 0.0f) override;
   [[nodiscard]] std::expected<void, StarException> disable_interpolation() override;
 
-  [[nodiscard]] std::expected<std::optional<HitType>, StarException> queryHit(DamageSource const& source) const override;
-  [[nodiscard]] std::expected<std::optional<PolyF>, StarException> hitPoly() const override;
+  [[nodiscard]] std::expected<std::optional<HitType>, StarException> query_hit(DamageSource const& source) const override;
+  [[nodiscard]] std::expected<std::optional<PolyF>, StarException> hit_poly() const override;
 
-  [[nodiscard]] std::expected<List<DamageNotification>, StarException> applyDamage(DamageRequest const& damage) override;
-  [[nodiscard]] std::expected<List<DamageNotification>, StarException> selfDamageNotifications() override;
+  [[nodiscard]] std::expected<List<DamageNotification>, StarException> apply_damage(DamageRequest const& damage) override;
+  [[nodiscard]] std::expected<List<DamageNotification>, StarException> self_damage_notifications() override;
 
   [[nodiscard]] std::expected<void, StarException> hitOther(EntityId targetEntityId, DamageRequest const& damageRequest) override;
-  [[nodiscard]] std::expected<void, StarException> damagedOther(DamageNotification const& damage) override;
+  [[nodiscard]] std::expected<void, StarException> damaged_other(DamageNotification const& damage) override;
 
   [[nodiscard]] std::expected<List<DamageSource>, StarException> damage_sources() const override;
 
   [[nodiscard]] std::expected<bool, StarException> should_destroy() const override;
   [[nodiscard]] std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) override;
 
-  std::optional<EntityAnchorState> loungingIn() const override;
+  std::optional<EntityAnchorState> lounging_in() const override;
   [[nodiscard]] std::expected<bool, StarException> lounge(EntityId loungeableEntityId, std::size_t anchorIndex);
   [[nodiscard]] std::expected<void, StarException> stopLounging();
 
@@ -250,7 +250,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> dropItem();
 
   [[nodiscard]] std::expected<float, StarException> toolRadius() const;
-  [[nodiscard]] std::expected<float, StarException> interactRadius() const override;
+  [[nodiscard]] std::expected<float, StarException> interact_radius() const override;
   void setInteractRadius(float interactRadius);
   void queue_interact_action(RpcPromise<InteractAction> action);
   [[nodiscard]] std::expected<List<InteractAction>, StarException> pull_interact_actions();
@@ -258,8 +258,8 @@ public:
   std::uint64_t currency(String const& currencyType) const;
 
   float health() const override;
-  [[nodiscard]] std::expected<float, StarException> maxHealth() const override;
-  DamageBarType damageBar() const override;
+  [[nodiscard]] std::expected<float, StarException> max_health() const override;
+  DamageBarType damage_bar() const override;
   [[nodiscard]] std::expected<float, StarException> healthPercentage() const;
 
   [[nodiscard]] std::expected<float, StarException> energy() const override;
@@ -268,9 +268,9 @@ public:
 
   [[nodiscard]] std::expected<float, StarException> energyRegenBlockPercent() const;
 
-  [[nodiscard]] std::expected<bool, StarException> energyLocked() const override;
-  [[nodiscard]] std::expected<bool, StarException> fullEnergy() const override;
-  [[nodiscard]] std::expected<bool, StarException> consumeEnergy(float energy) override;
+  [[nodiscard]] std::expected<bool, StarException> energy_locked() const override;
+  [[nodiscard]] std::expected<bool, StarException> full_energy() const override;
+  [[nodiscard]] std::expected<bool, StarException> consume_energy(float energy) override;
 
   [[nodiscard]] std::expected<float, StarException> foodPercentage() const;
 
@@ -286,8 +286,8 @@ public:
 
   [[nodiscard]] std::expected<List<LightSource>, StarException> light_sources() const override;
 
-  Direction walkingDirection() const override;
-  Direction facingDirection() const override;
+  Direction walking_direction() const override;
+  Direction facing_direction() const override;
 
   [[nodiscard]] MessageResponseResult receive_message(ConnectionId sending_connection, String const& message, JsonArray const& args = {}) override;
 
@@ -295,7 +295,7 @@ public:
 
   std::uint64_t presentation_epoch() const override;
 
-  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& render_callback) override;
+  [[nodiscard]] std::expected<void, StarException> collect_render_events(RenderCallback& render_callback) override;
 
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback) override;
 
@@ -360,19 +360,19 @@ public:
 
   // Aim this player's target at the given world position.
   void aim(Vec2F const& position);
-  [[nodiscard]] std::expected<Vec2F, StarException> aimPosition() const override;
+  [[nodiscard]] std::expected<Vec2F, StarException> aim_position() const override;
 
   [[nodiscard]] std::expected<Vec2F, StarException> arm_position(ToolHand hand, Direction facing_direction, float arm_angle, Vec2F offset = {}) const override;
   [[nodiscard]] std::expected<Vec2F, StarException> hand_offset(ToolHand hand, Direction facing_direction) const override;
 
   [[nodiscard]] std::expected<Vec2F, StarException> hand_position(ToolHand hand, Vec2F const& hand_offset = {}) const override;
-  std::shared_ptr<Item> handItem(ToolHand hand) const override;
+  std::shared_ptr<Item> hand_item(ToolHand hand) const override;
 
-  [[nodiscard]] std::expected<Vec2F, StarException> armAdjustment() const override;
+  [[nodiscard]] std::expected<Vec2F, StarException> arm_adjustment() const override;
 
-  void setCameraFocusEntity(std::optional<EntityId> const& cameraFocusEntity) override;
+  void set_camera_focus_entity(std::optional<EntityId> const& cameraFocusEntity) override;
 
-  [[nodiscard]] std::expected<void, StarException> playEmote(HumanoidEmote emote) override;
+  [[nodiscard]] std::expected<void, StarException> play_emote(HumanoidEmote emote) override;
 
   bool canUseTool() const;
 
@@ -411,10 +411,10 @@ public:
   [[nodiscard]] std::expected<String, StarException> name() const override;
   [[nodiscard]] std::expected<void, StarException> setName(String const& name);
 
-  std::optional<String> statusText() const override;
-  bool displayNametag() const override;
-  [[nodiscard]] std::expected<Vec3B, StarException> nametagColor() const override;
-  [[nodiscard]] std::expected<Vec2F, StarException> nametagOrigin() const override;
+  std::optional<String> status_text() const override;
+  bool display_nametag() const override;
+  [[nodiscard]] std::expected<Vec3B, StarException> nametag_color() const override;
+  [[nodiscard]] std::expected<Vec2F, StarException> nametag_origin() const override;
   [[nodiscard]] std::expected<String, StarException> nametag() const override;
   [[nodiscard]] std::expected<void, StarException> setNametag(std::optional<String> nametag);
 
@@ -459,29 +459,29 @@ public:
   [[nodiscard]] std::expected<void, StarException> setIdentity(HumanoidIdentity identity);
 
   void setAdmin(bool isAdmin);
-  bool isAdmin() const override;
+  bool is_admin() const override;
 
-  [[nodiscard]] std::expected<bool, StarException> inToolRange() const override;
-  [[nodiscard]] std::expected<bool, StarException> inToolRange(Vec2F const& aimPos) const override;
+  [[nodiscard]] std::expected<bool, StarException> in_tool_range() const override;
+  [[nodiscard]] std::expected<bool, StarException> in_tool_range(Vec2F const& aimPos) const override;
   [[nodiscard]] std::expected<bool, StarException> inInteractionRange() const;
   [[nodiscard]] std::expected<bool, StarException> inInteractionRange(Vec2F aimPos) const;
 
-  [[nodiscard]] std::expected<void, StarException> addParticles(List<Particle> const& particles) override;
-  [[nodiscard]] std::expected<void, StarException> addSound(String const& sound, float volume = 1.0f, float pitch = 1.0f) override;
+  [[nodiscard]] std::expected<void, StarException> add_particles(List<Particle> const& particles) override;
+  [[nodiscard]] std::expected<void, StarException> add_sound(String const& sound, float volume = 1.0f, float pitch = 1.0f) override;
 
   bool wireToolInUse() const;
   void setWireConnector(std::optional<std::reference_wrapper<WireConnector>> wireConnector) const;
 
-  [[nodiscard]] std::expected<void, StarException> addEphemeralStatusEffects(List<EphemeralStatusEffect> const& statusEffects) override;
-  [[nodiscard]] std::expected<ActiveUniqueStatusEffectSummary, StarException> activeUniqueStatusEffectSummary() const override;
+  [[nodiscard]] std::expected<void, StarException> add_ephemeral_status_effects(List<EphemeralStatusEffect> const& statusEffects) override;
+  [[nodiscard]] std::expected<ActiveUniqueStatusEffectSummary, StarException> active_unique_status_effect_summary() const override;
 
-  [[nodiscard]] std::expected<float, StarException> powerMultiplier() const override;
+  [[nodiscard]] std::expected<float, StarException> power_multiplier() const override;
 
   bool isDead() const;
   [[nodiscard]] std::expected<void, StarException> kill();
 
   [[nodiscard]] std::expected<void, StarException> setFavoriteColor(Color color);
-  Color favoriteColor() const override;
+  Color favorite_color() const override;
 
   // Starts the teleport animation sequence, locking player movement and
   // preventing some update code
@@ -504,7 +504,7 @@ public:
   List<String> pullQueuedMessages();
   List<std::shared_ptr<Item>> pullQueuedItemDrops();
 
-  [[nodiscard]] std::expected<void, StarException> queueUIMessage(String const& message) override;
+  [[nodiscard]] std::expected<void, StarException> queue_ui_message(String const& message) override;
   void queueItemPickupMessage(std::shared_ptr<Item> const& item);
 
   [[nodiscard]] std::expected<void, StarException> add_chat_message(String const& message, Json const& config = {});
@@ -519,16 +519,16 @@ public:
   [[nodiscard]] std::expected<std::optional<String>, StarException> inspectionLogName() const override;
   [[nodiscard]] std::expected<std::optional<String>, StarException> inspectionDescription(String const& species) const override;
 
-  [[nodiscard]] std::expected<float, StarException> beamGunRadius() const override;
+  [[nodiscard]] std::expected<float, StarException> beam_gun_radius() const override;
 
-  [[nodiscard]] std::expected<bool, StarException> instrumentPlaying() override;
-  [[nodiscard]] std::expected<void, StarException> instrumentEquipped(String const& instrumentKind) override;
+  [[nodiscard]] std::expected<bool, StarException> instrument_playing() override;
+  [[nodiscard]] std::expected<void, StarException> instrument_equipped(String const& instrumentKind) override;
   [[nodiscard]] std::expected<void, StarException> interact(InteractAction action) override;
-  [[nodiscard]] std::expected<void, StarException> addEffectEmitters(StringSet const& emitters) override;
-  [[nodiscard]] std::expected<void, StarException> requestEmote(String const& emote) override;
+  [[nodiscard]] std::expected<void, StarException> add_effect_emitters(StringSet const& emitters) override;
+  [[nodiscard]] std::expected<void, StarException> request_emote(String const& emote) override;
 
   ActorMovementController& movement_controller() override;
-  StatusController& statusController() override;
+  StatusController& status_controller() override;
 
   [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> force_regions() const override;
 

@@ -96,7 +96,7 @@ public:
 
   [[nodiscard]] MessageResponseResult receive_message(ConnectionId sending_connection, String const& message, JsonArray const& args) override;
 
-  using Entity::setUniqueId;
+  using Entity::set_unique_id;
 
 private:
   Stagehand(Root& rootContext);

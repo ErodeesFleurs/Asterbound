@@ -94,7 +94,7 @@ std::expected<bool, StarException> TileEntity::canBeDamaged() const {
   return true;
 }
 
-bool TileEntity::isInteractive() const {
+bool TileEntity::is_interactive() const {
   return false;
 }
 
@@ -107,15 +107,15 @@ std::expected<InteractAction, StarException> TileEntity::interact(InteractReques
   return InteractAction();
 }
 
-std::expected<List<QuestArcDescriptor>, StarException> TileEntity::offeredQuests() const {
+std::expected<List<QuestArcDescriptor>, StarException> TileEntity::offered_quests() const {
   return List<QuestArcDescriptor>{};
 }
 
-std::expected<StringSet, StarException> TileEntity::turnInQuests() const {
+std::expected<StringSet, StarException> TileEntity::turn_in_quests() const {
   return StringSet();
 }
 
-std::expected<Vec2F, StarException> TileEntity::questIndicatorPosition() const {
+std::expected<Vec2F, StarException> TileEntity::quest_indicator_position() const {
   return position();
 }
 

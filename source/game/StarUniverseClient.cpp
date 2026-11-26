@@ -936,7 +936,7 @@ std::expected<bool, StarException> UniverseClient::canBeamUp() const {
   auto world = m_client_context->player_world_id();
   if (std::holds_alternative<std::monostate>(world) || std::holds_alternative<ClientShipWorldId>(world))
     return false;
-  if (m_mainPlayer->isAdmin())
+  if (m_mainPlayer->is_admin())
     return true;
   if (m_mainPlayer->isDead() || m_mainPlayer->isTeleporting())
     return false;
@@ -967,7 +967,7 @@ std::expected<bool, StarException> UniverseClient::canBeamDown(bool deploy) cons
     if (!canDeploy)
       return false;
   }
-  if (m_mainPlayer->isAdmin())
+  if (m_mainPlayer->is_admin())
     return true;
   return !m_mainPlayer->isDead() && !m_mainPlayer->isTeleporting() && m_client_context->has_ship_capability("teleport");
 }
@@ -976,7 +976,7 @@ std::expected<bool, StarException> UniverseClient::canBeamToTeamShip() const {
   auto world = m_client_context->player_world_id();
   if (std::holds_alternative<std::monostate>(world))
     return false;
-  if (m_mainPlayer->isAdmin())
+  if (m_mainPlayer->is_admin())
     return true;
   auto beamUpResult = canBeamUp();
   if (!beamUpResult)
@@ -988,7 +988,7 @@ std::expected<bool, StarException> UniverseClient::canBeamToTeamShip() const {
 }
 
 std::expected<bool, StarException> UniverseClient::canTeleport() const {
-  if (m_mainPlayer->isAdmin())
+  if (m_mainPlayer->is_admin())
     return true;
   if (std::holds_alternative<ClientShipWorldId>(m_client_context->player_world_id()))
     return !flying() && m_client_context->has_ship_capability("teleport");
@@ -1057,7 +1057,7 @@ WorldId UniverseClient::player_world() const {
 }
 
 bool UniverseClient::isAdmin() const {
-  return m_mainPlayer->isAdmin();
+  return m_mainPlayer->is_admin();
 }
 
 Uuid UniverseClient::teamUuid() const {

@@ -45,7 +45,7 @@ public:
     return sources;
   }
 
-  std::expected<std::optional<HitType>, StarException> queryHit(DamageSource const& source) const override {
+  std::expected<std::optional<HitType>, StarException> query_hit(DamageSource const& source) const override {
     trace.emplace_back(Phase::Query, entityId(), source.source_entity_id);
     return HitType::StrongHit;
   }
@@ -58,13 +58,13 @@ public:
     return {};
   }
 
-  std::expected<List<DamageNotification>, StarException> applyDamage(DamageRequest const& request) override {
+  std::expected<List<DamageNotification>, StarException> apply_damage(DamageRequest const& request) override {
     trace.emplace_back(Phase::Damage, entityId(), request.source_entity_id);
     return List<DamageNotification>{{request.source_entity_id, entityId(), position(), request.damage, request.damage,
         request.hit_type, request.damage_source_kind, "flesh"}};
   }
 
-  std::expected<void, StarException> damagedOther(DamageNotification const& notification) override {
+  std::expected<void, StarException> damaged_other(DamageNotification const& notification) override {
     trace.emplace_back(Phase::Notify, entityId(), notification.target_entity_id);
     return {};
   }

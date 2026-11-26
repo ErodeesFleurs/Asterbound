@@ -275,7 +275,7 @@ std::expected<bool, StarException> ClientCommandProcessor::adminCommandAllowed()
   if (!allow) return std::unexpected(std::move(allow.error()));
   auto enabled = allow->to_bool();
   if (!enabled) return std::unexpected(std::move(enabled.error()));
-  return *enabled || m_universeClient->mainPlayer()->isAdmin();
+  return *enabled || m_universeClient->mainPlayer()->is_admin();
 }
 
 std::expected<String, StarException> ClientCommandProcessor::previewQuestDialog(StringList const& arguments, String const& kind) {
@@ -447,7 +447,7 @@ std::expected<String, StarException> ClientCommandProcessor::hotReload() {
 std::expected<String, StarException> ClientCommandProcessor::whoami() {
   auto name = m_universeClient->mainPlayer()->name();
   if (!name) return std::unexpected(std::move(name.error()));
-  return Star::format("Client: You are {}. You are {}an Admin.", *name, m_universeClient->mainPlayer()->isAdmin() ? std::string_view("") : std::string_view("not "));
+  return Star::format("Client: You are {}. You are {}an Admin.", *name, m_universeClient->mainPlayer()->is_admin() ? std::string_view("") : std::string_view("not "));
 }
 
 std::expected<String, StarException> ClientCommandProcessor::gravity() {

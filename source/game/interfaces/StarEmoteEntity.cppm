@@ -30,7 +30,7 @@ public:
   void query_type(TypeQuery& query) const noexcept override { query_type_of<EmoteEntity, Entity>(*this, query); }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<EmoteEntity>(); }
 
-  [[nodiscard]] virtual std::expected<void, StarException> playEmote(HumanoidEmote emote) = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> play_emote(HumanoidEmote emote) = 0;
 };
 
 }

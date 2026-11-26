@@ -52,13 +52,13 @@ public:
   [[nodiscard]] virtual std::expected<Vec2F, StarException> hand_offset(ToolHand hand, Direction facing_direction) const = 0;
 
   // Gets the world position of the current aim point.
-  [[nodiscard]] virtual std::expected<Vec2F, StarException> aimPosition() const = 0;
+  [[nodiscard]] virtual std::expected<Vec2F, StarException> aim_position() const = 0;
 
-  virtual bool isAdmin() const = 0;
-  virtual Color favoriteColor() const = 0;
+  virtual bool is_admin() const = 0;
+  virtual Color favorite_color() const = 0;
   virtual String species() const = 0;
 
-  [[nodiscard]] virtual std::expected<void, StarException> requestEmote(String const& emote) = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> request_emote(String const& emote) = 0;
 
   // FIXME: This is effectively unusable, because since tool user items control
   // the angle and facing direction of the owner, and this uses the facing
@@ -68,7 +68,7 @@ public:
   // FIXME: This was used for an Item to get a shared pointer to itself, which was
   // super bad and weird, but it COULD be used to get the item in the owner's
   // other hand, which is LESS bad.
-  virtual std::shared_ptr<Item> handItem(ToolHand hand) const = 0;
+  virtual std::shared_ptr<Item> hand_item(ToolHand hand) const = 0;
 
   // FIXME: What is the difference between interactRadius (which defines a tool
   // range) and inToolRange (which also defines a tool range indirectly).
@@ -77,15 +77,15 @@ public:
   // position, which is again redundant.  Also, what is beamGunRadius and why
   // is it different than interact radius?  Can different tools have a
   // different interact radius?
-  [[nodiscard]] virtual std::expected<float, StarException> interactRadius() const = 0;
-  [[nodiscard]] virtual std::expected<bool, StarException> inToolRange() const = 0;
-  [[nodiscard]] virtual std::expected<bool, StarException> inToolRange(Vec2F const& position) const = 0;
-  [[nodiscard]] virtual std::expected<float, StarException> beamGunRadius() const = 0;
+  [[nodiscard]] virtual std::expected<float, StarException> interact_radius() const = 0;
+  [[nodiscard]] virtual std::expected<bool, StarException> in_tool_range() const = 0;
+  [[nodiscard]] virtual std::expected<bool, StarException> in_tool_range(Vec2F const& position) const = 0;
+  [[nodiscard]] virtual std::expected<float, StarException> beam_gun_radius() const = 0;
 
   // FIXME: Too specific to Player, just cast to Player if you have to and do
   // that, NPCs cannot possibly implement these properly (and do not implement
   // them at all).
-  [[nodiscard]] virtual std::expected<void, StarException> queueUIMessage(String const& message) = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> queue_ui_message(String const& message) = 0;
   [[nodiscard]] virtual std::expected<void, StarException> interact(InteractAction action) = 0;
 
   // FIXME: Ditto here, instrumentPlaying() is just an accessor to the songbook
@@ -93,35 +93,35 @@ public:
   // when to cancel music anyway, also instrumentEquipped(String) is a straight
   // up ridiculous way of notifying the Player that the player itself is
   // holding an instrument, which it already knows.
-  [[nodiscard]] virtual std::expected<bool, StarException> instrumentPlaying() = 0;
-  [[nodiscard]] virtual std::expected<void, StarException> instrumentEquipped(String const& instrumentKind) = 0;
+  [[nodiscard]] virtual std::expected<bool, StarException> instrument_playing() = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> instrument_equipped(String const& instrumentKind) = 0;
 
   // FIXME: how is this related to the hand position and isn't it already
   // included in the hand position and why is it necessary?
-  [[nodiscard]] virtual std::expected<Vec2F, StarException> armAdjustment() const = 0;
+  [[nodiscard]] virtual std::expected<Vec2F, StarException> arm_adjustment() const = 0;
 
   // FIXME: These were all fine, just need to be fixed because now we have the
   // movement controller itself and can use that directly
   Vec2F position() const override = 0;
   virtual Vec2F velocity() const = 0;
-  virtual Direction facingDirection() const = 0;
-  virtual Direction walkingDirection() const = 0;
+  virtual Direction facing_direction() const = 0;
+  virtual Direction walking_direction() const = 0;
 
   // FIXME: Ditto here, except we now have the status controller directly.
-  [[nodiscard]] virtual std::expected<float, StarException> powerMultiplier() const = 0;
-  [[nodiscard]] virtual std::expected<bool, StarException> fullEnergy() const = 0;
+  [[nodiscard]] virtual std::expected<float, StarException> power_multiplier() const = 0;
+  [[nodiscard]] virtual std::expected<bool, StarException> full_energy() const = 0;
   [[nodiscard]] virtual std::expected<float, StarException> energy() const = 0;
-  [[nodiscard]] virtual std::expected<bool, StarException> consumeEnergy(float energy) = 0;
-  [[nodiscard]] virtual std::expected<bool, StarException> energyLocked() const = 0;
-  [[nodiscard]] virtual std::expected<void, StarException> addEphemeralStatusEffects(List<EphemeralStatusEffect> const& statusEffects) = 0;
-  [[nodiscard]] virtual std::expected<ActiveUniqueStatusEffectSummary, StarException> activeUniqueStatusEffectSummary() const = 0;
+  [[nodiscard]] virtual std::expected<bool, StarException> consume_energy(float energy) = 0;
+  [[nodiscard]] virtual std::expected<bool, StarException> energy_locked() const = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> add_ephemeral_status_effects(List<EphemeralStatusEffect> const& statusEffects) = 0;
+  [[nodiscard]] virtual std::expected<ActiveUniqueStatusEffectSummary, StarException> active_unique_status_effect_summary() const = 0;
 
   // FIXME: This is a dumb way of getting limited animation support
-  [[nodiscard]] virtual std::expected<void, StarException> addEffectEmitters(StringSet const& emitters) = 0;
-  [[nodiscard]] virtual std::expected<void, StarException> addParticles(List<Particle> const& particles) = 0;
-  [[nodiscard]] virtual std::expected<void, StarException> addSound(String const& sound, float volume = 1.0f, float pitch = 1.0f) = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> add_effect_emitters(StringSet const& emitters) = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> add_particles(List<Particle> const& particles) = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> add_sound(String const& sound, float volume = 1.0f, float pitch = 1.0f) = 0;
 
-  virtual void setCameraFocusEntity(std::optional<EntityId> const& cameraFocusEntity) = 0;
+  virtual void set_camera_focus_entity(std::optional<EntityId> const& cameraFocusEntity) = 0;
 };
 
 }

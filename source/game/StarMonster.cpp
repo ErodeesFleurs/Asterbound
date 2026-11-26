@@ -279,7 +279,7 @@ if (!result30) return std::unexpected(std::move(result30.error()));
 
   auto result31 = diskStore.opt_string("uniqueId");
 if (!result31) return std::unexpected(std::move(result31.error()));
-setUniqueId(std::move(*result31));
+set_unique_id(std::move(*result31));
   {
   auto result32 = diskStore.contains("team");
   if (!result32) return std::unexpected(std::move(result32.error()));
@@ -553,11 +553,11 @@ std::expected<String, StarException> Monster::description() const {
   return m_monster_variant.description.value_or("Some indescribable horror");
 }
 
-std::expected<std::optional<HitType>, StarException> Monster::queryHit(DamageSource const& source) const {
+std::expected<std::optional<HitType>, StarException> Monster::query_hit(DamageSource const& source) const {
   if (!inWorld() || m_knocked_out || m_status_controller->statPositive("invulnerable"))
     return {};
 
-  auto body = hitPoly();
+  auto body = hit_poly();
   if (!body) return std::unexpected(std::move(body.error()));
   if (!*body) return std::unexpected(MonsterException("Monster has no hit polygon"));
   {
@@ -572,14 +572,14 @@ std::expected<std::optional<HitType>, StarException> Monster::queryHit(DamageSou
   return {};
 }
 
-std::expected<std::optional<PolyF>, StarException> Monster::hitPoly() const {
+std::expected<std::optional<PolyF>, StarException> Monster::hit_poly() const {
   PolyF hitBody = m_monster_variant.self_damage_poly;
   hitBody.rotate(m_movement_controller->rotation());
   hitBody.translate(position());
   return hitBody;
 }
 
-std::expected<List<DamageNotification>, StarException> Monster::applyDamage(DamageRequest const& damage) {
+std::expected<List<DamageNotification>, StarException> Monster::apply_damage(DamageRequest const& damage) {
   if (!inWorld())
     return {};
 
@@ -608,7 +608,7 @@ if (!result94) return std::unexpected(std::move(result94.error()));
   return notifications;
 }
 
-std::expected<List<DamageNotification>, StarException> Monster::selfDamageNotifications() {
+std::expected<List<DamageNotification>, StarException> Monster::self_damage_notifications() {
   return m_status_controller->pull_self_damage_notifications();
 }
 
@@ -988,7 +988,7 @@ std::expected<void, StarException> Monster::hitOther(EntityId targetEntityId, Da
   return {};
 }
 
-std::expected<void, StarException> Monster::damagedOther(DamageNotification const& damage) {
+std::expected<void, StarException> Monster::damaged_other(DamageNotification const& damage) {
   if (inWorld() && isMaster())
     m_status_controller->damaged_other(damage);
   return {};
@@ -1046,7 +1046,7 @@ std::uint64_t Monster::presentation_epoch() const {
   return Entity::presentation_epoch() + m_movement_controller->presentation_epoch();
 }
 
-std::expected<void, StarException> Monster::collectRenderEvents(RenderCallback& render_callback) {
+std::expected<void, StarException> Monster::collect_render_events(RenderCallback& render_callback) {
   auto result158 = render_callback.add_audios(m_networked_animator_dynamic_target.pull_new_audios());
 if (!result158) return std::unexpected(std::move(result158.error()));
   auto result159 = render_callback.add_particles(m_networked_animator_dynamic_target.pull_new_particles());
@@ -1129,7 +1129,7 @@ MessageResponseResult Monster::receive_message(ConnectionId sending_connection, 
   return m_status_controller->receive_message(message, fallback_world->get().connection() == sending_connection, args);
 }
 
-std::expected<float, StarException> Monster::maxHealth() const {
+std::expected<float, StarException> Monster::max_health() const {
   auto maximum = m_status_controller->resourceMax("health");
   if (!maximum) return std::unexpected(std::move(maximum.error()));
   if (!*maximum) return std::unexpected(MonsterException("Health resource has no maximum"));
@@ -1140,7 +1140,7 @@ float Monster::health() const {
   return m_status_controller->resource("health");
 }
 
-DamageBarType Monster::damageBar() const {
+DamageBarType Monster::damage_bar() const {
   return m_damage_bar.get();
 }
 
@@ -1312,7 +1312,7 @@ setTeam(std::move(*result203));
 if (!result204) return std::unexpected(std::move(result204.error()));
 
 auto result205 = callbacks.register_callback(
-  "setUniqueId", [this](std::optional<String> uniqueId) { setUniqueId(std::move(uniqueId)); });
+  "setUniqueId", [this](std::optional<String> uniqueId) { set_unique_id(std::move(uniqueId)); });
 if (!result205) return std::unexpected(std::move(result205.error()));
 
   auto result207 = callbacks.register_callback("setDamageBar", [this](String const& damageBarType) -> std::expected<void, StarException> {
@@ -1459,7 +1459,7 @@ std::expected<void, StarException> Monster::setNetStates() {
 }
 
 std::expected<void, StarException> Monster::getNetStates(bool initial) {
-  setUniqueId(m_unique_id_net_state.get());
+  set_unique_id(m_unique_id_net_state.get());
   setTeam(m_team_net_state.get());
   m_monster_level = m_monster_level_net_state.get();
   m_damage_on_touch = m_damage_on_touch_net_state.get();
@@ -1537,19 +1537,19 @@ MonsterVariant Monster::monster_variant() const {
   return m_monster_variant;
 }
 
-std::optional<String> Monster::statusText() const {
+std::optional<String> Monster::status_text() const {
   return {};
 }
 
-bool Monster::displayNametag() const {
+bool Monster::display_nametag() const {
   return m_display_nametag.get();
 }
 
-std::expected<Vec3B, StarException> Monster::nametagColor() const {
+std::expected<Vec3B, StarException> Monster::nametag_color() const {
   return m_monster_variant.nametag_color;
 }
 
-std::expected<Vec2F, StarException> Monster::nametagOrigin() const {
+std::expected<Vec2F, StarException> Monster::nametag_origin() const {
   return mouth_position(false);
 }
 
@@ -1595,11 +1595,11 @@ std::expected<InteractAction, StarException> Monster::interact(InteractRequest c
   return interact_action_from_script(**result, entityId());
 }
 
-bool Monster::isInteractive() const {
+bool Monster::is_interactive() const {
   return m_interactive.get();
 }
 
-std::expected<Vec2F, StarException> Monster::questIndicatorPosition() const {
+std::expected<Vec2F, StarException> Monster::quest_indicator_position() const {
   Vec2F pos = position() + m_quest_indicator_offset;
   pos[1] += collision_area().y_max();
   return pos;
@@ -1609,7 +1609,7 @@ ActorMovementController& Monster::movement_controller() {
   return *m_movement_controller;
 }
 
-StatusController& Monster::statusController() {
+StatusController& Monster::status_controller() {
   return *m_status_controller;
 }
 

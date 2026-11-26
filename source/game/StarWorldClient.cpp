@@ -616,7 +616,7 @@ std::expected<void, StarException> WorldClient::removeEntity(EntityId entityId, 
         : static_cast<RenderCallback&>(render_callback);
     // Removal packets can arrive before the next tick's event pass. Drain
     // pending live events before destroy() contributes its final death effects.
-    auto collected = entity->collectRenderEvents(events);
+    auto collected = entity->collect_render_events(events);
     if (!collected) {
       if (entity->isMaster())
         return std::unexpected(std::move(collected.error()));
@@ -1176,7 +1176,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
           auto tool_user = as<ToolUserEntity>(entity);
           String image = "/rendering/sprites/error.png";
           if (tool_user) {
-            auto result65 = enum_name<direction_names>(tool_user->facingDirection());
+            auto result65 = enum_name<direction_names>(tool_user->facing_direction());
             if (!result65)
               return std::unexpected(std::move(result65.error()));
             image = Star::format("/rendering/sprites/error_{}.png", *result65);
@@ -1217,7 +1217,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
       
       if (self.m_interactiveHighlightMode || (!inspecting && entity->entityId() == player_aim_interactive)) {
         if (auto interactive = as<InteractiveEntity>(entity)) {
-          if (interactive->isInteractive()) {
+          if (interactive->is_interactive()) {
             ed.highlight_effect.type = EntityHighlightEffectType::Interactive;
             ed.highlight_effect.level = pulse_level;
           }
@@ -2312,7 +2312,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
       }
       NullRenderCallback hidden_events(deferred_loops);
       m_event_render_callback.clear();
-      auto collected = entity->collectRenderEvents(hidden
+      auto collected = entity->collect_render_events(hidden
           ? static_cast<RenderCallback&>(hidden_events)
           : static_cast<RenderCallback&>(m_event_render_callback));
       if (!collected) {
@@ -3867,9 +3867,9 @@ std::expected<void, StarException> WorldClient::setProperty(String const& proper
 }
 
 std::expected<bool, StarException> WorldClient::playerCanReachEntity(EntityId entityId, bool preferInteractive) const {
-  if (entityId == m_mainPlayer->entityId() || m_mainPlayer->isAdmin())
+  if (entityId == m_mainPlayer->entityId() || m_mainPlayer->is_admin())
     return true;
-  auto radius = m_mainPlayer->interactRadius();
+  auto radius = m_mainPlayer->interact_radius();
   if (!radius)
     return std::unexpected(std::move(radius.error()));
   return canReachEntity(m_mainPlayer->position(), *radius, entityId, preferInteractive);

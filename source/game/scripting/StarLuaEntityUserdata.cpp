@@ -198,7 +198,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
                                    if (auto monster = as_ref<Monster>(*entity))
                                      return monster->get().type_name();
                                    if (auto npc = as_ref<Npc>(*entity))
-                                     return npc->get().npcType();
+                                     return npc->get().npc_type();
                                    if (auto vehicle = as_ref<Vehicle>(*entity))
                                      return vehicle->get().name();
                                    if (auto object = as_ref<Object>(*entity))
@@ -268,7 +268,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
         if (auto object = as_ref<Object>(*entity))
           val = object->get().configValue(parameterName);
         else if (auto npc = as_ref<Npc>(*entity))
-          val = npc->get().scriptConfigParameter(parameterName);
+          val = npc->get().script_config_parameter(parameterName);
         else if (auto projectile = as_ref<Projectile>(*entity))
           val = projectile->get().configValue(parameterName);
         else if (auto stagehand = as_ref<Stagehand>(*entity))
@@ -317,19 +317,19 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           auto nametag = nametagEntity->get().nametag();
           if (!nametag)
             return std::unexpected(std::move(nametag.error()));
-          auto color = nametagEntity->get().nametagColor();
+          auto color = nametagEntity->get().nametag_color();
           if (!color)
             return std::unexpected(std::move(color.error()));
-          auto origin = nametagEntity->get().nametagOrigin();
+          auto origin = nametagEntity->get().nametag_origin();
           if (!origin)
             return std::unexpected(std::move(origin.error()));
           result = JsonObject{
             {"nametag", std::move(*nametag)},
-            {"displayed", nametagEntity->get().displayNametag()},
+            {"displayed", nametagEntity->get().display_nametag()},
             {"color", json_from_color(Color::rgb(*color))},
             {"origin", json_from_vec2f(*origin)},
           };
-          if (auto status = nametagEntity->get().statusText()) {
+          if (auto status = nametagEntity->get().status_text()) {
             auto setStatus = result.set("status", *status);
             if (!setStatus)
               return std::unexpected(std::move(setStatus.error()));
@@ -366,7 +366,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "health",
           [&](std::shared_ptr<Entity> const& entity) -> std::expected<std::optional<Vec2F>, StarException> {
             if (auto dmgEntity = as_ref<DamageBarEntity>(*entity)) {
-              auto maxHealth = dmgEntity->get().maxHealth();
+              auto maxHealth = dmgEntity->get().max_health();
               if (!maxHealth)
                 return std::unexpected(std::move(maxHealth.error()));
               return Vec2F(dmgEntity->get().health(), *maxHealth);
@@ -381,7 +381,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "isInteractive",
           [&](std::shared_ptr<Entity> const& entity) -> std::expected<std::optional<bool>, StarException> {
             if (auto interactEntity = as_ref<InteractiveEntity>(*entity))
-              return interactEntity->get().isInteractive();
+              return interactEntity->get().is_interactive();
             return {};
           });
         !registration)
@@ -406,7 +406,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
                                  [&](std::shared_ptr<Entity> entity, String name,
                                      Json const& def = Json()) -> std::expected<std::optional<Json>, StarException> {
                                    if (auto actor = as_ref<ActorEntity>(*entity))
-                                     return actor->get().statusController().statusProperty(name, def);
+                                     return actor->get().status_controller().statusProperty(name, def);
                                    return {};
                                  });
         !registration)
@@ -415,7 +415,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "stat",
           [&](std::shared_ptr<Entity> entity, String name) -> std::expected<std::optional<float>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().statusController().stat(name);
+              return actor->get().status_controller().stat(name);
             return {};
           });
         !registration)
@@ -424,7 +424,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "statPositive",
           [&](std::shared_ptr<Entity> entity, String name) -> std::expected<std::optional<bool>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().statusController().statPositive(name);
+              return actor->get().status_controller().statPositive(name);
             return {};
           });
         !registration)
@@ -433,7 +433,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "resourceNames",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<StringList>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().statusController().resourceNames();
+              return actor->get().status_controller().resourceNames();
             return {};
           });
         !registration)
@@ -442,7 +442,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "resource",
           [&](std::shared_ptr<Entity> entity, String name) -> std::expected<std::optional<float>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().statusController().resource(name);
+              return actor->get().status_controller().resource(name);
             return {};
           });
         !registration)
@@ -451,7 +451,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "isResource",
           [&](std::shared_ptr<Entity> entity, String name) -> std::expected<std::optional<bool>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().statusController().isResource(name);
+              return actor->get().status_controller().isResource(name);
             return {};
           });
         !registration)
@@ -460,7 +460,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "resourcePositive",
           [&](std::shared_ptr<Entity> entity, String name) -> std::expected<std::optional<bool>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().statusController().resourcePositive(name);
+              return actor->get().status_controller().resourcePositive(name);
             return {};
           });
         !registration)
@@ -469,7 +469,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "resourceLocked",
           [&](std::shared_ptr<Entity> entity, String name) -> std::expected<std::optional<bool>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity)) {
-              auto locked = actor->get().statusController().resourceLocked(name);
+              auto locked = actor->get().status_controller().resourceLocked(name);
               if (!locked)
                 return std::unexpected(std::move(locked.error()));
               return std::optional<bool>(*locked);
@@ -482,7 +482,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "resourceMax",
           [&](std::shared_ptr<Entity> entity, String name) -> std::expected<std::optional<float>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().statusController().resourceMax(name);
+              return actor->get().status_controller().resourceMax(name);
             return {};
           });
         !registration)
@@ -491,7 +491,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "resourcePercentage",
           [&](std::shared_ptr<Entity> entity, String name) -> std::expected<std::optional<float>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().statusController().resourcePercentage(name);
+              return actor->get().status_controller().resourcePercentage(name);
             return {};
           });
         !registration)
@@ -501,7 +501,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           [&](std::shared_ptr<Entity> entity, String name) -> std::expected<std::optional<JsonArray>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity)) {
               JsonArray effects;
-              for (auto const& effect : actor->get().statusController().getPersistentEffects(name)) {
+              for (auto const& effect : actor->get().status_controller().getPersistentEffects(name)) {
                 auto json = jsonFromPersistentStatusEffect(effect);
                 if (!json)
                   return std::unexpected(std::move(json.error()));
@@ -517,7 +517,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "activeUniqueStatusEffectSummary",
           [&](std::shared_ptr<Entity> entity) -> std::expected<std::optional<List<JsonArray>>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().statusController().activeUniqueStatusEffectSummary().transformed(
+              return actor->get().status_controller().activeUniqueStatusEffectSummary().transformed(
                 [](std::pair<UniqueStatusEffect, std::optional<float>> effect) {
                   JsonArray effectJson = {effect.first};
                   if (effect.second)
@@ -533,7 +533,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "uniqueStatusEffectActive",
           [&](std::shared_ptr<Entity> entity, String name) -> std::expected<std::optional<bool>, StarException> {
             if (auto actor = as_ref<ActorEntity>(*entity))
-              return actor->get().statusController().uniqueStatusEffectActive(name);
+              return actor->get().status_controller().uniqueStatusEffectActive(name);
             return {};
           });
         !registration)
@@ -829,7 +829,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
         }
 
         if (auto toolUser = as_ref<ToolUserEntity>(*entity)) {
-          if (auto item = toolUser->get().handItem(toolHand)) {
+          if (auto item = toolUser->get().hand_item(toolHand)) {
             return item->name();
           }
         }
@@ -850,7 +850,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
         }
 
         if (auto toolUser = as_ref<ToolUserEntity>(*entity)) {
-          if (auto item = toolUser->get().handItem(toolHand)) {
+          if (auto item = toolUser->get().hand_item(toolHand)) {
             return item->descriptor().to_json();
           }
         }
@@ -863,7 +863,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
           "aimPosition",
           [&](std::shared_ptr<Entity> const& entity) -> std::expected<std::optional<Vec2F>, StarException> {
             if (auto toolUser = as_ref<ToolUserEntity>(*entity))
-              return toolUser->get().aimPosition();
+              return toolUser->get().aim_position();
             return {};
           });
         !registration)

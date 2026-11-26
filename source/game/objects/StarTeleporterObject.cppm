@@ -102,7 +102,7 @@ std::expected<std::shared_ptr<TeleporterObject>, StarException> TeleporterObject
   auto id = idConfig->opt_string();
   if (!id)
     return std::unexpected(std::move(id.error()));
-  object->setUniqueId(std::move(*id));
+  object->set_unique_id(std::move(*id));
   return object;
 }
 

@@ -506,7 +506,7 @@ if (!result917) return std::unexpected(std::move(result917.error()));
 auto victimEntity = result917->get().entity(entity);
     if (!victimEntity || (victimEntity->getTeam().type != TeamType::Passive && victimEntity->getTeam().type != TeamType::Environment)) {
       if (victimEntity) {
-        auto result918 = victimEntity->hitPoly();
+        auto result918 = victimEntity->hit_poly();
 if (!result918) return std::unexpected(std::move(result918.error()));
 if (auto hitPoly = std::move(*result918)) {
           auto result919 = world();
@@ -652,7 +652,7 @@ std::uint64_t Projectile::presentation_epoch() const {
   return Entity::presentation_epoch() + m_movement_controller->presentation_epoch();
 }
 
-std::expected<void, StarException> Projectile::collectRenderEvents(RenderCallback& render_callback) {
+std::expected<void, StarException> Projectile::collect_render_events(RenderCallback& render_callback) {
   auto result900 = collectPendingRenderEvents(render_callback);
 if (!result900) return std::unexpected(std::move(result900.error()));
 
@@ -1622,7 +1622,7 @@ std::expected<void, StarException> Projectile::setup() {
   auto result681 = m_parameters.opt_string("uniqueId");
 if (!result681) return std::unexpected(std::move(result681.error()));
 if (auto uniqueId = std::move(*result681))
-    setUniqueId(*uniqueId);
+    set_unique_id(*uniqueId);
 
   auto result682 = m_parameters.get_float("acceleration", m_config->acceleration);
 if (!result682) return std::unexpected(std::move(result682.error()));

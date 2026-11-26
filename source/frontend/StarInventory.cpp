@@ -1179,7 +1179,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
   if (!fetchChildResult151)
     return std::unexpected(std::move(fetchChildResult151.error()));
   auto healthLabel = std::move(*fetchChildResult151);
-  auto maxHealthResult152 = m_player->maxHealth();
+  auto maxHealthResult152 = m_player->max_health();
   if (!maxHealthResult152)
     return std::unexpected(std::move(maxHealthResult152.error()));
   auto setTextResult153 = healthLabel->setText(Star::format("{:.1f}", std::move(*maxHealthResult152)));
@@ -1199,7 +1199,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
   if (!fetchChildResult157)
     return std::unexpected(std::move(fetchChildResult157.error()));
   auto weaponLabel = std::move(*fetchChildResult157);
-  auto powerMultiplierResult158 = m_player->powerMultiplier();
+  auto powerMultiplierResult158 = m_player->power_multiplier();
   if (!powerMultiplierResult158)
     return std::unexpected(std::move(powerMultiplierResult158.error()));
   auto setTextResult159 = weaponLabel->setText(Star::format("{:.1f}%", std::move(*powerMultiplierResult158) * 100));

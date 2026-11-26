@@ -543,7 +543,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback(   "favoriteColor", [&player]() -> std::expected<Color, StarException> {
-    return player.favoriteColor();
+    return player.favorite_color();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("setFavoriteColor", [&player](Color color) -> std::expected<void, StarException> {
@@ -584,7 +584,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback(   "interactRadius", [&player]() -> std::expected<float, StarException> {
-    return player.interactRadius();
+    return player.interact_radius();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("setInteractRadius", [&player](float radius) -> std::expected<void, StarException> {
@@ -868,7 +868,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("aimPosition", [&player]() -> std::expected<Vec2F, StarException> {
-    return player.aimPosition();
+    return player.aim_position();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
@@ -881,7 +881,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("isAdmin",  [&player]() -> std::expected<bool, StarException> {
-    return player.isAdmin();
+    return player.is_admin();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
@@ -1594,11 +1594,11 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback(
         "isLounging",
-        [&player]() -> std::expected<bool, StarException> { return static_cast<bool>(player.loungingIn()); });
+        [&player]() -> std::expected<bool, StarException> { return static_cast<bool>(player.lounging_in()); });
       !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("loungingIn", [&player]() -> std::expected<std::optional<EntityId>, StarException> {
-    if (auto anchorState = player.loungingIn())
+    if (auto anchorState = player.lounging_in())
         return anchorState->entityId;
       return {};
   }); !registered)
@@ -1890,7 +1890,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
     return std::unexpected(std::move(registered.error()));
 
   if (auto registered = callbacks.register_callback("setCameraFocusEntity", [&player](std::optional<EntityId> const& entityId) -> std::expected<void, StarException> {
-    player.setCameraFocusEntity(entityId);
+    player.set_camera_focus_entity(entityId);
     return {};
   }); !registered)
     return std::unexpected(std::move(registered.error()));

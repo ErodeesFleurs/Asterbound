@@ -719,10 +719,74 @@ std::expected<std::shared_ptr<Humanoid>, StarException> Humanoid::create(Root& r
 }
 
 std::expected<void, StarException> Humanoid::set_identity(HumanoidIdentity const& identity) {
-  auto checked93 = enum_name<gender_names>(identity.gender);
-  if (!checked93)
-    return std::unexpected(std::move(checked93.error()));
-  m_gender_name = String(*checked93);
+  auto gender = enum_name<gender_names>(identity.gender);
+  if (!gender)
+    return std::unexpected(std::move(gender.error()));
+  String gender_name(*gender);
+  if (m_use_animation) {
+    // Stage tag resolution: authored tags can fail to parse, and later
+    // frameset tags can refer to ones already resolved in this update.
+    auto& animator = *m_networked_animator;
+    auto head = animator.get_local_transformation_group("personalityHeadOffset");
+    if (!head)
+      return std::unexpected(std::move(head.error()));
+    auto arm = animator.get_local_transformation_group("personalityArmOffset");
+    if (!arm)
+      return std::unexpected(std::move(arm.error()));
+
+    auto install_base_tags = [&](auto& target) {
+      target.set_local_tag("name", identity.name);
+      target.set_local_tag("species", identity.species);
+      target.set_local_tag("gender", gender_name);
+      target.set_local_tag("hairGroup", identity.hair_group);
+      target.set_local_tag("hairType", identity.hair_type);
+      target.set_local_tag("hairDirectives", identity.hair_directives.string());
+      target.set_local_tag("bodyDirectives", identity.body_directives.string());
+      target.set_local_tag("emoteDirectives", identity.emote_directives.string());
+      target.set_local_tag("facialHairGroup", identity.facial_hair_group);
+      target.set_local_tag("facialHairType", identity.facial_hair_type);
+      target.set_local_tag("facialHairDirectives", identity.facial_hair_directives.string());
+      target.set_local_tag("facialMaskGroup", identity.facial_hair_group);
+      target.set_local_tag("facialMaskType", identity.facial_hair_type);
+      target.set_local_tag("facialMaskDirectives", identity.facial_mask_directives.string());
+      target.set_local_tag("personalityIdle", identity.personality.idle);
+      target.set_local_tag("personalityArmIdle", identity.personality.arm_idle);
+      auto frameset = [](String const& group, String const& type) {
+        return type.empty() ? String{} : String(Star::format("{}/{}.png", group, type));
+      };
+      target.set_local_tag("hairFrameset", frameset(identity.hair_group, identity.hair_type));
+      target.set_local_tag("facialHairFrameset", frameset(identity.facial_hair_group, identity.facial_hair_type));
+      target.set_local_tag("facialMaskFrameset", frameset(identity.facial_mask_group, identity.facial_mask_type));
+    };
+    List<std::pair<String, String>> frameset_tags;
+    if (!m_identity_frameset_tags.empty()) {
+      frameset_tags.reserve(m_identity_frameset_tags.size());
+      auto sample = animator.sample(1.0f);
+      install_base_tags(sample);
+      for (auto const& [name, value] : m_identity_frameset_tags) {
+        auto resolved_name = sample.apply_part_tags("anchor", name);
+        if (!resolved_name)
+          return std::unexpected(std::move(resolved_name.error()));
+        auto resolved_value = sample.apply_part_tags("anchor", value);
+        if (!resolved_value)
+          return std::unexpected(std::move(resolved_value.error()));
+        sample.set_local_tag(*resolved_name, *resolved_value);
+        frameset_tags.emplace_back(std::move(*resolved_name), std::move(*resolved_value));
+      }
+    }
+
+    if (auto result = animator.set_local_transformation_group(
+          "personalityHeadOffset", Mat3F::translation(identity.personality.head_offset / tile_pixels)); !result)
+      return std::unexpected(std::move(result.error()));
+    if (auto result = animator.set_local_transformation_group(
+          "personalityArmOffset", Mat3F::translation(identity.personality.arm_offset / tile_pixels)); !result)
+      return std::unexpected(std::move(result.error()));
+    install_base_tags(animator);
+    for (auto& [name, value] : frameset_tags)
+      animator.set_local_tag(std::move(name), std::move(value));
+  }
+
+  m_gender_name = std::move(gender_name);
   m_identity = identity;
   m_head_frameset = get_head_from_identity();
   m_body_frameset = get_body_from_identity();
@@ -733,62 +797,10 @@ std::expected<void, StarException> Humanoid::set_identity(HumanoidIdentity const
   m_back_arm_frameset = get_back_arm_from_identity();
   m_front_arm_frameset = get_front_arm_from_identity();
   m_vapor_trail_frameset = get_vapor_trail_frameset();
-  if (m_config.use_body_mask) {
+  if (m_config.use_body_mask)
     m_body_mask_frameset = get_body_mask_from_identity();
-    
-}
-  if (m_config.use_body_head_mask) {
+  if (m_config.use_body_head_mask)
     m_body_head_mask_frameset = get_body_head_mask_from_identity();
-    
-}
-  if (m_use_animation) {
-    m_networked_animator->set_local_tag("name", m_identity.name);
-    m_networked_animator->set_local_tag("species", m_identity.species);
-    m_networked_animator->set_local_tag("gender", m_gender_name);
-    m_networked_animator->set_local_tag("hairGroup", m_identity.hair_group);
-    m_networked_animator->set_local_tag("hairType", m_identity.hair_type);
-    m_networked_animator->set_local_tag("hairDirectives", m_identity.hair_directives.string());
-    m_networked_animator->set_local_tag("bodyDirectives", m_identity.body_directives.string());
-    m_networked_animator->set_local_tag("emoteDirectives", m_identity.emote_directives.string());
-    m_networked_animator->set_local_tag("facialHairGroup", m_identity.facial_hair_group);
-    m_networked_animator->set_local_tag("facialHairType", m_identity.facial_hair_type);
-    m_networked_animator->set_local_tag("facialHairDirectives", m_identity.facial_hair_directives.string());
-    m_networked_animator->set_local_tag("facialMaskGroup", m_identity.facial_hair_group);
-    m_networked_animator->set_local_tag("facialMaskType", m_identity.facial_hair_type);
-    m_networked_animator->set_local_tag("facialMaskDirectives", m_identity.facial_mask_directives.string());
-    m_networked_animator->set_local_tag("personalityIdle", m_identity.personality.idle);
-    m_networked_animator->set_local_tag("personalityArmIdle", m_identity.personality.arm_idle);
-    auto checked94 = m_networked_animator->reset_local_transformation_group("personalityHeadOffset");
-if (!checked94) return std::unexpected(std::move(checked94.error()));
-    auto checked95 = m_networked_animator->translate_local_transformation_group("personalityHeadOffset", m_identity.personality.head_offset / tile_pixels);
-if (!checked95) return std::unexpected(std::move(checked95.error()));
-    auto checked96 = m_networked_animator->reset_local_transformation_group("personalityArmOffset");
-if (!checked96) return std::unexpected(std::move(checked96.error()));
-    auto checked97 = m_networked_animator->translate_local_transformation_group("personalityArmOffset", m_identity.personality.arm_offset / tile_pixels);
-if (!checked97) return std::unexpected(std::move(checked97.error()));
-
-m_networked_animator->set_local_tag(
-  "hairFrameset",
-  m_identity.hair_type.empty() ? "" : String(Star::format("{}/{}.png", m_identity.hair_group, m_identity.hair_type)));
-m_networked_animator->set_local_tag("facialHairFrameset",
-                                 m_identity.facial_hair_type.empty()
-                                   ? ""
-                                   : String(Star::format("{}/{}.png", m_identity.facial_hair_group, m_identity.facial_hair_type)));
-m_networked_animator->set_local_tag("facialMaskFrameset",
-                                 m_identity.facial_mask_type.empty()
-                                   ? ""
-                                   : String(Star::format("{}/{}.png", m_identity.facial_mask_group, m_identity.facial_mask_type)));
-
-for (auto const& p : m_identity_frameset_tags) {
-  auto checked98 = m_networked_animator->apply_part_tags("anchor", p.first);
-  if (!checked98)
-    return std::unexpected(std::move(checked98.error()));
-  auto checked99 = m_networked_animator->apply_part_tags("anchor", p.second);
-  if (!checked99)
-    return std::unexpected(std::move(checked99.error()));
-  m_networked_animator->set_local_tag(std::move(*checked98), std::move(*checked99));
-}
-}
   return {};
 }
 

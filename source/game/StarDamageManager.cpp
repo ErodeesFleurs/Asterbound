@@ -183,7 +183,7 @@ std::expected<void, StarException> DamageManager::update_entity(Entity& causing_
 
   if (!still_in_world(causing_entity, causing_id, world))
     return {};
-  auto notifications = causing_entity.selfDamageNotifications();
+  auto notifications = causing_entity.self_damage_notifications();
   if (!notifications) return std::unexpected(std::move(notifications.error()));
   for (auto& notification : *notifications) {
     auto result = add_damage_notification(causing_id, std::move(notification));
@@ -214,7 +214,7 @@ std::expected<void, StarException> DamageManager::push_remote_damage_request(Rem
 std::expected<void, StarException> DamageManager::apply_damage(Entity& target_entity, DamageRequest const& request) {
   if constexpr (Star::debug_enabled)
     Star::star_assert_failed(target_entity.isMaster());
-  auto notifications = target_entity.applyDamage(request);
+  auto notifications = target_entity.apply_damage(request);
   if (!notifications) return std::unexpected(std::move(notifications.error()));
   for (auto& notification : *notifications) {
     auto result = add_damage_notification(request.source_entity_id, std::move(notification));
@@ -226,7 +226,7 @@ std::expected<void, StarException> DamageManager::apply_damage(Entity& target_en
 std::expected<void, StarException> DamageManager::notify_source(EntityId source_id, DamageNotification const& notification) {
   if (source_id != notification.target_entity_id) {
     if (auto source = m_world.get().entity(source_id); source && source->isMaster())
-      return source->damagedOther(notification);
+      return source->damaged_other(notification);
   }
   return {};
 }
@@ -288,7 +288,7 @@ std::expected<SmallList<DamageManager::PendingHit, 4>, StarException> DamageMana
         }
       } else {
         auto const& line = std::get<Line2F>(source.damage_area);
-        auto hit_poly = target->hitPoly();
+        auto hit_poly = target->hit_poly();
         if (!hit_poly) return std::unexpected(std::move(hit_poly.error()));
         if (!still_in_world(*target, candidate.target_id, world)) return {};
         if (*hit_poly) {
@@ -302,7 +302,7 @@ std::expected<SmallList<DamageManager::PendingHit, 4>, StarException> DamageMana
         }
       }
     }
-    return target->queryHit(source);
+    return target->query_hit(source);
   };
   auto kept = hits.begin();
   for (auto it = hits.begin(); it != hits.end(); ++it) {

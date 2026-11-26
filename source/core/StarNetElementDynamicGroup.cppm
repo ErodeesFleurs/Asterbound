@@ -44,6 +44,10 @@ public:
   // Must not call add_net_element / remove_net_element when being used as a slave,
   // id errors will result.
   [[nodiscard]] std::expected<ElementId, StarException> add_net_element(std::shared_ptr<Element> element);
+  // Prepare must not edit this group. A failed preparation preserves its elements and wire history.
+  template <std::invocable Prepare>
+    requires std::same_as<std::invoke_result_t<Prepare>, std::expected<void, StarException>>
+  [[nodiscard]] std::expected<void, StarException> replace_net_elements(std::shared_ptr<Element> element, Prepare&& prepare);
   void remove_net_element(ElementId id);
 
   // Remove all elements
@@ -51,6 +55,9 @@ public:
 
   List<ElementId> net_element_ids() const;
   [[nodiscard]] std::expected<std::shared_ptr<Element>, StarException> get_net_element(ElementId id) const;
+  // Borrows the element with the largest ID, matching net_elements().last().
+  [[nodiscard]] std::expected<std::reference_wrapper<Element>, StarException> last_net_element() const&;
+  std::expected<std::reference_wrapper<Element>, StarException> last_net_element() const&& = delete;
 
   List<std::shared_ptr<Element>> net_elements() const;
 
@@ -120,6 +127,47 @@ template <dynamic_net_element Element>
 }
 
 template <dynamic_net_element Element>
+template <std::invocable Prepare>
+  requires std::same_as<std::invoke_result_t<Prepare>, std::expected<void, StarException>>
+std::expected<void, StarException> NetElementDynamicGroup<Element>::replace_net_elements(
+    std::shared_ptr<Element> element, Prepare&& prepare) {
+  if (auto result = ready_element(element); !result)
+    return std::unexpected(std::move(result.error()));
+
+  auto size = m_id_map.size();
+  if (size == std::numeric_limits<ElementId>::max())
+    return std::unexpected(IdMapException("No id space left in dynamic net element group"));
+
+  std::shared_ptr<Element> previous;
+  List<std::shared_ptr<Element>> remaining;
+  if (size > 1)
+    remaining.reserve(size - 1);
+  if (auto result = std::invoke(std::forward<Prepare>(prepare)); !result)
+    return std::unexpected(std::move(result.error()));
+
+  // There is room for the candidate without removing or reusing any existing ID.
+  auto id = m_id_map.emplace(std::move(element));
+  if (!id)
+    return std::unexpected(std::move(id.error()));
+  // Displaced elements may reenter the group when released. Finish all
+  // structural changes and record Remove(s) before Add before releasing them.
+  for (auto it = m_id_map.begin(); it != m_id_map.end();) {
+    if (auto old_id = it->first; old_id != *id) {
+      if (previous)
+        remaining.push_back(std::move(it->second));
+      else
+        previous = std::move(it->second);
+      it = m_id_map.erase(it);
+      add_change_data(Remove{old_id});
+    } else {
+      ++it;
+    }
+  }
+  add_change_data(Add{*id});
+  return {};
+}
+
+template <dynamic_net_element Element>
 void NetElementDynamicGroup<Element>::remove_net_element(ElementId id) {
   // Finish erasing the node before releasing the element: its destructor can reenter the group.
   m_id_map.try_extract_value(id);
@@ -143,6 +191,13 @@ template <dynamic_net_element Element>
   auto element = m_id_map.get(id);
   if (!element) return std::unexpected(std::move(element.error()));
   return element->get();
+}
+
+template <dynamic_net_element Element>
+auto NetElementDynamicGroup<Element>::last_net_element() const& -> std::expected<std::reference_wrapper<Element>, StarException> {
+  if (m_id_map.empty())
+    return std::unexpected(IOException("Dynamic net element group is empty"));
+  return std::ref(*std::prev(m_id_map.end())->second);
 }
 
 template <dynamic_net_element Element>

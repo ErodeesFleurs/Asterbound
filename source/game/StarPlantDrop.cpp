@@ -577,7 +577,7 @@ std::uint64_t PlantDrop::presentation_epoch() const {
   return Entity::presentation_epoch() + m_movement_controller->presentation_epoch();
 }
 
-std::expected<void, StarException> PlantDrop::collectRenderEvents(RenderCallback& render_callback) {
+std::expected<void, StarException> PlantDrop::collect_render_events(RenderCallback& render_callback) {
   auto result284 = this->root().assets();
 if (!result284) return std::unexpected(std::move(result284.error()));
 auto assets = std::move(*result284);

@@ -1454,6 +1454,49 @@ TEST(NetElements, DynamicGroupClearLogsReentrantChangesInRemovalOrder) {
   EXPECT_TRUE(std::ranges::equal(delta->first.span(), expected));
 }
 
+TEST(NetElements, DynamicGroupReplacementPreservesHistoryUntilPrepared) {
+  using Group = NetElementTop<NetElementDynamicGroup<NetElementGroup>>;
+  Group sender;
+  Group receiver;
+  EXPECT_FALSE(sender.last_net_element());
+  auto first = std::make_shared<NetElementGroup>();
+  auto last = std::make_shared<NetElementGroup>();
+  ASSERT_EQ(sender.add_net_element(first), 1u);
+  ASSERT_EQ(sender.add_net_element(last), 2u);
+  auto selected = sender.last_net_element();
+  ASSERT_TRUE(selected);
+  EXPECT_EQ(std::addressof(selected->get()), last.get());
+  auto baseline = sender.write_net_state();
+  ASSERT_TRUE(baseline);
+  ASSERT_TRUE(receiver.read_net_state(baseline->first));
+
+  auto candidate = std::make_shared<NetElementGroup>();
+  auto rejected = sender.replace_net_elements(candidate, []() -> std::expected<void, StarException> {
+    return std::unexpected(StarException("replacement preparation failed"));
+  });
+  EXPECT_FALSE(rejected);
+  EXPECT_EQ(sender.net_element_ids(), (List<std::uint32_t>{1u, 2u}));
+  auto unchanged = sender.write_net_state(baseline->second);
+  ASSERT_TRUE(unchanged);
+  EXPECT_TRUE(unchanged->first.empty());
+  ASSERT_TRUE(sender.replace_net_elements(candidate, []() -> std::expected<void, StarException> { return {}; }));
+  auto replaced = sender.last_net_element();
+  ASSERT_TRUE(replaced);
+  EXPECT_EQ(std::addressof(replaced->get()), candidate.get());
+  EXPECT_EQ(sender.net_element_ids(), List<std::uint32_t>{3u});
+  auto delta = sender.write_net_state(unchanged->second);
+  ASSERT_TRUE(delta);
+  constexpr std::array<char, 22> expected{
+      0, 0,
+      1, 1, 0, 0, 0, 1,
+      1, 1, 0, 0, 0, 2,
+      1, 2, 0, 0, 0, 3, 0,
+      0};
+  EXPECT_TRUE(std::ranges::equal(delta->first.span(), expected));
+  ASSERT_TRUE(receiver.read_net_state(delta->first));
+  EXPECT_EQ(receiver.net_element_ids(), List<std::uint32_t>{3u});
+}
+
 TEST(NetElements, DynamicGroupForwardsNestedFieldsWithPeerProtocol) {
   class VersionedField : public NetElementCustomData<std::uint32_t> {
   public:

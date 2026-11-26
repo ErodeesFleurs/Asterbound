@@ -93,7 +93,7 @@ std::expected<void, StarException> CodexItem::fire_triggered() {
     if (*learned == CodexLearnResult::NotFound)
       return {};
   }
-  return player->get().queueUIMessage(*message);
+  return player->get().queue_ui_message(*message);
 }
 
 std::expected<List<Drawable>, StarException> CodexItem::drawables() const {

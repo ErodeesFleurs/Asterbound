@@ -233,7 +233,7 @@ std::expected<void, StarException> NameplatePainter::update(float dt, std::share
   auto entities = world->query<NametagEntity>(camera.worldScreenRect());
   if (!entities) return std::unexpected(std::move(entities.error()));
   for (auto const& entity : *entities) {
-    if ((entity->isMaster() && !m_showMasterNames) || !entity->displayNametag()) continue;
+    if ((entity->isMaster() && !m_showMasterNames) || !entity->display_nametag()) continue;
     if (auto player = as<Player>(entity)) {
       if (player->isTeleporting()) continue;
     }
@@ -241,10 +241,10 @@ std::expected<void, StarException> NameplatePainter::update(float dt, std::share
     if (!m_entitiesWithNametags.contains(entity->entityId())) {
       auto name = entity->nametag();
       if (!name) return std::unexpected(std::move(name.error()));
-      auto color = entity->nametagColor();
+      auto color = entity->nametag_color();
       if (!color) return std::unexpected(std::move(color.error()));
       Nametag nametag = {.name = std::move(*name),
-                         .statusText = entity->statusText(),
+                         .statusText = entity->status_text(),
                          .color = *color,
                          .opacity = 1.0f,
                          .entityId = entity->entityId(),
@@ -263,18 +263,18 @@ std::expected<void, StarException> NameplatePainter::update(float dt, std::share
         bubble_state.reset_presentation();
         nametag.presentation_epoch = entity->presentation_epoch();
       }
-      auto origin = entity->nametagOrigin();
+      auto origin = entity->nametag_origin();
       if (!origin) return std::unexpected(std::move(origin.error()));
       nametag.origin = *origin;
       bubble_state.ideal_destination = camera.worldToScreen(*origin) + m_offset * camera.pixelRatio();
       auto bounds = determineBoundBox(bubble_state.ideal_destination, nametag);
       if (!bounds) return std::unexpected(std::move(bounds.error()));
       bubble_state.bound_box = *bounds;
-      nametag.statusText = entity->statusText();
+      nametag.statusText = entity->status_text();
       auto name = entity->nametag();
       if (!name) return std::unexpected(std::move(name.error()));
       nametag.name = std::move(*name);
-      auto color = entity->nametagColor();
+      auto color = entity->nametag_color();
       if (!color) return std::unexpected(std::move(color.error()));
       nametag.color = *color;
       auto fullyOnScreen = world->geometry().rect_contains(camera.worldScreenRect(), entity->position());

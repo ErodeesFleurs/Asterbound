@@ -498,7 +498,7 @@ ClientEntityMode Vehicle::client_entity_mode() const {
   return m_client_entity_mode;
 }
 
-std::expected<std::optional<HitType>, StarException> Vehicle::queryHit(DamageSource const& source) const {
+std::expected<std::optional<HitType>, StarException> Vehicle::query_hit(DamageSource const& source) const {
   auto result1264 = world();
 if (!result1264) return std::unexpected(std::move(result1264.error()));
 auto result1265 = source.intersects_with_poly(result1264->get().geometry(), m_movement_controller->collision_body());
@@ -509,11 +509,11 @@ if (std::move(*result1265))
   return {};
 }
 
-std::expected<std::optional<PolyF>, StarException> Vehicle::hitPoly() const {
+std::expected<std::optional<PolyF>, StarException> Vehicle::hit_poly() const {
   return m_movement_controller->collision_body();
 }
 
-std::expected<List<DamageNotification>, StarException> Vehicle::applyDamage(DamageRequest const& damage) {
+std::expected<List<DamageNotification>, StarException> Vehicle::apply_damage(DamageRequest const& damage) {
   if (!inWorld())
     return {};
 
@@ -522,7 +522,7 @@ if (!result1262) return std::unexpected(std::move(result1262.error()));
   return std::move(*result1262).value_or(List<DamageNotification>{});
 }
 
-std::expected<List<DamageNotification>, StarException> Vehicle::selfDamageNotifications() {
+std::expected<List<DamageNotification>, StarException> Vehicle::self_damage_notifications() {
   auto result1260 = recover_lua_script_error(m_scriptComponent.invoke<List<DamageNotification>>("selfDamageNotifications"));
 if (!result1260) return std::unexpected(std::move(result1260.error()));
   return std::move(*result1260).value_or(List<DamageNotification>{});
@@ -779,7 +779,7 @@ std::uint64_t Vehicle::presentation_epoch() const {
   return Entity::presentation_epoch() + m_movement_controller->presentation_epoch();
 }
 
-std::expected<void, StarException> Vehicle::collectRenderEvents(RenderCallback& renderer) {
+std::expected<void, StarException> Vehicle::collect_render_events(RenderCallback& renderer) {
   auto&& result1190 = m_networkedAnimatorDynamicTarget.pull_new_audios();
 auto result1191 = renderer.add_audios(std::move(result1190));
 if (!result1191) return std::unexpected(std::move(result1191.error()));
@@ -961,11 +961,11 @@ return std::move(*result1176);
 }
 }
 
-RectF Vehicle::interactiveBoundBox() const {
+RectF Vehicle::interactive_bound_box() const {
   return collision_area();
 }
 
-bool Vehicle::isInteractive() const {
+bool Vehicle::is_interactive() const {
   return m_interactive.get();
 }
 
