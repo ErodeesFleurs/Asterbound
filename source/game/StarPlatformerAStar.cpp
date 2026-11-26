@@ -357,7 +357,7 @@ std::expected<std::optional<bool>, StarException> PathFinder::explore(std::optio
   PathFinder::get_jumping_neighbors(Node const& node, List<Edge>& neighbors, float jump_cost) const {
     if (auto jump_speed = m_movement_params.air_jump_profile.jump_speed) {
       auto add_velocity = [jump_cost, &node, &neighbors](Vec2F velocity) -> std::expected<void, StarException> {
-        neighbors.push_back(Edge{jump_cost, Action::Jump, velocity, node, node.with_velocity(velocity)});
+        neighbors.push_back(Edge{jump_cost, Action::Jump, velocity, node, {node.position, velocity}});
         return {};
       };
       auto walk_speed = m_search_params.enable_walk_speed_jumps ? m_movement_params.walk_speed : std::nullopt;

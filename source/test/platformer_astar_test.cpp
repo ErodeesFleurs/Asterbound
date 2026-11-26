@@ -630,8 +630,8 @@ const GameTestRegistration
       ASSERT_TRUE(callbacks) << callbacks.error().what();
       ASSERT_TRUE(context->set_callbacks("world", *callbacks));
       ASSERT_TRUE(context->set("movement", parameters));
-      ASSERT_TRUE(context->set("start_position", origin + Vec2F(-6, 4.25f)));
-      ASSERT_TRUE(context->set("target_position", origin + Vec2F(6, 4.25f)));
+      ASSERT_TRUE(context->set("start_position", origin + Vec2F(-16, 8.25f)));
+      ASSERT_TRUE(context->set("target_position", origin + Vec2F(16, 8.25f)));
       auto decoded = context->eval<PlatformerAStar::Parameters>(R"LUA(
         return {maxDistance=21, returnBest=true, mustEndOnGround=true,
           enableWalkSpeedJumps=true, enableVerticalJumpAirControl=true,
@@ -662,21 +662,41 @@ const GameTestRegistration
       auto defaults = context->eval<PlatformerAStar::Parameters>("return nil");
       ASSERT_TRUE(defaults) << defaults.error().what();
       EXPECT_EQ(*defaults, PlatformerAStar::Parameters());
-      PlatformerAStar::Path jump_path{PlatformerAStar::Edge{2.5f,
-                                                            PlatformerAStar::Action::Jump,
-                                                            Vec2F(3, 7),
-                                                            {Vec2F(1, 2), {}},
-                                                            {Vec2F(1, 2), Vec2F(3, 7)}}};
-      ASSERT_TRUE(context->set("jump_path", jump_path));
+      using PlatformerAStar::Action;
+      std::array const action_values{Action::Walk, Action::Jump, Action::Arc, Action::Drop,
+                                     Action::Swim, Action::Fly, Action::Land};
+      PlatformerAStar::Path actions;
+      for (auto action : action_values)
+        actions.push_back({2.5f, action, Vec2F(3, 7), {Vec2F(1, 2), {}}, {Vec2F(1, 2), Vec2F(0, 0)}});
+      ASSERT_TRUE(context->set("actions", actions));
+      auto invalid_actions = actions;
+      invalid_actions.back().action = static_cast<Action>(-1);
+      auto invalid_name = PlatformerAStar::action_name(invalid_actions.back().action);
+      auto invalid_export = context->set("actions", invalid_actions);
+      ASSERT_FALSE(invalid_name);
+      ASSERT_FALSE(invalid_export);
+      auto const& diagnostic = invalid_name.error().diagnostic_summary();
+      ASSERT_TRUE(diagnostic);
+      EXPECT_EQ(diagnostic->category, "MapException");
+      EXPECT_EQ(diagnostic->reason, "Key '-1' not found in Map::get()");
+      EXPECT_EQ(invalid_export.error().what(), invalid_name.error().what());
       auto checked = context->eval<bool>(R"LUA(
-        assert(jump_path[1].action == "Jump")
-        assert(jump_path[1].jumpVelocity[1] == 3 and jump_path[1].jumpVelocity[2] == 7)
-        assert(jump_path[1].jump_velocity == nil and jump_path[1].cost == 2.5)
-        assert(jump_path[1].source.position[1] == 1 and jump_path[1].target.velocity[2] == 7)
-        local options = {maxDistance=20, maxNodesToSearch=2000}
+        local names = {"Walk", "Jump", "Arc", "Drop", "Swim", "Fly", "Land"}
+        assert(#actions == #names)
+        for i, name in ipairs(names) do
+          local edge = actions[i]
+          assert(edge.action == name and edge.cost == 2.5 and edge.jump_velocity == nil)
+          assert(edge.jumpVelocity[1] == 3 and edge.jumpVelocity[2] == 7)
+          assert(edge.source.position[1] == 1 and edge.target.position[2] == 2)
+          assert(edge.source.velocity == nil and edge.target.velocity[1] == 0 and edge.target.velocity[2] == 0)
+          assert(edge.source.position ~= edge.target.position)
+          assert(edge.source ~= edge.target and edge.jumpVelocity ~= edge.target.velocity)
+        end
+        local options = {maxDistance=40, maxNodesToSearch=2000}
         local synchronous = world.findPlatformerPath(start_position, target_position, movement, options)
         assert(synchronous and #synchronous > 0)
         local finder = world.platformerPathStart(start_position, target_position, movement, options)
+        assert(finder:result() == nil)
         local finished
         for i = 1, 20000 do
           finished = finder:explore(2)
@@ -684,16 +704,36 @@ const GameTestRegistration
         end
         assert(finished == true and finder:explore(1) == true)
         local first, second = finder:result(), finder:result()
-        assert(#first == #second and #first == #synchronous)
+        assert(first ~= second and #first >= 30 and #first == #second and #first == #synchronous)
         for i, edge in ipairs(first) do
-          assert(edge.action == "Fly" and edge.cost == synchronous[i].cost)
-          assert(second[i].action == edge.action and type(edge.jumpVelocity) == "table")
-          for axis = 1, 2 do
-            assert(edge.source.position[axis] == second[i].source.position[axis])
-            assert(edge.target.position[axis] == second[i].target.position[axis])
-            assert(edge.target.position[axis] == synchronous[i].target.position[axis])
+          local other = second[i]
+          assert(edge ~= other and edge.action == "Fly" and edge.cost == synchronous[i].cost)
+          assert(other.action == edge.action and other.cost == edge.cost and edge.jumpVelocity ~= other.jumpVelocity)
+          for _, endpoint in ipairs({"source", "target"}) do
+            local node, other_node = edge[endpoint], other[endpoint]
+            assert(node ~= other_node and node.position ~= other_node.position)
+            assert(node.velocity == nil and other_node.velocity == nil)
+            for axis = 1, 2 do
+              assert(node.position[axis] == other_node.position[axis])
+              assert(node.position[axis] == synchronous[i][endpoint].position[axis])
+              assert(edge.jumpVelocity[axis] == 0 and other.jumpVelocity[axis] == 0)
+            end
           end
         end
+        first[1].action = "changed"
+        first[1].jumpVelocity[2] = 100
+        first[1].source.position[1] = 200
+        first[1].target.velocity = {0, 0}
+        first[2] = nil
+        local third = finder:result()
+        assert(third ~= second and #third == #second and third[2] ~= second[2])
+        for _, path in ipairs({second, third}) do
+          assert(path[1].action == "Fly" and path[1].jumpVelocity[2] == 0)
+          assert(path[1].source.position[1] == start_position[1] and path[1].target.velocity == nil)
+        end
+        actions[1].target.velocity[1] = 100
+        actions[1].source.position[2] = 200
+        assert(actions[2].target.velocity[1] == 0 and actions[2].source.position[2] == 2)
         return true
       )LUA");
       ASSERT_TRUE(checked) << checked.error().what();

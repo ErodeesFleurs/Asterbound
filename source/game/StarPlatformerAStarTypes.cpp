@@ -1,36 +1,23 @@
-import star.vector;
 import std;
 import star.format;
-import star.string;
-import star.bi_map;
+import star.map;
 import star.platformer_astar_types;
 
 namespace Star {
 namespace PlatformerAStar {
 
-extern std::expected<EnumMap<Action>, StarException> const action_names =
-  EnumMap<Action>::create({{Action::Walk, "Walk"},
-                           {Action::Jump, "Jump"},
-                           {Action::Arc, "Arc"},
-                           {Action::Drop, "Drop"},
-                           {Action::Swim, "Swim"},
-                           {Action::Fly, "Fly"},
-                           {Action::Land, "Land"}});
-
-Node Node::with_velocity(Vec2F velocity) const { return {position, velocity}; }
-
-std::expected<std::reference_wrapper<String const>, StarException> action_name(Action action) {
-  if (!action_names)
-    return std::unexpected(action_names.error());
-  return action_names->get_right(action);
-}
-
-std::expected<String, StarException> print_edge(Edge const& edge) {
-  auto name = action_name(edge.action);
-  if (!name)
-    return std::unexpected(std::move(name.error()));
-  return Star::format("Edge{{cost = {}, action = {}, jumpVelocity = {}, source = {}, target = {}}}", edge.cost,
-                      name->get(), edge.jump_velocity, edge.source, edge.target);
+std::expected<std::string_view, StarException> action_name(Action action) {
+  using namespace std::string_view_literals;
+  switch (action) {
+    case Action::Walk: return "Walk"sv;
+    case Action::Jump: return "Jump"sv;
+    case Action::Arc: return "Arc"sv;
+    case Action::Drop: return "Drop"sv;
+    case Action::Swim: return "Swim"sv;
+    case Action::Fly: return "Fly"sv;
+    case Action::Land: return "Land"sv;
+  }
+  return std::unexpected(MapException::format("Key '{}' not found in Map::get()", std::to_underlying(action)));
 }
 }
 }

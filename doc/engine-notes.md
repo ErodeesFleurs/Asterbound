@@ -347,6 +347,11 @@ that reaches an exact fixed point has no successor. An arc that still changes
 without leaving its rounded node after 4,096 substeps reports a search error,
 rather than treating the unfinished trajectory as an impassable route.
 
+Lua `finder:result()` is repeatable. Each call builds a fresh path table;
+editing one edge or its nested nodes must not mutate another edge, a later
+result, or the native path. A node without velocity is distinct from one
+with velocity `{0, 0}`.
+
 ### Shutdown order
 
 Shutdown stops audio callbacks and client services first, releases SDK/GL owners

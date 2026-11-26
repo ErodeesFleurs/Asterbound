@@ -1,13 +1,9 @@
 module;
 import std;
-import star.optional;
 import star.format;
-import star.string;
-import star.text_formatter;
 
 import star.vector;
 import star.rect;
-import star.bi_map;
 import star.a_star;
 
 namespace Star {
@@ -17,10 +13,6 @@ class PathFinder;
 
 struct Node {
   friend bool operator==(Node const& a, Node const& b) = default;
-  friend void write_text(TextBuffer& buffer, Node const& node);
-
-  Node with_velocity(Vec2F velocity) const;
-
   bool operator<(Node const& other) const;
 
   Vec2F position;
@@ -28,7 +20,6 @@ struct Node {
 };
 
 enum class Action { Walk, Jump, Arc, Drop, Swim, Fly, Land };
-extern std::expected<EnumMap<Action>, StarException> const action_names;
 
 struct Edge {
   float cost;
@@ -99,22 +90,7 @@ struct Parameters {
   std::optional<float> max_landing_velocity;
 };
 
-inline void write_text(TextBuffer& buffer, Node const& node);
-[[nodiscard]] std::expected<std::reference_wrapper<String const>, StarException> action_name(Action action);
-[[nodiscard]] std::expected<String, StarException> print_edge(Edge const& edge);
-}
-
-}
-
-// The formatter specialization must be visible before formatting Node below.
-template <> struct std::formatter<Star::PlatformerAStar::Node> : Star::TextFormatter {};
-
-namespace Star {
-namespace PlatformerAStar {
-
-inline void write_text(TextBuffer& buffer, Node const& node) {
-  std::format_to(std::back_inserter(buffer), "Node{{position = {}, velocity = {}}}", node.position, Star::output_optional(node.velocity));
-}
+[[nodiscard]] std::expected<std::string_view, StarException> action_name(Action action);
 
 inline bool Node::operator<(Node const& other) const {
   if (position == other.position)
@@ -127,17 +103,12 @@ inline bool Node::operator<(Node const& other) const {
 
 export module star.platformer_astar_types;
 
-export template <> struct std::formatter<Star::PlatformerAStar::Node>;
-
 export namespace Star::PlatformerAStar {
 using ::Star::PlatformerAStar::Action;
 using ::Star::PlatformerAStar::action_name;
-using ::Star::PlatformerAStar::action_names;
 using ::Star::PlatformerAStar::Edge;
 using ::Star::PlatformerAStar::Node;
 using ::Star::PlatformerAStar::Parameters;
 using ::Star::PlatformerAStar::Path;
 using ::Star::PlatformerAStar::PathFinder;
-using ::Star::PlatformerAStar::print_edge;
-using ::Star::PlatformerAStar::write_text;
 }

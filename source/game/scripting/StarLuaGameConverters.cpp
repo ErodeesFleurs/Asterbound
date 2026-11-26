@@ -212,7 +212,7 @@ std::expected<void, StarException> LuaConverter<PlatformerAStar::Path>::from(Lua
   if (!created)
     return std::unexpected(std::move(created.error()));
   auto path_table = std::move(*created);
-  int index = 1;
+  LuaInt index = 0;
   for (auto const& edge : path) {
     auto action = PlatformerAStar::action_name(edge.action);
     if (!action)
@@ -225,11 +225,11 @@ std::expected<void, StarException> LuaConverter<PlatformerAStar::Path>::from(Lua
     if (!target)
       return std::unexpected(std::move(target.error()));
     auto target_table = stack.value(-1);
-    auto converted = makeTable(stack, "cost", edge.cost, "action", action->get(), "jumpVelocity", edge.jump_velocity,
+    auto converted = makeTable(stack, "cost", edge.cost, "action", *action, "jumpVelocity", edge.jump_velocity,
                                "source", source_table, "target", target_table);
     if (!converted)
       return std::unexpected(std::move(converted.error()));
-    auto inserted = path_table.set(index++, stack.value(-1));
+    auto inserted = path_table.raw_set(++index, stack.value(-1));
     if (!inserted)
       return std::unexpected(std::move(inserted.error()));
     stack.pop(3);
@@ -255,8 +255,9 @@ template <> struct LuaUserDataMethods<LuaPathFinder> {
           });
         !registered)
       return std::unexpected(std::move(registered.error()));
-    if (auto registered =
-          methods.register_method("result", [](LuaPathFinder const& value) { return value.finder->result(); });
+    // The method wrapper keeps the userdata rooted while serializing the terminal result.
+    if (auto registered = methods.register_method(
+          "result", [](LuaPathFinder const& value) -> decltype(auto) { return value.finder->result(); });
         !registered)
       return std::unexpected(std::move(registered.error()));
     return methods;
@@ -284,10 +285,6 @@ LuaConverter<std::shared_ptr<PlatformerAStar::PathFinder>>::to(LuaStackValue val
 std::expected<std::optional<PlatformerAStar::Parameters>, StarException>
 LuaConverter<PlatformerAStar::Parameters>::to(LuaStackValue v) {
   PlatformerAStar::Parameters p;
-  p.return_best = false;
-  p.must_end_on_ground = false;
-  p.enable_walk_speed_jumps = false;
-  p.enable_vertical_jump_air_control = false;
   if (v.is<LuaNilType>())
     return p;
   if (!v.is<LuaTable>())
@@ -305,10 +302,10 @@ LuaConverter<PlatformerAStar::Parameters>::to(LuaStackValue v) {
     return std::unexpected(std::move(read.error()));
   if (!*read)
     return std::nullopt;
-  p.return_best = return_best.value_or(false);
-  p.must_end_on_ground = must_end_on_ground.value_or(false);
-  p.enable_walk_speed_jumps = enable_walk_speed_jumps.value_or(false);
-  p.enable_vertical_jump_air_control = enable_vertical_jump_air_control.value_or(false);
+  p.return_best = return_best.value_or(p.return_best);
+  p.must_end_on_ground = must_end_on_ground.value_or(p.must_end_on_ground);
+  p.enable_walk_speed_jumps = enable_walk_speed_jumps.value_or(p.enable_walk_speed_jumps);
+  p.enable_vertical_jump_air_control = enable_vertical_jump_air_control.value_or(p.enable_vertical_jump_air_control);
   return p;
 }
 
