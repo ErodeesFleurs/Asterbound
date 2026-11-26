@@ -8,6 +8,7 @@ import star.file;
 import star.format;
 import star.game_test;
 import star.game_types;
+import star.liquid_types;
 import star.lua;
 import star.lua_actor_movement_component;
 import star.lua_components;
@@ -16,6 +17,7 @@ import star.lua_game_converters;
 import star.lua_root;
 import star.material_database;
 import star.material_types;
+import star.movement_controller;
 import star.platformer_astar;
 import star.platformer_astar_types;
 import star.poly;
@@ -93,7 +95,8 @@ template <platform_world_callback Callback> void with_platform_world(GameTest& f
 std::expected<PlatformerAStar::Path, StarException> search_path(WorldServer& world, Vec2F start, Vec2F target,
                                                                 ActorMovementParameters parameters,
                                                                 PlatformerAStar::Parameters search_parameters,
-                                                                std::optional<unsigned> budget) {
+                                                                std::optional<unsigned> budget,
+                                                                std::optional<std::reference_wrapper<unsigned>> pending = {}) {
   auto created =
     PlatformerAStar::PathFinder::create(world, start, target, std::move(parameters), std::move(search_parameters));
   if (!created)
@@ -103,8 +106,11 @@ std::expected<PlatformerAStar::Path, StarException> search_path(WorldServer& wor
     auto explored = finder->explore(budget);
     if (!explored)
       return std::unexpected(std::move(explored.error()));
-    if (!*explored)
+    if (!*explored) {
+      if (pending)
+        ++pending->get();
       continue;
+    }
     if (!**explored || !finder->result())
       return std::unexpected(StarException("Platform fixture search failed to reach its target"));
     auto repeated = finder->explore(budget);
@@ -134,6 +140,29 @@ void expect_same_path(PlatformerAStar::Path const& actual, PlatformerAStar::Path
     EXPECT_EQ(actual[i].jump_velocity, expected[i].jump_velocity);
     EXPECT_EQ(actual[i].cost, expected[i].cost);
   }
+}
+
+void record_path(std::string const& label, PlatformerAStar::Path const& path, unsigned pending) {
+  // Hex float bits retain every coordinate, velocity and cost in edge order.
+  std::string trace = std::to_string(pending);
+  auto vector = [&](Vec2F const& vec) {
+    for (float component : {vec[0], vec[1]})
+      std::format_to(std::back_inserter(trace), ",{:08x}", std::bit_cast<std::uint32_t>(component));
+  };
+  auto node = [&](PlatformerAStar::Node const& value) {
+    vector(value.position);
+    trace += value.velocity ? ",v" : ",-";
+    if (value.velocity)
+      vector(*value.velocity);
+  };
+  for (auto const& edge : path) {
+    std::format_to(std::back_inserter(trace), ";{},{:08x}", static_cast<unsigned>(edge.action),
+                   std::bit_cast<std::uint32_t>(edge.cost));
+    node(edge.source);
+    node(edge.target);
+    vector(edge.jump_velocity);
+  }
+  testing::Test::RecordProperty(label, trace);
 }
 
 std::expected<void, StarException> place_ledge(Root& root, WorldServer& world, Vec2F origin,
@@ -219,8 +248,8 @@ const GameTestRegistration platform_simulated_landings(
       parameters.run_speed.reset();
       auto search_parameters = explicit_bounds();
       search_parameters.drop_cost = 0.25f;
-      // The free fall and platform drop enter different synchronous callback
-      // chains; both must eventually preserve the zero-cost Land transition.
+      // Free fall and platform drop enter arc simulation differently; both
+      // must eventually preserve the zero-cost Land transition.
       for (bool drop : {false, true}) {
         SCOPED_TRACE(drop ? "platform drop" : "free fall");
         Vec2F start = origin + (drop ? Vec2F(-7, 6.25f) : Vec2F(-3, 8.25f));
@@ -241,9 +270,101 @@ const GameTestRegistration platform_simulated_landings(
           EXPECT_FLOAT_EQ(edge.target.position[0], start[0]);
           EXPECT_LE(edge.target.position[1], edge.source.position[1]);
         }
-        auto budgeted = search_path(world, start, target, parameters, search_parameters, 2);
+        unsigned pending = 0;
+        auto budgeted = search_path(world, start, target, parameters, search_parameters, 2, std::ref(pending));
         ASSERT_TRUE(budgeted) << budgeted.error().what();
         expect_same_path(*budgeted, *path);
+        EXPECT_GT(pending, 0u);
+        record_path(drop ? "platform_drop" : "free_fall", *budgeted, pending);
+        // The final Arc can cross the radius, but the simultaneous Land starts
+        // at its out-of-radius contact, not at the expanded Arc source.
+        ASSERT_GE(path->size(), 2u);
+        auto const& last_arc = (*path)[path->size() - 2];
+        ASSERT_EQ(last_arc.action, PlatformerAStar::Action::Arc);
+        float arc_source_distance = world.geometry().diff(start, last_arc.source.position).magnitude();
+        float contact_distance = world.geometry().diff(start, last_arc.target.position).magnitude();
+        ASSERT_LT(arc_source_distance, contact_distance);
+        search_parameters.max_distance = std::midpoint(arc_source_distance, contact_distance);
+        auto restricted = PlatformerAStar::PathFinder::create(world, start, target, parameters, search_parameters);
+        ASSERT_TRUE(restricted) << restricted.error().what();
+        auto done = (*restricted)->explore({});
+        ASSERT_TRUE(done) << done.error().what();
+        EXPECT_EQ(*done, std::optional<bool>(false));
+        done = (*restricted)->explore(1);
+        ASSERT_TRUE(done) << done.error().what();
+        EXPECT_EQ(*done, std::optional<bool>(false));
+        EXPECT_FALSE((*restricted)->result());
+      }
+    });
+  });
+
+const GameTestRegistration platform_slow_arcs(
+  "PlatformerAStar", "SlowArcsCanProgressStallOrExhaustSimulationWork", [](GameTest& fixture) {
+    with_platform_world(fixture, [](WorldServer& world, Vec2F origin, ActorMovementParameters parameters) {
+      parameters.gravity_enabled = true;
+      parameters.air_jump_profile.jump_speed.reset();
+      parameters.walk_speed.reset();
+      parameters.run_speed.reset();
+      auto search_parameters = explicit_bounds();
+      search_parameters.must_end_on_ground = false;
+
+      {
+        SCOPED_TRACE("a tiny falling step initially leaves position and rounded position unchanged");
+        parameters.gravity_multiplier = 2.0e-6f;
+        Vec2F start = origin + Vec2F(-3, 8.25f);
+        Vec2F target = start - Vec2F(0, 1);
+        auto path = search_path(world, start, target, parameters, search_parameters, 1);
+        ASSERT_TRUE(path) << path.error().what();
+        ASSERT_EQ(path->size(), 1u);
+        auto const& edge = path->front();
+        EXPECT_EQ(edge.action, PlatformerAStar::Action::Arc);
+        EXPECT_EQ(edge.source.position, start);
+        EXPECT_FALSE(edge.source.velocity);
+        EXPECT_FLOAT_EQ(edge.target.position[0], start[0]);
+        EXPECT_LT(edge.target.position[1], start[1] - 0.5f);
+        EXPECT_GT(edge.target.position[1], target[1]);
+        ASSERT_TRUE(edge.target.velocity);
+        EXPECT_GT((*edge.target.velocity)[1], -0.05f);
+        EXPECT_LT((*edge.target.velocity)[1], 0.0f);
+      }
+
+      {
+        SCOPED_TRACE("neither position nor velocity can change in a very small jump");
+        parameters.gravity_multiplier = 1.0e-15f;
+        parameters.air_jump_profile.jump_speed = 1.0e-4f;
+        Vec2F start = origin + Vec2F(-3, 1.25f);
+        auto local_search = search_parameters;
+        local_search.jump_cost = 0.5f;
+        local_search.max_f_score = 5.0;
+        auto finder = PlatformerAStar::PathFinder::create(world, start, start + Vec2F(0, 2), parameters, local_search);
+        ASSERT_TRUE(finder) << finder.error().what();
+        // This score window keeps the vertical Jump nodes, but prunes Walks.
+        auto started = (*finder)->explore(1);
+        ASSERT_TRUE(started) << started.error().what();
+        ASSERT_FALSE(started->has_value());
+        auto result = (*finder)->explore();
+        ASSERT_TRUE(result) << result.error().what();
+        EXPECT_EQ(*result, std::optional<bool>(false));
+        EXPECT_FALSE((*finder)->result());
+      }
+
+      {
+        SCOPED_TRACE("changing velocity does not make a same-node arc unbounded");
+        parameters.gravity_multiplier = 1.0e-12f;
+        parameters.air_jump_profile.jump_speed.reset();
+        Vec2F start = origin + Vec2F(-3, 8.25f);
+        auto finder =
+          PlatformerAStar::PathFinder::create(world, start, start - Vec2F(0, 1), parameters, search_parameters);
+        ASSERT_TRUE(finder) << finder.error().what();
+        auto exhausted = (*finder)->explore(1);
+        ASSERT_FALSE(exhausted);
+        EXPECT_TRUE(exhausted.error().is<MovementControllerException>());
+        EXPECT_NE(std::string_view(exhausted.error().what()).find("PathFinder arc simulation exceeded"),
+                  std::string_view::npos);
+        auto repeated = (*finder)->explore();
+        ASSERT_FALSE(repeated);
+        EXPECT_EQ(repeated.error().what(), exhausted.error().what());
+        EXPECT_FALSE((*finder)->result());
       }
     });
   });
@@ -577,6 +698,100 @@ const GameTestRegistration
       )LUA");
       ASSERT_TRUE(checked) << checked.error().what();
       EXPECT_TRUE(*checked);
+    });
+  });
+
+const GameTestRegistration platform_semi_submerged_jump(
+  "PlatformerAStar", "SemiSubmergedJumpKeepsLiquidAndSwimCost", [](GameTest& fixture) {
+    with_platform_world(fixture, [&](WorldServer& world, Vec2F origin, ActorMovementParameters parameters) {
+      Vec2F start = origin + Vec2F(-8, 2.25f);
+      Vec2F target = start + Vec2F(0, 1);
+      for (int x : {-1, 0})
+        ASSERT_TRUE(world.setLiquid(Vec2I(start) + Vec2I(x, 0), LiquidId(1), 0.75f, 1.0f));
+      parameters.gravity_enabled = true;
+      parameters.minimum_liquid_percentage = 0.5f;
+      parameters.air_jump_profile.jump_speed = 24.0f;
+      parameters.walk_speed.reset();
+      parameters.run_speed.reset();
+      auto options = explicit_bounds();
+      options.must_end_on_ground = false;
+      options.jump_cost = 1.0f;
+      options.liquid_jump_cost = 7.0f;
+      options.swim_cost = 2.0f;
+      auto path = search_path(world, start, target, parameters, options, {});
+      ASSERT_TRUE(path) << path.error().what();
+      ASSERT_EQ(path->size(), 2u);
+      EXPECT_EQ((*path)[0].action, PlatformerAStar::Action::Jump);
+      EXPECT_EQ((*path)[0].source.position, start);
+      EXPECT_EQ((*path)[0].target.position, start);
+      ASSERT_TRUE((*path)[0].target.velocity);
+      EXPECT_EQ((*path)[0].jump_velocity, *(*path)[0].target.velocity);
+      EXPECT_FLOAT_EQ((*path)[0].cost, 14.0f);
+      EXPECT_EQ(path->back().action, PlatformerAStar::Action::Arc);
+      EXPECT_EQ(path->back().source, (*path)[0].target);
+      // The goal accepts arc samples within one node of the requested point.
+      EXPECT_EQ(path->back().target.position, start + Vec2F(0, 0.5f));
+      EXPECT_FLOAT_EQ(path->back().cost, 0.5f);
+      unsigned pending = 0;
+      auto incremental = search_path(world, start, target, parameters, options, 1, std::ref(pending));
+      ASSERT_TRUE(incremental) << incremental.error().what();
+      expect_same_path(*incremental, *path);
+      EXPECT_GT(pending, 0u);
+      record_path("semi_submerged_jump", *incremental, pending);
+    });
+  });
+
+const GameTestRegistration platform_compound_slopes(
+  "PlatformerAStar", "CompoundPlatformSlopesPreserveWalkingTransitions", [](GameTest& fixture) {
+    with_platform_world(fixture, [&](WorldServer& world, Vec2F origin, ActorMovementParameters parameters) {
+      auto materials = fixture.root().material_database();
+      ASSERT_TRUE(materials) << materials.error().what();
+      auto dirt = (*materials)->material_id("dirt");
+      ASSERT_TRUE(dirt) << dirt.error().what();
+      // Two connected ramps with opposing directions share the high platform.
+      for (auto offset : {Vec2I(-11, 4), Vec2I(-10, 4), Vec2I(-9, 4), Vec2I(-9, 5),
+                          Vec2I(-8, 5), Vec2I(-8, 6), Vec2I(-7, 6), Vec2I(-6, 5),
+                          Vec2I(-5, 4), Vec2I(-4, 4)}) {
+        SCOPED_TRACE(std::format("{}, {}", offset[0], offset[1]));
+        auto tile = world.modifyServerTile(Vec2I(origin) + offset, true);
+        ASSERT_TRUE(tile) << tile.error().what();
+        ASSERT_TRUE(*tile);
+        (*tile)->get().background = structure_material_id;
+        auto placed = world.forceModifyTile(Vec2I(origin) + offset,
+          PlaceMaterial{TileLayer::Foreground, *dirt, MaterialHue(0), TileCollisionOverride::Platform}, true);
+        ASSERT_TRUE(placed) << placed.error().what();
+        ASSERT_TRUE(*placed);
+      }
+      parameters.gravity_enabled = true;
+      parameters.air_jump_profile.jump_speed.reset();
+      parameters.run_speed.reset();
+      auto options = explicit_bounds();
+      // Place the feet just right of the node so the platform already passed
+      // cannot also support the forward probe while descending the right ramp.
+      options.bound_box = RectF(0.1f, -0.25f, 0.4f, 0.25f);
+      Vec2F start = origin + Vec2F(-9, 5.25f);
+      Vec2F target = origin + Vec2F(-6, 6.25f);
+      auto path = search_path(world, start, target, parameters, options, {});
+      ASSERT_TRUE(path) << path.error().what();
+      std::array const ordered_steps{Vec2F(1, 1), Vec2F(1, 1), Vec2F(1, -1)};
+      ASSERT_EQ(path->size(), ordered_steps.size());
+      PlatformerAStar::Node previous{start, {}};
+      for (std::size_t i = 0; i < ordered_steps.size(); ++i) {
+        auto const& edge = (*path)[i];
+        EXPECT_EQ(edge.action, PlatformerAStar::Action::Walk);
+        EXPECT_EQ(edge.source, previous);
+        EXPECT_FALSE(edge.target.velocity);
+        EXPECT_EQ(world.geometry().diff(edge.target.position, edge.source.position), ordered_steps[i]);
+        EXPECT_FLOAT_EQ(edge.cost, ordered_steps[i].magnitude());
+        previous = edge.target;
+      }
+      EXPECT_EQ(previous.position, target);
+      unsigned pending = 0;
+      auto incremental = search_path(world, start, target, parameters, options, 1, std::ref(pending));
+      ASSERT_TRUE(incremental) << incremental.error().what();
+      expect_same_path(*incremental, *path);
+      EXPECT_GT(pending, 0u);
+      record_path("compound_slopes", *incremental, pending);
     });
   });
 

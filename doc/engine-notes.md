@@ -335,6 +335,18 @@ piece list. Piece order within a segment is significant for rendering and
 drops. Tree generation uses both the supplied seed and the world's random
 source for sway; reproducing only the seed does not reproduce all piece data.
 
+### Platform path expansion
+
+The search radius limits an edge's source, not its destination. Walk, jump,
+arc, drop, swim and fly edges start at the expanded node; a land edge starts at
+the simulated contact. It must be checked separately even when emitted with
+its incoming arc. Distances wrap across the horizontal world seam.
+
+The incremental node budget is not a physics substep budget. A simulated arc
+that reaches an exact fixed point has no successor. An arc that still changes
+without leaving its rounded node after 4,096 substeps reports a search error,
+rather than treating the unfinished trajectory as an impassable route.
+
 ### Shutdown order
 
 Shutdown stops audio callbacks and client services first, releases SDK/GL owners
