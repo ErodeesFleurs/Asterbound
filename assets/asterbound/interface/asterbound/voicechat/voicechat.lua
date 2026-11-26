@@ -134,7 +134,7 @@ local function updateVolumeCanvas(canvas, volume, multiplier)
 	canvas:drawLine({1, MID}, {lineEnd, MID}, lineColor, 60)
 	canvas:drawLine({lineEnd - 0.5, MID}, {lineEnd + 0.5, MID}, {255, 255, 255, 200}, 60)
 	local label = volume == 0 and str("^#f00,shadow;", "Muted") or fmt("^shadow;%s%%", math.floor(volume * multiplier * 1000) * 0.1)
-	canvas:drawText(label, {position = {84, MID}, horizontalAnchor = "mid", verticalAnchor = "mid"}, 12, {255, 255, 255, 255})
+	canvas:drawText(label, {position = {84, MID - 1}, horizontalAnchor = "mid", verticalAnchor = "mid"}, 10, {255, 255, 255, 255})
 end
 
 local thresholdCanvas = nil
@@ -158,7 +158,7 @@ local function updateThresholdCanvas(canvas, dB)
 	end
 
 	local label = fmt("^shadow;%.1f dB", dB)
-	canvas:drawText(label, {position = {84, MID}, horizontalAnchor = "mid", verticalAnchor = "mid"}, 12, {255, 255, 255, 255})
+	canvas:drawText(label, {position = {84, MID - 1}, horizontalAnchor = "mid", verticalAnchor = "mid"}, 10, {255, 255, 255, 255})
 end
 
 function init()
