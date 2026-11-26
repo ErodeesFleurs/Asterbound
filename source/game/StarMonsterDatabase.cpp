@@ -97,7 +97,22 @@ import star.monster_database;
 import star.net_compatibility;
 import star.byte_array;
 import star.static_random;
+import star.math_common;
 namespace Star {
+namespace {
+template<std::unsigned_integral T>
+  requires (std::numeric_limits<T>::digits <= std::numeric_limits<double>::digits)
+std::expected<T, StarException> read_unsigned_field(Json const& parameters, String const& key, T fallback) {
+  auto field = parameters.find(key);
+  if (!field) return std::unexpected(std::move(field.error()));
+  if (!*field || (**field).get().is_null()) return fallback;
+  auto number = (**field).get().to_double();
+  if (!number) return std::unexpected(std::move(number.error()));
+  if (!is_finite(*number) || *number < 0 || *number > std::numeric_limits<T>::max() || std::trunc(*number) != *number)
+    return std::unexpected(MonsterException(Star::format("Invalid unsigned integer for '{}'", key)));
+  return static_cast<T>(*number);
+}
+}
 
 MonsterDatabase::MonsterDatabase(ConstructionKey, Root& root) : m_root(root), m_monster_cache(root.random()) {}
 
@@ -233,6 +248,7 @@ std::expected<void, StarException> MonsterDatabase::initialize() {
           return std::unexpected(std::move(part_parameter_description.error()));
         monster_type.part_parameter_description = std::move(*part_parameter_description);
       }
+      monster_type.compile_part_parameter_rules();
       return {};
     }();
     if (!loaded)
@@ -249,33 +265,29 @@ std::expected<void, StarException> MonsterDatabase::initialize() {
       if (config->is_null())
         return {};
 
-      MonsterPart part;
       auto name = config->get_string("name");
       if (!name)
         return std::unexpected(std::move(name.error()));
-      part.name = std::move(*name);
       auto category = config->get_string("category");
       if (!category)
         return std::unexpected(std::move(category.error()));
-      part.category = std::move(*category);
       auto type = config->get_string("type");
       if (!type)
         return std::unexpected(std::move(type.error()));
-      part.type = std::move(*type);
-      part.path = AssetPath::directory(file);
-      auto frames = config->get_object("frames");
+      auto frames = config->get("frames").and_then(&Json::object_ptr);
       if (!frames)
         return std::unexpected(std::move(frames.error()));
-      part.frames = std::move(*frames);
       auto parameters = config->get("parameters", JsonObject());
       if (!parameters)
         return std::unexpected(std::move(parameters.error()));
-      part.part_parameters = std::move(*parameters);
 
-      auto& part_map = self.get().m_part_directory[part.category][part.type];
-      if (part_map.contains(part.name))
-        return std::unexpected(MonsterException(Star::format("Repeat monster part name '{}' for category '{}'", part.name, part.category)));
-      part_map[part.name] = std::move(part);
+      auto category_group = self.get().m_part_directory.try_emplace(std::move(*category)).first;
+      auto& part_pool = category_group->second[std::move(*type)];
+      auto position = std::ranges::lower_bound(part_pool, *name, std::less<String>{}, &MonsterPart::name);
+      if (position != part_pool.end() && position->name == *name)
+        return std::unexpected(MonsterException(Star::format("Repeat monster part name '{}' for category '{}'", *name, category_group->first)));
+      part_pool.insert(position, MonsterPart{std::move(*name), AssetPath::directory(file),
+                                             std::move(*frames), std::move(*parameters)});
       return {};
     }();
     if (!loaded)
@@ -514,23 +526,32 @@ std::expected<List<Drawable>, StarException> MonsterDatabase::monster_portrait(M
   auto animator = NetworkedAnimator::create(m_root, variant.animator_config);
   if (!animator)
     return std::unexpected(std::move(animator.error()));
-  for (auto const& [part, image] : variant.animator_part_tags)
-    (*animator)->setPartTag(part, "partImage", image);
-  (*animator)->setZoom(variant.animator_zoom);
-  auto colors = variant.parameters.get_string("colors", "default");
-  if (!colors)
-    return std::unexpected(std::move(colors.error()));
-  auto palette = color_swap(*colors, variant.seed);
-  if (!palette)
-    return std::unexpected(std::move(palette.error()));
-  auto swaps = variant.color_swap.value_or(std::move(*palette));
-  if (!swaps.empty())
-    (*animator)->setProcessingDirectives(image_operation_to_string(ColorReplaceImageOperation{std::move(swaps)}));
+  if (auto applied = apply_appearance(variant, **animator); !applied)
+    return std::unexpected(std::move(applied.error()));
   auto drawables = (*animator)->drawables();
   if (!drawables)
     return std::unexpected(std::move(drawables.error()));
   Drawable::scale_all(*drawables, tile_pixels);
   return drawables;
+}
+
+std::expected<void, StarException> MonsterDatabase::apply_appearance(
+    MonsterVariant const& variant, NetworkedAnimator& animator) const {
+  for (auto const& [part, image] : variant.animator_part_tags)
+    animator.setPartTag(part, "partImage", image);
+  animator.setZoom(variant.scale);
+
+  auto colors = variant.parameters.get_string("colors", "default");
+  if (!colors)
+    return std::unexpected(std::move(colors.error()));
+  // Resolve the configured palette even when an explicit swap (including an empty one) wins.
+  auto palette = select_color_swap(*colors, variant.seed);
+  if (!palette)
+    return std::unexpected(std::move(palette.error()));
+  auto const& swaps = variant.color_swap ? *variant.color_swap : palette->get();
+  if (!swaps.empty())
+    animator.setProcessingDirectives(color_replace_operation_to_string(swaps));
+  return {};
 }
 
 std::expected<std::pair<String, String>, StarException> MonsterDatabase::skill_info(String const& skill_name) const {
@@ -545,7 +566,8 @@ std::expected<Json, StarException> MonsterDatabase::skill_config_parameter(Strin
   return Json();
 }
 
-std::expected<ColorReplaceMap, StarException> MonsterDatabase::color_swap(String const& set_name, std::uint64_t seed) const {
+std::expected<std::reference_wrapper<ColorReplaceMap const>, StarException> MonsterDatabase::select_color_swap(
+    String const& set_name, std::uint64_t seed) const {
   auto swaps = m_color_swaps.find_ref(set_name);
   if (!swaps) {
     auto reported = m_root.logger().error("Monster colors '{}' not found!", set_name);
@@ -556,10 +578,7 @@ std::expected<ColorReplaceMap, StarException> MonsterDatabase::color_swap(String
       return std::unexpected(std::move(fallback.error()));
     swaps = *fallback;
   }
-  auto selected = static_random_from(swaps->get(), seed);
-  if (!selected)
-    return std::unexpected(std::move(selected.error()));
-  return selected->get();
+  return static_random_from(swaps->get(), seed);
 }
 
 std::expected<Json, StarException> MonsterDatabase::monster_config(String const& type_name) const {
@@ -569,71 +588,109 @@ std::expected<Json, StarException> MonsterDatabase::monster_config(String const&
   return type->get().to_json();
 }
 
-std::expected<Json, StarException> MonsterDatabase::merge_part_parameters(Json const& part_parameter_description, JsonArray const& parameters) {
-  JsonObject merged;
-  auto descriptions = part_parameter_description.iterate_object();
-  if (!descriptions)
-    return std::unexpected(std::move(descriptions.error()));
-  for (auto const& [key, description] : *descriptions) {
-    auto default_value = description.get(1);
-    if (!default_value)
-      return std::unexpected(std::move(default_value.error()));
-    merged[key] = std::move(*default_value);
+std::expected<MonsterDatabase::PartMergeMethod, StarException> MonsterDatabase::read_part_merge_method(Json const& method_json) {
+  auto method = method_json.string_ptr();
+  if (!method)
+    return std::unexpected(std::move(method.error()));
+  constexpr std::array methods{
+    std::pair{StringView("add"), PartMergeMethod::Add},
+    std::pair{StringView("multiply"), PartMergeMethod::Multiply},
+    std::pair{StringView("merge"), PartMergeMethod::Merge},
+    std::pair{StringView("override"), PartMergeMethod::Override},
+  };
+  for (auto const& [name, rule] : methods) {
+    auto matches = StringView(**method).equals_ignore_case(name);
+    if (!matches)
+      return std::unexpected(std::move(matches.error()));
+    if (*matches)
+      return rule;
   }
+  return PartMergeMethod::Unrecognized;
+}
+
+void MonsterDatabase::MonsterType::compile_part_parameter_rules() {
+  auto descriptions = *part_parameter_description.object_ptr();
+  for (auto const& [key, description] : *descriptions) {
+    if (!description.is_type(Json::Type::Array)) {
+      invalid_part_parameter_default = description;
+      return;
+    }
+    auto fields = *description.array_ptr();
+    if (fields->size() < 2) {
+      invalid_part_parameter_default = description;
+      return;
+    }
+    part_parameter_defaults[key] = (*fields)[1];
+    auto& method = part_parameter_methods[key];
+    // A malformed method is not an error unless a selected part supplies this key.
+    if ((*fields)[0].is_type(Json::Type::String)) {
+      if (auto decoded = read_part_merge_method((*fields)[0]); decoded)
+        method = *decoded;
+    }
+  }
+}
+
+namespace {
+JsonArray join_parameter_arrays(JsonArray const& left, JsonArray const& right) {
+  JsonArray combined;
+  combined.reserve(left.size() + right.size());
+  combined.append_range(left);
+  combined.append_range(right);
+  return combined;
+}
+}
+
+std::expected<Json, StarException> MonsterDatabase::merge_part_parameters(MonsterType const& monster_type, JsonArray const& parameters) {
+  if (auto const& invalid = monster_type.invalid_part_parameter_default)
+    return std::unexpected(invalid->get(1).error());
+  auto merged = monster_type.part_parameter_defaults;
+  // Keep growing arrays mutable until the last part, without touching shared defaults.
+  StringMap<JsonArray> appended_arrays;
 
   for (auto const& part_parameters : parameters) {
     auto entries = part_parameters.iterate_object();
     if (!entries)
       return std::unexpected(std::move(entries.error()));
     for (auto const& [key, next] : *entries) {
-      auto description = part_parameter_description.get(key);
-      if (!description)
-        return std::unexpected(std::move(description.error()));
-      auto method = description->get_string(0);
-      if (!method)
-        return std::unexpected(std::move(method.error()));
-      auto value = merged.get(key);
-      if (!value)
-        return std::unexpected(std::move(value.error()));
-      auto& current = value->get();
-
-      auto add = method->equals_ignore_case("add");
-      if (!add)
-        return std::unexpected(std::move(add.error()));
-      auto multiply = *add ? std::expected<bool, StarException>(false) : method->equals_ignore_case("multiply");
-      if (!multiply)
-        return std::unexpected(std::move(multiply.error()));
-      if (*add || *multiply) {
+      auto rule = monster_type.part_parameter_methods.find(key);
+      if (rule == monster_type.part_parameter_methods.end())
+        return std::unexpected(monster_type.part_parameter_description.get(key).error());
+      if (!rule->second) {
+        auto description = *monster_type.part_parameter_description.get(key);
+        return std::unexpected(read_part_merge_method(*description.get(0)).error());
+      }
+      auto method = *rule->second;
+      auto& current = merged.find(key)->second;
+      if (method == PartMergeMethod::Add || method == PartMergeMethod::Multiply) {
         auto left = current.to_double();
         if (!left)
           return std::unexpected(std::move(left.error()));
         auto right = next.to_double();
         if (!right)
           return std::unexpected(std::move(right.error()));
-        current = *add ? *left + *right : *left * *right;
+        current = method == PartMergeMethod::Add ? *left + *right : *left * *right;
         continue;
       }
 
-      auto merge = method->equals_ignore_case("merge");
-      if (!merge)
-        return std::unexpected(std::move(merge.error()));
-      if (*merge) {
+      if (method == PartMergeMethod::Merge) {
         if (next.is_null())
           continue;
-        if (current.is_null() || current.type() != next.type()) {
+        if (current.type() != next.type()) {
+          if (current.is_type(Json::Type::Array))
+            appended_arrays.erase(key);
           current = next;
-        } else if (next.type() == Json::Type::Array) {
-          auto left = current.array_ptr();
-          if (!left)
-            return std::unexpected(std::move(left.error()));
-          auto right = next.array_ptr();
-          if (!right)
-            return std::unexpected(std::move(right.error()));
-          JsonArray combined;
-          combined.reserve((*left)->size() + (*right)->size());
-          combined.append_range(**left);
-          combined.append_range(**right);
-          current = std::move(combined);
+        } else if (next.is_type(Json::Type::Array)) {
+          auto right = *next.array_ptr();
+          if (right->empty())
+            continue;
+          auto pending = appended_arrays.find(key);
+          if (pending != appended_arrays.end()) {
+            pending->second.append_range(*right);
+          } else if (auto left = *current.array_ptr(); left->empty()) {
+            current = next;
+          } else {
+            appended_arrays.insert(key, join_parameter_arrays(*left, *right));
+          }
         } else if (next.type() == Json::Type::Object) {
           auto combined = current.to_object();
           if (!combined)
@@ -647,40 +704,56 @@ std::expected<Json, StarException> MonsterDatabase::merge_part_parameters(Json c
         continue;
       }
 
-      auto replace = method->equals_ignore_case("override");
-      if (!replace)
-        return std::unexpected(std::move(replace.error()));
-      if (*replace && !next.is_null())
+      if (method == PartMergeMethod::Override && !next.is_null())
         current = next;
     }
   }
+  for (auto&& [key, array] : appended_arrays)
+    merged.find(key)->second = std::move(array);
   return merged;
 }
 
 std::expected<JsonObject, StarException> MonsterDatabase::merge_final_parameters(JsonArray const& parameters) {
   JsonObject merged;
+  // Scripts and skill lists append instead of replacing.
+  constexpr std::array<std::string_view, 4> append_keys{"scripts", "skills", "specialSkills", "baseSkills"};
+  std::array<JsonArray, append_keys.size()> appended_arrays;
   for (auto const& source : parameters) {
     auto entries = source.iterate_object();
     if (!entries)
       return std::unexpected(std::move(entries.error()));
     for (auto const& [key, next] : *entries) {
       auto& value = merged[key];
-      // Scripts and skill lists append instead of replacing.
-      if (key == "scripts" || key == "skills" || key == "specialSkills" || key == "baseSkills") {
-        auto current = value.opt_array();
-        if (!current)
-          return std::unexpected(std::move(current.error()));
-        auto appended = next.opt_array();
-        if (!appended)
-          return std::unexpected(std::move(appended.error()));
-        auto array = std::move(*current).value_or(JsonArray{});
-        if (*appended)
-          array.append_range(**appended);
-        value = std::move(array);
-      } else {
+      auto key_position = std::ranges::find(append_keys, std::string_view(key.utf8()));
+      if (key_position == append_keys.end()) {
         value = json_merge(value, next);
+        continue;
+      }
+      if (next.is_null()) {
+        if (value.is_null())
+          value = JsonArray{};
+        continue;
+      }
+      auto right = next.array_ptr();
+      if (!right)
+        return std::unexpected(std::move(right.error()));
+      if (value.is_null()) {
+        value = next;
+      } else if (!(*right)->empty()) {
+        auto& pending = appended_arrays[key_position - append_keys.begin()];
+        if (!pending.empty()) {
+          pending.append_range(**right);
+        } else if (auto left = *value.array_ptr(); left->empty()) {
+          value = next;
+        } else {
+          pending = join_parameter_arrays(*left, **right);
+        }
       }
     }
+  }
+  for (std::size_t i = 0; i < append_keys.size(); ++i) {
+    if (!appended_arrays[i].empty())
+      merged.find(String(append_keys[i]))->second = std::move(appended_arrays[i]);
   }
   return merged;
 }
@@ -709,7 +782,7 @@ std::expected<void, StarException> MonsterDatabase::read_common_parameters(Monst
   auto animation_custom = parameters.get("animationCustom", JsonObject());
   if (!animation_custom) return std::unexpected(std::move(animation_custom.error()));
   variant.animator_config = json_merge(variant.animator_config, *animation_custom);
-  auto initial_script_delta = parameters.get_uint("initialScriptDelta", 5);
+  auto initial_script_delta = read_unsigned_field(parameters, "initialScriptDelta", 5u);
   if (!initial_script_delta) return std::unexpected(std::move(initial_script_delta.error()));
   variant.initial_script_delta = *initial_script_delta;
   auto bounds = parameters.get("metaBoundBox");
@@ -794,7 +867,7 @@ std::expected<void, StarException> MonsterDatabase::read_common_parameters(Monst
   auto damage_team_type = enum_value<TeamTypeNames>(*damage_team_name);
   if (!damage_team_type) return std::unexpected(std::move(damage_team_type.error()));
   variant.damage_team_type = *damage_team_type;
-  auto damage_team = parameters.get_uint("damageTeam", 2);
+  auto damage_team = read_unsigned_field(parameters, "damageTeam", std::uint8_t{2});
   if (!damage_team) return std::unexpected(std::move(damage_team.error()));
   variant.damage_team = *damage_team;
 
@@ -883,11 +956,12 @@ std::expected<MonsterVariant, StarException> MonsterDatabase::produce_monster(
       return std::unexpected(std::move(category_parts.error()));
     std::optional<Json> selected_parts;
     for (auto const& part_type : monster_type.part_types) {
-      auto part_map = category_parts->get().get(part_type);
-      if (!part_map)
-        return std::unexpected(std::move(part_map.error()));
+      auto found_pool = category_parts->get().get(part_type);
+      if (!found_pool)
+        return std::unexpected(std::move(found_pool.error()));
+      auto const& part_pool = found_pool->get();
       // The draw is consumed even when selectedParts overrides this part.
-      auto sampled = random.sample_ref(part_map->get());
+      auto sampled = random.sample_ref(part_pool);
       if (!sampled)
         return std::unexpected(std::move(sampled.error()));
       if (!selected_parts) {
@@ -900,19 +974,20 @@ std::expected<MonsterVariant, StarException> MonsterDatabase::produce_monster(
       if (!name)
         return std::unexpected(std::move(name.error()));
       if (*name) {
-        auto selected = part_map->get().get(**name);
-        if (!selected)
-          return std::unexpected(std::move(selected.error()));
-        parts.push_back(*selected);
+        auto selected = std::ranges::lower_bound(part_pool, **name, std::less<String>{}, &MonsterPart::name);
+        if (selected == part_pool.end() || selected->name != **name)
+          return std::unexpected(map_diagnostic_error("Key '{}' not found in Map::get()",
+              "Map::get: key not found while rendering its diagnostic", **name));
+        parts.emplace_back(*selected);
       } else {
-        parts.push_back(std::cref(sampled->get().second));
+        parts.push_back(*sampled);
       }
     }
   }
 
   // Resolve only selected frames, before reading any part parameter overrides.
   for (MonsterPart const& part : parts) {
-    for (auto const& [tag, frame] : part.frames) {
+    for (auto const& [tag, frame] : *part.frames) {
       auto image = frame.to_string();
       if (!image)
         return std::unexpected(std::move(image.error()));
@@ -938,7 +1013,7 @@ std::expected<MonsterVariant, StarException> MonsterDatabase::produce_monster(
     }
   }
 
-  auto merged_parts = merge_part_parameters(monster_type.part_parameter_description, part_parameters);
+  auto merged_parts = merge_part_parameters(monster_type, part_parameters);
   if (!merged_parts)
     return std::unexpected(std::move(merged_parts.error()));
   auto merged = merge_final_parameters({monster_type.base_parameters, std::move(*merged_parts)});
@@ -951,7 +1026,6 @@ std::expected<MonsterVariant, StarException> MonsterDatabase::produce_monster(
   variant.drop_pool_config = monster_type.drop_pools;
   if (auto read = read_common_parameters(variant); !read)
     return std::unexpected(std::move(read.error()));
-  variant.animator_zoom = variant.scale;
   if (variant.drop_pool_config.is_type(Json::Type::Array)) {
     auto drop_pools = variant.drop_pool_config.array_ptr();
     if (!drop_pools)

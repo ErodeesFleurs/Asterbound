@@ -163,6 +163,7 @@ using ImageOperation =
 
 ImageOperation image_operation_from_string(StringView string);
 String image_operation_to_string(ImageOperation const& operation);
+String color_replace_operation_to_string(ColorReplaceMap const& swaps);
 
 [[nodiscard]] std::expected<void, StarException>
 parse_image_operations(StringView params,
@@ -206,6 +207,7 @@ using ::Star::BorderImageOperation;
 using ::Star::bordered_image_size;
 using ::Star::BrightnessMultiplyImageOperation;
 using ::Star::color_directives_from_config;
+using ::Star::color_replace_operation_to_string;
 using ::Star::ColorLookupTables;
 using ::Star::ColorReplaceImageOperation;
 using ::Star::ColorReplaceMap;

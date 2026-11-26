@@ -67,6 +67,7 @@ class LuaRoot;
 class Rebuilder;
 class RandomSource;
 class Monster;
+class NetworkedAnimator;
 
 struct MonsterExceptionTag {
   static constexpr std::string_view name() { return "MonsterException"; }
@@ -83,7 +84,6 @@ struct MonsterVariant {
 
   Json animator_config;
   StringMap<String> animator_part_tags;
-  float animator_zoom;
   // Is the animator specified Left facing?
   bool reversed;
 
@@ -174,12 +174,20 @@ public:
   [[nodiscard]] std::expected<std::pair<String, String>, StarException> skill_info(String const& skill_name) const;
   [[nodiscard]] std::expected<Json, StarException> skill_config_parameter(String const& skill_name, String const& config_parameter_name) const;
 
-  [[nodiscard]] std::expected<ColorReplaceMap, StarException> color_swap(String const& set_name, std::uint64_t seed) const;
-
   [[nodiscard]] std::expected<Json, StarException> monster_config(String const& type_name) const;
 
 private:
+  friend class Monster;
+
+  [[nodiscard]] std::expected<void, StarException> apply_appearance(MonsterVariant const& variant, NetworkedAnimator& animator) const;
+  [[nodiscard]] std::expected<std::reference_wrapper<ColorReplaceMap const>, StarException> select_color_swap(
+      String const& set_name, std::uint64_t seed) const;
+
   [[nodiscard]] std::expected<void, StarException> initialize();
+
+  enum class PartMergeMethod : std::uint8_t { Add, Multiply, Merge, Override, Unrecognized };
+
+  [[nodiscard]] static std::expected<PartMergeMethod, StarException> read_part_merge_method(Json const& method_json);
 
   struct MonsterType {
     String type_name;
@@ -204,17 +212,19 @@ private:
     // Description of all part parameters, and how they are combined and with
     // what defaults.
     Json part_parameter_description;
+    JsonObject part_parameter_defaults;
+    StringMap<std::optional<PartMergeMethod>> part_parameter_methods;
+    std::optional<Json> invalid_part_parameter_default;
+
+    void compile_part_parameter_rules();
 
     Json to_json() const;
   };
 
   struct MonsterPart {
     String name;
-    String category;
-    String type;
-
     String path;
-    JsonObject frames;
+    std::shared_ptr<JsonObject const> frames;
     Json part_parameters;
   };
 
@@ -230,7 +240,7 @@ private:
 
   // Merges part configuration by the method specified in the part parameter
   // config.
-  [[nodiscard]] static std::expected<Json, StarException> merge_part_parameters(Json const& part_parameter_description, JsonArray const& parameters);
+  [[nodiscard]] static std::expected<Json, StarException> merge_part_parameters(MonsterType const& monster_type, JsonArray const& parameters);
 
   // Merges final monster variant parameters together according to the
   // hard-coded variant merge rules (handles things like scripts which are
@@ -242,9 +252,10 @@ private:
 
   Root& m_root;
 
-  // Maps category name -> part type -> part name -> MonsterPart.  part name ->
-  // MonsterPart needs to be be in a predictable order.
-  using PartDirectory = StringMap<StringMap<Map<String, MonsterPart>>>;
+  // Each category and part type has a contiguous pool in the original Map<String, ...> key order.
+  // A slot's position in that order is part of the seeded generation contract.
+  using PartPool = std::vector<MonsterPart>;
+  using PartDirectory = StringMap<StringMap<PartPool>>;
 
   [[nodiscard]] std::expected<MonsterVariant, StarException> produce_monster(String const& type_name, std::uint64_t seed, Json const& unique_parameters) const;
 

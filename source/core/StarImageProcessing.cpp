@@ -32,7 +32,7 @@ std::expected<StringList, StarException> color_directives_from_config(JsonArray 
 }
 
 std::expected<String, StarException> palette_swap_directives_from_config(Json const& swaps) {
-  ColorReplaceImageOperation palette_swaps;
+  ColorReplaceMap palette_swaps;
   auto object = swaps.iterate_object();
   if (!object)
     return std::unexpected(std::move(object.error()));
@@ -46,9 +46,9 @@ std::expected<String, StarException> palette_swap_directives_from_config(Json co
     auto to = Color::from_hex(*text);
     if (!to)
       return std::unexpected(std::move(to.error()));
-    palette_swaps.color_replace_map[from->to_rgba()] = to->to_rgba();
+    palette_swaps[from->to_rgba()] = to->to_rgba();
   }
-  return "?" + image_operation_to_string(palette_swaps);
+  return "?" + color_replace_operation_to_string(palette_swaps);
 }
 
 HueShiftImageOperation HueShiftImageOperation::hue_shift_degrees(float degrees) {
@@ -250,6 +250,13 @@ ImageOperation image_operation_from_string(StringView string) {
   return NullImageOperation{};
 }
 
+String color_replace_operation_to_string(ColorReplaceMap const& swaps) {
+  String str = "replace";
+  for (auto const& [from, to] : swaps)
+    str += Star::format(";{}={}", Color::rgba(from).to_hex(), Color::rgba(to).to_hex());
+  return str;
+}
+
 String image_operation_to_string(ImageOperation const& operation) {
   if (auto op = (std::holds_alternative<HueShiftImageOperation>(operation) ? std::optional{std::cref(std::get<HueShiftImageOperation>(operation))} : std::nullopt)) {
     return Star::format("hueshift={}", op->get().hue_shift_amount * 360.0f);
@@ -268,10 +275,7 @@ String image_operation_to_string(ImageOperation const& operation) {
   } else if (auto op = (std::holds_alternative<SetColorImageOperation>(operation) ? std::optional{std::cref(std::get<SetColorImageOperation>(operation))} : std::nullopt)) {
     return Star::format("setcolor={}", Color::rgb(op->get().color).to_hex());
   } else if (auto op = (std::holds_alternative<ColorReplaceImageOperation>(operation) ? std::optional{std::cref(std::get<ColorReplaceImageOperation>(operation))} : std::nullopt)) {
-    String str = "replace";
-    for (auto const& pair : op->get().color_replace_map)
-      str += Star::format(";{}={}", Color::rgba(pair.first).to_hex(), Color::rgba(pair.second).to_hex());
-    return str;
+    return color_replace_operation_to_string(op->get().color_replace_map);
   } else if (auto op = (std::holds_alternative<AlphaMaskImageOperation>(operation) ? std::optional{std::cref(std::get<AlphaMaskImageOperation>(operation))} : std::nullopt)) {
     if (op->get().mode == AlphaMaskImageOperation::Additive)
       return Star::format("addmask={};{};{}", op->get().mask_images.join("+"), op->get().offset[0], op->get().offset[1]);

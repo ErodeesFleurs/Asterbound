@@ -5,6 +5,7 @@ import star.thread;
 import star.io_device;
 import star.list;
 import star.image_processing;
+import star.image;
 import star.hash;
 import star.data_stream;
 import star.string_view;
@@ -53,6 +54,7 @@ import star.networked_animator;
 import star.networked_animator_lua_bindings;
 import star.scripted_animator_lua_bindings;
 import star.drawable;
+import star.image_metadata_database;
 import star.dungeon_generator;
 import star.item;
 import star.item_bag;
@@ -109,6 +111,7 @@ import star.entity_rendering_types;
 import star.warping;
 import star.data_stream_devices;
 import star.byte_array;
+import star.buffer;
 import star.data_stream_extra;
 import star.encode;
 
@@ -2252,6 +2255,22 @@ const GameTestRegistration npcEquipmentBoundaries("RootTest", "NpcEquipmentBound
   }
 });
 
+const GameTestRegistration monster_numeric_fields("RootTest", "MonsterNumericFieldBounds", [](GameTest& fixture) {
+  auto database = fixture.root().monster_database();
+  if (!fixture.check(bool(database), "load monster catalog")) return;
+  auto variant = [&](String const& field, Json value) {
+    return (*database)->monster_variant("poptop", 123, JsonObject{{field, std::move(value)}});
+  };
+  auto team = variant("damageTeam", 255.0);
+  auto delta = variant("initialScriptDelta", 0);
+  fixture.check(team && team->damage_team == 255 && delta && delta->initial_script_delta == 0,
+      "accept exact team and script interval boundaries");
+  for (auto value : std::array<Json, 3>{-1, 1.5, 256})
+    fixture.check(!variant("damageTeam", value), "reject team alias before narrowing");
+  for (auto value : std::array<Json, 3>{-1, 0.5, std::int64_t{1} << 32})
+    fixture.check(!variant("initialScriptDelta", value), "reject invalid script interval before narrowing");
+});
+
 const GameTestRegistration monster_drop_pool_boundaries("RootTest", "MonsterDropPoolBoundaries", [](GameTest& fixture) {
   auto database = fixture.root().monster_database();
   ASSERT_TRUE(database) << database.error().what();
@@ -2274,35 +2293,97 @@ const GameTestRegistration monster_part_merge("RootTest", "MonsterPartShallowMer
   ASSERT_TRUE(writeIsolationModules(overlay, {
     {"merge-probe.animation", "{}"},
     {"merge-probe.monstertype", R"JSON({
-      "type":"merge-probe","categories":["merge-probe"],"parts":["body"],"animation":"merge-probe.animation",
-      "baseParameters":{"scripts":[],"scale":1,"metaBoundBox":[0,0,1,1],"mouthOffset":[0,0],"feetOffset":[0,0],
+      "type":"merge-probe","categories":["merge-probe"],"parts":["body","tail","eyes","legs"],
+      "animation":"merge-probe.animation",
+      "baseParameters":{"scripts":["/base.lua"],"baseSkills":null,"specialSkills":["merge-skill-b"],
+        "scale":1,"metaBoundBox":[0,0,1,1],"mouthOffset":[0,0],"feetOffset":[0,0],
         "statusSettings":{},"selfDamagePoly":[[0,0],[1,0],[0,1]]},
       "partParameterDescription":{
-        "list":["merge",[1,2]],"map":["merge",{"left":1,"nested":{"old":1}}],
-        "same":["merge",1],"different":["merge",1],"absent":["merge",null],"ignored":["merge",true]
+        "list":["mErGe",[1,2]],"map":["merge",{"left":1,"nested":{"old":1}}],
+        "same":["merge",1],"different":["merge",1],"absent":["merge",null],"ignored":["merge",true],
+        "reset":["merge",[-1]],"keepNull":["merge",[1]],"unknown":["future",42],"latent":[false,"untouched"],
+        "sum":["aDD",10],"product":["MULTIPLY",2],"overrideValue":["oVerride","default"],
+        "scripts":["merge",["/default.lua"]],"baseSkills":["merge",["merge-skill-a"]],
+        "specialSkills":["merge",null]
       }
     })JSON"},
     {"merge-probe.monsterpart", R"JSON({
       "name":"merge-probe-body","category":"merge-probe","type":"body","frames":{},
       "parameters":{"list":[3,4],"map":{"right":2,"nested":{"new":2}},
-        "same":2,"different":"changed","absent":[5],"ignored":null}
+        "same":2,"different":"changed","absent":[5],"ignored":null,"reset":[0],"keepNull":[2],
+        "unknown":"unused input","sum":3,"product":4,"overrideValue":"body","scripts":["/body.lua"]}
+    })JSON"},
+    {"merge-tail.monsterpart", R"JSON({
+      "name":"tail","category":"merge-probe","type":"tail","frames":{},
+      "parameters":{"list":[5],"reset":false,"keepNull":null,"sum":-1,"product":3,"overrideValue":null}
+    })JSON"},
+    {"merge-eyes.monsterpart", R"JSON({
+      "name":"eyes","category":"merge-probe","type":"eyes","frames":{},
+      "parameters":{"reset":[1],"scripts":[]}
+    })JSON"},
+    {"merge-legs.monsterpart", R"JSON({
+      "name":"legs","category":"merge-probe","type":"legs","frames":{},
+      "parameters":{"list":[6],"reset":[2],"keepNull":[],"scripts":["/legs.lua"]}
+    })JSON"},
+    {"merge-bad-method.monsterpart", R"JSON({
+      "name":"bad-method","category":"merge-probe","type":"body","frames":{},"parameters":{"latent":null}
+    })JSON"},
+    {"merge-missing-rule.monsterpart", R"JSON({
+      "name":"missing-rule","category":"merge-probe","type":"body","frames":{},"parameters":{"missing":1}
+    })JSON"},
+    {"merge-bad-default.monstertype", R"JSON({
+      "type":"merge-bad-default","categories":["merge-probe"],"parts":[],"animation":"merge-probe.animation",
+      "partParameterDescription":{"unused":["merge"]}
+    })JSON"},
+    {"merge-skill-a.monsterskill", R"JSON({
+      "name":"merge-skill-a","label":"a","image":"a.png",
+      "parameters":{"scripts":["/skill-a.lua"],"baseSkills":["later-a"],"specialSkills":null}
+    })JSON"},
+    {"merge-skill-b.monsterskill", R"JSON({
+      "name":"merge-skill-b","label":"b","image":"b.png",
+      "parameters":{"scripts":["/skill-b.lua"],"baseSkills":["later-b"],"specialSkills":["later-special"]}
+    })JSON"},
+    {"merge-bad-script.monsterskill", R"JSON({
+      "name":"merge-bad-script","label":"broken","image":"broken.png","parameters":{"scripts":false}
     })JSON"}
   }));
   auto root = Root::create(std::move(*settings));
   ASSERT_TRUE(root) << root.error().what();
   auto database = (*root)->monster_database();
   ASSERT_TRUE(database) << database.error().what();
-  auto variant = (*database)->monster_variant("merge-probe", 42);
+  auto selected_body = [](String const& name) {
+    return JsonObject{{"selectedParts", JsonObject{{"body", name}}}};
+  };
+  auto variant = (*database)->monster_variant("merge-probe", 42, selected_body("merge-probe-body"));
   ASSERT_TRUE(variant) << variant.error().what();
   auto expected = Json::parse_json(R"JSON({
-    "list":[1,2,3,4],"map":{"left":1,"nested":{"new":2},"right":2},
-    "same":1,"different":"changed","absent":[5],"ignored":true
+    "list":[1,2,3,4,5,6],"map":{"left":1,"nested":{"new":2},"right":2},
+    "same":1,"different":"changed","absent":[5],"ignored":true,"reset":[1,2],"keepNull":[1,2],
+    "unknown":42,"latent":"untouched","sum":12,"product":24,"overrideValue":"body",
+    "scripts":["/base.lua","/default.lua","/body.lua","/legs.lua","/skill-a.lua","/skill-b.lua"],
+    "skills":["merge-skill-a","merge-skill-b"],"baseSkills":["merge-skill-a","later-a","later-b"],
+    "specialSkills":["merge-skill-b","later-special"]
   })JSON");
   ASSERT_TRUE(expected) << expected.error().what();
   auto fields = expected->iterate_object();
   ASSERT_TRUE(fields) << fields.error().what();
   for (auto const& [key, value] : *fields)
     EXPECT_EQ(variant->parameters.get(key), value) << key.utf8();
+
+  auto bad_method = (*database)->monster_variant("merge-probe", 42, selected_body("bad-method"));
+  ASSERT_FALSE(bad_method);
+  EXPECT_NE(std::string_view(bad_method.error().what()).find("Cannot convert from bool to string"), std::string_view::npos);
+  auto missing_rule = (*database)->monster_variant("merge-probe", 42, selected_body("missing-rule"));
+  ASSERT_FALSE(missing_rule);
+  EXPECT_NE(std::string_view(missing_rule.error().what()).find("No such key in Json::get(\"missing\")"), std::string_view::npos);
+  auto bad_default = (*database)->monster_variant("merge-bad-default", 42);
+  ASSERT_FALSE(bad_default);
+  EXPECT_NE(std::string_view(bad_default.error().what()).find("Json::get(1) out of range"), std::string_view::npos);
+  auto bad_script_parameters = selected_body("merge-probe-body");
+  bad_script_parameters["specialSkills"] = JsonArray{"merge-bad-script"};
+  auto bad_script = (*database)->monster_variant("merge-probe", 42, std::move(bad_script_parameters));
+  ASSERT_FALSE(bad_script);
+  EXPECT_NE(std::string_view(bad_script.error().what()).find("Improper conversion to JsonArray from bool"), std::string_view::npos);
 });
 
 const GameTestRegistration monster_generation_rng("RootTest", "MonsterGenerationRng", [](GameTest& fixture) {
@@ -2393,6 +2474,15 @@ const GameTestRegistration monster_generation_rng("RootTest", "MonsterGeneration
   EXPECT_EQ(selected->parameters.get("skills"), *generated_skills);
   EXPECT_EQ(selected->drop_pool_config, generated->drop_pool_config);
 
+  // A binary lookup must reject a non-equal successor as well as the end of the pool.
+  for (String const& name : {String("B"), String("z")}) {
+    auto missing = monsters.monster_variant("generation-probe", seed,
+        JsonObject{{"selectedParts", JsonObject{{"body", name}}}});
+    ASSERT_FALSE(missing);
+    auto message = std::string_view(missing.error().what());
+    EXPECT_NE(message.find(Star::format("Key '{}' not found in Map::get()", name)), std::string_view::npos) << message;
+  }
+
   auto split = monsters.monster_variant("generation-probe", seed,
       JsonObject{{"baseSkills", JsonArray{"base0", "base1"}},
                  {"specialSkills", JsonArray{"generation-a", "generation-b", "generation-c", "generation-d"}},
@@ -2430,6 +2520,36 @@ const GameTestRegistration monster_generation_rng("RootTest", "MonsterGeneration
   auto created = monsters.create_monster(std::move(*from_wire), 1.0f);
   ASSERT_TRUE(created) << created.error().what();
   EXPECT_EQ((*created)->net_store(), *wire);
+});
+
+const GameTestRegistration monster_part_pool_duplicate("RootTest", "MonsterPartPoolDuplicate", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto settings = isolationSettings(fixture.rootSettings(), *directory, "monster-part-pool-duplicate");
+  ASSERT_TRUE(settings) << settings.error().what();
+  auto overlay = File::relative_to(*directory, "assets");
+  String part = R"({"name":"repeated","category":"part-pool-probe","type":"body","frames":{}})";
+  ASSERT_TRUE(writeIsolationModules(overlay, {
+    {"part-pool-first.monsterpart", part}, {"part-pool-second.monsterpart", part}
+  }));
+  auto root = Root::create(std::move(*settings));
+  ASSERT_TRUE(root) << root.error().what();
+  auto assets = (*root)->assets();
+  ASSERT_TRUE(assets) << assets.error().what();
+  auto parts = (*assets)->scan_extension("monsterpart");
+  ASSERT_TRUE(parts) << parts.error().what();
+  String duplicate_file;
+  for (auto const& file : parts->get()) {
+    if (file.string() == "/part-pool-first.monsterpart" || file.string() == "/part-pool-second.monsterpart")
+      duplicate_file = file.string();
+  }
+  ASSERT_FALSE(duplicate_file.empty());
+  auto database = (*root)->monster_database();
+  ASSERT_FALSE(database);
+  auto message = std::string_view(database.error().what());
+  EXPECT_NE(message.find(Star::format("Error loading monster part '{}'", duplicate_file)), std::string_view::npos) << message;
+  EXPECT_NE(message.find("Repeat monster part name 'repeated' for category 'part-pool-probe'"), std::string_view::npos) << message;
 });
 
 void expectIsolationModuleError(Json const& result, String const& field, String const& fragment) {
@@ -2994,7 +3114,7 @@ const GameTestRegistration monster_damage_sources("RootTest", "MonsterDamageSour
   ASSERT_TRUE(animation) << animation.error().what();
   variant->animator_config = std::move(*animation);
   variant->animator_part_tags.clear();
-  variant->animator_zoom = 1;
+  variant->scale = 1;
   auto parts = Json::parse_json(R"JSON({
     "omitted":{"anchorPart":"body","damageSource":{"damage":4,"line":[[0,0],[18,0]],"damageSourceKind":"omitted"}},
     "unchecked":{"anchorPart":"body","checkLineCollision":false,"bounces":"ignored","damageSource":{"damage":4,"line":[[0,0],[18,0]],"damageSourceKind":"unchecked"}},
@@ -3212,6 +3332,173 @@ const GameTestRegistration monster_damage_sources("RootTest", "MonsterDamageSour
   ASSERT_EQ(sources->size(), 1u);
   EXPECT_EQ(sources->front().damage_source_kind, "touch");
   EXPECT_FLOAT_EQ(sources->front().damage, 7.0f * (2.0f * static_cast<float>(*new_level_power) * status_power));
+});
+
+const GameTestRegistration monster_appearance("RootTest", "MonsterAppearanceScaleAndPalettes", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto settings = isolationSettings(fixture.rootSettings(), *directory, "monster-appearance");
+  ASSERT_TRUE(settings) << settings.error().what();
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(writeIsolationModules(overlay, {
+    {"appearance-probe.animation", R"JSON({
+      "animatedParts":{"parts":{"body":{"properties":{"image":"<partImage>"}}}}
+    })JSON"},
+    {"appearance-probe.monstertype", R"JSON({
+      "type":"appearance-probe","categories":["appearance-probe"],"parts":["body"],
+      "animation":"appearance-probe.animation",
+      "baseParameters":{
+        "scripts":[],"scale":1,"metaBoundBox":[-8,-8,8,8],"mouthOffset":[0,0],"feetOffset":[0,0],
+        "colors":"appearance-palette",
+        "movementSettings":{
+          "standingPoly":[[-1,-2],[1,-2],[1,2],[-1,2]],
+          "crouchingPoly":[[-1,-1],[1,-1],[1,1],[-1,1]]
+        },
+        "statusSettings":{"minimumLiquidStatusEffectPercentage":1,
+          "appliesEnvironmentStatusEffects":false,"appliesWeatherStatusEffects":false}
+      }
+    })JSON"},
+    {"appearance-probe.monsterpart", R"JSON({
+      "name":"body","category":"appearance-probe","type":"body","frames":{"body":"appearance-probe.png"}
+    })JSON"},
+    {"appearance-palette.monstercolors", R"JSON({
+      "name":"appearance-palette","swaps":[{"ff0000":"0000ff","00ff00":"ffff00"}]
+    })JSON"},
+    {"appearance-empty.monstercolors", R"JSON({"name":"appearance-empty","swaps":[{}]})JSON"}
+  }));
+
+  std::array source_pixels{Vec4B(255, 0, 0, 255), Vec4B(0, 255, 0, 255)};
+  std::array palette_pixels{Vec4B(0, 0, 255, 255), Vec4B(255, 255, 0, 255)};
+  std::array explicit_pixels{Vec4B(255, 0, 255, 255), source_pixels[1]};
+  Image image(2, 1, PixelFormat::RGBA32);
+  ASSERT_TRUE(image.set(0, 0, source_pixels[0]));
+  ASSERT_TRUE(image.set(1, 0, source_pixels[1]));
+  auto png = std::make_shared<Buffer>();
+  ASSERT_TRUE(image.write_png(fixture.root().logger(), png));
+  ASSERT_TRUE(File::write_file(png->take_data(), File::relative_to(overlay, "appearance-probe.png")));
+
+  auto root = Root::create(std::move(*settings));
+  ASSERT_TRUE(root) << root.error().what();
+  auto database = (*root)->monster_database();
+  ASSERT_TRUE(database) << database.error().what();
+  auto assets = (*root)->assets();
+  ASSERT_TRUE(assets) << assets.error().what();
+  auto metadata = (*root)->image_metadata_database();
+  ASSERT_TRUE(metadata) << metadata.error().what();
+
+  auto check_portrait = [&](std::expected<List<Drawable>, StarException> const& portrait,
+                            float scale, std::array<Vec4B, 2> const& colors) {
+    ASSERT_TRUE(portrait) << portrait.error().what();
+    ASSERT_EQ(portrait->size(), 1u);
+    auto const& drawable = portrait->front();
+    ASSERT_TRUE(drawable.is_image());
+    auto const& path = drawable.image_part().image;
+    EXPECT_EQ(path.base_path, "/appearance-probe.png");
+    EXPECT_EQ(path.directives.empty(), colors == source_pixels);
+    auto bounds = drawable.bound_box(**metadata, false);
+    ASSERT_TRUE(bounds) << bounds.error().what();
+    EXPECT_FLOAT_EQ(bounds->width(), 2 * scale);
+    EXPECT_FLOAT_EQ(bounds->height(), scale);
+    auto decoded = (*assets)->image(path);
+    ASSERT_TRUE(decoded) << decoded.error().what();
+    for (unsigned x = 0; x != colors.size(); ++x) {
+      auto pixel = (*decoded)->get(x, 0);
+      ASSERT_TRUE(pixel) << pixel.error().what();
+      EXPECT_EQ(*pixel, colors[x]);
+    }
+  };
+
+  auto base = (*database)->monster_variant("appearance-probe", 53);
+  ASSERT_TRUE(base) << base.error().what();
+  ASSERT_NO_FATAL_FAILURE(check_portrait((*database)->monster_portrait(*base), 1.0f, palette_pixels));
+  JsonObject overrides{{"scale", 2.5f}, {"colorSwap", JsonObject{{"ff0000", "ff00ff"}}}};
+  auto monster = (*database)->create_monster(*base, 1.0f, overrides);
+  ASSERT_TRUE(monster) << monster.error().what();
+  EXPECT_EQ((*monster)->collision_area(), RectF(-2.5f, -5, 2.5f, 5));
+  auto& movement = (*monster)->movement_controller();
+  ASSERT_TRUE(movement.load_state(JsonObject{{"position", JsonArray{0, 0}}, {"velocity", JsonArray{0, 0}},
+    {"rotation", 0.0f}, {"movingDirection", "left"}, {"facingDirection", "left"}, {"crouching", true}}));
+  ASSERT_TRUE(movement.update_base_parameters(ActorMovementParameters{}));
+  EXPECT_EQ((*monster)->collision_area(), RectF(-2.5f, -2.5f, 2.5f, 2.5f));
+  ASSERT_NO_FATAL_FAILURE(check_portrait((*monster)->portrait(PortraitMode::Full), 2.5f, explicit_pixels));
+  auto generated = (*database)->monster_variant("appearance-probe", 53, overrides);
+  ASSERT_TRUE(generated) << generated.error().what();
+  ASSERT_NO_FATAL_FAILURE(check_portrait((*database)->monster_portrait(*generated), 2.5f, explicit_pixels));
+
+  for (auto const& empty : {JsonObject{{"colorSwap", JsonObject{}}}, JsonObject{{"colors", "appearance-empty"}}}) {
+    auto variant = (*database)->monster_variant("appearance-probe", 53, empty);
+    ASSERT_TRUE(variant) << variant.error().what();
+    ASSERT_NO_FATAL_FAILURE(check_portrait((*database)->monster_portrait(*variant), 1.0f, source_pixels));
+    auto entity = (*database)->create_monster(std::move(*variant), 1.0f);
+    ASSERT_TRUE(entity) << entity.error().what();
+    ASSERT_NO_FATAL_FAILURE(check_portrait((*entity)->portrait(PortraitMode::Full), 1.0f, source_pixels));
+  }
+
+  auto cached = (*database)->monster_variant("appearance-probe", 53);
+  ASSERT_TRUE(cached) << cached.error().what();
+  EXPECT_FALSE(cached->color_swap);
+  auto cached_entity = (*database)->create_monster(*cached, 1.0f);
+  ASSERT_TRUE(cached_entity) << cached_entity.error().what();
+  EXPECT_EQ((*cached_entity)->collision_area(), RectF(-1, -2, 1, 2));
+  ASSERT_NO_FATAL_FAILURE(check_portrait((*cached_entity)->portrait(PortraitMode::Full), 1.0f, palette_pixels));
+
+  auto with_default = (*database)->monster_variant("appearance-probe", 53, JsonObject{{"colors", "default"}});
+  ASSERT_TRUE(with_default) << with_default.error().what();
+  auto with_missing = (*database)->monster_variant("appearance-probe", 53, JsonObject{{"colors", "appearance-missing"}});
+  ASSERT_TRUE(with_missing) << with_missing.error().what();
+  auto default_portrait = (*database)->monster_portrait(*with_default);
+  auto fallback_portrait = (*database)->monster_portrait(*with_missing);
+  ASSERT_TRUE(default_portrait) << default_portrait.error().what();
+  ASSERT_TRUE(fallback_portrait) << fallback_portrait.error().what();
+  ASSERT_EQ(default_portrait->size(), 1u);
+  ASSERT_EQ(fallback_portrait->size(), 1u);
+  EXPECT_TRUE(default_portrait->front().image_part() == fallback_portrait->front().image_part());
+
+  // An empty list defines no palette; unlike [{}], it cannot supply a fallback.
+  // Override the real default asset in the test's private source only.
+  auto palette_assets = (*assets)->scan_extension("monstercolors");
+  ASSERT_TRUE(palette_assets) << palette_assets.error().what();
+  std::optional<String> default_path;
+  for (auto const& asset : palette_assets->get()) {
+    auto config = (*assets)->json(asset.string());
+    ASSERT_TRUE(config) << config.error().what();
+    if (!config->is_null() && config->get_string("name") == String("default")) {
+      auto relative_path = asset.string().substr(1);
+      ASSERT_TRUE(relative_path) << relative_path.error().what();
+      default_path = File::relative_to(overlay, *relative_path);
+      break;
+    }
+  }
+  ASSERT_TRUE(default_path);
+  ASSERT_TRUE(File::create_directories(File::dir_name(*default_path)));
+  ASSERT_TRUE(File::write_file(String(R"JSON({"name":"default","swaps":[]})JSON"), *default_path));
+  ASSERT_TRUE((*root)->reload());
+  auto reloaded = (*root)->monster_database();
+  ASSERT_TRUE(reloaded) << reloaded.error().what();
+  for (auto const& swaps : {JsonObject{{"ff0000", "ff00ff"}}, JsonObject{}}) {
+    auto missing = (*reloaded)->monster_variant("appearance-probe", 53,
+        JsonObject{{"colors", "appearance-missing"}, {"colorSwap", swaps}});
+    ASSERT_TRUE(missing) << missing.error().what();
+    auto portrait_error = (*reloaded)->monster_portrait(*missing);
+    auto entity_error = (*reloaded)->create_monster(std::move(*missing), 1.0f);
+    ASSERT_FALSE(portrait_error);
+    ASSERT_FALSE(entity_error);
+    EXPECT_EQ(entity_error.error().what(), portrait_error.error().what());
+    EXPECT_NE(std::string_view(entity_error.error().what()).find("default"), std::string_view::npos);
+  }
+
+  auto malformed = (*reloaded)->monster_variant("appearance-probe", 53,
+      JsonObject{{"colors", false}, {"colorSwap", JsonObject{{"ff0000", "ff00ff"}}}});
+  ASSERT_TRUE(malformed) << malformed.error().what();
+  auto invalid_colors = malformed->parameters.get_string("colors", "default");
+  auto portrait_error = (*reloaded)->monster_portrait(*malformed);
+  auto entity_error = (*reloaded)->create_monster(std::move(*malformed), 1.0f);
+  ASSERT_FALSE(invalid_colors);
+  ASSERT_FALSE(portrait_error);
+  ASSERT_FALSE(entity_error);
+  EXPECT_EQ(entity_error.error().what(), invalid_colors.error().what());
+  EXPECT_EQ(portrait_error.error().what(), invalid_colors.error().what());
 });
 
 const GameTestRegistration simultaneousWorldMaterials("RootTest", "SimultaneousWorldMaterials", [](GameTest& fixture) {

@@ -29,7 +29,6 @@ import star.set;
 import star.color;
 import star.string;
 import star.rect;
-import star.image_processing;
 import star.image_metadata_database;
 import star.hash;
 import star.string_view;
@@ -169,21 +168,11 @@ std::expected<void, StarException> Monster::initialize(std::optional<float> leve
   if (!emitter)
     return std::unexpected(std::move(emitter.error()));
   m_effect_emitter = std::move(*emitter);
-  for (auto const& [part, image] : variant.animator_part_tags)
-    m_networked_animator->setPartTag(part, "partImage", image);
-  m_networked_animator->setZoom(variant.animator_zoom);
   auto database = root().monster_database();
   if (!database)
     return std::unexpected(std::move(database.error()));
-  auto colors = variant.parameters.get_string("colors", "default");
-  if (!colors)
-    return std::unexpected(std::move(colors.error()));
-  auto palette = (*database)->color_swap(*colors, variant.seed);
-  if (!palette)
-    return std::unexpected(std::move(palette.error()));
-  auto swaps = variant.color_swap.value_or(std::move(*palette));
-  if (!swaps.empty())
-    m_networked_animator->setProcessingDirectives(image_operation_to_string(ColorReplaceImageOperation{std::move(swaps)}));
+  if (auto applied = (*database)->apply_appearance(variant, *m_networked_animator); !applied)
+    return std::unexpected(std::move(applied.error()));
 
   auto status = StatusController::create(root(), variant.status_settings);
   if (!status)
@@ -209,9 +198,9 @@ std::expected<void, StarException> Monster::initialize(std::optional<float> leve
     return std::unexpected(std::move(defaults.error()));
   auto movement_parameters = std::move(*defaults).merge(variant.movement_settings);
   if (movement_parameters.standing_poly)
-    movement_parameters.standing_poly->scale(variant.animator_zoom);
+    movement_parameters.standing_poly->scale(variant.scale);
   if (movement_parameters.crouching_poly)
-    movement_parameters.crouching_poly->scale(variant.animator_zoom);
+    movement_parameters.crouching_poly->scale(variant.scale);
   *movement_parameters.walk_speed *= variant.walk_multiplier;
   *movement_parameters.run_speed *= variant.run_multiplier;
   *movement_parameters.air_jump_profile.jump_speed *= variant.jump_multiplier;
