@@ -90,7 +90,7 @@ public:
   [[nodiscard]] std::expected<std::optional<QuestIndicator>, StarException> getQuestIndicator(std::shared_ptr<Entity> const& entity) const;
 
   // Handled at this level to allow multiple active quests to specify interestingObjects
-  [[nodiscard]] std::expected<StringSet, StarException> interestingObjects();
+  [[nodiscard]] std::expected<StringSet, StarException> interesting_objects();
 
   [[nodiscard]] MessageResponseResult receive_message(String const& message, bool local_message, JsonArray const& args = {});
   [[nodiscard]] std::expected<void, StarException> update(float dt);

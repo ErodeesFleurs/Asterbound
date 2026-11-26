@@ -110,12 +110,12 @@ void PlayerLog::clearScannedObjects() {
   m_scannedObjects.clear();
 }
 
-StringSet PlayerLog::radioMessages() const {
-  return m_radioMessages;
+bool PlayerLog::has_radio_message(String const& message_name) const {
+  return m_radioMessages.contains(message_name);
 }
 
-bool PlayerLog::addRadioMessage(String const& messageName) {
-  return m_radioMessages.add(messageName);
+bool PlayerLog::add_radio_message(String const& message_name) {
+  return m_radioMessages.add(message_name);
 }
 
 void PlayerLog::clearRadioMessages() {

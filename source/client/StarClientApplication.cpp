@@ -2241,9 +2241,9 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
       }
 
       if (isActionTakenEdge(InterfaceAction::PlayerInteract))
-        m_player->beginTrigger();
+        m_player->begin_trigger();
       else if (!isActionTaken(InterfaceAction::PlayerInteract))
-        m_player->endTrigger();
+        m_player->end_trigger();
 
       if (isActionTakenEdge(InterfaceAction::PlayerDropItem)) {
         if (auto dropped = m_player->dropItem(); !dropped)

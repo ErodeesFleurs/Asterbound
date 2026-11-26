@@ -29,8 +29,8 @@ public:
   void removeScannedObject(String const& objectName);
   void clearScannedObjects();
 
-  StringSet radioMessages() const;
-  bool addRadioMessage(String const& messageName);
+  bool has_radio_message(String const& message_name) const;
+  bool add_radio_message(String const& message_name);
   void clearRadioMessages();
 
   StringSet cinematics() const;

@@ -544,7 +544,7 @@ std::expected<String, StarException> ClientCommandProcessor::radioMessage(String
   if (!allowed) return std::unexpected(std::move(allowed.error()));
   if (!*allowed) return "You must be an admin to use this command.";
   if (arguments->size() != 1) return "Must provide one argument";
-  if (auto queued = m_universeClient->mainPlayer()->queueRadioMessage((*arguments)[0]); !queued)
+  if (auto queued = m_universeClient->mainPlayer()->queue_radio_message((*arguments)[0]); !queued)
     return std::unexpected(std::move(queued.error()));
   return "Queued radio message";
 }

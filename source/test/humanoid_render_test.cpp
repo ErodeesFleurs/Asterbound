@@ -3,6 +3,7 @@
 import std;
 import star.actor_movement_controller;
 import star.animated_part_set;
+import star.anchorable_entity;
 import star.color;
 import star.algorithm;
 import star.armor_wearer;
@@ -15,9 +16,11 @@ import star.client_context;
 import star.damage;
 import star.drawable;
 import star.file;
+import star.entity;
 import star.entity_rendering;
 import star.entity_rendering_types;
 import star.format;
+import star.force_regions;
 import star.list;
 import star.light_source;
 import star.mixer;
@@ -29,6 +32,9 @@ import star.status_types;
 import star.game_test;
 import star.game_types;
 import star.humanoid;
+import star.interaction_types;
+import star.inspectable_entity;
+import star.interactive_entity;
 import star.image_metadata_database;
 import star.item;
 import star.item_database;
@@ -40,22 +46,32 @@ import star.networked_animator;
 import star.lua;
 import star.lua_root;
 import star.net_compatibility;
+import star.object;
+import star.object_database;
+import star.physics_entity;
 import star.player;
 import star.player_inventory;
 import star.inventory_types;
 import star.poly;
 import star.player_factory;
 import star.player_lua_bindings;
+import star.quest_descriptor;
+import star.quest_manager;
+import star.quests;
+import star.rect;
 import star.root;
 import star.random;
 import star.string;
 import star.string_view;
 import star.liquid_types;
 import star.material_types;
+import star.collision_block;
 import star.tool_user;
+import star.type_identity;
 import star.uuid;
 import star.vector;
 import star.world_server;
+import star.world_tiles;
 
 using namespace Star;
 
@@ -107,14 +123,14 @@ struct PlayerWorldContext {
 
   ~PlayerWorldContext() {
     if (initialized)
-      EXPECT_TRUE(player->uninit());
+      EXPECT_TRUE(registered ? world->removeEntity(player->entityId(), false) : player->uninit());
     player.reset();
     client.reset();
     if (world)
       EXPECT_TRUE(world->close());
   }
 
-  std::expected<void, StarException> init(Root& root) {
+  std::expected<void, StarException> init(Root& root, std::optional<Vec2F> indexed_position = {}) {
     auto opened = File::ephemeral_file(root.random());
     if (!opened)
       return std::unexpected(std::move(opened.error()));
@@ -142,8 +158,12 @@ struct PlayerWorldContext {
       return std::unexpected(std::move(connected.error()));
     client = std::move(*connected);
     player->set_client_context(client);
-    if (auto entered = player->init(*world, 100, EntityMode::Master); !entered)
+    if (indexed_position)
+      player->movement_controller().set_position(*indexed_position);
+    auto entered = indexed_position ? world->addEntity(player) : player->init(*world, 100, EntityMode::Master);
+    if (!entered)
       return std::unexpected(std::move(entered.error()));
+    registered = indexed_position.has_value();
     initialized = true;
     return player->refresh_humanoid();
   }
@@ -154,6 +174,7 @@ struct PlayerWorldContext {
   std::shared_ptr<ClientContext> client;
   std::shared_ptr<Player> player;
   bool initialized = false;
+  bool registered = false;
 };
 
 // Vanilla species use the legacy renderer; opt in through the real builder,
@@ -176,6 +197,294 @@ std::expected<std::unique_ptr<Root>, StarException> human_animation_root(GameTes
   return Root::create(std::move(settings));
 }
 }// namespace
+
+namespace {
+std::expected<std::unique_ptr<Root>, StarException> headless_player_root(GameTest& fixture, String const& directory) {
+  auto overlay = File::relative_to(directory, "assets");
+  // Standalone WorldServer fixtures have no client-only input callbacks.
+  auto patch = File::write_file(String(R"([{"op":"replace","path":"/genericScriptContexts","value":{}}])"),
+      File::relative_to(overlay, "player.config.patch"));
+  if (!patch)
+    return std::unexpected(std::move(patch.error()));
+  // Skip the vanilla tutorial, which automatically seats the player at a nearby object.
+  auto quests = File::relative_to(overlay, "quests");
+  if (auto made = File::create_directory(quests); !made)
+    return std::unexpected(std::move(made.error()));
+  auto initial_quests = File::write_file(String(R"([{"op":"replace","path":"/initialquests/human","value":[]}])"),
+      File::relative_to(quests, "quests.config.patch"));
+  if (!initial_quests)
+    return std::unexpected(std::move(initial_quests.error()));
+  auto settings = fixture.rootSettings();
+  settings.assetSources.push_back(overlay);
+  settings.storageDirectory = File::relative_to(directory, "storage");
+  settings.runtimeConfigFile = {};
+  settings.logDirectory = {};
+  settings.logFile = {};
+  settings.includeUGC = false;
+  return Root::create(std::move(settings));
+}
+
+struct UseTarget final : InteractiveEntity, PhysicsEntity {
+  UseTarget(Root& root, Player& player, Vec2F position)
+    : Entity(root), player(player), target_position(position) {}
+
+  void query_type(TypeQuery& query) const noexcept override {
+    query_type_of<UseTarget, InteractiveEntity, PhysicsEntity>(*this, query);
+  }
+  std::string_view dynamic_type_name() const noexcept override { return Star::type_name<UseTarget>(); }
+  EntityType entity_type() const override { return EntityType::Object; }
+  Vec2F position() const override { return target_position; }
+  RectF meta_bound_box() const override { return {-2, -2, 2, 2}; }
+
+  void press() const {
+    player.end_trigger();
+    player.begin_trigger();
+  }
+
+  std::expected<List<PhysicsForceRegion>, StarException> force_regions() const override {
+    if (std::exchange(press_during_movement, false))
+      press();
+    if (std::exchange(fail_movement, false))
+      return std::unexpected(StarException("before use dispatch"));
+    return List<PhysicsForceRegion>{};
+  }
+
+  std::expected<InteractAction, StarException> interact(InteractRequest const& request) override {
+    ++deliveries;
+    if (std::exchange(press_during_interaction, false))
+      press();
+    if (std::exchange(fail_interaction, false))
+      return std::unexpected(StarException("after use dispatch"));
+    return InteractAction{InteractActionType::Message, request.target_id, request.source_id};
+  }
+
+  Player& player;
+  Vec2F target_position;
+  mutable bool press_during_movement = false;
+  mutable bool fail_movement = false;
+  bool press_during_interaction = false;
+  bool fail_interaction = false;
+  unsigned deliveries = 0;
+};
+
+const GameTestRegistration use_edges("PlayerUse", "EdgeRetriesAndDispatchesOnce", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  if (!fixture.check(bool(directory), "create private use fixture directory")) return;
+  auto cleanup = make_scope_exit([&] { fixture.check(bool(File::remove_all(*directory)), "remove private use fixture"); });
+  if (!fixture.check(bool(File::create_directory(File::relative_to(*directory, "assets"))), "create use asset overlay")) return;
+  auto root = headless_player_root(fixture, *directory);
+  if (!fixture.check(bool(root), root ? "create private asset root" : root.error().what())) return;
+  PlayerWorldContext setup;
+  auto initialized = setup.init(**root);
+  if (!initialized) {
+    fixture.check(false, initialized.error().what());
+    return;
+  }
+  auto& player = *setup.player;
+  auto& movement = player.movement_controller();
+  ActorMovementParameters parameters;
+  parameters.gravity_enabled = false;
+  parameters.collision_enabled = false;
+  if (!fixture.check(bool(movement.update_base_parameters(parameters)), "configure movement")) return;
+  movement.set_position({1024, 1024});
+  player.aim(player.position());
+
+  auto target = std::make_shared<UseTarget>(**root, player, player.position());
+  if (!fixture.check(bool(setup.world->addEntity(target, 101)), "insert use target")) return;
+  auto remove = make_scope_exit([&] { fixture.check(bool(setup.world->removeEntity(target->entityId(), false)), "remove use target"); });
+
+  std::uint64_t step = 0;
+  auto tick = [&](unsigned deliveries, std::string_view failure = {},
+      std::source_location at = std::source_location::current()) {
+    auto result = player.update(1.0f / 60, ++step);
+    if (failure.empty()) {
+      if (!result)
+        return fixture.check(false, result.error().what(), at);
+    } else if (!fixture.check(!result && std::string_view(result.error().what()).contains(failure), failure, at)) {
+      return false;
+    }
+    return fixture.check(target->deliveries == deliveries, "interaction delivery count", at);
+  };
+
+  // A press from movement is too late for this tick, and holding it does not repeat.
+  target->press_during_movement = true;
+  if (!tick(0) || !tick(1)) return;
+  player.begin_trigger();
+  if (!tick(1)) return;
+
+  // Neither the retry nor the later press from the failed tick may be lost.
+  target->press();
+  target->press_during_movement = true;
+  target->fail_movement = true;
+  if (!tick(1, "before use dispatch") || !tick(2) || !tick(3) || !tick(3)) return;
+
+  // A failing handler has already received its press but can enqueue another one.
+  target->press();
+  target->press_during_interaction = true;
+  target->fail_interaction = true;
+  if (!tick(4, "after use dispatch") || !tick(5) || !tick(5)) return;
+
+  auto actions = player.pull_interact_actions();
+  if (!fixture.check(actions && actions->size() == 4, "four successful interactions returned exactly four actions")) return;
+  for (auto const& action : *actions)
+    fixture.check(action.type == InteractActionType::Message && action.entity_id == target->entityId()
+        && action.data == Json(player.entityId()), "action preserves source and target");
+});
+
+const GameTestRegistration quest_focus("PlayerQuestFocus", "RetainsPublishesAndSnapshotsHighlights", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  if (!fixture.check(bool(directory), "create private quest fixture directory")) return;
+  auto cleanup = make_scope_exit([&] { fixture.check(bool(File::remove_all(*directory)), "remove private quest fixture"); });
+  auto overlay = File::relative_to(*directory, "assets");
+  if (!fixture.check(bool(File::create_directory(overlay)), "create quest asset overlay")) return;
+  if (!fixture.check(bool(File::write_file(String(R"LUA(
+    function init()
+      message.setHandler("interestingObjects", function()
+        local mode = player.getProperty("zzFocusMode")
+        if mode == "clear" then return jarray() end
+        local template = quest.templateId()
+        if template == "zz-focus-peer" then return {"peer"} end
+        if template == "zz-focus-replacement" then return {"replacement"} end
+        if mode == "invalid" then return {"replacement", false} end
+        if mode == "repaired" then return {"replacement"} end
+        if mode == "replaceQuest" then
+          assert(player.startQuest({quests = {{
+            questId = quest.questId(), templateId = "zz-focus-replacement", parameters = jobject()
+          }}}) == "zz-focus-driver")
+        end
+        return {"original"}
+      end)
+    end
+  )LUA"), File::relative_to(overlay, "zz-focus.lua"))), "write quest message handler")) return;
+  for (auto const& id : {String("zz-focus-original"), String("zz-focus-peer"), String("zz-focus-replacement")}) {
+    auto config = Json(JsonObject{{"id", id}, {"script", "/zz-focus.lua"}, {"showAcceptDialog", false}}).print_json();
+    if (!fixture.check(config && File::write_file(*config, File::relative_to(overlay, id + ".questtemplate")),
+        "write quest template")) return;
+  }
+  auto root = headless_player_root(fixture, *directory);
+  if (!fixture.check(bool(root), root ? "create private asset root" : root.error().what())) return;
+  PlayerWorldContext setup;
+  auto initialized = setup.init(**root, Vec2F(1024, 1024));
+  if (!initialized) {
+    fixture.check(false, initialized.error().what());
+    return;
+  }
+  auto& player = *setup.player;
+  auto& movement = player.movement_controller();
+  ActorMovementParameters movement_parameters;
+  movement_parameters.gravity_enabled = false;
+  movement_parameters.collision_enabled = false;
+  if (!fixture.check(bool(movement.update_base_parameters(movement_parameters)), "configure stationary player")) return;
+  player.aim({1030, 1024});
+
+  auto item_database = (*root)->itemDatabase();
+  auto scanner_descriptor = ItemDescriptor::create("scanmode", 1, JsonObject{
+      {"requireLineOfSight", false}, {"inspectionAngles", JsonArray{3.2, 3.3}}});
+  if (!fixture.check(item_database && scanner_descriptor, "resolve scan tool descriptor")) return;
+  auto scanner = (*item_database)->item(*scanner_descriptor);
+  if (!fixture.check(scanner && *scanner, "create scan tool")) return;
+  auto inventory = player.inventory();
+  inventory->setEssentialItem(EssentialItem::InspectionTool, std::move(*scanner));
+  if (!fixture.check(bool(inventory->select_action_bar_location(EssentialItem::InspectionTool)), "select scan tool")) return;
+
+  auto object_database = (*root)->object_database();
+  if (!fixture.check(bool(object_database), "load object assets")) return;
+  constexpr std::array<std::string_view, 3> probe_names{"original", "replacement", "peer"};
+  std::array<std::shared_ptr<InspectableEntity>, probe_names.size()> probes;
+  std::array<EntityId, probe_names.size()> probe_ids{};
+  auto& world = *setup.world;
+  auto remove_probes = make_scope_exit([&] {
+    for (auto id : probe_ids)
+      if (id != null_entity_id)
+        fixture.check(bool(world.removeEntity(id, false)), "remove inspectable object");
+  });
+  Vec2I const first_probe(1027, 1024);
+  if (!fixture.check(bool(world.generateRegion(RectI::with_size(first_probe - Vec2I(4, 4), {17, 8}))),
+      "generate scan probe region")) return;
+  for (int x = -2; x <= 9; ++x) {
+    auto floor = world.modifyServerTile(first_probe + Vec2I(x, -1));
+    if (!fixture.check(floor && *floor, "load support tile under scan probe")) return;
+    (*floor)->get().foreground = structure_material_id;
+    (*floor)->get().update_collision(CollisionKind::Block);
+  }
+  for (std::size_t i = 0; i < probes.size(); ++i) {
+    auto object = (*object_database)->create_object("woodenchair", JsonObject{{"inspectionLogName", String(probe_names[i])}});
+    if (!fixture.check(object && *object && (*object)->set_tile_position(first_probe + Vec2I(3 * static_cast<int>(i), 0))
+        && world.addEntity(*object), "place inspectable object")) return;
+    probe_ids[i] = (*object)->entityId();
+    if (!fixture.check((*object)->inspectable(), "placed object is scannable")
+        || !fixture.check(!(*object)->spaces().empty(), "placed object has an anchored orientation")) return;
+    probes[i] = std::move(*object);
+  }
+
+  std::uint64_t step = 0;
+  auto warm = player.update(1.0f / 60, ++step);
+  if (!fixture.check(bool(warm), warm ? "equip the scanner" : warm.error().what())
+      || !fixture.check(player.inspecting() && player.canUseTool() && !player.lounging_in(),
+          "standing player can use the scanner")) return;
+  for (std::size_t i = 0; i < probes.size(); ++i) {
+    auto name = probes[i]->inspection_log_name();
+    if (!fixture.check(name && *name && **name == String(probe_names[i]), "scan probe has its authored log name")) return;
+    auto highlight = player.inspectionHighlight(probes[i]);
+    if (!fixture.check(bool(highlight), highlight ? "read baseline scan highlight" : highlight.error().what())
+        || !fixture.check(highlight->level > 0 && highlight->type == EntityHighlightEffectType::Inspectable,
+            std::format("baseline scan for {} has level {} and type {}", probe_names[i], highlight->level,
+                std::to_underlying(highlight->type)))) return;
+  }
+
+  auto manager = player.questManager();
+  auto offer = [&](String id, String template_id) -> std::expected<void, StarException> {
+    auto arc = QuestArcDescriptor::fromJson(**root, JsonObject{{"quests", JsonArray{JsonObject{
+        {"questId", std::move(id)}, {"templateId", std::move(template_id)}, {"parameters", JsonObject{}}}}}});
+    if (!arc)
+      return std::unexpected(std::move(arc.error()));
+    auto quest = Quest::create(**root, *arc, 0, player);
+    if (!quest)
+      return std::unexpected(std::move(quest.error()));
+    return manager->offer(*quest);
+  };
+  auto offered = offer("zz-focus-driver", "zz-focus-original").and_then([&] {
+    return offer("zz-focus-peer", "zz-focus-peer");
+  });
+  if (!offered) {
+    fixture.check(false, offered.error().what());
+    return;
+  }
+
+  auto check_tick = [&](String const& mode, std::array<bool, probe_names.size()> interesting, bool bad = false,
+      std::source_location at = std::source_location::current()) {
+    player.setGenericProperty("zzFocusMode", mode);
+    auto result = player.update(1.0f / 60, ++step);
+    if (bad) {
+      if (!fixture.check(!result && result.error().is<JsonException>(),
+          result ? "expected malformed quest focus to fail" : result.error().what(), at)) return false;
+    } else if (!fixture.check(bool(result), result ? "publish quest focus" : result.error().what(), at)) {
+      return false;
+    }
+    for (std::size_t i = 0; i < probes.size(); ++i) {
+      auto highlight = player.inspectionHighlight(probes[i]);
+      auto expected = interesting[i] ? EntityHighlightEffectType::Interesting : EntityHighlightEffectType::Inspectable;
+      if (!fixture.check(bool(highlight), highlight ? "read scan highlight" : highlight.error().what(), at)
+          || !fixture.check(highlight->level > 0 && highlight->type == expected,
+              std::format("{}: {} highlight type {}, expected {} (level {})", mode.utf8(), probe_names[i],
+                  std::to_underlying(highlight->type), std::to_underlying(expected), highlight->level), at))
+        return false;
+    }
+    return true;
+  };
+  if (!check_tick("initial", {true, false, true})
+      || !check_tick("invalid", {true, false, true}, true)
+      || !check_tick("repaired", {false, true, true})
+      || !check_tick("clear", {false, false, false})) return;
+
+  // The callback replaces its own quest while the pass holds the old quest.
+  // Its old result and the peer's result both land; the replacement waits a tick.
+  if (!check_tick("replaceQuest", {true, false, true})) return;
+  auto replacement = manager->getQuest("zz-focus-driver");
+  if (!fixture.check(replacement && (*replacement)->templateId() == "zz-focus-replacement", "Lua replaced the active quest")) return;
+  check_tick("replaceQuest", {false, true, true});
+});
+}
 
 const GameTestRegistration handheld_light_units(
   "LightSourceTest", "EquippedToolsKeepTheirAuthoredOffsetUnits", [](GameTest& fixture) {
@@ -319,6 +628,149 @@ const GameTestRegistration armor_retry("ArmorWearerTest", "BadLegacyCosmeticCanR
   if (!fixture.check(sender.setSecretProperty("armorWearer.cosmetic1.data", Json()) && sync(), "retry same revision")) return;
   fixture.check(read_slot() == nullptr, "corrected revision clears cosmetic");
 });
+
+const GameTestRegistration player_lounge_cosmetics(
+  "HumanoidRenderTest", "PlayerLoungeCosmeticsRestoreAndKeepEmitting", [](GameTest& fixture) {
+    auto directory = File::temporary_directory(fixture.root().random());
+    if (!fixture.check(bool(directory), "create an isolated lounge asset directory")) return;
+    auto cleanup = make_scope_exit([&] { fixture.check(bool(File::remove_all(*directory)), "remove lounge assets"); });
+    auto overlay = File::relative_to(*directory, "assets");
+    if (!fixture.check(bool(File::create_directory(overlay)), "create lounge asset overlay")) return;
+    // The headless WorldServer has no input callbacks for generic client scripts.
+    if (!fixture.check(bool(File::write_file(String(R"([
+          {"op":"replace","path":"/genericScriptContexts","value":{}}
+        ])"), File::relative_to(overlay, "player.config.patch"))), "exclude client scripts from lounge fixture")) return;
+    // The Protectorate tutorial automatically seats the player in the nearest chair.
+    auto quests = File::relative_to(overlay, "quests");
+    if (!fixture.check(bool(File::create_directory(quests))
+          && File::write_file(String(R"([
+            {"op":"replace","path":"/initialquests/human","value":[]}
+          ])"), File::relative_to(quests, "quests.config.patch")), "exclude the auto-seating tutorial")) return;
+    if (!fixture.check(bool(File::write_file(String(R"({
+          "kind":"player-lounge-probe",
+          "definition":{"duration":0.001,"particles":[["player-lounge-probe"]],
+                        "start":{"particles":[["player-lounge-probe"]]}}
+        })"), File::relative_to(overlay, "lounge.effectsource")))
+        && File::write_file(String(R"({
+          "kind":"player-lounge-probe","definition":{"type":"text","text":"player-lounge-probe"}
+        })"), File::relative_to(overlay, "lounge.particle")), "write a looping lounge effect")) return;
+    auto settings = fixture.rootSettings();
+    settings.assetSources.push_back(overlay);
+    settings.storageDirectory = File::relative_to(*directory, "storage");
+    settings.runtimeConfigFile = {};
+    settings.logDirectory = {};
+    settings.logFile = {};
+    settings.includeUGC = false;
+    auto root = Root::create(std::move(settings));
+    if (!fixture.check(bool(root), root ? "create lounge root" : root.error().what())) return;
+
+    Vec2I first_seat(1024, 1024);
+    PlayerWorldContext setup;
+    auto initialized = setup.init(**root, Vec2F(first_seat) + Vec2F(0, 2));
+    if (!fixture.check(bool(initialized), initialized ? "initialize player" : initialized.error().what())) return;
+    auto& player = *setup.player;
+    auto& world = *setup.world;
+    if (!fixture.check(bool(world.generateRegion(RectI::with_size(first_seat - Vec2I(4, 4), {24, 16}))),
+          "generate chair region")) return;
+    for (int x = -2; x <= 14; ++x) {
+      auto floor = world.modifyServerTile(first_seat + Vec2I(x, -1));
+      if (!fixture.check(floor && *floor, "load support tile under chair")) return;
+      (*floor)->get().foreground = structure_material_id;
+      (*floor)->get().update_collision(CollisionKind::Block);
+    }
+    auto items = (*root)->itemDatabase();
+    auto objects = (*root)->object_database();
+    if (!fixture.check(items && objects, "load armor and chair catalogs")) return;
+    String const inventory_marker = "lounge-inventory-head";
+    String const override_marker = "lounge-override-head";
+    auto descriptor = [](String const& marker) {
+      return ItemDescriptor::create("apextier1head", 1,
+        JsonObject{{"humanoidConfig", JsonObject{{"deathParticles", marker}}},
+                   {"hideInVanillaSlots", false}, {"bypassNude", true},
+                   {"effectSources", JsonArray{"player-lounge-probe"}}});
+    };
+    auto inventory_descriptor = descriptor(inventory_marker);
+    auto override_descriptor = descriptor(override_marker);
+    if (!fixture.check(inventory_descriptor && override_descriptor, "create cosmetic head descriptions")) return;
+    auto inventory_armor = (*items)->item(*inventory_descriptor);
+    if (!fixture.check(inventory_armor && *inventory_armor
+          && player.inventory()->setItem(EquipmentSlot::HeadCosmetic, *inventory_armor) == true,
+          "equip the inventory cosmetic")) return;
+
+    std::array<JsonObject, 4> overrides{{
+      {{"head", override_descriptor->to_json()}}, {}, {{"unrelated", false}}, {{"head", "apextier1chest"}}
+    }};
+    std::array<EntityId, overrides.size()> seats{};
+    auto remove_chairs = make_scope_exit([&] {
+      for (auto id : seats)
+        if (id != null_entity_id)
+          fixture.check(bool(world.removeEntity(id, false)), "remove test chair");
+    });
+    for (std::size_t i = 0; i != overrides.size(); ++i) {
+      auto chair = (*objects)->create_object("woodenchair", JsonObject{
+        {"sitArmorCosmeticOverrides", std::move(overrides[i])},
+        {"sitEffectEmitters", JsonArray{"player-lounge-probe"}},
+        {"sitStatusEffects", JsonArray{JsonObject{{"stat", "loungeProbe"}, {"amount", 2}}}}
+      });
+      if (!fixture.check(chair && *chair && (*chair)->set_tile_position(first_seat + Vec2I(4 * static_cast<int>(i), 0))
+            && world.addEntity(*chair), "place a real loungeable chair")) return;
+      seats[i] = (*chair)->entityId();
+    }
+
+    struct Events : NullRenderCallback {
+      unsigned particles = 0;
+      std::expected<void, StarException> add_particle(Particle&& particle) override {
+        if (particle.string == "player-lounge-probe")
+          ++particles;
+        return {};
+      }
+    } events;
+    if (!fixture.check(bool(player.collect_render_events(events)), "enable player effect collection")) return;
+    std::uint64_t step = 0;
+    auto tick = [&] {
+      events.particles = 0;
+      ++step;
+      auto updated = player.update(1.f / 60, step);
+      if (!fixture.check(bool(updated), updated ? "update player" : updated.error().what())) return false;
+      auto collected = player.collect_render_events(events);
+      return fixture.check(bool(collected), collected ? "collect player effects" : collected.error().what());
+    };
+    auto check_cosmetic = [&](std::string_view phase, EntityId seat, String const& marker) {
+      auto anchor = player.lounging_in();
+      EntityId actual_seat = anchor ? anchor->entityId : null_entity_id;
+      if (!fixture.check(actual_seat == seat, std::format("{}: expected seat {}, anchored to {}", phase, seat, actual_seat)))
+        return false;
+      auto equipped = player.inventory()->equipment(EquipmentSlot::HeadCosmetic);
+      auto presented = player.humanoid()->default_death_particles();
+      return fixture.check(equipped && equipped->descriptor() == (*inventory_armor)->descriptor(),
+               "lounge must not replace the inventory cosmetic")
+        && fixture.check(presented == marker,
+             std::format("{}: tick {}, seat {}: expected '{}', presented '{}'; seat stat={}, particles={}",
+               phase, step, actual_seat, marker.utf8(), presented.utf8(),
+               player.status_controller().stat("loungeProbe"), events.particles));
+    };
+    auto sit = [&](std::string_view phase, EntityId seat, String const& marker) {
+      if (!fixture.check(player.lounge(seat, 0) == true, "enter or switch to chair")) return false;
+      for (unsigned i = 0; i != 2; ++i)
+        if (!tick() || !check_cosmetic(phase, seat, marker)
+            || !fixture.check(player.status_controller().stat("loungeProbe") == 2.f && events.particles == 2,
+              "submit seat and armor effects on every lounge tick")) return false;
+      return true;
+    };
+
+    if (!fixture.check(!player.lounging_in(), "begin standing before any gameplay tick")) return;
+    if (!tick() || !check_cosmetic("standing", null_entity_id, inventory_marker)
+        || !fixture.check(events.particles == 1, "emit equipped armor effect while standing")) return;
+    constexpr std::array<std::string_view, 3> switch_phases{"switch to empty", "switch to unknown", "switch to incompatible"};
+    for (std::size_t i = 0; i != switch_phases.size(); ++i)
+      if (!sit("override", seats.front(), override_marker) || !sit(switch_phases[i], seats[i + 1], inventory_marker)) return;
+    if (!sit("override before leaving", seats.front(), override_marker)
+        || !fixture.check(bool(player.stopLounging()), "leave the override chair")
+        || !tick() || !check_cosmetic("leave override", null_entity_id, inventory_marker)
+        || !fixture.check(player.status_controller().stat("loungeProbe") == 0.f, "clear persistent lounge status on leave")
+        || !tick() || !tick()) return;
+    fixture.check(events.particles == 1, "retire the seat emitter while keeping the restored armor emitter");
+  });
 
 const GameTestRegistration armor_visibility_transitions(
   "ArmorWearerTest", "CosmeticBoundsMaskingNudityAndConfigRetry", [](GameTest& fixture) {

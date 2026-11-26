@@ -230,36 +230,46 @@ std::expected<void, StarException> TechController::uninit() {
   return {};
 }
 
-std::expected<void, StarException> TechController::setLoadedTech(StringList const& techModules, bool forceLoad) {
-  if (forceLoad || loadedTech() != techModules) {
-    auto setup = setupTechModules(techModules.transformed([](String const& module) { return std::make_tuple(module, JsonObject()); }));
-    if (!setup)
-      return std::unexpected(std::move(setup.error()));
-    if (m_parentEntity)
-      return initializeModules();
-  }
+std::expected<void, StarException> TechController::sync_equipped_tech(HashMap<TechType, String> const& equipped) {
+  if (m_overriddenTech)
+    return {};
+  auto names = equipped.value_view();
+  if (!m_tech_sync_pending && std::ranges::equal(names, m_techModules, {}, std::identity{},
+      [](TechModule const& module) -> String const& { return module.config.name; }))
+    return {};
+  return load_tech_names(names);
+}
+
+template <std::ranges::input_range Names>
+std::expected<void, StarException> TechController::load_tech_names(Names&& names) {
+  List<std::tuple<String, JsonObject>> module_inits;
+  if constexpr (std::ranges::sized_range<Names>)
+    module_inits.reserve(std::ranges::size(names));
+  for (auto const& name : names)
+    module_inits.emplace_back(name, JsonObject{});
+  if (auto setup = setupTechModules(module_inits); !setup)
+    return std::unexpected(std::move(setup.error()));
+  if (m_parentEntity)
+    return initializeModules();
   return {};
 }
 
-StringList TechController::loadedTech() const {
-  return transform<StringList>(m_techModules, [](TechModule const& tm) { return tm.config.name; });
-}
-
-std::expected<void, StarException> TechController::reloadTech() {
-  return setLoadedTech(loadedTech(), true);
+std::expected<void, StarException> TechController::reload_tech() {
+  return load_tech_names(std::as_const(m_techModules) | std::views::transform(
+      [](TechModule const& module) -> String const& { return module.config.name; }));
 }
 
 bool TechController::techOverridden() const { return static_cast<bool>(m_overriddenTech); }
 
 std::expected<void, StarException> TechController::setOverrideTech(StringList const& techModules) {
   if (!m_overriddenTech)
-    m_overriddenTech = loadedTech();
-  return setLoadedTech(techModules, true);
+    m_overriddenTech = transform<StringList>(m_techModules, [](TechModule const& module) { return module.config.name; });
+  return load_tech_names(techModules);
 }
 
 std::expected<void, StarException> TechController::clearOverrideTech() {
   if (m_overriddenTech) {
-    auto loaded = setLoadedTech(*m_overriddenTech, true);
+    auto loaded = load_tech_names(*m_overriddenTech);
     if (!loaded)
       return std::unexpected(std::move(loaded.error()));
     m_overriddenTech = {};
@@ -570,6 +580,7 @@ bool TechController::TechAnimator::isVisible() const {
 }
 
 std::expected<void, StarException> TechController::setupTechModules(List<std::tuple<String, JsonObject>> const& moduleInits) {
+  m_tech_sync_pending = true;
   std::optional<StarException> unloadError;
   for (auto& module : m_techModules) {
     auto unloaded = unloadModule(module);
@@ -625,6 +636,7 @@ std::expected<void, StarException> TechController::setupTechModules(List<std::tu
       return std::unexpected(std::move(added.error()));
     module.animatorId = *added;
   }
+  m_tech_sync_pending = false;
   return {};
 }
 
@@ -648,6 +660,7 @@ std::expected<void, StarException> TechController::unloadModule(TechModule& modu
 }
 
 std::expected<void, StarException> TechController::initializeModules() {
+  m_tech_sync_pending = true;
   auto initialized = [&]() -> std::expected<void, StarException> {
     for (auto& module : m_techModules) {
       auto add = [&](String name, std::expected<LuaCallbacks, StarException> callbacks) -> std::expected<void, StarException> {
@@ -692,6 +705,7 @@ std::expected<void, StarException> TechController::initializeModules() {
     }
     return std::unexpected(std::move(error));
   }
+  m_tech_sync_pending = false;
   return {};
 }
 

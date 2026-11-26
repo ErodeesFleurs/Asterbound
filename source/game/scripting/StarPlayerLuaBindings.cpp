@@ -1549,16 +1549,16 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makePlayerCallbacks(Root
   }); !registered)
     return std::unexpected(std::move(registered.error()));
 
-  if (auto registered = callbacks.register_callback("radioMessage", [&player](Json const& messageConfig, std::optional<float> const& delay) -> std::expected<void, StarException> {
-    return player.queueRadioMessage(messageConfig, delay.value_or(0));
+  if (auto registered = callbacks.register_callback("radioMessage", [&player](Json const& message_config, std::optional<float> const& delay) -> std::expected<void, StarException> {
+    return player.queue_radio_message(message_config, delay.value_or(0));
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("interruptRadioMessage", [&player]() {
-    return player.interruptRadioMessage();
+    return player.interrupt_radio_message();
   }); !registered)
     return std::unexpected(std::move(registered.error()));
   if (auto registered = callbacks.register_callback("pullPendingRadioMessage", [&player]() -> std::expected<std::optional<Json>, StarException> {
-    auto pending = player.pullPendingRadioMessage();
+    auto pending = player.pull_pending_radio_message();
     if (!pending) return std::unexpected(std::move(pending.error()));
     if (!*pending) return std::optional<Json>{};
     auto const& message = **pending;

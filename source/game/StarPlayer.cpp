@@ -240,22 +240,38 @@ namespace Star {
 
 namespace {
 
-template <std::derived_from<ArmorItem> Armor>
-std::expected<void, StarException> apply_lounge_cosmetic_override(
-    JsonObject const& overrides, String const& key, EquipmentSlot slot, ItemDatabase const& item_database,
-    ArmorWearer& armor) {
-  auto override_json = overrides.maybe(key);
-  if (!override_json)
+std::expected<void, StarException> apply_lounge_cosmetic_overrides(
+    Root& root, JsonObject const& overrides, ArmorWearer& armor) {
+  std::shared_ptr<ItemDatabase const> item_database;
+  auto apply = [&]<std::derived_from<ArmorItem> Armor>(
+      std::string_view key, EquipmentSlot slot) -> std::expected<void, StarException> {
+    auto entry = overrides.find(key);
+    if (entry == overrides.end())
+      return {};
+    if (!item_database) {
+      auto acquired = root.itemDatabase();
+      if (!acquired)
+        return std::unexpected(std::move(acquired.error()));
+      item_database = std::move(*acquired);
+    }
+    auto descriptor = ItemDescriptor::create(entry->second);
+    if (!descriptor)
+      return std::unexpected(std::move(descriptor.error()));
+    auto item = item_database->item(std::move(*descriptor));
+    if (!item)
+      return std::unexpected(std::move(item.error()));
+    if (PlayerInventory::itemAllowedAsEquipment(*item, slot))
+      armor.set_item(static_cast<std::uint8_t>(slot), as<Armor>(std::move(*item)));
     return {};
-  auto descriptor = ItemDescriptor::create(*override_json);
-  if (!descriptor)
-    return std::unexpected(std::move(descriptor.error()));
-  auto item = item_database.item(std::move(*descriptor));
-  if (!item)
-    return std::unexpected(std::move(item.error()));
-  if (PlayerInventory::itemAllowedAsEquipment(*item, slot))
-    armor.set_item(static_cast<std::uint8_t>(slot), as<Armor>(std::move(*item)));
-  return {};
+  };
+
+  if (auto result = apply.operator()<HeadArmor>("head", EquipmentSlot::HeadCosmetic); !result)
+    return result;
+  if (auto result = apply.operator()<ChestArmor>("chest", EquipmentSlot::ChestCosmetic); !result)
+    return result;
+  if (auto result = apply.operator()<LegsArmor>("legs", EquipmentSlot::LegsCosmetic); !result)
+    return result;
+  return apply.operator()<BackArmor>("back", EquipmentSlot::BackCosmetic);
 }
 
 }
@@ -391,8 +407,6 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   if (auto result = setModeType(PlayerMode::Casual); !result)
     return std::unexpected(std::move(result.error()));
 
-  m_useDown = false;
-  m_edgeTriggeredUse = false;
   setTeam(EntityDamageTeam(TeamType::Friendly));
 
   auto footstepVolumeVarianceJsonResult = assets->json("/sfx.config:footstepVolumeVariance");
@@ -479,7 +493,7 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   m_chat_message_changed = false;
   m_chat_message_updated = false;
 
-  m_interruptRadioMessage = false;
+  m_interrupt_radio_message = false;
 
   auto songbookResult = Songbook::create(root(), species());
   if (!songbookResult)
@@ -1039,7 +1053,7 @@ std::expected<void, StarException> Player::init(World& world, EntityId entityId,
       return std::unexpected(std::move(result.error()));
     if (auto result = m_deployment->init(*this, world); !result)
       return std::unexpected(std::move(result.error()));
-    m_missionRadioMessages.clear();
+    m_mission_radio_messages.clear();
     if (auto result = m_statusController->setPersistentEffects("species", speciesDefinition->statusEffects()); !result)
       return std::unexpected(std::move(result.error()));
     for (auto&& p : m_genericScriptContexts) {
@@ -1609,7 +1623,7 @@ std::expected<void, StarException> Player::revive(Vec2F const& footPosition) {
     return std::unexpected(std::move(result.error()));
   endPrimaryFire();
   endAltFire();
-  endTrigger();
+  end_trigger();
   m_effectEmitter->reset();
   auto offsetResult = feetOffset();
   if (!offsetResult)
@@ -1618,7 +1632,7 @@ std::expected<void, StarException> Player::revive(Vec2F const& footPosition) {
   resetPresentation();
   m_movement_controller->set_position(footPosition - offset);
   m_movement_controller->set_velocity(Vec2F());
-  if (auto result = m_techController->reloadTech(); !result)
+  if (auto result = m_techController->reload_tech(); !result)
     return std::unexpected(std::move(result.error()));
   float moneyCost = m_inventory->currency("money") * m_modeConfig.reviveCostPercentile;
   m_inventory->consumeCurrency(
@@ -1868,7 +1882,7 @@ MessageResponseResult Player::receive_message(ConnectionId from_connection, Stri
     auto action = std::move(*action_result);
     setPendingWarp(action, animation, deploy);
   } else if (message == "interruptRadioMessage") {
-    m_interruptRadioMessage = true;
+    m_interrupt_radio_message = true;
   } else if (auto presentation = presentation_message(message)) {
     auto checked = process_presentation_message(root(), *presentation, args, std::ref(*this));
     if (!checked)
@@ -1998,7 +2012,10 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
           return std::unexpected(std::move(result.error()));
       }
 
-      bool edgeTriggeredUse = std::exchange(m_edgeTriggeredUse, false);
+      // Keep the existing input cutoff. A failed eligible edge retries before
+      // a newer press queued by a callback after this point.
+      if (!m_use_edge_ready)
+        m_use_edge_ready = std::exchange(m_use_edge_pending, false);
 
       {
         if (auto result = m_inventory->cleanup(); !result)
@@ -2020,34 +2037,27 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
         }
 
       if (m_state == State::Lounge) {
-        if (auto loungeAnchor = as<LoungeAnchor>(m_movement_controller->entity_anchor())) {
+        if (auto lounge_anchor = as<LoungeAnchor>(m_movement_controller->entity_anchor())) {
           {
-            if (auto result = m_statusController->setPersistentEffects("lounging", loungeAnchor->statusEffects); !result)
+            if (auto result = m_statusController->setPersistentEffects("lounging", lounge_anchor->statusEffects); !result)
               return std::unexpected(std::move(result.error()));
           }
           {
-            if (auto result = add_effect_emitters(loungeAnchor->effectEmitters); !result)
+            if (auto result = add_effect_emitters(lounge_anchor->effectEmitters); !result)
               return std::unexpected(std::move(result.error()));
           }
-          if (loungeAnchor->emote)
+          if (lounge_anchor->emote)
             {
-              if (auto result = request_emote(*loungeAnchor->emote); !result)
+              if (auto result = request_emote(*lounge_anchor->emote); !result)
                 return std::unexpected(std::move(result.error()));
             }
 
-          auto itemDatabaseResult = root().itemDatabase();
-          if (!itemDatabaseResult)
-            return std::unexpected(std::move(itemDatabaseResult.error()));
-          auto itemDatabase = std::move(*itemDatabaseResult);
-          auto const& overrides = loungeAnchor->armorCosmeticOverrides;
-          if (auto result = apply_lounge_cosmetic_override<HeadArmor>(overrides, "head", EquipmentSlot::HeadCosmetic, *itemDatabase, *m_armor); !result)
-            return std::unexpected(std::move(result.error()));
-          if (auto result = apply_lounge_cosmetic_override<ChestArmor>(overrides, "chest", EquipmentSlot::ChestCosmetic, *itemDatabase, *m_armor); !result)
-            return std::unexpected(std::move(result.error()));
-          if (auto result = apply_lounge_cosmetic_override<LegsArmor>(overrides, "legs", EquipmentSlot::LegsCosmetic, *itemDatabase, *m_armor); !result)
-            return std::unexpected(std::move(result.error()));
-          if (auto result = apply_lounge_cosmetic_override<BackArmor>(overrides, "back", EquipmentSlot::BackCosmetic, *itemDatabase, *m_armor); !result)
-            return std::unexpected(std::move(result.error()));
+          // Equipment refresh has already restored inventory cosmetics for this tick.
+          auto const& overrides = lounge_anchor->armorCosmeticOverrides;
+          if (!overrides.empty()) {
+            if (auto result = apply_lounge_cosmetic_overrides(root(), overrides, *m_armor); !result)
+              return std::unexpected(std::move(result.error()));
+          }
         } else {
           m_state = State::Idle;
           {
@@ -2094,33 +2104,31 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
           return std::unexpected(std::move(result.error()));
       }
 
-      if (edgeTriggeredUse) {
+      if (m_use_edge_ready) {
         auto anchor = as<LoungeAnchor>(m_movement_controller->entity_anchor());
-        bool useTool = canUseTool();
-        if (anchor && (!useTool || anchor->controllable))
+        bool can_use_tool = canUseTool();
+        if (anchor && (!can_use_tool || anchor->controllable))
           {
             if (auto result = m_movement_controller->reset_anchor_state(); !result)
               return std::unexpected(std::move(result.error()));
           }
-        else if (useTool) {
+        else if (can_use_tool) {
           auto target = bestInteractionEntity(true);
           if (!target)
             return std::unexpected(std::move(target.error()));
           if (*target) {
-            if (auto result = interact_with_entity(std::move(*target)); !result)
+            if (auto result = dispatch_use_interaction(*target); !result)
               return std::unexpected(std::move(result.error()));
           }
         }
+        m_use_edge_ready = false;
       }
 
       if (auto result = synchronize_equipment_status_effects(*m_armor, *m_tools, *m_statusController); !result)
         return std::unexpected(std::move(result.error()));
 
-      if (!m_techController->techOverridden())
-        {
-          if (auto result = m_techController->setLoadedTech(m_techs->equippedTechs().values()); !result)
-            return std::unexpected(std::move(result.error()));
-        }
+      if (auto result = m_techController->sync_equipped_tech(m_techs->equippedTechs()); !result)
+        return std::unexpected(std::move(result.error()));
 
       if (!isDead())
         {
@@ -2151,14 +2159,20 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
         }
       }
 
-      for (auto& pair : m_delayed_radio_messages) {
-        if (pair.first.tick(dt))
-          {
-            if (auto result = queueRadioMessage(pair.second); !result)
-              return std::unexpected(std::move(result.error()));
-          }
+      auto retained = m_delayed_radio_messages.begin();
+      auto const end = m_delayed_radio_messages.end();
+      for (auto entry = retained; entry != end; ++entry) {
+        auto& [timer, message] = *entry;
+        if (timer.tick(dt)) {
+          enqueue_radio_message(std::move(message));
+        } else {
+          if (retained != entry)
+            *retained = std::move(*entry);
+          ++retained;
+        }
       }
-      m_delayed_radio_messages.filter([](std::pair<GameTimer, RadioMessage>& pair) { return !pair.first.ready(); });
+      if (retained != end)
+        m_delayed_radio_messages.erase(retained, end);
     }
 
     if (m_isAdmin) {
@@ -2218,11 +2232,10 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
       }
     }
 
-    auto interestingObjectsResult = m_questManager->interestingObjects();
-    if (!interestingObjectsResult)
-      return std::unexpected(std::move(interestingObjectsResult.error()));
-    auto interestingObjects = std::move(*interestingObjectsResult);
-    m_interestingObjects = std::move(interestingObjects);
+    auto interesting_objects = m_questManager->interesting_objects();
+    if (!interesting_objects)
+      return std::unexpected(std::move(interesting_objects.error()));
+    m_interesting_objects = std::move(*interesting_objects);
 
   } else {
     {
@@ -2776,11 +2789,11 @@ std::expected<void, StarException> Player::triggerPickupEvents(std::shared_ptr<I
         if (!delayResult)
           return std::unexpected(std::move(delayResult.error()));
         auto delay = std::move(*delayResult);
-        if (auto result = queueRadioMessage(parts[0], delay); !result)
+        if (auto result = queue_radio_message(parts[0], delay); !result)
           return std::unexpected(std::move(result.error()));
       }
     } else {
-      if (auto result = queueRadioMessage(message); !result)
+      if (auto result = queue_radio_message(message); !result)
         return std::unexpected(std::move(result.error()));
     }
   }
@@ -2879,7 +2892,7 @@ std::expected<void, StarException> Player::clearSwap() {
   }
   endPrimaryFire();
   endAltFire();
-  endTrigger();
+  end_trigger();
   return {};
 }
 
@@ -3107,9 +3120,11 @@ std::expected<std::shared_ptr<InteractiveEntity>, StarException> Player::bestInt
   return reachable ? entity : std::shared_ptr<InteractiveEntity>{};
 }
 
-std::expected<void, StarException> Player::interact_with_entity(std::shared_ptr<InteractiveEntity> entity) {
+std::expected<void, StarException> Player::dispatch_use_interaction(std::shared_ptr<InteractiveEntity> const& entity) {
   bool quest_intercepted = false;
   for (auto const& quest : m_questManager->listActiveQuests()) {
+    // A quest can act even if its interaction hook declines or returns an error.
+    m_use_edge_ready = false;
     auto intercepted = quest->interactWithEntity(entity->entityId());
     if (!intercepted)
       return std::unexpected(std::move(intercepted.error()));
@@ -3129,6 +3144,7 @@ std::expected<void, StarException> Player::interact_with_entity(std::shared_ptr<
         return std::unexpected(std::move(quest.error()));
       if (auto result = (*quest)->setEntityParameter("questReceiver", entity); !result)
         return std::unexpected(std::move(result.error()));
+      m_use_edge_ready = false;
       if (auto result = (*quest)->complete(); !result)
         return std::unexpected(std::move(result.error()));
       any_turned_in = true;
@@ -3151,12 +3167,15 @@ std::expected<void, StarException> Player::interact_with_entity(std::shared_ptr<
       (*quest)->setServerUuid(client_context()->server_uuid());
       if (auto result = (*quest)->setEntityParameter("questGiver", entity); !result)
         return std::unexpected(std::move(result.error()));
+      m_use_edge_ready = false;
       return m_questManager->offer(*quest);
     }
   }
   auto current_world = world();
   if (!current_world)
     return std::unexpected(std::move(current_world.error()));
+  // The world may deliver synchronously and return a handler error afterward.
+  m_use_edge_ready = false;
   auto action = current_world->get().interact(InteractRequest{entityId(), position(), entity->entityId(), m_aimPosition});
   if (!action)
     return std::unexpected(std::move(action.error()));
@@ -3235,14 +3254,14 @@ void Player::endAltFire() {
   m_tools->endAltFire();
 }
 
-void Player::beginTrigger() {
-  if (!m_useDown)
-    m_edgeTriggeredUse = true;
-  m_useDown = true;
+void Player::begin_trigger() {
+  if (!m_use_down)
+    m_use_edge_pending = true;
+  m_use_down = true;
 }
 
-void Player::endTrigger() {
-  m_useDown = false;
+void Player::end_trigger() {
+  m_use_down = false;
 }
 
 std::expected<float, StarException> Player::toolRadius() const {
@@ -4810,29 +4829,23 @@ bool Player::isPermaDead() const {
   return m_modeConfig.permadeath;
 }
 
-bool Player::interruptRadioMessage() {
-  if (m_interruptRadioMessage) {
-    m_interruptRadioMessage = false;
-    return true;
-  }
-  return false;
+bool Player::interrupt_radio_message() {
+  return std::exchange(m_interrupt_radio_message, false);
 }
 
-std::expected<std::optional<RadioMessage>, StarException> Player::pullPendingRadioMessage() {
-  if (m_pendingRadioMessages.empty())
+std::expected<std::optional<RadioMessage>, StarException> Player::pull_pending_radio_message() {
+  if (m_pending_radio_messages.empty())
     return std::optional<RadioMessage>{};
-  auto const& first = m_pendingRadioMessages[0];
+  auto& first = m_pending_radio_messages.front();
   if (first.unique)
-    m_log->addRadioMessage(first.messageId);
-  auto messageResult = m_pendingRadioMessages.take_front();
-  if (!messageResult)
-    return std::unexpected(std::move(messageResult.error()));
-  auto message = std::move(*messageResult);
-  return std::optional<RadioMessage>{std::move(message)};
+    m_log->add_radio_message(first.messageId);
+  std::expected<std::optional<RadioMessage>, StarException> message(std::in_place, std::in_place, std::move(first));
+  m_pending_radio_messages.pop_front();
+  return message;
 }
 
-std::expected<void, StarException> Player::queueRadioMessage(Json const& messageConfig, float delay) {
-  auto checked = process_radio_message(messageConfig, delay);
+std::expected<void, StarException> Player::queue_radio_message(Json const& message_config, float delay) {
+  auto checked = process_radio_message(message_config, delay);
   if (!checked)
     return std::unexpected(std::move(checked.error()));
   if (*checked)
@@ -4847,9 +4860,18 @@ std::expected<std::optional<String>, StarException> Player::process_radio_messag
   auto decoded = (*database)->createRadioMessage(config);
   if (!decoded)
     return Star::format("invalid radio message: {}", decoded.error().what());
-  auto& message = *decoded;
-  while (message.speciesAiMessage.contains(shipSpecies()) || message.speciesMessage.contains(species()))
-    message = message.speciesAiMessage.value(shipSpecies(), message.speciesMessage.value(species()));
+  // Keep the decoded tree alive until the selected payload has been queued.
+  // Assigning a parent from one of its own descendants would invalidate the source.
+  auto selected = std::ref(*decoded);
+  for (;;) {
+    auto variant = selected.get().speciesAiMessage.find_ref(m_shipSpecies);
+    if (!variant)
+      variant = selected.get().speciesMessage.find_ref(m_identity.species);
+    if (!variant)
+      break;
+    selected = *variant;
+  }
+  auto& message = selected.get();
   if (message.type == RadioMessageType::Tutorial) {
     auto configuration = root().configuration();
     if (!configuration)
@@ -4868,47 +4890,42 @@ std::expected<std::optional<String>, StarException> Player::process_radio_messag
       auto ai = root().ai_database();
       if (!ai)
         return std::unexpected(std::move(ai.error()));
-      auto portrait = (*ai)->portrait_image(shipSpecies(), message.portraitImage);
+      auto portrait = (*ai)->portrait_image(m_shipSpecies, message.portraitImage);
       if (!portrait)
         return std::unexpected(std::move(portrait.error()));
       message.portraitImage = std::move(*portrait);
     }
   }
-  if (m_log->radioMessages().contains(message.messageId))
+  if (m_log->has_radio_message(message.messageId))
     return {};
-  if (message.type == RadioMessageType::Mission) {
-    if (m_missionRadioMessages.contains(message.messageId))
-      return {};
-    m_missionRadioMessages.add(message.messageId);
-  }
-  for (auto const& pending : m_pendingRadioMessages) {
+  // A mission accepts one request per world, including when the first is delayed.
+  if (message.type == RadioMessageType::Mission && !m_mission_radio_messages.add(message.messageId))
+    return {};
+  for (auto const& pending : m_pending_radio_messages) {
     if (pending.messageId == message.messageId)
       return {};
   }
-  for (auto& delayed : m_delayed_radio_messages) {
-    if (delayed.second.messageId == message.messageId) {
+  for (auto& [timer, delayed] : m_delayed_radio_messages) {
+    if (delayed.messageId == message.messageId) {
       if (delay == 0)
-        delayed.first.set_done();
+        timer.set_done();
       return {};
     }
   }
-  if (delay > 0) {
-    m_delayed_radio_messages.push_back(std::pair<GameTimer, RadioMessage>{GameTimer(delay), std::move(message)});
-    return {};
-  }
-  if (auto queued = queueRadioMessage(std::move(message)); !queued)
-    return std::unexpected(std::move(queued.error()));
+  if (delay > 0)
+    m_delayed_radio_messages.emplace_back(GameTimer(delay), std::move(message));
+  else
+    enqueue_radio_message(std::move(message));
   return {};
 }
 
-std::expected<void, StarException> Player::queueRadioMessage(RadioMessage message) {
+void Player::enqueue_radio_message(RadioMessage&& message) {
   if (message.important) {
-    m_interruptRadioMessage = true;
-    m_pendingRadioMessages.push_front(message);
+    m_interrupt_radio_message = true;
+    m_pending_radio_messages.push_front(std::move(message));
   } else {
-    m_pendingRadioMessages.push_back(message);
+    m_pending_radio_messages.push_back(std::move(message));
   }
-  return {};
 }
 
 std::expected<std::optional<Json>, StarException> Player::pullPendingCinematic() {
@@ -5004,7 +5021,7 @@ std::expected<EntityHighlightEffect, StarException> Player::inspectionHighlight(
   auto level = std::move(*levelResult);
   result.level = level;
   if (result.level > 0) {
-    if (m_interestingObjects.contains(*name))
+    if (m_interesting_objects.contains(*name))
       result.type = EntityHighlightEffectType::Interesting;
     else if (m_log->scannedObjects().contains(*name))
       result.type = EntityHighlightEffectType::Inspected;

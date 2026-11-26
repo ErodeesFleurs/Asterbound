@@ -352,6 +352,14 @@ editing one edge or its nested nodes must not mutate another edge, a later
 result, or the native path. A node without velocity is distinct from one
 with velocity `{0, 0}`.
 
+### Player quest highlights
+
+The master player asks quests for `interestingObjects` each update. The quest
+list is snapshotted before the first script runs: changing the active quests
+inside a handler does not invalidate that traversal. Object names from all
+responses are merged into a new set. A malformed response leaves the last
+published highlights intact; a successful empty result clears them.
+
 ### Shutdown order
 
 Shutdown stops audio callbacks and client services first, releases SDK/GL owners

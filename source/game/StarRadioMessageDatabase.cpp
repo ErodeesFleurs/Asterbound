@@ -152,16 +152,17 @@ std::expected<RadioMessage, StarException> RadioMessageDatabase::createRadioMess
   auto merger = withoutAi->erase("speciesMessage");
   if (!merger)
     return std::unexpected(std::move(merger.error()));
-  for (auto const& key : std::initializer_list<String>{"speciesAiMessage", "speciesMessage"}) {
-    auto variants =
-      mergedConfig.get(key, JsonObject()).and_then([](Json const& value) { return value.iterate_object(); });
+  for (auto const& [key, overrides] : {
+           std::pair{std::string_view{"speciesAiMessage"}, std::ref(message.speciesAiMessage)},
+           std::pair{std::string_view{"speciesMessage"}, std::ref(message.speciesMessage)}}) {
+    auto variants = mergedConfig.get(key, JsonObject()).and_then([](Json const& value) { return value.iterate_object(); });
     if (!variants)
       return std::unexpected(std::move(variants.error()));
     for (auto const& pair : *variants) {
       auto nested = createRadioMessage(json_merge(*merger, pair.second), messageId);
       if (!nested)
         return std::unexpected(std::move(nested.error()));
-      message.speciesMessage[pair.first] = std::move(*nested);
+      overrides.get().try_emplace(pair.first, std::move(*nested));
     }
   }
   if (message.portraitFrames <= 0)

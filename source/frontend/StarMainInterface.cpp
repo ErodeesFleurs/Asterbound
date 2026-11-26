@@ -1309,7 +1309,7 @@ std::expected<bool, StarException> MainInterface::handleInputEvent(InputEvent co
     if (button == MouseButton::Right)
       player->beginAltFire();
     if (button == MouseButton::Middle)
-      player->beginTrigger();
+      player->begin_trigger();
   } else if (std::holds_alternative<MouseButtonUpEvent>(event)) {
     auto const& mouseUp = std::get<MouseButtonUpEvent>(event);
     if (mouseUp.mouse_button == MouseButton::Left)
@@ -1317,7 +1317,7 @@ std::expected<bool, StarException> MainInterface::handleInputEvent(InputEvent co
     if (mouseUp.mouse_button == MouseButton::Right)
       player->endAltFire();
     if (mouseUp.mouse_button == MouseButton::Middle)
-      player->endTrigger();
+      player->end_trigger();
   }
   bool captured = false;
   for (auto&& pair : m_canvases) {

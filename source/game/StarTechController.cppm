@@ -80,9 +80,8 @@ public:
   [[nodiscard]] std::expected<void, StarException> init(Entity& parentEntity, ActorMovementController& movementController, StatusController& statusController);
   [[nodiscard]] std::expected<void, StarException> uninit();
 
-  [[nodiscard]] std::expected<void, StarException> setLoadedTech(StringList const& techModules, bool forceLoad = false);
-  StringList loadedTech() const;
-  [[nodiscard]] std::expected<void, StarException> reloadTech();
+  [[nodiscard]] std::expected<void, StarException> sync_equipped_tech(HashMap<TechType, String> const& equipped);
+  [[nodiscard]] std::expected<void, StarException> reload_tech();
 
   bool techOverridden() const;
   [[nodiscard]] std::expected<void, StarException> setOverrideTech(StringList const& techModules);
@@ -171,6 +170,9 @@ private:
     TechAnimatorGroup::ElementId animatorId;
   };
 
+  template <std::ranges::input_range Names>
+  [[nodiscard]] std::expected<void, StarException> load_tech_names(Names&& names);
+
   // Name of module, any existing module script data.
   [[nodiscard]] std::expected<void, StarException> setupTechModules(List<std::tuple<String, JsonObject>> const& moduleInits);
 
@@ -184,6 +186,7 @@ private:
   [[nodiscard]] std::expected<LuaCallbacks, StarException> makeTechCallbacks(TechModule& techModule);
 
   std::optional<StringList> m_overriddenTech;
+  bool m_tech_sync_pending = false;
   LinkedList<TechModule> m_techModules;
   TechAnimatorGroup m_techAnimators;
 

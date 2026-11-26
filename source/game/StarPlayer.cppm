@@ -356,7 +356,6 @@ public:
   std::shared_ptr<PlayerLog> log() const;
 
   [[nodiscard]] std::expected<std::shared_ptr<InteractiveEntity>, StarException> bestInteractionEntity(bool includeNearby);
-  [[nodiscard]] std::expected<void, StarException> interact_with_entity(std::shared_ptr<InteractiveEntity> entity);
 
   // Aim this player's target at the given world position.
   void aim(Vec2F const& position);
@@ -389,8 +388,8 @@ public:
   void endAltFire();
 
   // Triggered whenever the use key is pressed
-  void beginTrigger();
-  void endTrigger();
+  void begin_trigger();
+  void end_trigger();
 
   std::shared_ptr<Item> primaryHandItem() const;
   std::shared_ptr<Item> altHandItem() const;
@@ -555,10 +554,9 @@ public:
 
   bool isPermaDead() const;
 
-  bool interruptRadioMessage();
-  [[nodiscard]] std::expected<std::optional<RadioMessage>, StarException> pullPendingRadioMessage();
-  [[nodiscard]] std::expected<void, StarException> queueRadioMessage(Json const& messageConfig, float delay = 0);
-  [[nodiscard]] std::expected<void, StarException> queueRadioMessage(RadioMessage message);
+  bool interrupt_radio_message();
+  [[nodiscard]] std::expected<std::optional<RadioMessage>, StarException> pull_pending_radio_message();
+  [[nodiscard]] std::expected<void, StarException> queue_radio_message(Json const& message_config, float delay = 0);
 
   // If a cinematic should play, returns it and clears it.  May stop cinematics
   // by returning a null Json.
@@ -629,6 +627,7 @@ public:
 private:
   explicit Player(Root& root);
   [[nodiscard]] std::expected<std::optional<String>, StarException> process_radio_message(Json const& config, float delay);
+  void enqueue_radio_message(RadioMessage&& message);
   [[nodiscard]] std::expected<void, StarException> initialize(std::shared_ptr<PlayerConfig> config, Uuid uuid);
   [[nodiscard]] std::expected<void, StarException> net_load(ByteArray const& store, NetCompatibilityRules rules);
   [[nodiscard]] std::expected<void, StarException> install_humanoid();
@@ -636,6 +635,7 @@ private:
 
   // handle input and other events (master only) that happen BEFORE movement/tech controller updates
   [[nodiscard]] std::expected<void, StarException> processControls();
+  [[nodiscard]] std::expected<void, StarException> dispatch_use_interaction(std::shared_ptr<InteractiveEntity> const& entity);
 
   // state changes and effect animations (master and slave) that happen AFTER movement/tech controller updates
   [[nodiscard]] std::expected<void, StarException> processStateChanges(float dt);
@@ -728,8 +728,9 @@ private:
   std::shared_ptr<ArmorWearer> m_armor;
   HashMap<EquipmentSlot, std::uint64_t> m_armor_secret_net_versions;
 
-  bool m_useDown;
-  bool m_edgeTriggeredUse;
+  bool m_use_down = false;
+  bool m_use_edge_pending = false;
+  bool m_use_edge_ready = false;
 
   Vec2F m_aimPosition;
 
@@ -767,10 +768,10 @@ private:
 
   List<ChatAction> m_pending_chat_actions;
 
-  StringSet m_missionRadioMessages;
-  bool m_interruptRadioMessage;
+  StringSet m_mission_radio_messages;
+  bool m_interrupt_radio_message;
   List<std::pair<GameTimer, RadioMessage>> m_delayed_radio_messages;
-  Deque<RadioMessage> m_pendingRadioMessages;
+  Deque<RadioMessage> m_pending_radio_messages;
   std::optional<Json> m_pendingCinematic;
   std::optional<AltMusicRequest> m_pending_alt_music;
   std::optional<PlayerWarpRequest> m_pendingWarp;
@@ -789,7 +790,7 @@ private:
   int m_hitDamageNotificationLimiter;
   int m_hitDamageNotificationLimit;
 
-  StringSet m_interestingObjects;
+  StringSet m_interesting_objects;
 
   NetElementUInt m_stateNetState;
   NetElementBool m_shiftingNetState;

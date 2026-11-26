@@ -455,17 +455,22 @@ std::expected<std::optional<QuestIndicator>, StarException> QuestManager::getQue
   }
   return std::optional<QuestIndicator>();
 }
-std::expected<StringSet, StarException> QuestManager::interestingObjects() {
+std::expected<StringSet, StarException> QuestManager::interesting_objects() {
   StringSet result;
+  // Keep the quest snapshot alive across script callbacks that change the active set.
   for (auto const& quest : m_quests.values()) {
     auto response = quest->receive_message("interestingObjects", true, JsonArray());
     if (!response) return std::unexpected(std::move(response.error()));
-    if (*response) {
-      if (std::holds_alternative<Json>(**response)) {
-        auto objects = json_to_string_set(std::get<Json>(**response));
-        if (!objects) return std::unexpected(std::move(objects.error()));
-        result.insert_range(*objects);
-      }
+    if (!*response || !std::holds_alternative<Json>(**response))
+      continue;
+    auto entries = std::get<Json>(**response).iterate_array();
+    if (!entries)
+      return std::unexpected(std::move(entries.error()));
+    for (auto const& entry : *entries) {
+      auto name = entry.to_string();
+      if (!name)
+        return std::unexpected(std::move(name.error()));
+      result.add(std::move(*name));
     }
   }
   return result;

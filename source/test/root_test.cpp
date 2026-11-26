@@ -33,6 +33,7 @@ import star.lua_root;
 import star.random;
 import star.root_lua_bindings;
 import star.string;
+import star.tech_controller;
 import star.tech_database;
 import star.statistics_database;
 import star.collision_block;
@@ -666,6 +667,48 @@ const GameTestRegistration codex_catalog("CodexCatalog", "EmptyDefaultsRelativeI
   return settings;
 }
 
+const GameTestRegistration tech_sync("TechControllerRegression", "StableEquipmentAndForcedOverrideRestoration", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  if (!fixture.check(bool(directory), "create tech test directory")) return;
+  auto cleanup = make_scope_exit([&] { (void)File::remove_all(*directory); });
+  auto settings = isolationSettings(fixture.rootSettings(), *directory, "tech-sync");
+  if (!fixture.check(bool(settings), "prepare isolated tech assets")) return;
+  auto body_path = File::relative_to(*directory, "assets/tech-sync-body.tech");
+  auto body_asset = File::write_file(String(R"({"name":"tech-sync-body","type":"Body","scripts":[],
+    "description":"Body fixture","shortDescription":"Body fixture","rarity":"common","icon":"/interface/missing.png"})"), body_path);
+  if (!fixture.check(bool(body_asset), "write body tech asset")) return;
+  auto root = Root::create(std::move(*settings));
+  if (!fixture.check(bool(root), "create tech test root")) return;
+  auto created = TechController::create(**root);
+  if (!fixture.check(bool(created), "create tech controller")) return;
+  auto& controller = **created;
+
+  HashMap<TechType, String> equipped{{TechType::Head, "root-isolation"}, {TechType::Body, "tech-sync-body"}};
+  auto make_save = [](StringList const& names, JsonObject const& storage) {
+    JsonArray modules;
+    for (auto const& name : names)
+      modules.emplace_back(JsonObject{{"module", name}, {"scriptData", storage}});
+    return Json(JsonObject{{"techModules", std::move(modules)}});
+  };
+  auto expected_order = equipped.values();
+  auto saved = make_save(expected_order, JsonObject{{"sentinel", 42}});
+  if (!fixture.check(bool(controller.diskLoad(saved)), "restore tech storage")) return;
+  if (!fixture.check(bool(controller.sync_equipped_tech(equipped)), "synchronize unchanged equipment")) return;
+  fixture.check(controller.diskStore() == saved, "stable synchronization preserves order and script storage");
+
+  auto restored = make_save(expected_order, {});
+  if (!fixture.check(bool(controller.reload_tech()), "force reload unchanged equipment")) return;
+  fixture.check(controller.diskStore() == restored, "forced reload clears script storage");
+  if (!fixture.check(bool(controller.setOverrideTech({"root-isolation"})), "activate tech override")) return;
+  if (!fixture.check(bool(controller.setOverrideTech({"tech-sync-body"})), "replace tech override")) return;
+  equipped.clear();
+  if (!fixture.check(bool(controller.sync_equipped_tech(equipped)), "ignore equipment changes under override")) return;
+  if (!fixture.check(bool(controller.clearOverrideTech()), "clear tech override")) return;
+  fixture.check(!controller.techOverridden() && controller.diskStore() == restored, "clear restores original ordered equipment");
+  if (!fixture.check(bool(controller.sync_equipped_tech(equipped)), "apply equipment changes after restoration")) return;
+  fixture.check(controller.diskStore() == make_save({}, {}), "synchronization resumes after clearing override");
+});
+
 [[nodiscard]] std::expected<void, StarException> expectIsolationConsumers(Root& root, LuaContext& context,
     String const& owner, String const& scriptOwner, String const& configurationOwner) {
   auto assets = root.assets();
@@ -1041,7 +1084,7 @@ const GameTestRegistration presentation_message_failures("WorldClientTest", "Pre
   auto radio_response = from_server[std::size(invalid) + 1].result();
   ASSERT_TRUE(radio_response && *radio_response);
   EXPECT_TRUE((**radio_response).is_null());
-  auto queued = player->pullPendingRadioMessage();
+  auto queued = player->pull_pending_radio_message();
   ASSERT_TRUE(queued && *queued);
   EXPECT_EQ((**queued).messageId, "radio-after-errors");
   auto accepted = from_server.back().result();
@@ -4292,7 +4335,7 @@ const GameTestRegistration retry_interaction_batch(
   EXPECT_TRUE(drained->empty());
 });
 
-const GameTestRegistration hudRadioDequeue("HudDomainTest", "RadioUniqueAccountingOccursAtDequeue", [](GameTest& fixture) {
+const GameTestRegistration hud_radio_dequeue("HudDomainTest", "RadioUniqueAccountingOccursAtDequeue", [](GameTest& fixture) {
   auto factory = fixture.root().playerFactory();
   ASSERT_TRUE(factory) << factory.error().what();
   auto created = (*factory)->create();
@@ -4303,44 +4346,141 @@ const GameTestRegistration hudRadioDequeue("HudDomainTest", "RadioUniqueAccounti
         {"important", important}, {"text", id}, {"portraitImage", ""}});
   };
   auto unique = message("hud-domain-unique", true);
-  ASSERT_TRUE(player.queueRadioMessage(unique));
-  ASSERT_TRUE(player.queueRadioMessage(unique));
-  EXPECT_FALSE(player.log()->radioMessages().contains("hud-domain-unique"));
-  ASSERT_TRUE(player.queueRadioMessage(message("hud-domain-normal", false)));
-  ASSERT_TRUE(player.queueRadioMessage(message("hud-domain-important-a", true, true)));
-  ASSERT_TRUE(player.queueRadioMessage(message("hud-domain-important-b", true, true)));
-  EXPECT_TRUE(player.interruptRadioMessage());
-  EXPECT_FALSE(player.interruptRadioMessage());
+  ASSERT_TRUE(player.queue_radio_message(unique));
+  ASSERT_TRUE(player.queue_radio_message(unique));
+  EXPECT_FALSE(player.log()->has_radio_message("hud-domain-unique"));
+  ASSERT_TRUE(player.queue_radio_message(message("hud-domain-normal", false)));
+  ASSERT_TRUE(player.queue_radio_message(message("hud-domain-important-a", true, true)));
+  ASSERT_TRUE(player.queue_radio_message(message("hud-domain-important-b", true, true)));
+  EXPECT_TRUE(player.interrupt_radio_message());
+  EXPECT_FALSE(player.interrupt_radio_message());
   for (auto const& id : {String("hud-domain-important-b"), String("hud-domain-important-a"),
       String("hud-domain-unique"), String("hud-domain-normal")}) {
-    EXPECT_FALSE(player.log()->radioMessages().contains(id));
-    auto next = player.pullPendingRadioMessage();
+    EXPECT_FALSE(player.log()->has_radio_message(id));
+    auto next = player.pull_pending_radio_message();
     ASSERT_TRUE(next) << next.error().what();
     ASSERT_TRUE(*next);
     EXPECT_EQ((**next).messageId, id);
-    EXPECT_EQ(player.log()->radioMessages().contains(id), id != "hud-domain-normal");
+    EXPECT_EQ(player.log()->has_radio_message(id), id != "hud-domain-normal");
   }
-  auto empty = player.pullPendingRadioMessage();
+  auto empty = player.pull_pending_radio_message();
   ASSERT_TRUE(empty);
   EXPECT_FALSE(*empty); // The duplicate pending unique message was not replayed.
-  ASSERT_TRUE(player.queueRadioMessage(unique));
-  empty = player.pullPendingRadioMessage();
+  ASSERT_TRUE(player.queue_radio_message(unique));
+  empty = player.pull_pending_radio_message();
   ASSERT_TRUE(empty);
   EXPECT_FALSE(*empty); // Dequeue, not UI completion, suppresses later resends.
   for (int replay = 0; replay != 2; ++replay) {
-    ASSERT_TRUE(player.queueRadioMessage(message("hud-domain-normal", false)));
-    auto next = player.pullPendingRadioMessage();
+    ASSERT_TRUE(player.queue_radio_message(message("hud-domain-normal", false)));
+    auto next = player.pull_pending_radio_message();
     ASSERT_TRUE(next && *next);
     EXPECT_EQ((**next).messageId, String("hud-domain-normal"));
-    EXPECT_FALSE(player.log()->radioMessages().contains("hud-domain-normal"));
+    EXPECT_FALSE(player.log()->has_radio_message("hud-domain-normal"));
   }
   // The consumed unique set is player-owned, not a shared queue/database cache.
   auto other = (*factory)->create();
   ASSERT_TRUE(other) << other.error().what();
-  ASSERT_TRUE((*other)->queueRadioMessage(unique));
-  auto next = (*other)->pullPendingRadioMessage();
+  ASSERT_TRUE((*other)->queue_radio_message(unique));
+  auto next = (*other)->pull_pending_radio_message();
   ASSERT_TRUE(next && *next);
   EXPECT_EQ((**next).messageId, String("hud-domain-unique"));
+});
+
+const GameTestRegistration hud_radio_delayed("HudDomainTest", "RadioDelayedDispatchPreservesEventOrder", [](GameTest& fixture) {
+  auto universe = TestUniverse::create(fixture.root(), {100, 100});
+  ASSERT_TRUE(universe) << universe.error().what();
+  auto close = make_scope_exit([&] { EXPECT_TRUE((*universe)->close()); });
+  auto player = (*universe)->client()->mainPlayer();
+  auto uuid = player->uuid();
+  ASSERT_TRUE(uuid) << uuid.error().what();
+  ASSERT_TRUE((*universe)->warpPlayer(ClientShipWorldId(*uuid)));
+  auto world = (*universe)->worldClient();
+  ASSERT_TRUE(world);
+
+  auto message = [](String const& id, bool important = false, String const& type = "generic") {
+    return Json(JsonObject{{"messageId", id}, {"type", type}, {"unique", false},
+        {"important", important}, {"text", id}, {"portraitImage", ""}});
+  };
+  auto expect_messages = [&](std::initializer_list<String> ids) {
+    for (auto const& id : ids) {
+      auto next = player->pull_pending_radio_message();
+      ASSERT_TRUE(next) << next.error().what();
+      ASSERT_TRUE(*next) << id.utf8();
+      EXPECT_EQ((**next).messageId, id);
+      EXPECT_EQ((**next).text, id); // Re-requests must not replace the original payload.
+    }
+    auto empty = player->pull_pending_radio_message();
+    ASSERT_TRUE(empty) << empty.error().what();
+    EXPECT_FALSE(*empty);
+  };
+
+  constexpr float dt = 1.0f / 64.0f;
+  ASSERT_TRUE(player->queue_radio_message(message("radio-survivor-a"), 4 * dt));
+  ASSERT_TRUE(player->queue_radio_message(message("radio-normal-a"), dt));
+  ASSERT_TRUE(player->queue_radio_message(message("radio-important-a", true), dt));
+  ASSERT_TRUE(player->queue_radio_message(message("radio-survivor-b"), 4 * dt));
+  ASSERT_TRUE(player->queue_radio_message(message("radio-rushed"), 32 * dt));
+  ASSERT_TRUE(player->queue_radio_message(message("radio-normal-b"), dt));
+  ASSERT_TRUE(player->queue_radio_message(message("radio-important-b", true), dt));
+  auto mission = message("radio-mission", false, "mission");
+  ASSERT_TRUE(player->queue_radio_message(mission, 3 * dt));
+  ASSERT_TRUE(player->queue_radio_message(mission)); // Mission repeats never accelerate an accepted request.
+  ASSERT_TRUE(player->queue_radio_message(message("radio-survivor-a"), dt)); // A positive duplicate leaves the deadline alone.
+  ASSERT_TRUE(player->receive_message(server_connection_id, "queueRadioMessage",
+      {JsonObject{{"messageId", "radio-rushed"}, {"type", "generic"}, {"important", true},
+          {"text", "replacement"}, {"portraitImage", ""}}}));
+  EXPECT_FALSE(player->interrupt_radio_message());
+  expect_messages({});
+
+  ASSERT_TRUE(player->queue_radio_message(message("radio-pending")));
+  ASSERT_TRUE(world->update(dt));
+  EXPECT_TRUE(player->interrupt_radio_message());
+  EXPECT_FALSE(player->interrupt_radio_message());
+  expect_messages({"radio-important-b", "radio-important-a", "radio-pending", "radio-normal-a", "radio-rushed", "radio-normal-b"});
+
+  ASSERT_TRUE(world->update(dt));
+  expect_messages({});
+  ASSERT_TRUE(world->update(dt));
+  expect_messages({"radio-mission"});
+  EXPECT_FALSE(player->log()->has_radio_message("radio-mission"));
+  ASSERT_TRUE(player->queue_radio_message(mission));
+  expect_messages({});
+  ASSERT_TRUE(world->update(dt));
+  expect_messages({"radio-survivor-a", "radio-survivor-b"});
+  ASSERT_TRUE(world->update(dt));
+  expect_messages({});
+});
+
+const GameTestRegistration hud_radio_species("HudDomainTest", "RadioSpeciesOverrideUsesShipThenPlayer", [](GameTest& fixture) {
+  auto factory = fixture.root().playerFactory();
+  ASSERT_TRUE(factory) << factory.error().what();
+  auto created = (*factory)->create();
+  ASSERT_TRUE(created) << created.error().what();
+  auto& player = **created;
+  auto const player_species = player.species();
+  String const ship_species = player_species == "avian" ? String("human") : String("avian");
+  player.setShipSpecies(ship_species);
+  Json const nested_override = JsonObject{{"text", "nested"}, {"senderName", "nested sender"}};
+  Json const ship_override = JsonObject{{"text", "ship"},
+      {"speciesMessage", JsonObject{{player_species, nested_override}}}};
+  Json const config = JsonObject{{"messageId", "radio-override"}, {"type", "generic"}, {"unique", false},
+      {"text", "base"}, {"portraitImage", ""},
+      {"speciesMessage", JsonObject{{player_species, JsonObject{{"text", "player"}}}}},
+      {"speciesAiMessage", JsonObject{{ship_species, ship_override}}}};
+
+  ASSERT_TRUE(player.queue_radio_message(config));
+  auto next = player.pull_pending_radio_message();
+  ASSERT_TRUE(next && *next);
+  EXPECT_EQ((**next).messageId, "radio-override");
+  EXPECT_EQ((**next).text, "nested");
+  EXPECT_EQ((**next).senderName, "nested sender");
+
+  player.setShipSpecies(player_species);
+  ASSERT_TRUE(player.queue_radio_message(config));
+  next = player.pull_pending_radio_message();
+  ASSERT_TRUE(next && *next);
+  EXPECT_EQ((**next).messageId, "radio-override");
+  EXPECT_EQ((**next).text, "player");
 });
 
 const GameTestRegistration hudWorldViews("HudDomainTest", "WorldPortraitDeltasFollowNativeEntityIdentity", [](GameTest& fixture) {
