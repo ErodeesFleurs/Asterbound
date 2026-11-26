@@ -689,12 +689,12 @@ std::expected<void, StarException> StatusController::tickMaster(float dt) {
       auto visited = world->get().forEachEntity(collision_body.bounding_box(),
         [world = *world, collision_body, &entityEffects](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
           if (auto effectEntity = as<StatusEffectEntity>(entity)) {
-            auto area = effectEntity->statusEffectArea();
+            auto area = effectEntity->status_effect_area();
             area.translate(effectEntity->position());
             auto intersects = world.get().geometry().poly_intersects_poly(area, collision_body);
             if (!intersects) return std::unexpected(std::move(intersects.error()));
             if (*intersects) {
-              auto effects = effectEntity->statusEffects();
+              auto effects = effectEntity->status_effects();
               if (!effects) return std::unexpected(std::move(effects.error()));
               entityEffects.append_range(std::move(*effects));
             }

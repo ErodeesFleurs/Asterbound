@@ -129,7 +129,7 @@ import star.algorithm;
 namespace Star {
 
 ToolUser::ToolUser(Root& root)
-  : m_root(root), m_beamGunRadius(), m_beamGunGlowBorder(), m_objectPreviewInnerAlpha(), m_objectPreviewOuterAlpha(),
+  : m_root(root), m_beamGunRadius(), m_beamGunGlowBorder(), m_object_preview_inner_alpha(), m_object_preview_outer_alpha(),
     m_user(), m_primaryHandItem(root), m_altHandItem(root),
     m_fireMain(), m_fireAlt(), m_edgeTriggeredMain(), m_edgeTriggeredAlt(), m_edgeSuppressedMain(), m_edgeSuppressedAlt(),
     m_suppress() {
@@ -184,8 +184,8 @@ ToolUser::ToolUser(Root& root)
   if (!outer) return std::unexpected(std::move(outer.error()));
   m_beamGunRadius = *radius;
   m_beamGunGlowBorder = *border;
-  m_objectPreviewInnerAlpha = *inner;
-  m_objectPreviewOuterAlpha = *outer;
+  m_object_preview_inner_alpha = *inner;
+  m_object_preview_outer_alpha = *outer;
   return {};
 }
 
@@ -319,71 +319,54 @@ std::expected<void, StarException> ToolUser::append_light_sources(List<LightSour
   return std::optional<float>();
 }
 
-[[nodiscard]] std::expected<List<Drawable>, StarException> ToolUser::renderObjectPreviews(Vec2F aimPosition, Direction walkingDirection, bool inToolRange, Color favoriteColor) {
+[[nodiscard]] std::expected<List<Drawable>, StarException> ToolUser::render_object_previews(Vec2F aim_position,
+    Direction walking_direction, bool in_tool_range, Color favorite_color) {
   if (m_suppress.get() || !m_user)
     return {};
 
-  auto generate = [&](std::shared_ptr<ObjectItem> item) -> std::expected<List<Drawable>, StarException> {
-    Vec2I aimPos(aimPosition.floor());
-    if ((aimPos == m_cachedObjectPreviewPosition) && (item == m_cachedObjectItem))
-      return m_cachedObjectPreview;
-
-    auto objectDatabase = m_root.get().objectDatabase();
-    if (!objectDatabase) return std::unexpected(std::move(objectDatabase.error()));
+  auto generate = [&](ObjectItem const& item) -> std::expected<List<Drawable>, StarException> {
+    auto database = m_root.get().object_database();
+    if (!database) return std::unexpected(std::move(database.error()));
     auto world = m_user->get().world();
     if (!world) return std::unexpected(std::move(world.error()));
-    auto objectName = item->objectName();
-    if (!objectName) return std::unexpected(std::move(objectName.error()));
-    auto objectParameters = item->objectParameters();
-    if (!objectParameters) return std::unexpected(std::move(objectParameters.error()));
-    auto drawablesResult = (*objectDatabase)->cursorHintDrawables(world->get(), *objectName,
-        aimPos, walkingDirection, std::move(*objectParameters));
-    if (!drawablesResult) return std::unexpected(std::move(drawablesResult.error()));
-    auto drawables = std::move(*drawablesResult);
+    auto name = item.object_name();
+    if (!name) return std::unexpected(std::move(name.error()));
+    auto parameters = item.object_parameters();
+    if (!parameters) return std::unexpected(std::move(parameters.error()));
+    auto preview = (*database)->cursor_hint_drawables(world->get(), *name, Vec2I(aim_position.floor()),
+        walking_direction, *parameters, in_tool_range);
+    if (!preview) return std::unexpected(std::move(preview.error()));
 
-    Color opacityMask = Color::palette_white;
-    auto opacity = item->getAppropriateOpacity();
+    Color opacity_mask = Color::palette_white;
+    auto opacity = item.getAppropriateOpacity();
     if (!opacity) return std::unexpected(std::move(opacity.error()));
-    opacityMask.set_alpha_f(*opacity);
-    Color favoriteColorTrans = favoriteColor;
-    if (!inToolRange) favoriteColorTrans.set_hue(0.0f);
-    else {
-      auto placementObjectName = item->objectName();
-      if (!placementObjectName) return std::unexpected(std::move(placementObjectName.error()));
-      auto canPlace = (*objectDatabase)->canPlaceObject(world->get(), aimPos, *placementObjectName);
-      if (!canPlace) return std::unexpected(std::move(canPlace.error()));
-      if (!*canPlace) favoriteColorTrans.set_hue(0.0f);
-    }
-
-    favoriteColorTrans.set_alpha_f(m_objectPreviewOuterAlpha);
-    Color nearWhite = favoriteColorTrans;
-    nearWhite.set_value(1 - (1 - nearWhite.value()) / 5);
-    nearWhite.set_saturation(nearWhite.saturation() / 5);
-    nearWhite.set_alpha_f(m_objectPreviewInnerAlpha);
-    ImageOperation op = BorderImageOperation{m_beamGunGlowBorder, nearWhite.to_rgba(), favoriteColorTrans.to_rgba(), false, false};
+    opacity_mask.set_alpha_f(*opacity);
+    if (!in_tool_range || !preview->placeable)
+      favorite_color.set_hue(0.0f);
+    favorite_color.set_alpha_f(m_object_preview_outer_alpha);
+    Color near_white = favorite_color;
+    near_white.set_value(1 - (1 - near_white.value()) / 5);
+    near_white.set_saturation(near_white.saturation() / 5);
+    near_white.set_alpha_f(m_object_preview_inner_alpha);
+    ImageOperation op = BorderImageOperation{m_beamGunGlowBorder, near_white.to_rgba(), favorite_color.to_rgba(), false, false};
 
     auto image_metadata = m_root.get().image_metadata_database();
     if (!image_metadata) return std::unexpected(std::move(image_metadata.error()));
     auto operation = image_operation_to_string(op);
-    for (Drawable& drawable : drawables) {
+    for (Drawable& drawable : preview->drawables) {
       if (drawable.is_image()) {
         auto applied = drawable.image_part().add_directives(**image_metadata, operation, true);
         if (!applied) return std::unexpected(std::move(applied.error()));
       }
-      drawable.color = opacityMask;
+      drawable.color = opacity_mask;
     }
-    m_cachedObjectPreview = drawables;
-    m_cachedObjectItem = item;
-    m_cachedObjectPreviewPosition = aimPos;
-    return drawables;
+    return std::move(preview->drawables);
   };
 
-  if (auto pri = as<ObjectItem>(m_primaryHandItem.get()))
-    return generate(pri);
-  else if (auto alt = as<ObjectItem>(m_altHandItem.get()))
-    return generate(alt);
-  else
-    m_cachedObjectItem.reset();
+  if (auto primary = as<ObjectItem>(m_primaryHandItem.get()))
+    return generate(*primary);
+  if (auto alternate = as<ObjectItem>(m_altHandItem.get()))
+    return generate(*alternate);
   return {};
 }
 

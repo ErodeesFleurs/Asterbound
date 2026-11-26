@@ -47,8 +47,15 @@ import star.lua;
 import star.lua_game_converters;
 import star.mixer;
 import star.dance_database;
+import star.object;
 import star.object_database;
+import star.tile_damage;
+import star.tile_entity;
+import star.universe_client;
+import star.world_client;
 import star.world_server;
+import star.net_packets;
+import star.warping;
 import star.game_types;
 import star.drawable;
 import star.image_metadata_database;
@@ -276,7 +283,7 @@ constexpr std::array<unsigned char, 48> pcm_test_wave = {
 };
 
 std::expected<std::unique_ptr<Root>, StarException> effect_test_root(GameTest& fixture, String const& directory,
-    std::initializer_list<std::pair<String, String>> files) {
+    std::initializer_list<std::pair<String, String>> files, bool include_game_assets = false) {
   auto overlay = File::relative_to(directory, "assets");
   auto created = File::create_directory(overlay);
   if (!created)
@@ -290,12 +297,17 @@ std::expected<std::unique_ptr<Root>, StarException> effect_test_root(GameTest& f
   auto audio = File::write_file(std::span<char const>(wave), File::relative_to(overlay, "loop.wav"));
   if (!audio)
     return std::unexpected(std::move(audio.error()));
-  auto preload = File::write_file(String("[]"), File::relative_to(overlay, "preload.config"));
-  if (!preload)
-    return std::unexpected(std::move(preload.error()));
+  if (!include_game_assets) {
+    auto preload = File::write_file(String("[]"), File::relative_to(overlay, "preload.config"));
+    if (!preload)
+      return std::unexpected(std::move(preload.error()));
+  }
   auto settings = fixture.rootSettings();
-  settings.assetDirectories.clear();
-  settings.assetSources = {overlay};
+  if (!include_game_assets) {
+    settings.assetDirectories.clear();
+    settings.assetSources.clear();
+  }
+  settings.assetSources.push_back(overlay);
   settings.storageDirectory = File::relative_to(directory, "storage");
   settings.runtimeConfigFile = {};
   settings.logFile = {};
@@ -718,20 +730,233 @@ const GameTestRegistration objectCursorPreviewRandomIsolation(
       constexpr std::uint64_t seed = 0x435552534f525052;
       root.random().seed(seed);
       RandomSource untouchedGameplay(seed);
-      auto cold = (*database)->cursorHintDrawables(**world, objectName, position, direction, JsonObject{});
+      auto cold = (*database)->cursor_hint_drawables(**world, objectName, position, direction, JsonObject{});
       ASSERT_TRUE(cold) << cold.error().what();
-      ASSERT_FALSE(cold->empty());
+      ASSERT_FALSE(cold->drawables.empty());
       ASSERT_EQ(root.random().next_u64(), untouchedGameplay.next_u64()) << "cold preview";
-      auto cachedConfig = (*database)->getConfig(objectName);
+      auto cachedConfig = (*database)->get_config(objectName);
       ASSERT_TRUE(cachedConfig) << cachedConfig.error().what();
-      ASSERT_TRUE((*cachedConfig)->lightFlickering);
+      ASSERT_TRUE((*cachedConfig)->light_flickering);
       ASSERT_EQ(root.random().next_u64(), untouchedGameplay.next_u64()) << "warm config lookup";
-      auto warm = (*database)->cursorHintDrawables(**world, objectName, position, direction, JsonObject{});
+      auto warm = (*database)->cursor_hint_drawables(**world, objectName, position, direction, JsonObject{});
       ASSERT_TRUE(warm) << warm.error().what();
-      EXPECT_EQ(*warm, *cold);
+      EXPECT_EQ(warm->drawables, cold->drawables);
+      EXPECT_EQ(warm->placeable, cold->placeable);
       ASSERT_EQ(root.random().next_u64(), untouchedGameplay.next_u64()) << "warm preview";
     }
   });
+
+const GameTestRegistration object_effective_orientation("ObjectDatabase", "CustomOrientationsDrivePlacementPreviewAndEntity",
+    [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto isolated = effect_test_root(fixture, *directory, {
+      {"orientation-effective-open.object", R"({
+        "objectName":"orientation-effective-open", "orientations":[
+          {"image":"orientation-effective.png","imagePosition":[8,0],"direction":"left"},
+          {"image":"orientation-effective.png","imagePosition":[24,0],"direction":"left","anchors":["background"]}
+        ]
+      })"},
+      {"orientation-effective-blocked.object", R"({
+        "objectName":"orientation-effective-blocked", "orientations":[
+          {"image":"orientation-effective.png","imagePosition":[8,0],"direction":"left","anchors":["background"]},
+          {"image":"orientation-effective.png","imagePosition":[24,0],"direction":"left","anchors":["background"]}
+        ]
+      })"},
+      {"orientation-effective.animation", R"({"frames":"orientation-effective.png","variants":4,"frameNumber":1})"}}, true);
+  ASSERT_TRUE(isolated) << isolated.error().what();
+  auto& root = **isolated;
+  auto database = root.object_database();
+  ASSERT_TRUE(database) << database.error().what();
+  auto storage = File::ephemeral_file(root.random());
+  ASSERT_TRUE(storage);
+  auto world = WorldServer::create(root, Vec2U(128, 128), *storage);
+  ASSERT_TRUE(world) << world.error().what();
+  auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
+  Vec2I position(64, 64);
+  constexpr auto direction = Direction::Left;
+  String open = "orientation-effective-open";
+  String blocked = "orientation-effective-blocked";
+  EXPECT_EQ((*database)->can_place_object(**world, position, open), true);
+  EXPECT_EQ((*database)->can_place_object(**world, position, blocked), false);
+
+  Json reject = JsonObject{{"customOrientations", JsonArray{JsonObject{{"anchors", JsonArray{"background"}}}}}};
+  EXPECT_EQ((*database)->can_place_object(**world, position, open, reject), false);
+  auto rejected = (*database)->create_for_placement(**world, open, position, direction, reject);
+  ASSERT_TRUE(rejected) << rejected.error().what();
+  EXPECT_FALSE(*rejected);
+  auto preview = (*database)->cursor_hint_drawables(**world, open, position, direction, reject);
+  ASSERT_TRUE(preview) << preview.error().what();
+  EXPECT_FALSE(preview->placeable);
+  ASSERT_EQ(preview->drawables.size(), 1u);
+  EXPECT_EQ(preview->drawables.front().position, Vec2F(position) + Vec2F(3, 0)); // Database: last affinity.
+  auto unplaced = (*database)->create_object(open, reject);
+  ASSERT_TRUE(unplaced) << unplaced.error().what();
+  auto hint = (*unplaced)->cursor_hint_drawables();
+  ASSERT_TRUE(hint) << hint.error().what();
+  ASSERT_EQ(hint->size(), 1u);
+  EXPECT_EQ(hint->front().position, Vec2F(1, 0)); // Unplaced entity: first affinity.
+
+  auto permit = Json::parse(R"({"customOrientations":[{},{
+    "anchors":null, "spaces":[[1,0],[2,0]],
+    "particleEmitter":{"emissionRate":1,"particle":{"type":"animated","animation":"orientation-effective.animation"}}
+  }]})");
+  ASSERT_TRUE(permit);
+  constexpr std::uint64_t seed = 0x6f7269656e746174;
+  root.random().seed(seed);
+  RandomSource unchanged(seed);
+  EXPECT_EQ((*database)->can_place_object(**world, position, blocked, *permit), true);
+  auto permitted = (*database)->cursor_hint_drawables(**world, blocked, position, direction, *permit);
+  ASSERT_TRUE(permitted) << permitted.error().what();
+  EXPECT_TRUE(permitted->placeable);
+  ASSERT_EQ(permitted->drawables.size(), 1u);
+  EXPECT_EQ(permitted->drawables.front().position, Vec2F(position) + Vec2F(3, 0));
+  EXPECT_EQ(root.random().next_u64(), unchanged.next_u64()) << "Selecting an orientation must not sample its particle variant";
+
+  auto placed = (*database)->create_for_placement(**world, blocked, position, direction, *permit);
+  ASSERT_TRUE(placed) << placed.error().what();
+  ASSERT_TRUE(*placed);
+  ASSERT_TRUE((*placed)->init(**world, 1, EntityMode::Master));
+  auto detach = make_scope_exit([&] { EXPECT_TRUE((*placed)->uninit()); });
+  List<Vec2I> occupied{{1, 0}, {2, 0}};
+  EXPECT_EQ((*placed)->spaces(), occupied);
+  ASSERT_TRUE((*placed)->set_tile_position(position + Vec2I(2, 0)));
+  EXPECT_EQ((*placed)->spaces(), occupied);
+  auto entity_hint = (*placed)->cursor_hint_drawables();
+  ASSERT_TRUE(entity_hint) << entity_hint.error().what();
+  ASSERT_EQ(entity_hint->size(), 1u);
+  EXPECT_EQ(entity_hint->front().position, Vec2F(3, 0));
+});
+
+const GameTestRegistration object_catalog_retry("ObjectDatabase", "ConcurrentReadersShareRetriedConfig", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto isolated = effect_test_root(fixture, *directory, {{"orientation-retry.object", R"({
+      "objectName":"orientation-retry", "orientations":[{"imageLayers":[],"frames":0}]
+    })"}}, true);
+  ASSERT_TRUE(isolated) << isolated.error().what();
+  auto& root = **isolated;
+  auto database = root.object_database();
+  ASSERT_TRUE(database) << database.error().what();
+  auto broken = (*database)->get_config("orientation-retry");
+  ASSERT_FALSE(broken);
+  EXPECT_TRUE(std::string_view(broken.error().what()).contains("frames"));
+
+  auto path = File::relative_to(*directory, "assets/orientation-retry.object");
+  ASSERT_TRUE(File::write_file(String(R"({
+      "objectName":"orientation-retry", "orientations":[{"imageLayers":[],"frames":3}]
+    })"), path));
+  auto assets = root.assets();
+  ASSERT_TRUE(assets);
+  (*assets)->hot_reload();
+
+  using Config = std::expected<std::shared_ptr<ObjectConfig>, StarException>;
+  std::latch start(1);
+  std::array<std::future<Config>, 8> readers;
+  for (auto& reader : readers)
+    reader = std::async(std::launch::async, [&] {
+      start.wait();
+      return (*database)->get_config("orientation-retry");
+    });
+  start.count_down();
+  auto first = readers.front().get();
+  ASSERT_TRUE(first) << first.error().what();
+  ASSERT_EQ((*first)->orientations.size(), 1u);
+  EXPECT_EQ((*first)->orientations.front()->frames, 3);
+  for (auto& reader : std::span(readers).subspan(1)) {
+    auto result = reader.get();
+    ASSERT_TRUE(result) << result.error().what();
+    EXPECT_EQ(*result, *first);
+  }
+  auto cached = (*database)->get_config("orientation-retry");
+  ASSERT_TRUE(cached) << cached.error().what();
+  EXPECT_EQ(*cached, *first);
+});
+
+const GameTestRegistration object_signed_emission_cooldown("ObjectRenderTest", "StockNegativeAndZeroSampledRatesPreserveCooldown",
+    [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto isolated = effect_test_root(fixture, *directory, {{"signed-emission-probe.object", R"({
+    "objectName":"signed-emission-probe","hasObjectItem":false,"orientations":[{"imageLayers":[]}]
+  })"}}, true);
+  ASSERT_TRUE(isolated) << isolated.error().what();
+  auto& root = **isolated;
+  auto objects = root.object_database();
+  ASSERT_TRUE(objects) << objects.error().what();
+  auto booster = (*objects)->get_config("boosterflamehuman");
+  ASSERT_TRUE(booster) << booster.error().what();
+  auto const& emitters = (*booster)->orientations.front()->particle_emitters;
+  ASSERT_FALSE(emitters.empty());
+  auto const rate = emitters.front().particle_emission_rate;
+  auto const variance = emitters.front().particle_emission_rate_variance;
+  ASSERT_EQ(rate, 0.4f);
+  ASSERT_EQ(variance, 0.5f);
+  auto storage = File::ephemeral_file(root.random());
+  ASSERT_TRUE(storage);
+  auto world = WorldServer::create(root, {128, 128}, *storage);
+  ASSERT_TRUE(world) << world.error().what();
+  auto close_world = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
+
+  // Use the same RNG stream as a real emission: eleven particle variance
+  // components, then one rate draw. Pick a well-bounded negative sample.
+  std::uint64_t seed = 0;
+  float sampled_variance = 0.0f;
+  std::uint64_t next_random = 0;
+  for (; seed < 1024; ++seed) {
+    RandomSource oracle(seed);
+    for (int component = 0; component < 11; ++component)
+      (void)oracle.uniform_float();
+    auto sample = oracle.uniform_float(-variance, variance);
+    ASSERT_TRUE(sample) << sample.error().what();
+    if (*sample < -0.45f) {
+      sampled_variance = *sample;
+      next_random = oracle.next_u64();
+      break;
+    }
+  }
+  ASSERT_LT(seed, 1024u);
+
+  for (float base_rate : {rate, -sampled_variance}) {
+    Json parameters = JsonObject{{"customOrientations", JsonArray{JsonObject{{"particleEmitter", JsonObject{
+        {"emissionRate", base_rate}, {"emissionVariance", variance}, {"particle", JsonObject{{"type", "ember"}}}
+    }}}}}};
+    auto object = (*objects)->create_object("signed-emission-probe", parameters);
+    ASSERT_TRUE(object) << object.error().what();
+    ASSERT_TRUE((*object)->set_tile_position({64, 64}));
+    ASSERT_TRUE((*object)->init(**world, 1, EntityMode::Master));
+    auto uninit = make_scope_exit([&] { EXPECT_TRUE((*object)->uninit()); });
+    root.random().seed(seed);
+    EffectEventSink sink;
+    sink.fail_at = 0;
+    ASSERT_FALSE((*object)->collect_render_events(sink));
+    ASSERT_TRUE((*object)->collect_render_events(sink));
+    ASSERT_EQ(sink.particles.size(), 1u);
+    EXPECT_EQ(root.random().next_u64(), next_random);
+
+    if (base_rate == rate) {
+      float half_cooldown = -0.5f / (rate + sampled_variance);
+      ASSERT_TRUE((*object)->update(half_cooldown, 1));
+      ASSERT_TRUE((*object)->collect_render_events(sink));
+      EXPECT_EQ(sink.particles.size(), 1u);
+      ASSERT_TRUE((*object)->update(half_cooldown, 2));
+      ASSERT_TRUE((*object)->collect_render_events(sink));
+      EXPECT_EQ(sink.particles.size(), 2u);
+    } else {
+      // Exact cancellation historically produced an infinite cooldown, not a
+      // disabled emitter or a retry every tick. Only an orientation reset re-arms it.
+      ASSERT_TRUE((*object)->update(1000.0f, 1));
+      ASSERT_TRUE((*object)->collect_render_events(sink));
+      EXPECT_EQ(sink.particles.size(), 1u);
+      ASSERT_TRUE((*object)->update_orientation());
+      ASSERT_TRUE((*object)->collect_render_events(sink));
+      EXPECT_EQ(sink.particles.size(), 2u);
+    }
+  }
+});
 
 const GameTestRegistration directory_ignore_order(
   "AssetsTest", "DirectoryIgnoreCompilesOnlyReachedCaseInsensitivePartialPatterns", [](GameTest& fixture) {
@@ -2175,6 +2400,171 @@ const GameTestRegistration effect_emission_retry("EffectSourceTest", "RetriesOnl
   EXPECT_EQ(sink.accepted, "pppaa");
   ASSERT_EQ(sink.particles.size(), 3u);
   EXPECT_GT(sink.particles[1][0], 98);
+});
+
+const GameTestRegistration object_event_retry("ObjectRenderTest", "RetriesRejectedItemsAndPreservesRandomStream", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory);
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto root = effect_test_root(fixture, *directory, {
+    {"event-retry-probe.object", R"({
+      "objectName":"event-retry-probe","hasObjectItem":false,"health":10,
+      "soundEffect":"/loop.wav","soundEffectRangeMultiplier":4,
+      "damageTable":{"damageFactors":{"blockish":1},"damageRecovery":0,"maximumEffectTime":1},
+      "orientations":[{"imageLayers":[],"spaces":[[0,0],[1,0]],"anchors":[]}],
+      "particleEmitters":[
+        {"emissionRate":1,"emissionVariance":0.2,"placeInSpaces":true,
+         "particle":{"type":"text","text":"configured-a"},"particleVariance":{"position":[1,1]}},
+        {"emissionRate":1,"emissionVariance":0.2,
+         "particle":{"type":"text","text":"configured-b"},"particleVariance":{"position":[1,1]}}
+      ],
+      "animation":{"animatedParts":{"stateTypes":{"probe":{"default":"idle","states":{
+        "idle":{"properties":{"persistentSound":"/loop.wav","persistentSoundRangeMultiplier":2,
+                              "immediateSound":"/loop.wav","immediateSoundRangeMultiplier":3}}
+      }}}},"particleEmitters":{"probe":{"active":true,"particles":[
+        {"particle":{"type":"text","text":"animator-a","variance":{"position":[1,1]}}},
+        {"particle":{"type":"text","text":"animator-b","variance":{"position":[1,1]}}}
+      ]}}},
+      "animationScripts":["/event-retry-probe.lua"]
+    })"},
+    {"event-retry-probe.lua", R"(
+      function init()
+        localAnimator.spawnParticle({type="text", text="scripted-a", variance={position={1,1}}}, {10,20})
+        localAnimator.spawnParticle({type="text", text="scripted-b", variance={position={1,1}}}, {30,40})
+        localAnimator.playAudio("/loop.wav", 0, 0.25)
+        localAnimator.playAudio("/loop.wav", 0, 0.75)
+      end
+    )"}}, true);
+  ASSERT_TRUE(root) << root.error().what();
+  auto& game = **root;
+  auto assets = game.assets();
+  ASSERT_TRUE(assets) << assets.error().what();
+  ASSERT_TRUE((*assets)->audio("/loop.wav"));
+  ASSERT_TRUE(game.particleDatabase());
+
+  // Start a real headless client world by pumping its handshake without running a
+  // background simulation that could consume the fixture's seeded random stream.
+  auto universe = UniverseClient::create(game, {}, {}, File::relative_to(*directory, "client"));
+  ASSERT_TRUE(universe) << universe.error().what();
+  auto storage = File::ephemeral_file(game.random());
+  ASSERT_TRUE(storage);
+  auto server = WorldServer::create(game, {128, 128}, *storage);
+  ASSERT_TRUE(server) << server.error().what();
+  auto close_server = make_scope_exit([&] { EXPECT_TRUE((*server)->close()); });
+  auto client = WorldClient::create(game, main_client_world_id, **universe);
+  ASSERT_TRUE(client) << client.error().what();
+  auto close_client = make_scope_exit([&] { EXPECT_TRUE((*client)->close()); });
+  auto accepted = (*server)->addClient(min_client_connection_id, SpawnTargetPosition(Vec2F(31, 42)), true);
+  ASSERT_TRUE(accepted) << accepted.error().what();
+  ASSERT_TRUE(*accepted);
+  auto start_packets = (*server)->getOutgoingPackets(min_client_connection_id);
+  ASSERT_TRUE(start_packets) << start_packets.error().what();
+  auto started = (*client)->handleIncomingPackets(*start_packets);
+  ASSERT_TRUE(started) << started.error().what();
+  auto acknowledged = (*server)->handleIncomingPackets(min_client_connection_id, (*client)->getOutgoingPackets());
+  ASSERT_TRUE(acknowledged) << acknowledged.error().what();
+  ASSERT_EQ((*client)->connection(), min_client_connection_id);
+  auto objects = game.object_database();
+  ASSERT_TRUE(objects) << objects.error().what();
+  auto master = (*objects)->create_object("event-retry-probe");
+  ASSERT_TRUE(master) << master.error().what();
+  TileEntity& master_tile = **master;
+  ASSERT_TRUE(master_tile.set_tile_position({31, 42}));
+  ASSERT_TRUE((*master)->init(**server, 1, EntityMode::Master));
+  auto release_master = make_scope_exit([&] { EXPECT_TRUE((*master)->uninit()); });
+  auto stored = (*master)->net_store();
+  ASSERT_TRUE(stored) << stored.error().what();
+  auto state = (*master)->write_net_state();
+  ASSERT_TRUE(state) << state.error().what();
+
+  using SoundFingerprint = std::tuple<int, float, std::optional<Vec2F>, double>;
+  List<Vec2F> baseline_particles;
+  List<SoundFingerprint> baseline_sounds;
+  std::uint64_t baseline_rng = 0;
+  for (auto failure : std::array<std::optional<std::size_t>, 7>{std::nullopt, 1u, 2u, 4u, 6u, 8u, 10u}) {
+    SCOPED_TRACE(failure.value_or(11u));
+    auto object = (*objects)->net_load_object(*stored);
+    ASSERT_TRUE(object) << object.error().what();
+    ASSERT_TRUE((*object)->read_net_state(state->first));
+    game.random().seed(0x4f424a454354ull);
+    ASSERT_TRUE((*object)->init(**client, 1, EntityMode::Slave));
+    auto release_object = make_scope_exit([&] {
+      if ((*object)->inWorld())
+        EXPECT_TRUE((*object)->uninit());
+    });
+    TileEntity& tile = **object;
+    auto damaged = tile.damage_tiles({}, {}, {TileDamageType::Blockish, 1.0f});
+    ASSERT_TRUE(damaged) << damaged.error().what();
+    ASSERT_FALSE(*damaged);
+    auto updated = (*object)->update(0, 0);
+    ASSERT_TRUE(updated) << updated.error().what();
+
+    struct ObjectEventSink : EffectEventSink {
+      StringList labels;
+      std::expected<void, StarException> add_particle(Particle&& particle) override {
+        auto submitted = EffectEventSink::add_particle(std::move(particle));
+        if (submitted)
+          labels.push_back(std::move(particle.string));
+        return submitted;
+      }
+    } sink;
+    if (failure) {
+      sink.fail_at = failure;
+      ASSERT_FALSE((*object)->collect_render_events(sink));
+      ASSERT_EQ(sink.accepted.size(), *failure);
+      auto const particle_index = sink.particles.size();
+      auto const audio_index = sink.sounds.size();
+      auto const rejected_particle = sink.rejected_particle;
+      auto const rejected_audio = sink.rejected_audio;
+      sink.fail_at = failure;
+      ASSERT_FALSE((*object)->collect_render_events(sink));
+      ASSERT_EQ(sink.accepted.size(), *failure);
+      EXPECT_EQ(sink.rejected_particle, rejected_particle);
+      EXPECT_EQ(sink.rejected_audio, rejected_audio);
+      ASSERT_TRUE((*object)->collect_render_events(sink));
+      if (rejected_particle) {
+        ASSERT_LT(particle_index, sink.particles.size());
+        EXPECT_EQ(sink.particles[particle_index], *rejected_particle);
+      } else {
+        ASSERT_TRUE(rejected_audio);
+        ASSERT_LT(audio_index, sink.sounds.size());
+        EXPECT_EQ(sink.sounds[audio_index], rejected_audio);
+      }
+    } else {
+      auto result = (*object)->collect_render_events(sink);
+      ASSERT_TRUE(result) << result.error().what();
+    }
+    ASSERT_EQ(sink.accepted, "ppaaappppaa");
+    EXPECT_EQ(sink.labels, (StringList{"configured-a", "configured-b", "animator-a", "animator-b", "scripted-a", "scripted-b"}));
+    ASSERT_TRUE((*object)->collect_render_events(sink));
+    ASSERT_EQ(sink.accepted, "ppaaappppaa");
+    auto next_rng = game.random().next_u64();
+    List<SoundFingerprint> sounds;
+    for (auto const& sound : sink.sounds) {
+      auto time = sound->current_time();
+      ASSERT_TRUE(time) << time.error().what();
+      sounds.emplace_back(sound->loops(), sound->range_multiplier(), sound->position(), *time);
+    }
+    EXPECT_EQ(sink.sounds[0]->range_multiplier(), 4.0f);
+    EXPECT_EQ(sink.sounds[1]->range_multiplier(), 2.0f);
+    EXPECT_EQ(sink.sounds[2]->range_multiplier(), 3.0f);
+    if (!failure) {
+      baseline_particles = sink.particles;
+      baseline_sounds = std::move(sounds);
+      baseline_rng = next_rng;
+    } else {
+      EXPECT_EQ(sink.particles, baseline_particles);
+      EXPECT_EQ(sounds, baseline_sounds);
+      EXPECT_EQ(next_rng, baseline_rng);
+    }
+    Mixer mixer(game.logger(), 8000, 1);
+    ASSERT_EQ(sink.sounds[0]->loops(), -1);
+    ASSERT_TRUE(mixer.play(sink.sounds[0]));
+    ASSERT_TRUE((*object)->uninit());
+    std::array<std::int16_t, 8> output{};
+    ASSERT_TRUE(mixer.read(output, output.size()));
+    EXPECT_TRUE(sink.sounds[0]->finished());
+  }
 });
 
 const GameTestRegistration effect_audio_repair("EffectSourceTest", "AudioRepairResumesBatchAndPreservesLaterTick", [](GameTest& fixture) {

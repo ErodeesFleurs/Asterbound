@@ -984,17 +984,17 @@ std::expected<void, StarException> ItemDatabase::scan_items() {
 }
 
 std::expected<void, StarException> ItemDatabase::add_object_items() {
-  auto objects = m_root.objectDatabase();
+  auto objects = m_root.object_database();
   if (!objects)
     return std::unexpected(std::move(objects.error()));
   auto assets = m_root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  for (auto const& object_name : (*objects)->allObjects()) {
-    auto config = (*objects)->getConfig(object_name);
+  for (auto const& object_name : (*objects)->all_objects()) {
+    auto config = (*objects)->get_config(object_name);
     if (!config)
       return std::unexpected(std::move(config.error()));
-    if ((*config)->hasObjectItem) {
+    if ((*config)->has_object_item) {
       auto added = add_object_drop_item(**assets, (*config)->path, (*config)->config);
       if (!added)
         return std::unexpected((*assets)->with_asset_context(std::move(added.error()), (*config)->path, "Loading object drop item"));

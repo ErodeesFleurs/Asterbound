@@ -2565,23 +2565,30 @@ std::shared_ptr<Entity> WorldClient::entity(EntityId entityId) const {
 }
 
 std::expected<void, StarException> WorldClient::addEntity(std::shared_ptr<Entity> const& entity, EntityId entityId) {
-  if (!entity || !inWorld())
+  if (!entity)
     return {};
+  if (!inWorld())
+    return std::unexpected(WorldClientException("Cannot add an entity outside an active world"));
   if (entity->client_entity_mode() != ClientEntityMode::ClientSlaveOnly) {
+    if (entity->maybeWorld())
+      return std::unexpected(WorldClientException("Cannot add an entity that is already initialized"));
     auto reserved = m_entityMap->reserve_entity_id(entityId);
     if (!reserved)
       return std::unexpected(std::move(reserved.error()));
-    auto initialized = entity->init(*this, *reserved, EntityMode::Master);
-    if (!initialized)
-      return std::unexpected(std::move(initialized.error()));
-    auto added = m_entityMap->add_entity(entity);
-    if (!added) {
-      auto cleared = entity->uninit();
-      if (!cleared)
-        return std::unexpected(added.error().with_context(Star::format("Error uninitializing rejected entity: {}", cleared.error().what())));
-      return std::unexpected(std::move(added.error()));
+    auto reject = [&](StarException error) -> std::expected<void, StarException> {
+      if (auto cleared = entity->uninit(); !cleared)
+        error = error.with_context(Star::format("Error uninitializing rejected entity: {}", cleared.error().what()));
+      return std::unexpected(std::move(error));
+    };
+    if (auto initialized = entity->init(*this, *reserved, EntityMode::Master); !initialized)
+      return reject(std::move(initialized.error()));
+    if (auto added = m_entityMap->add_entity(entity); !added)
+      return reject(std::move(added.error()));
+    if (auto notified = notifyEntityCreate(entity); !notified) {
+      m_entityMap->remove_entity(*reserved);
+      return reject(std::move(notified.error()));
     }
-    return notifyEntityCreate(entity);
+    return {};
   }
   auto factory = this->root().entityFactory();
   if (!factory)
@@ -2593,6 +2600,7 @@ std::expected<void, StarException> WorldClient::addEntity(std::shared_ptr<Entity
   auto state = entity->write_net_state(0, rules);
   if (!state)
     return std::unexpected(std::move(state.error()));
+  // Without a spawn acknowledgement, queueing is the commit point for this client.
   m_outgoingPackets.push_back(
     std::make_shared<SpawnEntityPacket>(entity->entity_type(), std::move(*store), std::move(state->first)));
   return {};
@@ -3571,7 +3579,6 @@ std::expected<void, StarException> WorldClient::notifyEntityCreate(std::shared_p
     if (!result293)
       return std::unexpected(std::move(result293.error()));
     auto firstNetState = (std::move(*result293));
-    m_masterEntitiesNetVersion[entity->entityId()] = firstNetState.second;
     auto result294 = this->root().entityFactory();
     if (!result294)
       return std::unexpected(std::move(result294.error()));
@@ -3580,6 +3587,7 @@ std::expected<void, StarException> WorldClient::notifyEntityCreate(std::shared_p
       return std::unexpected(std::move(result295.error()));
     m_outgoingPackets.push_back(std::make_shared<EntityCreatePacket>(
       entity->entity_type(), (std::move(*result295)), std::move(firstNetState.first), entity->entityId()));
+    m_masterEntitiesNetVersion[entity->entityId()] = firstNetState.second;
   }
   return {};
 }
@@ -3880,8 +3888,8 @@ void WorldClient::disconnectAllWires(Vec2I wireEntityPosition, WireNode const& n
 }
 
 void WorldClient::wire(Vec2I const& outputPosition, std::size_t outputIndex, Vec2I const& inputPosition, std::size_t inputIndex) {
-  WireConnection output = {.entityLocation = outputPosition, .nodeIndex = outputIndex};
-  WireConnection input = {.entityLocation = inputPosition, .nodeIndex = inputIndex};
+  WireConnection output = {.entity_location = outputPosition, .node_index = outputIndex};
+  WireConnection input = {.entity_location = inputPosition, .node_index = inputIndex};
   connectWire(output, input);
 }
 
@@ -4144,7 +4152,7 @@ std::expected<void, StarException> WorldClient::renderCollisionDebug() {
     return std::unexpected(std::move(objects.error()));
   for (auto const& object : *objects) {
     for (auto const& space : object->spaces()) {
-      log_poly(PolyF(RectF(Vec2F(space), Vec2F(space) + Vec2F(1, 1))), Vec2F(object->tilePosition()), 0., 1., 0.);
+      log_poly(PolyF(RectF(Vec2F(space), Vec2F(space) + Vec2F(1, 1))), Vec2F(object->tile_position()), 0., 1., 0.);
     }
   }
   

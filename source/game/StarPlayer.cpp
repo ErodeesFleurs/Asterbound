@@ -1238,7 +1238,7 @@ std::expected<List<Drawable>, StarException> Player::drawables(float interpolati
     if (!rangeResult)
       return std::unexpected(std::move(rangeResult.error()));
     auto range = std::move(*rangeResult);
-    auto previewsResult = m_tools->renderObjectPreviews(m_aimPosition, walking_direction(), range, favorite_color());
+    auto previewsResult = m_tools->render_object_previews(m_aimPosition, walking_direction(), range, favorite_color());
     if (!previewsResult)
       return std::unexpected(std::move(previewsResult.error()));
     auto previews = std::move(*previewsResult);
@@ -4497,7 +4497,7 @@ Player::State Player::currentState() const {
 
 List<ChatAction> Player::pull_pending_chat_actions() { return std::exchange(m_pending_chat_actions, {}); }
 
-std::expected<std::optional<String>, StarException> Player::inspectionLogName() const {
+std::expected<std::optional<String>, StarException> Player::inspection_log_name() const {
   auto identifier = uniqueId();
   if (identifier) {
     auto hash = xx_hash3_128(std::span<char const>(identifier->utf8()));
@@ -4507,7 +4507,7 @@ std::expected<std::optional<String>, StarException> Player::inspectionLogName() 
   return identifier;
 }
 
-std::expected<std::optional<String>, StarException> Player::inspectionDescription(String const&) const {
+std::expected<std::optional<String>, StarException> Player::inspection_description(String const&) const {
   return m_description;
 }
 
@@ -4992,7 +4992,7 @@ std::expected<EntityHighlightEffect, StarException> Player::inspectionHighlight(
   EntityHighlightEffect result;
   if (!tool)
     return result;
-  auto nameResult = inspectableEntity->inspectionLogName();
+  auto nameResult = inspectableEntity->inspection_log_name();
   if (!nameResult)
     return std::unexpected(std::move(nameResult.error()));
   auto name = std::move(*nameResult);

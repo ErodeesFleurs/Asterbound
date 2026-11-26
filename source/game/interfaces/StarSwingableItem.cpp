@@ -105,7 +105,7 @@ std::expected<float, StarException> SwingableItem::getAngle(float aimAngle) {
     if (m_timeFiring < windupTime())
       return m_swingStart + (m_swingFinish - m_swingStart) * m_timeFiring / windupTime() + aimAngle * m_swingAimFactor;
 
-    return m_swingFinish + (m_swingStart - m_swingFinish) * fireTimer() / (cooldownTime() + windupTime()) + aimAngle * m_swingAimFactor;
+    return m_swingFinish + (m_swingStart - m_swingFinish) * fireTimer() / (cooldown_time() + windupTime()) + aimAngle * m_swingAimFactor;
   }
 
   return -std::numbers::pi / 2;

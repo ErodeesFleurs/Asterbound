@@ -741,13 +741,13 @@ std::expected<String, StarException> Quest::questReceiverIndicator() const {
   if (auto drop = as<ItemDrop>(entity)) {
     for (auto const& item : items) if (drop->item()->matches(item, true)) return true;
   } else if (auto object = as<Object>(entity)) {
-    auto database = root.objectDatabase();
+    auto database = root.object_database();
     if (!database) return std::unexpected(std::move(database.error()));
     auto name = object->name();
     if (!name) return std::unexpected(std::move(name.error()));
-    auto config = (*database)->getConfig(*name);
+    auto config = (*database)->get_config(*name);
     if (!config) return std::unexpected(std::move(config.error()));
-    if (!(*config)->hasObjectItem) return false;
+    if (!(*config)->has_object_item) return false;
     for (auto const& item : items) if (*name == item.name()) return true;
   }
   return false;

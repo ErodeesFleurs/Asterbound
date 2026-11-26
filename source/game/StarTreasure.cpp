@@ -397,7 +397,7 @@ std::expected<std::shared_ptr<ContainerObject>, StarException> TreasureDatabase:
 }
 
 std::expected<std::shared_ptr<ContainerObject>, StarException> TreasureDatabase::createTreasureChest(World& world, String const& treasureChestSet, Vec2I const& position, Direction direction, std::uint64_t seed) const {
-  auto objectDatabase = m_root.objectDatabase();
+  auto objectDatabase = m_root.object_database();
   if (!objectDatabase)
     return std::unexpected(std::move(objectDatabase.error()));
   auto set = m_treasureChestSets.find_ref(treasureChestSet);
@@ -417,7 +417,7 @@ std::expected<std::shared_ptr<ContainerObject>, StarException> TreasureDatabase:
   if (!containerName)
     return std::unexpected(std::move(containerName.error()));
   auto parameters = JsonObject{{"treasurePools", JsonArray{chest->get().treasurePool}}, {"treasureSeed", seed}};
-  auto object = (*objectDatabase)->createForPlacement(world, containerName->get(), position, direction, parameters);
+  auto object = (*objectDatabase)->create_for_placement(world, containerName->get(), position, direction, parameters);
   if (!object)
     return std::unexpected(std::move(object.error()));
   if (!*object)

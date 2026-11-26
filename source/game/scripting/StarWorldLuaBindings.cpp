@@ -2497,13 +2497,13 @@ namespace LuaBindings {
       Vec2I const& worldPosition,
       std::optional<int> const& objectDirection,
       Json const& objectParameters) {
-    auto objectDatabaseResult = world.root().objectDatabase();
+    auto objectDatabaseResult = world.root().object_database();
     if (!objectDatabaseResult)
       return std::unexpected(std::move(objectDatabaseResult.error()));
     auto objectDatabase = std::move(*objectDatabaseResult);
     auto spawn = [&]() -> std::expected<bool, StarException> {
       Direction direction = objectDirection && *objectDirection < 0 ? Direction::Left : Direction::Right;
-      auto placedObjectResult = objectDatabase->createForPlacement(world, objectType, worldPosition, direction, objectParameters ? objectParameters : JsonObject());
+      auto placedObjectResult = objectDatabase->create_for_placement(world, objectType, worldPosition, direction, objectParameters ? objectParameters : JsonObject());
       if (!placedObjectResult)
         return std::unexpected(std::move(placedObjectResult.error()));
       auto placedObject = std::move(*placedObjectResult);
@@ -2861,7 +2861,7 @@ namespace LuaBindings {
   std::expected<bool, StarException> ServerWorldCallbacks::breakObject(WorldServer& world, EntityId arg1, bool arg2) {
     if (auto entity = world.get<Object>(arg1)) {
       bool smash = arg2;
-      if (auto operation = entity->breakObject(smash); !operation)
+      if (auto operation = entity->break_object(smash); !operation)
         return std::unexpected(std::move(operation.error()));
       return true;
     }
@@ -3352,7 +3352,7 @@ namespace LuaBindings {
       if (auto inspectableEntity = as<InspectableEntity>(entity)) {
         if (species)
           {
-          auto descriptionResult = inspectableEntity->inspectionDescription(*species);
+          auto descriptionResult = inspectableEntity->inspection_description(*species);
           if (!descriptionResult)
             return std::unexpected(std::move(descriptionResult.error()));
           auto description = std::move(*descriptionResult);
@@ -3435,7 +3435,7 @@ namespace LuaBindings {
     Json val = Json();
 
     if (auto objectEntity = as<Object>(world.entity(entityId))) {
-      auto parameterResult = objectEntity->configValue(parameterName);
+      auto parameterResult = objectEntity->config_value(parameterName);
       if (!parameterResult)
         return std::unexpected(std::move(parameterResult.error()));
       auto parameter = std::move(*parameterResult);

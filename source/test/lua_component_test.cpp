@@ -943,15 +943,15 @@ bool expect_forwarded_origin(GameTest& fixture, WorldServer& server, WorldClient
 
 std::optional<EntityId> install_origin_probe(GameTest& fixture, WorldServer& server, WorldClient& owner,
     Vec2F const& position) {
-  auto objects = fixture.root().objectDatabase();
+  auto objects = fixture.root().object_database();
   if (!fixture.check(bool(objects), "load object database"))
     return std::nullopt;
-  auto object = (*objects)->createObject("stoneteleporter",
+  auto object = (*objects)->create_object("stoneteleporter",
     JsonObject{{"clientEntityMode", "ClientMasterAllowed"}, {"scripts", JsonArray{}}, {"unbreakable", true}});
   if (!fixture.check(bool(object), "create client-owned probe object"))
     return std::nullopt;
   TileEntity& tile = **object;
-  if (!fixture.check(bool(tile.setTilePosition(Vec2I::floor(position))), "position probe object"))
+  if (!fixture.check(bool(tile.set_tile_position(Vec2I::floor(position))), "position probe object"))
     return std::nullopt;
   if (!fixture.check(bool(owner.addEntity(*object)), "publish probe object"))
     return std::nullopt;

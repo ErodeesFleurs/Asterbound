@@ -30,8 +30,8 @@ public:
   }
   std::string_view dynamic_type_name() const noexcept override { return Star::type_name<StatusEffectEntity>(); }
 
-  [[nodiscard]] virtual std::expected<List<PersistentStatusEffect>, StarException> statusEffects() const = 0;
-  virtual PolyF statusEffectArea() const = 0;
+  [[nodiscard]] virtual std::expected<List<PersistentStatusEffect>, StarException> status_effects() const = 0;
+  virtual PolyF status_effect_area() const = 0;
 };
 
 }

@@ -526,7 +526,7 @@ std::expected<void, StarException> Root::fullyLoad() {
   add(&Root::statusEffectDatabase);
   add(&Root::treasureDatabase);
   add(&Root::material_database);
-  add(&Root::objectDatabase);
+  add(&Root::object_database);
   add(&Root::npc_database);
   add(&Root::plantDatabase);
   add(&Root::itemDatabase);
@@ -742,7 +742,7 @@ std::expected<std::shared_ptr<Configuration>, StarException> Root::configuration
     });
 }
 
-std::expected<std::shared_ptr<ObjectDatabase const>, StarException> Root::objectDatabase() {
+std::expected<std::shared_ptr<ObjectDatabase const>, StarException> Root::object_database() {
   return loadMember(m_objectDatabase, m_objectDatabaseMutex, "ObjectDatabase", *this);
 }
 

@@ -68,7 +68,11 @@ namespace Star {
 class Root;
 
 class FarmableObject : public Object {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
+
 public:
+  FarmableObject(ConstructionKey, Root& root);
+
   void query_type(TypeQuery& query) const noexcept override {
     query_type_of<FarmableObject, Object>(*this, query);
   }
@@ -78,18 +82,17 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
 
-  [[nodiscard]] std::expected<bool, StarException> damageTiles(List<Vec2I> const& position, Vec2F const& sourcePosition, TileDamage const& tileDamage) override;
+  [[nodiscard]] std::expected<bool, StarException> damage_tiles(List<Vec2I> const& position, Vec2F const& sourcePosition, TileDamage const& tileDamage) override;
   [[nodiscard]] std::expected<InteractAction, StarException> interact(InteractRequest const& request) override;
 
   [[nodiscard]] std::expected<bool, StarException> harvest();
   int stage() const;
 
 protected:
-  [[nodiscard]] std::expected<void, StarException> readStoredData(Json const& diskStore) override;
-  [[nodiscard]] std::expected<Json, StarException> writeStoredData() const override;
+  [[nodiscard]] std::expected<void, StarException> read_stored_data(Json const& diskStore) override;
+  [[nodiscard]] std::expected<Json, StarException> write_stored_data() const override;
 
 private:
-  explicit FarmableObject(Root& rootContext);
   [[nodiscard]] std::expected<void, StarException> enterStage(int newStage);
 
   int m_stage;

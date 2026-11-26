@@ -72,7 +72,11 @@ export module star.teleporter_object;
 export namespace Star {
 
 class TeleporterObject : public Object, public WarpTargetEntity {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
+
 public:
+  TeleporterObject(ConstructionKey, Root& root);
+
   void query_type(TypeQuery& query) const noexcept override {
     query_type_of<TeleporterObject, Object, WarpTargetEntity>(*this, query);
   }
@@ -81,22 +85,20 @@ public:
   [[nodiscard]] static std::expected<std::shared_ptr<TeleporterObject>, StarException> create(Root& rootContext, std::shared_ptr<ObjectConfig const> config, Json const& parameters = JsonObject());
 
   [[nodiscard]] std::expected<Vec2F, StarException> footPosition() const override;
-private:
-  explicit TeleporterObject(Root& rootContext);
 };
 
 }
 
 namespace Star {
 
-TeleporterObject::TeleporterObject(Root& rootContext) : Entity(rootContext), Object(rootContext) {}
+TeleporterObject::TeleporterObject(ConstructionKey, Root& root) : Entity(root), Object(root) {}
 
 std::expected<std::shared_ptr<TeleporterObject>, StarException> TeleporterObject::create(Root& rootContext, std::shared_ptr<ObjectConfig const> config, Json const& parameters) {
-  auto object = std::shared_ptr<TeleporterObject>(new TeleporterObject(rootContext));
+  auto object = std::make_shared<TeleporterObject>(ConstructionKey{}, rootContext);
   auto initialized = object->initialize(std::move(config), parameters);
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
-  auto idConfig = object->configValue("uniqueId", Uuid(rootContext.random()).hex());
+  auto idConfig = object->config_value("uniqueId", Uuid(rootContext.random()).hex());
   if (!idConfig)
     return std::unexpected(std::move(idConfig.error()));
   auto id = idConfig->opt_string();
@@ -107,7 +109,7 @@ std::expected<std::shared_ptr<TeleporterObject>, StarException> TeleporterObject
 }
 
 std::expected<Vec2F, StarException> TeleporterObject::footPosition() const {
-  auto foot = configValue("teleporterFootPosition");
+  auto foot = config_value("teleporterFootPosition");
   if (!foot)
     return std::unexpected(std::move(foot.error()));
   if (*foot)

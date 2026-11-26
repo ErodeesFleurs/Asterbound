@@ -868,7 +868,7 @@ namespace WorldImpl {
     };
 
     if (auto tile_entity = as_ref<TileEntity>(*entity)) {
-      for (auto space : prefer_interactive ? tile_entity->get().interactiveSpaces() : tile_entity->get().spaces()) {
+      for (auto space : prefer_interactive ? tile_entity->get().interactive_spaces() : tile_entity->get().spaces()) {
         auto space_position = entity->position() + center_of_tile(space);
         auto delta = geometry.diff(space_position, source_position);
         if (delta.magnitude() <= max_range) {

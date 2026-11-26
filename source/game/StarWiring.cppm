@@ -15,7 +15,7 @@ enum class WireDirection {
   Output
 };
 
-WireDirection otherWireDirection(WireDirection direction);
+WireDirection other_wire_direction(WireDirection direction);
 
 // Identifier for a specific WireNode in a WireEntity, node indexes for input
 // and output nodes are separate.
@@ -23,36 +23,36 @@ struct WireNode {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, WireNode& value);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, WireNode const& value);
   WireDirection direction;
-  std::size_t nodeIndex;
+  std::size_t node_index;
 };
 
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, WireNode& wireNode);
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, WireNode const& wireNode);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, WireNode& wire_node);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, WireNode const& wire_node);
 
 // Connection from a given WireNode to another WireNode, the direction must be
 // implied based on the context.
 struct WireConnection {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, WireConnection& value);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, WireConnection const& value);
-  Vec2I entityLocation;
-  std::size_t nodeIndex;
+  Vec2I entity_location;
+  std::size_t node_index;
 
-  bool operator==(WireConnection const& wireConnection) const;
+  bool operator==(WireConnection const& wire_connection) const;
 };
 
 template <>
 struct ValueHash<WireConnection> {
-  std::size_t operator()(WireConnection const& wireConnection) const;
+  std::size_t operator()(WireConnection const& wire_connection) const;
 };
 
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, WireConnection& wireConnection);
-[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, WireConnection const& wireConnection);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, WireConnection& wire_connection);
+[[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, WireConnection const& wire_connection);
 
 class WireCoordinator {
 public:
   virtual ~WireCoordinator() = default;
 
-  [[nodiscard]] virtual std::expected<bool, StarException> readInputConnection(WireConnection const& connection) = 0;
+  [[nodiscard]] virtual std::expected<bool, StarException> read_input_connection(WireConnection const& connection) = 0;
 };
 
 class WireConnector {
@@ -84,7 +84,7 @@ export namespace Star {
   using ::Star::WireCoordinator;
   using ::Star::WireConnector;
   using ::Star::WireDirection;
-  using ::Star::otherWireDirection;
+  using ::Star::other_wire_direction;
   using ::Star::WireNode;
   using ::Star::WireConnection;
   using ::Star::ValueHash;

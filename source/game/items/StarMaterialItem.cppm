@@ -858,7 +858,7 @@ std::expected<std::size_t, StarException> MaterialItem::block_swap(float radius,
   }
 
   if (auto item = as_ref<FireableItem>(beamAxe))
-    setFireTimer(item->get().windupTime() + item->get().cooldownTime());
+    setFireTimer(item->get().windupTime() + item->get().cooldown_time());
   
   return success;
 }

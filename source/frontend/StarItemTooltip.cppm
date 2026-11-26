@@ -309,16 +309,16 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
 
   if (auto objectItem = as<ObjectItem>(item)) {
     auto objectDescription = [&]() -> std::expected<void, StarException> {
-      auto objectDatabaseResult798 = context.root().objectDatabase();
+      auto objectDatabaseResult798 = context.root().object_database();
       if (!objectDatabaseResult798)
         return std::unexpected(std::move(objectDatabaseResult798.error()));
-      auto objectName = objectItem->objectName();
+      auto objectName = objectItem->object_name();
       if (!objectName)
         return std::unexpected(std::move(objectName.error()));
-      auto objectParameters = objectItem->objectParameters();
+      auto objectParameters = objectItem->object_parameters();
       if (!objectParameters)
         return std::unexpected(std::move(objectParameters.error()));
-      auto createObjectResult799 = std::move(*objectDatabaseResult798)->createObject(*objectName, *objectParameters);
+      auto createObjectResult799 = std::move(*objectDatabaseResult798)->create_object(*objectName, *objectParameters);
       if (!createObjectResult799)
         return std::unexpected(std::move(createObjectResult799.error()));
       auto object = std::move(*createObjectResult799);
@@ -328,7 +328,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
         if (!containsChildResult800)
           return std::unexpected(std::move(containsChildResult800.error()));
         if (std::move(*containsChildResult800)) {
-          auto cursorHintDrawablesResult801 = object->cursorHintDrawables();
+          auto cursorHintDrawablesResult801 = object->cursor_hint_drawables();
           if (!cursorHintDrawablesResult801)
             return std::unexpected(std::move(cursorHintDrawablesResult801.error()));
           auto drawables = std::move(*cursorHintDrawablesResult801);
@@ -355,7 +355,7 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
           
         }
 
-      auto shortDescriptionResult807 = object->shortDescription();
+      auto shortDescriptionResult807 = object->short_description();
       if (!shortDescriptionResult807)
         return std::unexpected(std::move(shortDescriptionResult807.error()));
       title = std::move(*shortDescriptionResult807);
@@ -526,13 +526,13 @@ std::expected<void, StarException> ItemTooltipBuilder::buildItemDescriptionInner
   }
 
   if (auto fireable = as<FireableItem>(item)) {
-    auto setLabelResult840 = container->setLabel("cooldownTimeLabel", Star::format("{:.2f}", fireable->cooldownTime()));
+    auto setLabelResult840 = container->setLabel("cooldownTimeLabel", Star::format("{:.2f}", fireable->cooldown_time()));
     if (!setLabelResult840)
       return std::unexpected(std::move(setLabelResult840.error()));
     auto setLabelResult841 = container->setLabel("windupTimeLabel", Star::format("{:.2f}", fireable->windupTime()));
     if (!setLabelResult841)
       return std::unexpected(std::move(setLabelResult841.error()));
-    auto setLabelResult842 = container->setLabel("speedLabel", Star::format("{:.2f}", 1.0f / (fireable->cooldownTime() + fireable->windupTime())));
+    auto setLabelResult842 = container->setLabel("speedLabel", Star::format("{:.2f}", 1.0f / (fireable->cooldown_time() + fireable->windupTime())));
     if (!setLabelResult842)
       return std::unexpected(std::move(setLabelResult842.error()));
   }

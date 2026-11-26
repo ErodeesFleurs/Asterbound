@@ -26,8 +26,8 @@ namespace {
 std::expected<String, StarException> wiredObjectName(ObjectDatabase const& database, WorldServer const& world, Vec2I const& position) {
   // Use a real installed object with both node directions, without replacing its
   // scripts, node configuration, or entity implementation with a test double.
-  for (auto const& name : database.allObjects()) {
-    auto config = database.getConfig(name);
+  for (auto const& name : database.all_objects()) {
+    auto config = database.get_config(name);
     if (!config) return std::unexpected(std::move(config.error()));
     auto inputs = (*config)->config.get_array("inputNodes", {});
     if (!inputs) return std::unexpected(std::move(inputs.error()));
@@ -37,7 +37,7 @@ std::expected<String, StarException> wiredObjectName(ObjectDatabase const& datab
     if (!outputs) return std::unexpected(std::move(outputs.error()));
     if (outputs->empty())
       continue;
-    auto placeable = database.canPlaceObject(world, position, name);
+    auto placeable = database.can_place_object(world, position, name);
     if (!placeable) return std::unexpected(std::move(placeable.error()));
     if (*placeable)
       return name;
@@ -46,7 +46,7 @@ std::expected<String, StarException> wiredObjectName(ObjectDatabase const& datab
 }
 
 void expectConnection(Object const& object, WireDirection direction, WireConnection const& connection, bool present) {
-  auto connections = object.connectionsForNode({direction, 0});
+  auto connections = object.connections_for_node({direction, 0});
   ASSERT_TRUE(connections) << connections.error().what();
   EXPECT_EQ(std::ranges::find(*connections, connection) != connections->end(), present);
 }
@@ -72,26 +72,26 @@ void exerciseNetwork(GameTest& fixture, bool cycle) {
       (*tile)->get().background = structure_material_id;
     }
   }
-  auto database = fixture.root().objectDatabase();
+  auto database = fixture.root().object_database();
   ASSERT_TRUE(database) << database.error().what();
   auto name = wiredObjectName(**database, *world, Vec2I(1000, 1024));
   ASSERT_TRUE(name) << name.error().what();
   SCOPED_TRACE(name->utf8());
   std::array<std::shared_ptr<Object>, 3> objects;
   for (std::size_t i = 0; i < objects.size(); ++i) {
-    auto object = (*database)->createForPlacement(*world, *name,
+    auto object = (*database)->create_for_placement(*world, *name,
         Vec2I(1000 + 40 * i, 1024), Direction::Left, JsonObject{{"unbreakable", true}});
     ASSERT_TRUE(object) << object.error().what();
     ASSERT_NE(*object, nullptr);
     objects[i] = *object;
-    ASSERT_GT(objects[i]->nodeCount(WireDirection::Input), 0u);
-    ASSERT_GT(objects[i]->nodeCount(WireDirection::Output), 0u);
+    ASSERT_GT(objects[i]->node_count(WireDirection::Input), 0u);
+    ASSERT_GT(objects[i]->node_count(WireDirection::Output), 0u);
     ASSERT_TRUE(world->addEntity(objects[i]));
   }
   auto connect = [&](std::size_t from, std::size_t to) -> std::expected<void, StarException> {
-    auto output = objects[from]->addNodeConnection({WireDirection::Output, 0}, {objects[to]->tilePosition(), 0});
+    auto output = objects[from]->add_node_connection({WireDirection::Output, 0}, {objects[to]->tile_position(), 0});
     if (!output) return std::unexpected(std::move(output.error()));
-    return objects[to]->addNodeConnection({WireDirection::Input, 0}, {objects[from]->tilePosition(), 0});
+    return objects[to]->add_node_connection({WireDirection::Input, 0}, {objects[from]->tile_position(), 0});
   };
   ASSERT_TRUE(connect(0, 1));
   ASSERT_TRUE(connect(1, 2));
@@ -103,8 +103,8 @@ void exerciseNetwork(GameTest& fixture, bool cycle) {
   // Object::evaluate or an isolated recursive-lambda/helper probe.
   WireConnection missingInput{Vec2I(1100, 1024), 0};
   WireConnection missingOutput{Vec2I(1104, 1024), 0};
-  ASSERT_TRUE(objects[1]->addNodeConnection({WireDirection::Input, 0}, missingInput));
-  ASSERT_TRUE(objects[2]->addNodeConnection({WireDirection::Output, 0}, missingOutput));
+  ASSERT_TRUE(objects[1]->add_node_connection({WireDirection::Input, 0}, missingInput));
+  ASSERT_TRUE(objects[2]->add_node_connection({WireDirection::Output, 0}, missingOutput));
   expectConnection(*objects[1], WireDirection::Input, missingInput, true);
   expectConnection(*objects[2], WireDirection::Output, missingOutput, true);
 
@@ -112,9 +112,9 @@ void exerciseNetwork(GameTest& fixture, bool cycle) {
   for (unsigned step = 0; step < 128; ++step) {
     auto updated = world->update(0.0f);
     ASSERT_TRUE(updated) << updated.error().what();
-    auto inputs = objects[1]->connectionsForNode({WireDirection::Input, 0});
+    auto inputs = objects[1]->connections_for_node({WireDirection::Input, 0});
     ASSERT_TRUE(inputs) << inputs.error().what();
-    auto outputs = objects[2]->connectionsForNode({WireDirection::Output, 0});
+    auto outputs = objects[2]->connections_for_node({WireDirection::Output, 0});
     ASSERT_TRUE(outputs) << outputs.error().what();
     removed = std::ranges::find(*inputs, missingInput) == inputs->end()
         && std::ranges::find(*outputs, missingOutput) == outputs->end();
@@ -124,13 +124,13 @@ void exerciseNetwork(GameTest& fixture, bool cycle) {
   ASSERT_TRUE(removed);
   for (auto const& object : objects)
     EXPECT_EQ(world->entity(object->entityId()).get(), object.get());
-  expectConnection(*objects[0], WireDirection::Output, {objects[1]->tilePosition(), 0}, true);
-  expectConnection(*objects[1], WireDirection::Input, {objects[0]->tilePosition(), 0}, true);
-  expectConnection(*objects[1], WireDirection::Output, {objects[2]->tilePosition(), 0}, true);
-  expectConnection(*objects[2], WireDirection::Input, {objects[1]->tilePosition(), 0}, true);
+  expectConnection(*objects[0], WireDirection::Output, {objects[1]->tile_position(), 0}, true);
+  expectConnection(*objects[1], WireDirection::Input, {objects[0]->tile_position(), 0}, true);
+  expectConnection(*objects[1], WireDirection::Output, {objects[2]->tile_position(), 0}, true);
+  expectConnection(*objects[2], WireDirection::Input, {objects[1]->tile_position(), 0}, true);
   if (cycle) {
-    expectConnection(*objects[2], WireDirection::Output, {objects[0]->tilePosition(), 0}, true);
-    expectConnection(*objects[0], WireDirection::Input, {objects[2]->tilePosition(), 0}, true);
+    expectConnection(*objects[2], WireDirection::Output, {objects[0]->tile_position(), 0}, true);
+    expectConnection(*objects[0], WireDirection::Input, {objects[2]->tile_position(), 0}, true);
   }
 }
 

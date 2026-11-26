@@ -1315,7 +1315,7 @@ std::expected<bool, StarException> UniverseClient::reloadPlayer(Json const& data
     return changed;
   }();
   remember(std::move(loaded));
-  if (!world->get().entity(entityId))
+  if (world->get().inWorld() && !world->get().entity(entityId))
     remember(world->get().addEntity(player, entityId));
   if (indicator && indicator->inWorld())
     remember(world->get().removeEntity(indicator->entityId(), false));

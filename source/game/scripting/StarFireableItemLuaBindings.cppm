@@ -69,7 +69,7 @@ namespace Star::LuaBindings::FireableItemCallbacks {
   [[nodiscard]] std::expected<void, StarException> triggerCooldown(FireableItem& fireableItem);
   void setCooldown(FireableItem& fireableItem, float cooldownTime);
   void endCooldown(FireableItem& fireableItem);
-  float cooldownTime(FireableItem& fireableItem);
+  float cooldown_time(FireableItem& fireableItem);
   [[nodiscard]] std::expected<Json, StarException> fireableParam(FireableItem& fireableItem, String const& name, Json const& def);
   String fireMode(FireableItem& fireableItem);
   bool ready(FireableItem& fireableItem);
@@ -105,7 +105,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeFireableItemCallback
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<float>(
-        "cooldownTime", [&fireableItem]() { return FireableItemCallbacks::cooldownTime(fireableItem); });
+        "cooldownTime", [&fireableItem]() { return FireableItemCallbacks::cooldown_time(fireableItem); });
       !registration)
     return std::unexpected(std::move(registration.error()));
   if (auto registration = callbacks.register_callback_with_signature<Json, String, Json>(
@@ -217,8 +217,8 @@ void LuaBindings::FireableItemCallbacks::endCooldown(FireableItem& fireableItem)
 // Returns the item's default cooldown time
 //
 // @return the default cooldown time in seconds
-float LuaBindings::FireableItemCallbacks::cooldownTime(FireableItem& fireableItem) {
-  return fireableItem.cooldownTime();
+float LuaBindings::FireableItemCallbacks::cooldown_time(FireableItem& fireableItem) {
+  return fireableItem.cooldown_time();
 }
 
 // Gets the value of a configuration option for this item.

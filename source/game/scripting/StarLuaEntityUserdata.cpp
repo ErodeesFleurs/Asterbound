@@ -247,7 +247,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
               std::optional<String> const& species) -> std::expected<std::optional<String>, StarException> {
             if (auto inspectableEntity = as_ref<InspectableEntity>(*entity)) {
               if (species)
-                return inspectableEntity->get().inspectionDescription(*species);
+                return inspectableEntity->get().inspection_description(*species);
             }
 
             return entity->description();
@@ -266,7 +266,7 @@ std::expected<LuaMethods<std::shared_ptr<Entity>>, StarException> LuaUserDataMet
         std::expected<Json, StarException> val = Json();
         bool handled = true;
         if (auto object = as_ref<Object>(*entity))
-          val = object->get().configValue(parameterName);
+          val = object->get().config_value(parameterName);
         else if (auto npc = as_ref<Npc>(*entity))
           val = npc->get().script_config_parameter(parameterName);
         else if (auto projectile = as_ref<Projectile>(*entity))

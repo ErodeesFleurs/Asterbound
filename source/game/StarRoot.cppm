@@ -168,7 +168,7 @@ public:
   [[nodiscard]] std::expected<std::reference_wrapper<String const>, StarException> mod_storage_id(
       Assets const& assets, String const& source_path) &;
 
-  [[nodiscard]] std::expected<std::shared_ptr<ObjectDatabase const>, StarException> objectDatabase();
+  [[nodiscard]] std::expected<std::shared_ptr<ObjectDatabase const>, StarException> object_database();
   [[nodiscard]] std::expected<std::shared_ptr<PlantDatabase const>, StarException> plantDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<ProjectileDatabase const>, StarException> projectileDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<MonsterDatabase const>, StarException> monster_database();

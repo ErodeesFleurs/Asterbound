@@ -531,7 +531,7 @@ std::expected<WorldStructure, StarException> WorldServer::setCentralStructure(Wo
     }
   }
 
-  auto result23 = this->root().objectDatabase();
+  auto result23 = this->root().object_database();
   if (!result23)
     return std::unexpected(std::move(result23.error()));
   auto objectDatabase = std::move(*result23);
@@ -539,7 +539,7 @@ std::expected<WorldStructure, StarException> WorldServer::setCentralStructure(Wo
     auto result24 = generateRegion(RectI::with_size(structureObject.position, {1, 1}));
     if (!result24)
       return std::unexpected(std::move(result24.error()));
-    auto result25 = objectDatabase->createForPlacement(*this, structureObject.name, structureObject.position, structureObject.direction, structureObject.parameters);
+    auto result25 = objectDatabase->create_for_placement(*this, structureObject.name, structureObject.position, structureObject.direction, structureObject.parameters);
     if (!result25)
       return std::unexpected(std::move(result25.error()));
     if (auto object = std::move(*result25)) {
@@ -573,7 +573,7 @@ std::expected<void, StarException> WorldServer::removeCentralStructure() {
       if (!result29)
         return std::unexpected(std::move(result29.error()));
       for (auto const& objectEntity : std::move(*result29)) {
-        bool condition31 = static_cast<bool>(objectEntity->tilePosition() == structureObject.position);
+        bool condition31 = static_cast<bool>(objectEntity->tile_position() == structureObject.position);
         if (condition31) {
           auto result30 = objectEntity->name();
           if (!result30)
@@ -1172,42 +1172,42 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
       if (!result106)
         return std::unexpected(std::move(result106.error()));
       for (auto const& wireEntity : std::move(*result106)) {
-        auto result107 = wireEntity->connectionsForNode(disconnectWires->wire_node);
+        auto result107 = wireEntity->connections_for_node(disconnectWires->wire_node);
         if (!result107)
           return std::unexpected(std::move(result107.error()));
         for (auto connection : std::move(*result107)) {
-          auto result108 = wireEntity->removeNodeConnection(disconnectWires->wire_node, connection);
+          auto result108 = wireEntity->remove_node_connection(disconnectWires->wire_node, connection);
           if (!result108)
             return std::unexpected(std::move(result108.error()));
-          auto result109 = atTile<WireEntity>(connection.entityLocation);
+          auto result109 = atTile<WireEntity>(connection.entity_location);
           if (!result109)
             return std::unexpected(std::move(result109.error()));
           for (auto const& connectedEntity : std::move(*result109)) {
-            auto result110 = connectedEntity->removeNodeConnection(
-              {.direction = otherWireDirection(disconnectWires->wire_node.direction), .nodeIndex = connection.nodeIndex},
-              WireConnection{.entityLocation = disconnectWires->entity_position,
-                             .nodeIndex = disconnectWires->wire_node.nodeIndex});
+            auto result110 = connectedEntity->remove_node_connection(
+              {.direction = other_wire_direction(disconnectWires->wire_node.direction), .node_index = connection.node_index},
+              WireConnection{.entity_location = disconnectWires->entity_position,
+                             .node_index = disconnectWires->wire_node.node_index});
             if (!result110)
               return std::unexpected(std::move(result110.error()));
           }
         }
       }
     } else if (auto connectWire = as<ConnectWirePacket>(packet)) {
-      auto result111 = atTile<WireEntity>(connectWire->input_connection.entityLocation);
+      auto result111 = atTile<WireEntity>(connectWire->input_connection.entity_location);
       if (!result111)
         return std::unexpected(std::move(result111.error()));
       for (auto const& source : std::move(*result111)) {
-        auto result112 = atTile<WireEntity>(connectWire->output_connection.entityLocation);
+        auto result112 = atTile<WireEntity>(connectWire->output_connection.entity_location);
         if (!result112)
           return std::unexpected(std::move(result112.error()));
         for (auto const& target : std::move(*result112)) {
-          auto result113 = source->addNodeConnection(
-            WireNode{.direction = WireDirection::Input, .nodeIndex = connectWire->input_connection.nodeIndex},
+          auto result113 = source->add_node_connection(
+            WireNode{.direction = WireDirection::Input, .node_index = connectWire->input_connection.node_index},
             connectWire->output_connection);
           if (!result113)
             return std::unexpected(std::move(result113.error()));
-          auto result114 = target->addNodeConnection(
-            WireNode{.direction = WireDirection::Output, .nodeIndex = connectWire->output_connection.nodeIndex},
+          auto result114 = target->add_node_connection(
+            WireNode{.direction = WireDirection::Output, .node_index = connectWire->output_connection.node_index},
             connectWire->input_connection);
           if (!result114)
             return std::unexpected(std::move(result114.error()));
@@ -1533,7 +1533,7 @@ std::expected<void, StarException> WorldServer::update(float dt) {
         auto active = world.regionActive(RectI::integral(tileEntity->meta_bound_box().translated(tileEntity->position())).padded(world_sector_size));
         if (!active) return std::unexpected(std::move(active.error()));
         if (*active) {
-          auto broken = tileEntity->checkBroken();
+          auto broken = tileEntity->check_broken();
           if (!broken) return std::unexpected(std::move(broken.error()));
         }
       }
@@ -1783,32 +1783,29 @@ std::shared_ptr<Entity> WorldServer::entity(EntityId entityId) const {
 std::expected<void, StarException> WorldServer::addEntity(std::shared_ptr<Entity> const& entity, EntityId entityId) {
   if (!entity)
     return {};
+  if (entity->maybeWorld())
+    return std::unexpected(WorldServerException("Cannot add an entity that is already initialized"));
 
   auto reservedId = m_entityMap->reserve_entity_id(entityId);
   if (!reservedId)
     return std::unexpected(std::move(reservedId.error()));
 
-  auto reject = [&, &world = *this](StarException error, bool published) -> std::expected<void, StarException> {
-    if (published) {
-      if (auto tileEntity = as<TileEntity>(entity)) {
-        if (auto result = world.updateTileEntityTiles(tileEntity, true, false); !result)
-          error = error.with_context(Star::format("Error clearing rejected entity tiles: {}", result.error().what()));
-      }
-      world.m_entityMap->remove_entity(entity->entityId());
-    }
+  auto reject = [&](StarException error) -> std::expected<void, StarException> {
     if (auto result = entity->uninit(); !result)
       error = error.with_context(Star::format("Error uninitializing rejected entity: {}", result.error().what()));
     return std::unexpected(std::move(error));
   };
 
   if (auto result = entity->init(*this, *reservedId, EntityMode::Master); !result)
-    return reject(std::move(result.error()), false);
+    return reject(std::move(result.error()));
   if (auto result = m_entityMap->add_entity(entity); !result)
-    return reject(std::move(result.error()), false);
+    return reject(std::move(result.error()));
 
   if (auto tileEntity = as<TileEntity>(entity)) {
-    if (auto result = updateTileEntityTiles(tileEntity); !result)
-      return reject(std::move(result.error()), true);
+    if (auto result = updateTileEntityTiles(tileEntity); !result) {
+      m_entityMap->remove_entity(*reservedId);
+      return reject(std::move(result.error()));
+    }
   }
   return {};
 }
@@ -2134,7 +2131,7 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
           if (!damagedEntities.contains(entity)) {
             Set<Vec2I> entitySpacesSet;
             for (auto const& space : entity->spaces())
-              entitySpacesSet.add(m_geometry.xwrap(entity->tilePosition() + space));
+              entitySpacesSet.add(m_geometry.xwrap(entity->tile_position() + space));
 
             List<Vec2I> entityDamagePositions;
             entityDamagePositions.reserve(std::min(entitySpacesSet.size(), damagePositionSet.size()));
@@ -2142,7 +2139,7 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
               if (damagePositionSet.contains(space))
                 entityDamagePositions.push_back(space);
             }
-            auto result238 = entity->damageTiles(entityDamagePositions, sourcePosition, tileDamage);
+            auto result238 = entity->damage_tiles(entityDamagePositions, sourcePosition, tileDamage);
             if (!result238)
               return std::unexpected(std::move(result238.error()));
             bool broken = std::move(*result238);
@@ -2172,7 +2169,7 @@ std::expected<TileDamageResult, StarException> WorldServer::damageTiles(List<Vec
               tileRes = TileDamageResult::Protected; else {
               bool condition243 = static_cast<bool>(broken);
               if (!condition243) {
-                auto result242 = entity->canBeDamaged();
+                auto result242 = entity->can_be_damaged();
                 if (!result242)
                   return std::unexpected(std::move(result242.error()));
                 condition243 = static_cast<bool>(std::move(*result242));
@@ -3168,14 +3165,49 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
   // for and maybe we shouldn't allow tile entity configurations to specify
   // material spaces outside of their spaces
 
-  auto& spaces = m_tileEntitySpaces[entity->entityId()];
+  auto const id = entity->entityId();
+  auto [entry, inserted] = m_tileEntitySpaces.try_emplace(id);
+  auto& spaces = entry->second;
 
-  List<MaterialSpace> newMaterialSpaces = removing ? List<MaterialSpace>() : entity->materialSpaces();
+  List<MaterialSpace> newMaterialSpaces = removing ? List<MaterialSpace>() : entity->material_spaces();
   List<Vec2I> newRoots = removing || entity->ephemeral() ? List<Vec2I>() : entity->roots();
 
   if (!removing && spaces.materials == newMaterialSpaces && spaces.roots == newRoots) {
     return {};
   }
+
+  // Adding an entity has no old footprint to remove. On rejection, restore
+  // only the fields this operation wrote, including preexisting terrain.
+  struct PreviousTile {
+    Vec2I position;
+    MaterialId foreground;
+    ModId mod;
+    std::optional<Vec2I> root_source;
+    CollisionKind object_collision;
+  };
+  bool const adding = inserted && !removing;
+  SmallVector<PreviousTile, 4> previous_tiles;
+  auto remember_tile = [&](Vec2I const& position, ServerTile const& tile) {
+    if (adding)
+      previous_tiles.emplace_back(position, tile.foreground, tile.foregroundMod, tile.rootSource, tile.objectCollision);
+  };
+  auto rollback = make_scope_exit([&] {
+    if (!adding)
+      return;
+    for (auto const& previous : std::views::reverse(previous_tiles)) {
+      if (auto tile = m_tileArray->modify_tile(previous.position)) {
+        tile->get().foreground = previous.foreground;
+        tile->get().foregroundMod = previous.mod;
+        tile->get().rootSource = previous.root_source;
+        if (tile->get().update_object_collision(previous.object_collision)) {
+          m_liquid_engine->visit_location(previous.position);
+          m_falling_blocks_agent->visit_location(previous.position);
+          WorldImpl::invalidate_collision_cache(*m_tileArray, RectI::with_size(previous.position, {1, 1}));
+        }
+      }
+    }
+    m_tileEntitySpaces.remove(id);
+  });
 
   auto result355 = this->root().material_database();
   if (!result355)
@@ -3184,13 +3216,13 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
 
   // remove all old roots
   for (auto const& rootPos : spaces.roots) {
-    if (auto tile = m_tileArray->modify_tile(rootPos + entity->tilePosition()))
+    if (auto tile = m_tileArray->modify_tile(rootPos + entity->tile_position()))
       tile->get().rootSource = {};
   }
 
   // remove all old material spaces
   for (auto const& materialSpace : spaces.materials) {
-    Vec2I pos = materialSpace.space + entity->tilePosition();
+    Vec2I pos = materialSpace.space + entity->tile_position();
 
     auto tile = m_tileArray->modify_tile(pos);
     if (tile) {
@@ -3225,24 +3257,25 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
     // add new material spaces and update the known material spaces entry
     List<MaterialSpace> passedSpaces;
     for (auto const& materialSpace : newMaterialSpaces) {
-      Vec2I pos = materialSpace.space + entity->tilePosition();
+      Vec2I pos = materialSpace.space + entity->tile_position();
 
       bool updatedTile = false;
       bool collision_changed = false;
       auto tile = m_tileArray->modify_tile(pos);
       if (tile) {
+        auto kind = material_database->material_collision_kind(materialSpace.material);
+        if (!kind)
+          return std::unexpected(std::move(kind.error()));
+        remember_tile(pos, tile->get());
         if (tile->get().foreground == empty_material_id) {
           tile->get().foreground = materialSpace.material;
           tile->get().foregroundMod = no_mod_id;
           updatedTile = true;
         }
         if (is_real_material(materialSpace.material))
-          tile->get().rootSource = entity->tilePosition();
+          tile->get().rootSource = entity->tile_position();
         passedSpaces.emplace_back(materialSpace);
-        auto result358 = material_database->material_collision_kind(materialSpace.material);
-        if (!result358)
-          return std::unexpected(std::move(result358.error()));
-        collision_changed = tile->get().update_object_collision(*result358);
+        collision_changed = tile->get().update_object_collision(*kind);
         updatedTile |= collision_changed;
       }
       if (collision_changed) {
@@ -3260,8 +3293,11 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
 
     // add new roots and update known roots entry
     for (auto const& rootPos : newRoots) {
-      if (auto tile = m_tileArray->modify_tile(rootPos + entity->tilePosition()))
-        tile->get().rootSource = entity->tilePosition();
+      Vec2I const pos = rootPos + entity->tile_position();
+      if (auto tile = m_tileArray->modify_tile(pos)) {
+        remember_tile(pos, tile->get());
+        tile->get().rootSource = entity->tile_position();
+      }
     }
     spaces.roots = std::move(newRoots);
   }
@@ -3272,6 +3308,7 @@ std::expected<void, StarException> WorldServer::updateTileEntityTiles(std::share
     if (!result361)
       return std::unexpected(std::move(result361.error()));
   }
+  rollback.release();
   return {};
 }
 
@@ -3875,7 +3912,7 @@ std::expected<void, StarException> WorldServer::checkEntityBreaks(RectF const& r
   if (!result437)
     return std::unexpected(std::move(result437.error()));
   for (auto const& tileEntity : std::move(*result437)) {
-    auto result438 = tileEntity->checkBroken();
+    auto result438 = tileEntity->check_broken();
     if (!result438)
       return std::unexpected(std::move(result438.error()));
   }
@@ -4590,22 +4627,22 @@ std::expected<void, StarException> WorldServer::setTemplate(std::shared_ptr<Worl
 }
 
 std::expected<void, StarException> WorldServer::wire(Vec2I const& outputPosition, std::size_t outputIndex, Vec2I const& inputPosition, std::size_t inputIndex) {
-  WireConnection output = {.entityLocation = outputPosition, .nodeIndex = outputIndex};
-  WireConnection input = {.entityLocation = inputPosition, .nodeIndex = inputIndex};
-  auto result520 = atTile<WireEntity>(input.entityLocation);
+  WireConnection output = {.entity_location = outputPosition, .node_index = outputIndex};
+  WireConnection input = {.entity_location = inputPosition, .node_index = inputIndex};
+  auto result520 = atTile<WireEntity>(input.entity_location);
   if (!result520)
     return std::unexpected(std::move(result520.error()));
   for (auto const& source : std::move(*result520)) {
-    auto result521 = atTile<WireEntity>(output.entityLocation);
+    auto result521 = atTile<WireEntity>(output.entity_location);
     if (!result521)
       return std::unexpected(std::move(result521.error()));
     for (auto const& target : std::move(*result521)) {
       auto result522 =
-        source->addNodeConnection(WireNode{.direction = WireDirection::Input, .nodeIndex = input.nodeIndex}, output);
+        source->add_node_connection(WireNode{.direction = WireDirection::Input, .node_index = input.node_index}, output);
       if (!result522)
         return std::unexpected(std::move(result522.error()));
       auto result523 =
-        target->addNodeConnection(WireNode{.direction = WireDirection::Output, .nodeIndex = output.nodeIndex}, input);
+        target->add_node_connection(WireNode{.direction = WireDirection::Output, .node_index = output.node_index}, input);
       if (!result523)
         return std::unexpected(std::move(result523.error()));
     }

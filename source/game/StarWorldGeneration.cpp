@@ -219,13 +219,13 @@ static int const PlantAdjustmentLimit = 2;
 
 static std::expected<std::shared_ptr<Object>, StarException> create_biome_object(
     WorldServer& world, ObjectPool const& pool, Vec2I const& position, std::uint64_t seed) {
-  auto objects = world.root().objectDatabase();
+  auto objects = world.root().object_database();
   if (!objects) return std::unexpected(std::move(objects.error()));
   auto direction = seed % 2 ? Direction::Left : Direction::Right;
   // An empty pool historically passed a default name and parameters to placement.
-  if (pool.empty()) return (*objects)->createForPlacement(world, String{}, position, direction, Json{});
+  if (pool.empty()) return (*objects)->create_for_placement(world, String{}, position, direction, Json{});
   auto const& [name, parameters] = pool.items()[pool.select_index(seed)].second;
-  return (*objects)->createForPlacement(world, name, position, direction, parameters);
+  return (*objects)->create_for_placement(world, name, position, direction, parameters);
 }
 
 
@@ -578,10 +578,10 @@ std::expected<void, StarException> DungeonGeneratorWorld::placeObject(Vec2I cons
     auto operationResult1 = m_worldServer.signalRegion(RectI::with_size(pos, {1, 1}));
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
-  auto autoobjectDatabaseResult1 = generationRoot.objectDatabase();
+  auto autoobjectDatabaseResult1 = generationRoot.object_database();
   if (!autoobjectDatabaseResult1) return std::unexpected(std::move(autoobjectDatabaseResult1.error()));
   auto objectDatabase = std::move((*autoobjectDatabaseResult1));
-  auto objectCheckedResult1 = objectDatabase->createForPlacement(m_worldServer, objectName, pos, direction, parameters);
+  auto objectCheckedResult1 = objectDatabase->create_for_placement(m_worldServer, objectName, pos, direction, parameters);
   if (!objectCheckedResult1) return std::unexpected(std::move(objectCheckedResult1.error()));
   if (auto object = std::move((*objectCheckedResult1)))
     {
@@ -767,7 +767,7 @@ std::expected<void, StarException> DungeonGeneratorWorld::placePlant(std::shared
     }
   }
   {
-    auto operationResult1 = plant->setTilePosition(position);
+    auto operationResult1 = plant->set_tile_position(position);
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
   {
@@ -986,33 +986,33 @@ std::expected<void, StarException> DungeonGeneratorWorld::connectWireGroup(List<
     if (!rangeValuesResult1) return std::unexpected(std::move(rangeValuesResult1.error()));
     auto rangeValues = std::move((*rangeValuesResult1));
     for (auto entity : rangeValues) {
-      for (std::size_t i = 0; i < entity->nodeCount(WireDirection::Input); ++i) {
+      for (std::size_t i = 0; i < entity->node_count(WireDirection::Input); ++i) {
         if (auto inputNodeMatches = [&]() -> std::expected<bool, StarException> {
-              auto nodeOffset = entity->nodePosition({.direction = WireDirection::Input, .nodeIndex = i});
+              auto nodeOffset = entity->node_position({.direction = WireDirection::Input, .node_index = i});
               if (!nodeOffset)
                 return std::unexpected(std::move(nodeOffset.error()));
-              auto condition = std::move(entity->tilePosition() + (*nodeOffset) == entry);
+              auto condition = std::move(entity->tile_position() + (*nodeOffset) == entry);
               return static_cast<bool>(condition);
             }();
             !inputNodeMatches)
           return std::unexpected(std::move(inputNodeMatches.error()));
         else if (*inputNodeMatches) {
-          inbounds.push_back(WireConnection{.entityLocation = entity->tilePosition(), .nodeIndex = i});
+          inbounds.push_back(WireConnection{.entity_location = entity->tile_position(), .node_index = i});
           found = true;
         }
       }
-      for (std::size_t i = 0; i < entity->nodeCount(WireDirection::Output); ++i) {
+      for (std::size_t i = 0; i < entity->node_count(WireDirection::Output); ++i) {
         if (auto outputNodeMatches = [&]() -> std::expected<bool, StarException> {
-              auto nodeOffset = entity->nodePosition({.direction = WireDirection::Output, .nodeIndex = i});
+              auto nodeOffset = entity->node_position({.direction = WireDirection::Output, .node_index = i});
               if (!nodeOffset)
                 return std::unexpected(std::move(nodeOffset.error()));
-              auto condition = std::move(entity->tilePosition() + (*nodeOffset) == entry);
+              auto condition = std::move(entity->tile_position() + (*nodeOffset) == entry);
               return static_cast<bool>(condition);
             }();
             !outputNodeMatches)
           return std::unexpected(std::move(outputNodeMatches.error()));
         else if (*outputNodeMatches) {
-          outbounds.push_back(WireConnection{.entityLocation = entity->tilePosition(), .nodeIndex = i});
+          outbounds.push_back(WireConnection{.entity_location = entity->tile_position(), .node_index = i});
           found = true;
         }
       }
@@ -1033,26 +1033,26 @@ std::expected<void, StarException> DungeonGeneratorWorld::connectWireGroup(List<
   }
 
   for (auto outbound : outbounds) {
-    auto autooutResult1 = m_worldServer.atTile<WireEntity>(outbound.entityLocation);
+    auto autooutResult1 = m_worldServer.atTile<WireEntity>(outbound.entity_location);
     if (!autooutResult1) return std::unexpected(std::move(autooutResult1.error()));
     auto autooutResult2 = (*autooutResult1).first();
     if (!autooutResult2) return std::unexpected(std::move(autooutResult2.error()));
     auto out = std::move(autooutResult2->get());
     for (auto inbound : inbounds) {
-      auto autoinResult1 = m_worldServer.atTile<WireEntity>(inbound.entityLocation);
+      auto autoinResult1 = m_worldServer.atTile<WireEntity>(inbound.entity_location);
       if (!autoinResult1) return std::unexpected(std::move(autoinResult1.error()));
       auto autoinResult2 = (*autoinResult1).first();
       if (!autoinResult2) return std::unexpected(std::move(autoinResult2.error()));
       auto in = std::move(autoinResult2->get());
       {
         auto inputConnectionAdded =
-          in->addNodeConnection({.direction = WireDirection::Input, .nodeIndex = inbound.nodeIndex}, outbound);
+          in->add_node_connection({.direction = WireDirection::Input, .node_index = inbound.node_index}, outbound);
         if (!inputConnectionAdded)
           return std::unexpected(std::move(inputConnectionAdded.error()));
       }
       {
         auto outputConnectionAdded =
-          out->addNodeConnection({.direction = WireDirection::Output, .nodeIndex = outbound.nodeIndex}, inbound);
+          out->add_node_connection({.direction = WireDirection::Output, .node_index = outbound.node_index}, inbound);
         if (!outputConnectionAdded)
           return std::unexpected(std::move(outputConnectionAdded.error()));
       }
@@ -1141,16 +1141,16 @@ std::expected<void, StarException> DungeonGeneratorWorld::clearTileEntities(Rect
   entities.filter([positions, geometry, clearAnchoredObjects](std::shared_ptr<Entity> const& entity) {
     auto tileEntity = as<TileEntity>(entity);
     for (auto pos : tileEntity->spaces()) {
-      if (positions.contains(geometry.xwrap(pos + tileEntity->tilePosition())))
+      if (positions.contains(geometry.xwrap(pos + tileEntity->tile_position())))
         return true;
     }
     if (clearAnchoredObjects) {
       for (auto pos : tileEntity->roots()) {
-        if (positions.contains(geometry.xwrap(pos + tileEntity->tilePosition())))
+        if (positions.contains(geometry.xwrap(pos + tileEntity->tile_position())))
           return true;
       }
       if (auto object = as<Object>(entity)) {
-        for (auto pos : object->anchorPositions()) {
+        for (auto pos : object->anchor_positions()) {
           if (positions.contains(geometry.xwrap(pos)))
             return true;
         }
@@ -2051,7 +2051,7 @@ std::expected<void, StarException> WorldGenerator::reapply_biome(WorldStorage& w
     if (auto plant = as<Plant>(entity)) {
       biome_tile_entities.push_back(as<TileEntity>(entity));
     } else if (auto object = as<Object>(entity)) {
-      if (object->biomePlaced())
+      if (object->biome_placed())
         biome_tile_entities.push_back(as<TileEntity>(entity));
     }
   }
@@ -2082,7 +2082,7 @@ std::expected<void, StarException> WorldGenerator::reapply_biome(WorldStorage& w
         MaterialId old_foreground = tile->get().foreground;
 
         for (auto iter = biome_tile_entities.begin(); iter != biome_tile_entities.end();) {
-          if ((*iter)->tilePosition() == position) {
+          if ((*iter)->tile_position() == position) {
             auto removed = m_worldServer.removeEntity((*iter)->entityId(), false);
             if (!removed) return std::unexpected(std::move(removed.error()));
             iter = biome_tile_entities.erase(iter);
@@ -2255,7 +2255,7 @@ std::expected<void, StarException> WorldGenerator::reapply_biome(WorldStorage& w
       auto valid = position_valid(pos);
       if (!valid) return std::unexpected(std::move(valid.error()));
       if (!*valid) continue;
-      auto positioned = plant->setTilePosition(pos);
+      auto positioned = plant->set_tile_position(pos);
       if (!positioned) return std::unexpected(std::move(positioned.error()));
       auto added = m_worldServer.addEntity(plant);
       if (!added) return std::unexpected(std::move(added.error()));
@@ -2286,7 +2286,7 @@ std::expected<void, StarException> WorldGenerator::reapply_biome(WorldStorage& w
     if (std::holds_alternative<ObjectPool>(item)) {
       auto object = create_biome_object(m_worldServer, std::get<ObjectPool>(item), position, seed);
       if (!object) return std::unexpected(std::move(object.error()));
-      if (*object && (*object)->biomePlaced()) {
+      if (*object && (*object)->biome_placed()) {
         auto added = m_worldServer.addEntity(*object);
         if (!added) return std::unexpected(std::move(added.error()));
       }
@@ -2516,7 +2516,7 @@ std::expected<bool, StarException> WorldGenerator::placePlant(WorldStorage& worl
     }
   }
   {
-    auto operationResult1 = plant->setTilePosition(position);
+    auto operationResult1 = plant->set_tile_position(position);
     if (!operationResult1) return std::unexpected(std::move(operationResult1.error()));
   }
   {

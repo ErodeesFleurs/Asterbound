@@ -65,8 +65,8 @@ public:
   Vec2F position() const override;
 
   // The base tile position of this object.
-  virtual Vec2I tilePosition() const = 0;
-  [[nodiscard]] virtual std::expected<void, StarException> setTilePosition(Vec2I const& pos) = 0;
+  virtual Vec2I tile_position() const = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> set_tile_position(Vec2I const& pos) = 0;
 
   // TileEntities occupy the given spaces in tile space.  This is relative to
   // the current base position, and may include negative positions.  A 1x1
@@ -80,16 +80,16 @@ public:
 
   // TileEntities may register some of their occupied spaces with metamaterials
   // to generate collidable regions
-  virtual List<MaterialSpace> materialSpaces() const;
+  virtual List<MaterialSpace> material_spaces() const;
   
   // Returns whether the entity was destroyed
-  [[nodiscard]] virtual std::expected<bool, StarException> damageTiles(List<Vec2I> const& positions, Vec2F const& sourcePosition, TileDamage const& tileDamage);
-  [[nodiscard]] virtual std::expected<bool, StarException> canBeDamaged() const;
+  [[nodiscard]] virtual std::expected<bool, StarException> damage_tiles(List<Vec2I> const& positions, Vec2F const& sourcePosition, TileDamage const& tileDamage);
+  [[nodiscard]] virtual std::expected<bool, StarException> can_be_damaged() const;
 
   // Forces the tile entity to do an immediate check if it has been invalidly
   // placed in some way.  The tile entity may do this check on its own, but
   // less often.
-  [[nodiscard]] virtual std::expected<bool, StarException> checkBroken() = 0;
+  [[nodiscard]] virtual std::expected<bool, StarException> check_broken() = 0;
 
   // If the entity accepts interaction through right clicking, by default,
   // returns false.
@@ -98,7 +98,7 @@ public:
   [[nodiscard]] std::expected<InteractAction, StarException> interact(InteractRequest const& request) override;
   // Specific subset spaces that are interactive, by default, just returns
   // spaces()
-  virtual List<Vec2I> interactiveSpaces() const;
+  virtual List<Vec2I> interactive_spaces() const;
 
   [[nodiscard]] std::expected<List<QuestArcDescriptor>, StarException> offered_quests() const override;
   [[nodiscard]] std::expected<StringSet, StarException> turn_in_quests() const override;

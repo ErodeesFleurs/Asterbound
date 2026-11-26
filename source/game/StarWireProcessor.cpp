@@ -118,16 +118,16 @@ std::expected<void, StarException> WireProcessor::process() {
   return {};
 }
 
-std::expected<bool, StarException> WireProcessor::readInputConnection(WireConnection const& connection) {
-  if (auto wes = m_workingWireEntities.find_ref(connection.entityLocation)) {
-    return wes->get().outputStates.get(connection.nodeIndex);
+std::expected<bool, StarException> WireProcessor::read_input_connection(WireConnection const& connection) {
+  if (auto wes = m_workingWireEntities.find_ref(connection.entity_location)) {
+    return wes->get().outputStates.get(connection.node_index);
   }
   return false;
 }
 
 std::expected<void, StarException> WireProcessor::populateWorking(WireEntity& wireEntity) {
   auto p = m_workingWireEntities.insert(
-    wireEntity.tilePosition(),
+    wireEntity.tile_position(),
     WireEntityState{.wireEntity = std::ref(wireEntity), .outputStates = {}, .networkLoaded = false});
   if (!p.second) {
     if (p.first->second.wireEntity.get().entityId() != wireEntity.entityId()) {
@@ -136,10 +136,10 @@ std::expected<void, StarException> WireProcessor::populateWorking(WireEntity& wi
     return {};
   }
   auto& wes = p.first->second;
-  std::size_t outputNodeCount = wes.wireEntity.get().nodeCount(WireDirection::Output);
+  std::size_t outputNodeCount = wes.wireEntity.get().node_count(WireDirection::Output);
   wes.outputStates.resize(outputNodeCount);
   for (std::size_t i = 0; i < outputNodeCount; ++i) {
-    auto state = wes.wireEntity.get().nodeState({.direction = WireDirection::Output, .nodeIndex = i});
+    auto state = wes.wireEntity.get().node_state({.direction = WireDirection::Output, .node_index = i});
     if (!state) return std::unexpected(std::move(state.error()));
     wes.outputStates[i] = *state;
   }
@@ -190,33 +190,33 @@ std::expected<void, StarException> WireProcessor::loadNetwork(Vec2I tilePosition
     // Recursively descend into all the inbound and outbound nodes, and if we
     // ever cannot load the wire entity for a connection, go ahead and remove
     // the connection.
-    std::size_t inboundNodeCount = wes->get().wireEntity.get().nodeCount(WireDirection::Input);
+    std::size_t inboundNodeCount = wes->get().wireEntity.get().node_count(WireDirection::Input);
     for (std::size_t i = 0; i < inboundNodeCount; ++i) {
       auto connections =
-        wes->get().wireEntity.get().connectionsForNode({.direction = WireDirection::Input, .nodeIndex = i});
+        wes->get().wireEntity.get().connections_for_node({.direction = WireDirection::Input, .node_index = i});
       if (!connections) return std::unexpected(std::move(connections.error()));
       for (auto const& connection : *connections) {
-        auto loaded = self(connection.entityLocation);
+        auto loaded = self(connection.entity_location);
         if (!loaded) return std::unexpected(std::move(loaded.error()));
         if (!*loaded) {
-          if (auto r = wes->get().wireEntity.get().removeNodeConnection(
-                {.direction = WireDirection::Input, .nodeIndex = i}, connection);
+          if (auto r = wes->get().wireEntity.get().remove_node_connection(
+                {.direction = WireDirection::Input, .node_index = i}, connection);
               !r)
             return std::unexpected(std::move(r.error()));
         }
       }
     }
-    std::size_t outboundNodeCount = wes->get().wireEntity.get().nodeCount(WireDirection::Output);
+    std::size_t outboundNodeCount = wes->get().wireEntity.get().node_count(WireDirection::Output);
     for (std::size_t i = 0; i < outboundNodeCount; ++i) {
       auto connections =
-        wes->get().wireEntity.get().connectionsForNode({.direction = WireDirection::Output, .nodeIndex = i});
+        wes->get().wireEntity.get().connections_for_node({.direction = WireDirection::Output, .node_index = i});
       if (!connections) return std::unexpected(std::move(connections.error()));
       for (auto const& connection : *connections) {
-        auto loaded = self(connection.entityLocation);
+        auto loaded = self(connection.entity_location);
         if (!loaded) return std::unexpected(std::move(loaded.error()));
         if (!*loaded) {
-          if (auto r = wes->get().wireEntity.get().removeNodeConnection(
-                {.direction = WireDirection::Output, .nodeIndex = i}, connection);
+          if (auto r = wes->get().wireEntity.get().remove_node_connection(
+                {.direction = WireDirection::Output, .node_index = i}, connection);
               !r)
             return std::unexpected(std::move(r.error()));
         }

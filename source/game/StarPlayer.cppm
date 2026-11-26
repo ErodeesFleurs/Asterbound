@@ -516,8 +516,8 @@ public:
 
   List<ChatAction> pull_pending_chat_actions() override;
 
-  [[nodiscard]] std::expected<std::optional<String>, StarException> inspectionLogName() const override;
-  [[nodiscard]] std::expected<std::optional<String>, StarException> inspectionDescription(String const& species) const override;
+  [[nodiscard]] std::expected<std::optional<String>, StarException> inspection_log_name() const override;
+  [[nodiscard]] std::expected<std::optional<String>, StarException> inspection_description(String const& species) const override;
 
   [[nodiscard]] std::expected<float, StarException> beam_gun_radius() const override;
 

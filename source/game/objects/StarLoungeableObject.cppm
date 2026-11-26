@@ -71,7 +71,11 @@ namespace Star {
 class Root;
 
 class LoungeableObject : public Object, public virtual LoungeableEntity {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
+
 public:
+  LoungeableObject(ConstructionKey, Root& root);
+
   void query_type(TypeQuery& query) const noexcept override {
     query_type_of<LoungeableObject, Object, LoungeableEntity>(*this, query);
   }
@@ -87,10 +91,9 @@ public:
   [[nodiscard]] std::expected<std::shared_ptr<LoungeAnchor const>, StarException> loungeAnchor(std::size_t positionIndex) const override;
 
 protected:
-  [[nodiscard]] std::expected<void, StarException> setOrientationIndex(std::size_t orientationIndex) override;
+  [[nodiscard]] std::expected<void, StarException> set_orientation_index(std::size_t orientationIndex) override;
 
 private:
-  explicit LoungeableObject(Root& rootContext);
   List<Vec2F> m_sitPositions;
   bool m_sitFlipDirection;
   LoungeOrientation m_sitOrientation;

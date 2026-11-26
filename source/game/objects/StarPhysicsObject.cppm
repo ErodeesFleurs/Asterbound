@@ -74,7 +74,11 @@ namespace Star {
 class Root;
 
 class PhysicsObject : public Object, public virtual PhysicsEntity {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
+
 public:
+  PhysicsObject(ConstructionKey, Root& root);
+
   void query_type(TypeQuery& query) const noexcept override {
     query_type_of<PhysicsObject, Object, PhysicsEntity>(*this, query);
   }
@@ -98,7 +102,6 @@ public:
   [[nodiscard]] std::expected<std::optional<PhysicsMovingCollision>, StarException> movingCollision(std::size_t positionIndex) const override;
 
 private:
-  explicit PhysicsObject(Root& rootContext);
   struct PhysicsForceConfig {
     PhysicsForceRegion force_region;
     NetElementBool enabled;

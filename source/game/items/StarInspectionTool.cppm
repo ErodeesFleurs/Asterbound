@@ -293,7 +293,7 @@ std::expected<float, StarException> InspectionTool::inspectionLevel(std::shared_
     // convert spaces to a set of world positions
     Set<Vec2I> spaceSet;
     for (auto space : tileEntity->spaces())
-      spaceSet.add(tileEntity->tilePosition() + space);
+      spaceSet.add(tileEntity->tile_position() + space);
 
     for (auto space : spaceSet) {
       auto pointLevel = pointInspectionLevel(center_of_tile(space));
@@ -357,11 +357,11 @@ std::expected<InspectionTool::InspectionResult, StarException> InspectionTool::i
       if (!level)
         return std::unexpected(std::move(level.error()));
       if (*level >= m_minimumInspectionLevel) {
-        auto description = entity->inspectionDescription(species);
+        auto description = entity->inspection_description(species);
         if (!description)
           return std::unexpected(std::move(description.error()));
         if (m_allowScanning) {
-          auto logName = entity->inspectionLogName();
+          auto logName = entity->inspection_log_name();
           if (!logName)
             return std::unexpected(std::move(logName.error()));
           return InspectionResult{.message = description->value_or(String{}),

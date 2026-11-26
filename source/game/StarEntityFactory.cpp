@@ -150,7 +150,7 @@ std::expected<std::shared_ptr<EntityFactory>, StarException> EntityFactory::crea
   auto monster = root.monster_database();
   if (!monster) return std::unexpected(std::move(monster.error()));
   factory->m_monster_database = std::move(*monster);
-  auto object = root.objectDatabase();
+  auto object = root.object_database();
   if (!object) return std::unexpected(std::move(object.error()));
   factory->m_object_database = std::move(*object);
   auto projectile = root.projectileDatabase();
@@ -268,8 +268,11 @@ std::expected<Json, StarException> EntityFactory::disk_store_entity_locked(std::
       return store.template operator()<Player>();
     case EntityType::Monster:
       return store.template operator()<Monster>();
-    case EntityType::Object:
-      return store.template operator()<Object>();
+    case EntityType::Object: {
+      auto object = convert_ref<Object>(*entity);
+      if (!object) return std::unexpected(std::move(object.error()));
+      return object->get().disk_store();
+    }
     case EntityType::Plant:
       return store.template operator()<Plant>();
     case EntityType::ItemDrop: {
@@ -312,7 +315,7 @@ std::expected<std::shared_ptr<Entity>, StarException> EntityFactory::disk_load_e
     case EntityType::Monster:
       return m_monster_database->disk_load_monster(disk_store);
     case EntityType::Object:
-      return m_object_database->diskLoadObject(disk_store);
+      return m_object_database->disk_load_object(disk_store);
     case EntityType::Plant:
       return Plant::create(m_root, disk_store);
     case EntityType::ItemDrop:

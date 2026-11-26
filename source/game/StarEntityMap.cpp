@@ -145,7 +145,7 @@ template <typename Visit>
 std::expected<bool, StarException> visit_tile_spaces(WorldGeometry const& geometry, Vec2I const& pos,
     TileEntity& tile, Visit&& visit) {
   auto spaces = tile.spaces();
-  auto origin = tile.tilePosition();
+  auto origin = tile.tile_position();
   std::int64_t width = geometry.width();
   for (std::size_t i = 0; i < spaces.size(); ++i) {
     auto const& space = spaces[i];
@@ -155,7 +155,7 @@ std::expected<bool, StarException> visit_tile_spaces(WorldGeometry const& geomet
     auto stop = visit();
     if (!stop || *stop) return stop;
     // The callback may move this entity; only the spaces list is a snapshot.
-    if (i + 1 < spaces.size()) origin = tile.tilePosition();
+    if (i + 1 < spaces.size()) origin = tile.tile_position();
   }
   return false;
 }
@@ -536,10 +536,10 @@ std::expected<std::shared_ptr<InteractiveEntity>, StarException> EntityMap::inte
       if (ie.is_interactive()) {
         if (auto tile = as_ref<TileEntity>(*entity)) {
           auto& tile_entity = tile->get();
-          auto spaces = tile_entity.interactiveSpaces();
+          auto spaces = tile_entity.interactive_spaces();
           if (spaces.empty())
             return {};
-          auto tile_position = tile_entity.tilePosition();
+          auto tile_position = tile_entity.tile_position();
           auto center_distance = m_geometry.diff(tile_entity.meta_bound_box().center() + tile_entity.position(), pos).magnitude();
           for (auto const& space : spaces) {
             auto dist = m_geometry.diff(pos, center_of_tile(space + tile_position)).magnitude();

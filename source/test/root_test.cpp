@@ -534,7 +534,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
       EXPECT_TRUE(*result);
     };
     ASSERT_NO_FATAL_FAILURE(expectCatalog("assets", root.assets()));
-    ASSERT_NO_FATAL_FAILURE(expectCatalog("objectDatabase", root.objectDatabase()));
+    ASSERT_NO_FATAL_FAILURE(expectCatalog("objectDatabase", root.object_database()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("plantDatabase", root.plantDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("projectileDatabase", root.projectileDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("monsterDatabase", root.monster_database()));
@@ -1193,12 +1193,12 @@ const GameTestRegistration vanished_warp_target("UniverseServerTest", "ReturnsAf
   // then removeClient erases it before addClient resolves the unique target.
   String const target_id = "temporary-warp-regression";
   SpawnTarget const target = SpawnTargetUniqueEntity(target_id);
-  auto objects = fixture.root().objectDatabase();
+  auto objects = fixture.root().object_database();
   ASSERT_TRUE(objects);
-  auto object = (*objects)->createObject("stoneteleporter", JsonObject{{"clientEntityMode", "ClientMasterAllowed"},
+  auto object = (*objects)->create_object("stoneteleporter", JsonObject{{"clientEntityMode", "ClientMasterAllowed"},
       {"uniqueId", target_id}, {"unbreakable", true}, {"scripts", JsonArray{}}});
   ASSERT_TRUE(object) << object.error().what();
-  ASSERT_TRUE((*object)->setTilePosition(Vec2I::floor(player->position()) + Vec2I(12, 0)));
+  ASSERT_TRUE((*object)->set_tile_position(Vec2I::floor(player->position()) + Vec2I(12, 0)));
   ASSERT_TRUE(world->addEntity(*object));
   ASSERT_TRUE((*object)->isMaster());
   bool available = false;

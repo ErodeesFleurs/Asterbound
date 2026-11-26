@@ -76,7 +76,8 @@ public:
   // with the rest of everything else, there are TILE previews and OBJECT
   // previews, but of course one has to go through the render method and the
   // other has to be rendered separately.
-  [[nodiscard]] std::expected<List<Drawable>, StarException> renderObjectPreviews(Vec2F aimPosition, Direction walkingDirection, bool inToolRange, Color favoriteColor);
+  [[nodiscard]] std::expected<List<Drawable>, StarException> render_object_previews(Vec2F aim_position,
+      Direction walking_direction, bool in_tool_range, Color favorite_color);
   // Returns the facing override direction if there is one.
   [[nodiscard]] std::expected<std::optional<Direction>, StarException> setupHumanoidHandItems(Humanoid& humanoid, Vec2F position, Vec2F aimPosition) const;
   [[nodiscard]] std::expected<void, StarException> setupHumanoidHandItemDrawables(Humanoid& humanoid, float interpolation = 1.0f) const;
@@ -161,8 +162,8 @@ private:
 
   float m_beamGunRadius;
   unsigned m_beamGunGlowBorder;
-  float m_objectPreviewInnerAlpha;
-  float m_objectPreviewOuterAlpha;
+  float m_object_preview_inner_alpha;
+  float m_object_preview_outer_alpha;
 
   std::optional<std::reference_wrapper<ToolUserEntity>> m_user;
 
@@ -184,10 +185,6 @@ private:
   NetElementFloat m_altTimeFiringNetState;
   NetElementBool m_primaryItemActiveNetState;
   NetElementBool m_altItemActiveNetState;
-
-  List<Drawable> m_cachedObjectPreview;
-  Vec2I m_cachedObjectPreviewPosition;
-  std::shared_ptr<Item> m_cachedObjectItem;
 };
 
 }

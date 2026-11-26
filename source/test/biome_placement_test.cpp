@@ -32,9 +32,9 @@ Json distribution_config(String mode, String type, String const& object_name) {
 const GameTestRegistration storage_round_trip("BiomePlacement", "ConfigAndStoragePreserveModesSeedsAndPlacement", [](GameTest& fixture) {
   auto assets = fixture.root().assets();
   ASSERT_TRUE(assets) << assets.error().what();
-  auto database = fixture.root().objectDatabase();
+  auto database = fixture.root().object_database();
   ASSERT_TRUE(database) << database.error().what();
-  auto names = (*database)->allObjects();
+  auto names = (*database)->all_objects();
   ASSERT_FALSE(names.empty());
   constexpr std::uint64_t seed = 0xfedcba9876543210ULL;
   std::array<std::pair<std::string_view, BiomePlacementMode>, 4> modes{{

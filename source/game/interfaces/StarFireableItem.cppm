@@ -94,7 +94,7 @@ public:
   virtual FireMode fireMode() const;
   virtual float fireTimer() const;
   virtual void setFireTimer(float fireTimer);
-  virtual float cooldownTime() const;
+  virtual float cooldown_time() const;
   virtual void setCooldownTime(float cooldownTime);
   virtual float windupTime() const;
   virtual void setWindupTime(float time);

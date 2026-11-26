@@ -3,11 +3,13 @@
 import std;
 import star.actor_movement_controller;
 import star.algorithm;
+import star.asset_path;
 import star.assets;
 import star.byte_array;
 import star.data_stream;
 import star.data_stream_devices;
 import star.data_stream_extra;
+import star.drawable;
 import star.entity;
 import star.entity_map;
 import star.farmable_object;
@@ -24,6 +26,7 @@ import star.list;
 import star.movement_controller;
 import star.collision_block;
 import star.physics_entity;
+import star.object;
 import star.object_database;
 import star.physics_object;
 import star.platformer_astar_types;
@@ -177,7 +180,7 @@ std::shared_ptr<ObjectConfig> unanchored_physics_config() {
   config->health = 1;
   auto orientation = std::make_shared<ObjectOrientation>();
   orientation->config = JsonObject();
-  orientation->boundBox = RectI(0, 0, 0, 0);
+  orientation->bound_box = RectI(0, 0, 0, 0);
   orientation->meta_bound_box = RectF(-1, -1, 1, 1);
   config->orientations.push_back(std::move(orientation));
   return config;
@@ -243,12 +246,12 @@ const GameTestRegistration farm_immersion("FarmableObject", "ImmersionSampleThre
   auto config = unanchored_physics_config();
   config->orientations.front()->spaces = {Vec2I(0, 0)};
   config->orientations.front()->frames = 1;
-  config->orientations.front()->animationCycle = 1;
+  config->orientations.front()->animation_cycle = 1;
   EXPECT_FALSE(FarmableObject::create(root, config, JsonObject{{"minImmersion", 1}, {"maxImmersion", 0}}));
   for (int threshold : {0, 1}) {
     auto crop = FarmableObject::create(root, config, JsonObject{{"minImmersion", threshold}, {"maxImmersion", threshold}});
     ASSERT_TRUE(crop) << crop.error().what();
-    ASSERT_TRUE((*crop)->setTilePosition({64, 64}));
+    ASSERT_TRUE((*crop)->set_tile_position({64, 64}));
     ASSERT_TRUE((*crop)->init(**world, 1, EntityMode::Master));
     auto release = make_scope_exit([&] { EXPECT_TRUE((*crop)->uninit()); });
     ASSERT_TRUE((*crop)->update(period / 2, 1));
@@ -278,7 +281,7 @@ const GameTestRegistration typed_tile_queries("EntityMap", "TypedLinesAndMutable
   auto object = PhysicsObject::create(fixture.root(), config, JsonObject{{"physicsForces", JsonObject()}});
   ASSERT_TRUE(object) << object.error().what();
   Vec2I origin(127, 64);
-  ASSERT_TRUE((*object)->setTilePosition(origin));
+  ASSERT_TRUE((*object)->set_tile_position(origin));
   EntityMap entities(size, 1, 10);
   ASSERT_TRUE((*object)->init(**world, 1, EntityMode::Master));
   auto release = make_scope_exit([&] { entities.remove_entity(1); EXPECT_TRUE((*object)->uninit()); });
@@ -307,7 +310,7 @@ const GameTestRegistration typed_tile_queries("EntityMap", "TypedLinesAndMutable
   calls = 0;
   ASSERT_TRUE(entities.for_each_entity_at_tile(wrapped, [&](auto const& tile) {
     ++calls;
-    return tile->setTilePosition({126, 64});
+    return tile->set_tile_position({126, 64});
   }));
   EXPECT_EQ(calls, 1);
 });
@@ -324,18 +327,18 @@ const GameTestRegistration preferred_orientation("ObjectDatabase", "PreferredOri
   preferred->direction_affinity = Direction::Right;
   config.orientations = {neutral, preferred};
   Vec2I position(64, 64);
-  EXPECT_EQ(config.find_valid_orientation(**world, position), 0u);
-  EXPECT_EQ(config.find_valid_orientation(**world, position, Direction::Right), 1u);
+  EXPECT_EQ(ObjectConfig::find_valid_orientation(config.orientations, **world, position), 0u);
+  EXPECT_EQ(ObjectConfig::find_valid_orientation(config.orientations, **world, position, Direction::Right), 1u);
   // An empty world's background cannot satisfy the preferred candidate's anchor.
   ObjectOrientation::Anchor anchor{};
   anchor.layer = TileLayer::Background;
   preferred->anchors.push_back(anchor);
-  EXPECT_EQ(config.find_valid_orientation(**world, position, Direction::Right), 0u);
+  EXPECT_EQ(ObjectConfig::find_valid_orientation(config.orientations, **world, position, Direction::Right), 0u);
 });
 
 const GameTestRegistration legacy_orientation_order("ObjectDatabase", "LegacyOrientationExpansion", [](GameTest& fixture) {
   auto parse = [&](Json const& entries) {
-    return ObjectDatabase::parseOrientations(fixture.root(), "/test.object", entries, JsonObject());
+    return ObjectDatabase::parse_orientations(fixture.root(), "/test.object", entries, JsonObject());
   };
   auto entries = Json::parse(R"([
     {"imageLayers":[]},
@@ -367,6 +370,93 @@ const GameTestRegistration legacy_orientation_order("ObjectDatabase", "LegacyOri
   auto malformed = parse(JsonArray{JsonObject(), Json()});
   ASSERT_FALSE(malformed);
   EXPECT_NE(std::string_view(malformed.error().what()).find("Improper conversion to JsonObject"), std::string_view::npos);
+});
+
+const GameTestRegistration object_orientation_numbers("ObjectDatabase", "RejectsInvalidFrameAndEmitterNumbers", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  auto parse = [&](JsonObject fields) {
+    fields["imageLayers"] = JsonArray{};
+    return ObjectDatabase::parse_orientations(root, "/orientation-numbers.object",
+        JsonArray{std::move(fields)}, JsonObject{});
+  };
+  // Materialize nonfinite JSON values even with finite-math-only compilation.
+  volatile std::uint64_t nan_bits = 0x7ff8000000000001ull;
+  volatile std::uint64_t infinity_bits = 0x7ff0000000000000ull;
+  auto nan = std::bit_cast<double>(static_cast<std::uint64_t>(nan_bits));
+  auto infinity = std::bit_cast<double>(static_cast<std::uint64_t>(infinity_bits));
+  auto rejects = [&](JsonObject fields, std::string_view field) {
+    auto parsed = parse(std::move(fields));
+    ASSERT_FALSE(parsed) << field;
+    auto error = std::string_view(parsed.error().what());
+    EXPECT_TRUE(error.contains(field)) << error;
+    EXPECT_TRUE(error.contains("/orientation-numbers.object")) << error;
+  };
+  for (auto frames : {Json(0), Json(-1), Json(1.5), Json(std::int64_t{1} << 31), Json(nan)})
+    rejects({{"frames", frames}}, "frames");
+  for (double cycle : {0.0, -0.5, 0x1p-160, std::numeric_limits<double>::max(), nan, infinity})
+    rejects({{"animationCycle", cycle}}, "animationCycle");
+  for (auto emitter : {
+      JsonObject{{"emissionRate", infinity}}, JsonObject{{"emissionRate", 0x1p-140}},
+      JsonObject{{"emissionRate", std::numeric_limits<float>::max()}, {"emissionVariance", 0x1p126}}})
+    rejects({{"particleEmitter", emitter}}, "emissionRate");
+  for (auto variance : {Json(-1), Json(nan), Json(infinity)})
+    rejects({{"particleEmitters", JsonArray{JsonObject{{"emissionRate", 1}, {"emissionVariance", variance}}}}},
+        "emissionVariance");
+
+  auto valid = parse({{"frames", std::numeric_limits<int>::max()}, {"animationCycle", 0.125},
+      {"particleEmitter", JsonObject{{"emissionRate", -1}, {"emissionVariance", -2}}},
+      {"particleEmitters", JsonArray{
+          JsonObject{{"emissionRate", 0.4}, {"emissionVariance", 0.5}},
+          JsonObject{{"emissionRate", 0.3}, {"emissionVariance", 0.3}}}}});
+  ASSERT_TRUE(valid) << valid.error().what();
+  auto const& orientation = *valid->front();
+  EXPECT_EQ(orientation.frames, std::numeric_limits<int>::max());
+  EXPECT_EQ(orientation.animation_cycle, 0.125f);
+  ASSERT_EQ(orientation.particle_emitters.size(), 3u);
+  EXPECT_EQ(orientation.particle_emitters[0].particle_emission_rate, -1);
+  EXPECT_EQ(orientation.particle_emitters[1].particle_emission_rate_variance, 0.5f);
+  EXPECT_EQ(orientation.particle_emitters[2].particle_emission_rate, orientation.particle_emitters[2].particle_emission_rate_variance);
+});
+
+const GameTestRegistration object_animation_clock("Object", "SamplesBeforeAdvanceAndClampsAfterOrientationChange", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  auto storage = File::ephemeral_file(root.random());
+  ASSERT_TRUE(storage);
+  auto world = WorldServer::create(root, Vec2U(128, 128), *storage);
+  ASSERT_TRUE(world) << world.error().what();
+  auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
+  auto config = unanchored_physics_config();
+  auto parsed = ObjectDatabase::parse_orientations(root, "/orientation-clock.object", JsonArray{
+      JsonObject{{"direction", "left"}, {"image", "/orientation-clock.png:<frame>"},
+          {"animationCycle", 10}, {"frames", 40}},
+      JsonObject{{"direction", "right"}, {"image", "/orientation-clock.png:<frame>"},
+          {"animationCycle", 0.25}, {"frames", std::numeric_limits<int>::max()}}}, JsonObject{});
+  ASSERT_TRUE(parsed) << parsed.error().what();
+  config->orientations = std::move(*parsed);
+  auto object = Object::create(root, config);
+  ASSERT_TRUE(object) << object.error().what();
+  ASSERT_TRUE((*object)->set_tile_position({64, 64}));
+  ASSERT_TRUE((*object)->init(**world, 1, EntityMode::Master));
+  auto release = make_scope_exit([&] { EXPECT_TRUE((*object)->uninit()); });
+  auto check_frame = [&](int frame) {
+    auto drawables = (*object)->cursor_hint_drawables();
+    ASSERT_TRUE(drawables) << drawables.error().what();
+    ASSERT_EQ(drawables->size(), 1u);
+    EXPECT_EQ(AssetPath::join(drawables->front().image_part().image),
+        "/orientation-clock.png:" + Star::to_string(frame));
+  };
+  ASSERT_TRUE((*object)->update(0.5f, 1));
+  check_frame(0);
+  ASSERT_TRUE((*object)->update(1.5f, 2));
+  check_frame(2);
+  (*object)->set_direction(Direction::Right);
+  ASSERT_TRUE((*object)->update_orientation());
+  ASSERT_TRUE((*object)->update(0.125f, 3));
+  check_frame(std::numeric_limits<int>::max() - 1);
+  ASSERT_TRUE((*object)->update(0.125f, 4));
+  check_frame(1 << 30);
+  ASSERT_TRUE((*object)->update(0.0f, 5));
+  check_frame(0);
 });
 
 const GameTestRegistration
@@ -427,7 +517,7 @@ const GameTestRegistration
       for (auto const& tilePosition : {Vec2I(512, 256), farPosition, Vec2I(0, 256),
                                        Vec2I(world_width - 13, 256), Vec2I(12, 256)}) {
         SCOPED_TRACE(Star::format("position {}", tilePosition));
-        ASSERT_TRUE(object->setTilePosition(tilePosition));
+        ASSERT_TRUE(object->set_tile_position(tilePosition));
         auto id = entities.reserve_entity_id();
         ASSERT_TRUE(id) << id.error().what();
         auto initialized = object->init(*world, *id, EntityMode::Master);
@@ -505,7 +595,7 @@ const GameTestRegistration
           EXPECT_EQ(filter_calls, 1);
           auto other = PhysicsObject::create(fixture.root(), config, JsonObject{{"physicsForces", JsonObject()}});
           ASSERT_TRUE(other) << other.error().what();
-          ASSERT_TRUE((*other)->setTilePosition(Vec2I(128, 256)));
+          ASSERT_TRUE((*other)->set_tile_position(Vec2I(128, 256)));
           auto other_id = entities.reserve_entity_id();
           ASSERT_TRUE(other_id);
           ASSERT_TRUE((*other)->init(*world, *other_id, EntityMode::Master));
@@ -515,7 +605,7 @@ const GameTestRegistration
           });
           (*other)->set_unique_id(String("second-object"));
           ASSERT_TRUE(entities.add_entity(*other));
-          ASSERT_TRUE((*other)->setTilePosition(Vec2I(512, 256)));
+          ASSERT_TRUE((*other)->set_tile_position(Vec2I(512, 256)));
           (*other)->set_unique_id(String("indexed-object"));
           auto conflict = entities.update_all_entities();
           ASSERT_FALSE(conflict);
@@ -584,7 +674,7 @@ const GameTestRegistration entity_id_range("EntityMap", "InclusiveIdReservation"
     ASSERT_EQ(*id, expected_id);
     auto object = PhysicsObject::create(fixture.root(), config, JsonObject());
     ASSERT_TRUE(object) << object.error().what();
-    ASSERT_TRUE((*object)->setTilePosition({64, 64}));
+    ASSERT_TRUE((*object)->set_tile_position({64, 64}));
     ASSERT_TRUE((*object)->init(**world, *id, EntityMode::Master));
     ASSERT_TRUE(pair.add_entity(*object));
   }
@@ -631,10 +721,10 @@ const GameTestRegistration entity_query_geometry("EntityMap", "InteractionRadius
   auto add = [&](EntityId id, int x, RectF bounds, int interaction_x) {
     auto config = unanchored_physics_config();
     config->orientations.front()->meta_bound_box = bounds;
-    config->orientations.front()->interactiveSpaces = List<Vec2I>{{interaction_x, 0}};
+    config->orientations.front()->interactive_spaces = List<Vec2I>{{interaction_x, 0}};
     auto object = PhysicsObject::create(fixture.root(), config, JsonObject{{"interactAction", "OpenCraftingInterface"}});
     ASSERT_TRUE(object) << object.error().what();
-    ASSERT_TRUE((*object)->setTilePosition({x, 64}));
+    ASSERT_TRUE((*object)->set_tile_position({x, 64}));
     ASSERT_TRUE((*object)->init(**world, id, EntityMode::Master));
     ASSERT_TRUE(entities.add_entity(*object));
   };
@@ -677,7 +767,7 @@ const GameTestRegistration moving_collision_filter("MovementController", "Moving
   ASSERT_TRUE(shapes) << shapes.error().what();
   auto object = PhysicsObject::create(fixture.root(), unanchored_physics_config(), JsonObject{{"physicsCollisions", *shapes}});
   ASSERT_TRUE(object) << object.error().what();
-  ASSERT_TRUE((*object)->setTilePosition({0, 256}));
+  ASSERT_TRUE((*object)->set_tile_position({0, 256}));
   auto added = world->addEntity(*object);
   ASSERT_TRUE(added) << added.error().what();
   auto remove = make_scope_exit([&] { EXPECT_TRUE(world->removeEntity((*object)->entityId(), false)); });
@@ -726,7 +816,7 @@ const GameTestRegistration moving_platform_detachment("MovementController", "Mov
   auto shapes = Json::parse(R"({"deck":{"collision":[[-2,0],[2,0],[2,1],[-2,1]]}})");
   if (!fixture.check(bool(shapes), "parse platform shape")) return;
   auto deck = PhysicsObject::create(root, unanchored_physics_config(), JsonObject{{"physicsCollisions", *shapes}});
-  if (!fixture.check(bool(deck) && bool((*deck)->setTilePosition({1024, 1024})) && bool((*world)->addEntity(*deck)), "place deck")) return;
+  if (!fixture.check(bool(deck) && bool((*deck)->set_tile_position({1024, 1024})) && bool((*world)->addEntity(*deck)), "place deck")) return;
   auto remove = make_scope_exit([&] { fixture.check(bool((*world)->removeEntity((*deck)->entityId(), false)), "remove deck"); });
 
   ForceTestController rider(root);
@@ -748,7 +838,7 @@ const GameTestRegistration moving_platform_detachment("MovementController", "Mov
   rider.set_velocity({0, -30});
   constexpr float dt = 1.0f / 60;
   if (!fixture.check(bool(rider.tick_master(dt)) && rider.y_position() == 1025.25f, "land on moving deck")) return;
-  if (!fixture.check(bool((*deck)->setTilePosition({1025, 1024})), "shift supporting deck")) return;
+  if (!fixture.check(bool((*deck)->set_tile_position({1025, 1024})), "shift supporting deck")) return;
   rider.set_velocity({0, 30});
   if (!fixture.check(bool(rider.tick_master(dt)), "launch from translated deck")) return;
   fixture.check(rider.position() == Vec2F(1025, 1025.75f) && rider.velocity() == Vec2F(1 / dt, 30),
@@ -756,13 +846,13 @@ const GameTestRegistration moving_platform_detachment("MovementController", "Mov
   fixture.check(rider.surface_velocity() == Vec2F{}, "detached rider has no supporting surface velocity");
 
   auto next_deck = PhysicsObject::create(root, unanchored_physics_config(), JsonObject{{"physicsCollisions", *shapes}});
-  if (!fixture.check(bool(next_deck) && bool((*next_deck)->setTilePosition({1031, 1024})) &&
+  if (!fixture.check(bool(next_deck) && bool((*next_deck)->set_tile_position({1031, 1024})) &&
                      bool((*world)->addEntity(*next_deck)), "place second deck")) return;
   auto remove_next = make_scope_exit([&] { fixture.check(bool((*world)->removeEntity((*next_deck)->entityId(), false)), "remove second deck"); });
   rider.set_position({1025, 1025.375f});
   rider.set_velocity({0, -30});
   if (!fixture.check(bool(rider.tick_master(dt)) && rider.y_position() == 1025.25f, "land back on first deck")) return;
-  if (!fixture.check(bool((*deck)->setTilePosition({1026, 1024})), "translate first deck again")) return;
+  if (!fixture.check(bool((*deck)->set_tile_position({1026, 1024})), "translate first deck again")) return;
   rider.set_velocity({300, -7.5f});
   if (!fixture.check(bool(rider.tick_master(dt)), "cross directly to second deck")) return;
   if (!fixture.check(rider.position() == Vec2F(1031, 1025.25f),
@@ -773,7 +863,7 @@ const GameTestRegistration moving_platform_detachment("MovementController", "Mov
   if (!fixture.check(rider.position() == Vec2F(1031, 1025.25f),
         std::format("stay on second deck, got ({}, {})", rider.x_position(), rider.y_position()))) return;
   auto velocity_before_pause = rider.velocity();
-  if (!fixture.check(bool((*next_deck)->setTilePosition({1032, 1024})), "translate deck while paused")) return;
+  if (!fixture.check(bool((*next_deck)->set_tile_position({1032, 1024})), "translate deck while paused")) return;
   if (!fixture.check(bool(rider.tick_master(0)), "synchronize attached rider at zero timestep")) return;
   fixture.check(rider.position() == Vec2F(1032, 1025.25f) && rider.velocity() == velocity_before_pause,
                 std::format("paused deck: pos ({}, {}), velocity ({}, {})", rider.x_position(), rider.y_position(), rider.x_velocity(), rider.y_velocity()));
@@ -801,7 +891,7 @@ const GameTestRegistration force_narrow_phase("MovementController", "ForceRegion
   ASSERT_TRUE(config) << config.error().what();
   auto object = PhysicsObject::create(fixture.root(), unanchored_physics_config(), JsonObject{{"physicsForces", *config}});
   ASSERT_TRUE(object) << object.error().what();
-  ASSERT_TRUE((*object)->setTilePosition({0, 256}));
+  ASSERT_TRUE((*object)->set_tile_position({0, 256}));
   ASSERT_TRUE((*world)->addEntity(*object));
   auto remove = make_scope_exit([&] { EXPECT_TRUE((*world)->removeEntity((*object)->entityId(), false)); });
 
@@ -863,7 +953,7 @@ const GameTestRegistration force_path_reset("MovementController", "ForceRegionRe
   ASSERT_TRUE(config);
   auto object = PhysicsObject::create(fixture.root(), unanchored_physics_config(), JsonObject{{"physicsForces", *config}});
   ASSERT_TRUE(object) << object.error().what();
-  ASSERT_TRUE((*object)->setTilePosition({1024, 1024}));
+  ASSERT_TRUE((*object)->set_tile_position({1024, 1024}));
   ASSERT_TRUE((*world)->addEntity(*object));
   auto remove = make_scope_exit([&] { EXPECT_TRUE((*world)->removeEntity((*object)->entityId(), false)); });
   ActorMovementParameters parameters;

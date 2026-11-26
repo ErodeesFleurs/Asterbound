@@ -358,7 +358,7 @@ std::expected<ObjectFixture, StarException> prepareObjects(Root& root) {
   auto database = ObjectDatabase::create(root);
   if (!database)
     return std::unexpected(std::move(database.error()));
-  auto catalogNames = (*database)->allObjects();
+  auto catalogNames = (*database)->all_objects();
   std::vector<String> names(catalogNames.begin(), catalogNames.end());
   std::ranges::sort(names);
   if (names.empty())
@@ -366,12 +366,12 @@ std::expected<ObjectFixture, StarException> prepareObjects(Root& root) {
   ObjectFixture fixture{std::move(*database), {}, {}, {}};
   std::array<std::size_t, 2> selected{};
   for (auto const& name : names) {
-    auto config = fixture.database->getConfig(name);
+    auto config = fixture.database->get_config(name);
     if (!config)
       return std::unexpected(std::move(config.error()));
     if (!*config || (*config)->name != name || (*config)->path.empty() || (*config)->orientations.empty())
       return std::unexpected(StarException("Real object config failed identity/orientation validation"));
-    bool scripted = !(*config)->scripts.empty() || !(*config)->animationScripts.empty();
+    bool scripted = !(*config)->scripts.empty() || !(*config)->animation_scripts.empty();
     if (selected[scripted] == 4)
       continue;
     ++selected[scripted];
@@ -380,7 +380,7 @@ std::expected<ObjectFixture, StarException> prepareObjects(Root& root) {
       return std::unexpected(std::move(jsonName.error()));
     if (*jsonName != name)
       return std::unexpected(StarException("Object config JSON disagrees with catalog identity"));
-    auto cached = fixture.database->getConfig(name);
+    auto cached = fixture.database->get_config(name);
     if (!cached)
       return std::unexpected(std::move(cached.error()));
     if (cached->get() != config->get())
@@ -417,7 +417,7 @@ void objectColdParse(benchmark::State& state, BenchmarkSession& session) {
     state.ResumeTiming();
     bool parsed = true;
     for (auto const& name : fixture->names) {
-      auto config = (*database)->getConfig(name);
+      auto config = (*database)->get_config(name);
       if (!config) {
         session.fail(state, config.error());
         parsed = false;
@@ -444,7 +444,7 @@ void objectWarmLookup(benchmark::State& state, BenchmarkSession& session) {
   for (auto _ : state) {
     (void)_;
     for (auto const& name : fixture->names) {
-      auto config = fixture->database->getConfig(name);
+      auto config = fixture->database->get_config(name);
       if (!config) {
         session.fail(state, config.error());
         return;
@@ -929,7 +929,7 @@ void benchmark_cold_codex_items(benchmark::State& state, BenchmarkSession& sessi
   // ItemDatabase construction includes normal items, recipes and blueprints, not just codex items.
   auto root = Root::create(session.root.settings());
   if (!root) return session.fail(state, root.error());
-  auto objects = (*root)->objectDatabase();
+  auto objects = (*root)->object_database();
   if (!objects) return session.fail(state, objects.error());
   for (auto _ : state) {
     auto catalog = (*root)->codex_database();

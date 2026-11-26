@@ -54,12 +54,12 @@ const GameTestRegistration entity_scripts("InteractionEntities", "ObjectNpcAndMo
   ASSERT_TRUE(world) << world.error().what();
   auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
 
-  auto objects = root.objectDatabase();
+  auto objects = root.object_database();
   ASSERT_TRUE(objects);
-  auto object = (*objects)->createObject("stoneteleporter", JsonObject{{"scripts", JsonArray{}},
+  auto object = (*objects)->create_object("stoneteleporter", JsonObject{{"scripts", JsonArray{}},
       {"interactAction", "ShowPopup"}, {"interactData", "configured"}});
   ASSERT_TRUE(object) << object.error().what();
-  ASSERT_TRUE((*object)->setTilePosition({126, 53}));
+  ASSERT_TRUE((*object)->set_tile_position({126, 53}));
   ASSERT_TRUE((*object)->init(**world, 1, EntityMode::Master));
   auto release_object = make_scope_exit([&] { EXPECT_TRUE((*object)->uninit()); });
   InteractRequest request{37, {1, 57}, 1, {0, 0}};

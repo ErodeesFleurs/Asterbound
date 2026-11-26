@@ -84,14 +84,14 @@ import star.object_database;
 import star.algorithm;
 namespace Star {
 
-PhysicsObject::PhysicsObject(Root& rootContext) : Entity(rootContext), Object(rootContext) {}
+PhysicsObject::PhysicsObject(ConstructionKey, Root& root) : Entity(root), Object(root) {}
 
 std::expected<std::shared_ptr<PhysicsObject>, StarException> PhysicsObject::create(Root& rootContext, std::shared_ptr<ObjectConfig const> config, Json const& parameters) {
-  auto object = std::shared_ptr<PhysicsObject>(new PhysicsObject(rootContext));
+  auto object = std::make_shared<PhysicsObject>(ConstructionKey{}, rootContext);
   auto operation1 = object->initialize(std::move(config), parameters);
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
-  auto config_forces = object->configValue("physicsForces", JsonObject());
+  auto config_forces = object->config_value("physicsForces", JsonObject());
   if (!config_forces)
     return std::unexpected(std::move(config_forces.error()));
   auto forces = config_forces->iterate_object();
@@ -108,7 +108,7 @@ std::expected<std::shared_ptr<PhysicsObject>, StarException> PhysicsObject::crea
       return std::unexpected(std::move(enabled.error()));
     force.enabled.set(*enabled);
   }
-  auto collisionsConfigResult = object->configValue("physicsCollisions", JsonObject());
+  auto collisionsConfigResult = object->config_value("physicsCollisions", JsonObject());
   if (!collisionsConfigResult)
     return std::unexpected(std::move(collisionsConfigResult.error()));
   auto collisionsConfig = std::move(*collisionsConfigResult);
@@ -133,21 +133,21 @@ std::expected<std::shared_ptr<PhysicsObject>, StarException> PhysicsObject::crea
   }
   object->m_physics_forces.sort_by_key();
   for (auto& pair : object->m_physics_forces) {
-    auto operation2 = object->m_netGroup.add_net_element(pair.second.enabled);
+    auto operation2 = object->m_net_group.add_net_element(pair.second.enabled);
     if (!operation2)
       return std::unexpected(std::move(operation2.error()));
   }
   object->m_physicsCollisions.sort_by_key();
   for (auto& pair : object->m_physicsCollisions) {
-    auto operation3 = object->m_netGroup.add_net_element(pair.second.xPosition);
+    auto operation3 = object->m_net_group.add_net_element(pair.second.xPosition);
     if (!operation3)
       return std::unexpected(std::move(operation3.error()));
-    auto operation4 = object->m_netGroup.add_net_element(pair.second.yPosition);
+    auto operation4 = object->m_net_group.add_net_element(pair.second.yPosition);
     if (!operation4)
       return std::unexpected(std::move(operation4.error()));
     pair.second.xPosition.set_interpolator(lerp<float, float>);
     pair.second.yPosition.set_interpolator(lerp<float, float>);
-    auto operation5 = object->m_netGroup.add_net_element(pair.second.enabled);
+    auto operation5 = object->m_net_group.add_net_element(pair.second.enabled);
     if (!operation5)
       return std::unexpected(std::move(operation5.error()));
   }
@@ -155,11 +155,11 @@ std::expected<std::shared_ptr<PhysicsObject>, StarException> PhysicsObject::crea
 }
 
 std::expected<void, StarException> PhysicsObject::enable_interpolation(float extrapolation_hint) {
-  return m_netGroup.enable_net_interpolation(extrapolation_hint);
+  return m_net_group.enable_net_interpolation(extrapolation_hint);
 }
 
 std::expected<void, StarException> PhysicsObject::disable_interpolation() {
-  return m_netGroup.disable_net_interpolation();
+  return m_net_group.disable_net_interpolation();
 }
 
 std::expected<void, StarException> PhysicsObject::init(World& world, EntityId entityId, EntityMode mode) {
@@ -196,13 +196,13 @@ std::expected<void, StarException> PhysicsObject::init(World& world, EntityId en
 });
     if (!operation8)
       return std::unexpected(std::move(operation8.error()));
-    auto operation9 = m_scriptComponent.add_callbacks("physics", std::move(callbacks));
+    auto operation9 = m_script_component.add_callbacks("physics", std::move(callbacks));
     if (!operation9)
       return std::unexpected(std::move(operation9.error()));
   }
   auto initialized = Object::init(world, entityId, mode);
   if (!initialized) {
-    auto removed = m_scriptComponent.remove_callbacks("physics");
+    auto removed = m_script_component.remove_callbacks("physics");
     if (!removed)
       return std::unexpected(initialized.error().with_context(Star::format("Physics callback cleanup failed: {}", Star::output_exception(removed.error(), false))));
     return std::unexpected(std::move(initialized.error()));
@@ -214,7 +214,7 @@ std::expected<void, StarException> PhysicsObject::init(World& world, EntityId en
 }
 
 std::expected<void, StarException> PhysicsObject::uninit() {
-  auto callbacks = m_scriptComponent.remove_callbacks("physics");
+  auto callbacks = m_script_component.remove_callbacks("physics");
   auto uninitialized = Object::uninit();
   if (!callbacks)
     return std::unexpected(std::move(callbacks.error()));
@@ -226,7 +226,7 @@ std::expected<void, StarException> PhysicsObject::update(float dt, std::uint64_t
   if (!operation10)
     return std::unexpected(std::move(operation10.error()));
   if (isSlave())
-    return m_netGroup.tick_net_interpolation(dt);
+    return m_net_group.tick_net_interpolation(dt);
   return {};
 }
 

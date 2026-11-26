@@ -268,10 +268,10 @@ std::expected<void, StarException> WirePane::update(float) {
   if (!active()) return {};
   if (!m_worldClient->inWorld()) { dismiss(); return {}; }
   if (m_connecting) {
-    auto entities = m_worldClient->atTile<WireEntity>(m_sourceConnector.entityLocation);
+    auto entities = m_worldClient->atTile<WireEntity>(m_sourceConnector.entity_location);
     if (!entities) return std::unexpected(std::move(entities.error()));
     for (auto const& entity : *entities) {
-      if (m_sourceConnector.nodeIndex < entity->nodeCount(m_sourceDirection)) return {};
+      if (m_sourceConnector.node_index < entity->node_count(m_sourceDirection)) return {};
     }
     // Cancel a pending connection when its source node disappears.
     m_connecting = false;
@@ -327,13 +327,13 @@ std::expected<void, StarException> WirePane::renderImpl() {
   auto drawLineColor = Color::palette_red.mix(Color::palette_white, phase);
   for (auto const& entity : *entities) {
     for (auto direction : {WireDirection::Input, WireDirection::Output}) {
-      for (std::size_t i = 0; i < entity->nodeCount(direction); ++i) {
-        WireNode node{.direction = direction, .nodeIndex = i};
-        auto offset = entity->nodePosition(node);
+      for (std::size_t i = 0; i < entity->node_count(direction); ++i) {
+        WireNode node{.direction = direction, .node_index = i};
+        auto offset = entity->node_position(node);
         if (!offset) return std::unexpected(std::move(offset.error()));
-        Vec2I position = entity->tilePosition() + *offset;
+        Vec2I position = entity->tile_position() + *offset;
         if (m_worldClient->isTileProtected(position)) continue;
-        auto icon = entity->nodeIcon(node);
+        auto icon = entity->node_icon(node);
         if (!icon) return std::unexpected(std::move(icon.error()));
         auto size = context().textureSize(*icon);
         if (!size) return std::unexpected(std::move(size.error()));
@@ -345,43 +345,43 @@ std::expected<void, StarException> WirePane::renderImpl() {
   HashSet<std::pair<WireConnection, WireConnection>> visitedConnections;
   for (auto const& entity : *entities) {
     for (auto direction : {WireDirection::Input, WireDirection::Output}) {
-      for (std::size_t i = 0; i < entity->nodeCount(direction); ++i) {
-        WireNode node{.direction = direction, .nodeIndex = i};
-        auto offset = entity->nodePosition(node);
+      for (std::size_t i = 0; i < entity->node_count(direction); ++i) {
+        WireNode node{.direction = direction, .node_index = i};
+        auto offset = entity->node_position(node);
         if (!offset) return std::unexpected(std::move(offset.error()));
-        auto connections = entity->connectionsForNode(node);
+        auto connections = entity->connections_for_node(node);
         if (!connections) return std::unexpected(std::move(connections.error()));
-        auto color = entity->nodeColor(node);
+        auto color = entity->node_color(node);
         if (!color) return std::unexpected(std::move(color.error()));
-        Vec2I tile = entity->tilePosition();
+        Vec2I tile = entity->tile_position();
         Vec2I position = tile + *offset;
         Color wire = *color;
         if (direction == WireDirection::Input) wire = wire.mix(Color::palette_black, 0.8f);
         else {
-          auto state = entity->nodeState(node);
+          auto state = entity->node_state(node);
           if (!state) return std::unexpected(std::move(state.error()));
           if (!*state) wire = wire.mix(Color::palette_black, 0.8f);
         }
         for (auto const& connection : *connections) {
           if (direction == WireDirection::Input) wire = color->mix(Color::palette_black, 0.8f);
           if (direction == WireDirection::Input)
-            visitedConnections.add({{.entityLocation = tile, .nodeIndex = i}, connection});
-          else if (visitedConnections.add({connection, {.entityLocation = tile, .nodeIndex = i}}))
+            visitedConnections.add({{.entity_location = tile, .node_index = i}, connection});
+          else if (visitedConnections.add({connection, {.entity_location = tile, .node_index = i}}))
             continue;
-          Vec2I otherPosition = connection.entityLocation;
-          auto sources = m_worldClient->atTile<WireEntity>(connection.entityLocation);
+          Vec2I otherPosition = connection.entity_location;
+          auto sources = m_worldClient->atTile<WireEntity>(connection.entity_location);
           if (!sources) return std::unexpected(std::move(sources.error()));
           if (auto source = sources->get(0)) {
             auto otherDirection = direction == WireDirection::Input ? WireDirection::Output : WireDirection::Input;
-            if (connection.nodeIndex < source->nodeCount(otherDirection)) {
-              WireNode otherNode{.direction = otherDirection, .nodeIndex = connection.nodeIndex};
-              auto otherOffset = source->nodePosition(otherNode);
+            if (connection.node_index < source->node_count(otherDirection)) {
+              WireNode otherNode{.direction = otherDirection, .node_index = connection.node_index};
+              auto otherOffset = source->node_position(otherNode);
               if (!otherOffset) return std::unexpected(std::move(otherOffset.error()));
               otherPosition += *otherOffset;
               if (direction == WireDirection::Input) {
-                auto otherColor = source->nodeColor(otherNode);
+                auto otherColor = source->node_color(otherNode);
                 if (!otherColor) return std::unexpected(std::move(otherColor.error()));
-                auto state = source->nodeState(otherNode);
+                auto state = source->node_state(otherNode);
                 if (!state) return std::unexpected(std::move(state.error()));
                 wire = *otherColor;
                 if (!*state) wire = wire.mix(Color::palette_black, 0.8f);
@@ -396,14 +396,14 @@ std::expected<void, StarException> WirePane::renderImpl() {
   }
   if (m_connecting) {
     Vec2F aimPos = camera.screenToWorld(Vec2F(m_mousePos) * context().interfaceScale());
-    Vec2I sourcePosition = m_sourceConnector.entityLocation;
-    auto sources = m_worldClient->atTile<WireEntity>(m_sourceConnector.entityLocation);
+    Vec2I sourcePosition = m_sourceConnector.entity_location;
+    auto sources = m_worldClient->atTile<WireEntity>(m_sourceConnector.entity_location);
     if (!sources) return std::unexpected(std::move(sources.error()));
     if (auto source = sources->get(0)) {
-      WireNode node{.direction = m_sourceDirection, .nodeIndex = m_sourceConnector.nodeIndex};
-      auto offset = source->nodePosition(node);
+      WireNode node{.direction = m_sourceDirection, .node_index = m_sourceConnector.node_index};
+      auto offset = source->node_position(node);
       if (!offset) return std::unexpected(std::move(offset.error()));
-      auto color = source->nodeColor(node);
+      auto color = source->node_color(node);
       if (!color) return std::unexpected(std::move(color.error()));
       sourcePosition += *offset;
       drawLineColor = color->mix(Color::palette_white, phase);
@@ -433,23 +433,23 @@ std::expected<WireConnector::SwingResult, StarException> WirePane::swing(WorldGe
   if (mode != FireMode::Primary) m_connecting = false;
   for (auto const& entity : *entities) {
     for (auto direction : {WireDirection::Input, WireDirection::Output}) {
-      for (std::size_t i = 0; i < entity->nodeCount(direction); ++i) {
-        WireNode node{.direction = direction, .nodeIndex = i};
-        auto offset = entity->nodePosition(node);
+      for (std::size_t i = 0; i < entity->node_count(direction); ++i) {
+        WireNode node{.direction = direction, .node_index = i};
+        auto offset = entity->node_position(node);
         if (!offset) return std::unexpected(std::move(offset.error()));
-        Vec2F center = center_of_tile(entity->tilePosition() + *offset);
+        Vec2F center = center_of_tile(entity->tile_position() + *offset);
         auto nodeBounds = RectF::with_size(center - m_nodeSize / 2.0f, m_nodeSize);
         auto contains = geometry.rect_contains(nodeBounds, pos);
         if (!contains) return std::unexpected(std::move(contains.error()));
         if (!*contains) continue;
         if (mode != FireMode::Primary) {
-          auto connections = entity->connectionsForNode(node);
+          auto connections = entity->connections_for_node(node);
           if (!connections) return std::unexpected(std::move(connections.error()));
           if (connections->empty()) continue;
         }
         float distance = geometry.diff(center, pos).magnitude_squared();
         if (!matchNode || distance < bestDist) {
-          matchNode = WireConnection{.entityLocation = entity->tilePosition(), .nodeIndex = i};
+          matchNode = WireConnection{.entity_location = entity->tile_position(), .node_index = i};
           matchDirection = direction;
           bestDist = distance;
         }
@@ -458,12 +458,12 @@ std::expected<WireConnector::SwingResult, StarException> WirePane::swing(WorldGe
   }
   if (!matchNode) return Nothing;
   if (mode != FireMode::Primary) {
-    m_worldClient->disconnectAllWires(matchNode->entityLocation,
-                                      WireNode{.direction = matchDirection, .nodeIndex = matchNode->nodeIndex});
+    m_worldClient->disconnectAllWires(matchNode->entity_location,
+                                      WireNode{.direction = matchDirection, .node_index = matchNode->node_index});
     return Connect;
   }
   if (m_connecting) {
-    if (m_sourceDirection == matchDirection || m_sourceConnector.entityLocation == matchNode->entityLocation) return Mismatch;
+    if (m_sourceDirection == matchDirection || m_sourceConnector.entity_location == matchNode->entity_location) return Mismatch;
     if (matchDirection == WireDirection::Output) {
       m_worldClient->connectWire(*matchNode, m_sourceConnector);
     } else {

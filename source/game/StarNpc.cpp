@@ -1074,7 +1074,7 @@ std::expected<void, StarException> Npc::render(RenderCallback& render_callback) 
   auto preview_in_range = in_tool_range();
   if (!preview_in_range)
     return std::unexpected(std::move(preview_in_range.error()));
-  auto previews = m_tools->renderObjectPreviews(*aim, walking_direction(), *preview_in_range, favorite_color());
+  auto previews = m_tools->render_object_previews(*aim, walking_direction(), *preview_in_range, favorite_color());
   if (!previews)
     return std::unexpected(std::move(previews.error()));
   return render_callback.add_drawables(std::move(*previews), render_layer);

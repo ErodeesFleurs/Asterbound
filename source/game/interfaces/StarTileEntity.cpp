@@ -71,7 +71,7 @@ TileEntity::TileEntity() {
 }
 
 Vec2F TileEntity::position() const {
-  return Vec2F(tilePosition());
+  return Vec2F(tile_position());
 }
 
 List<Vec2I> TileEntity::spaces() const {
@@ -82,15 +82,15 @@ List<Vec2I> TileEntity::roots() const {
   return {};
 }
 
-List<MaterialSpace> TileEntity::materialSpaces() const {
+List<MaterialSpace> TileEntity::material_spaces() const {
   return {};
 }
 
-std::expected<bool, StarException> TileEntity::damageTiles(List<Vec2I> const&, Vec2F const&, TileDamage const&) {
+std::expected<bool, StarException> TileEntity::damage_tiles(List<Vec2I> const&, Vec2F const&, TileDamage const&) {
   return false;
 }
 
-std::expected<bool, StarException> TileEntity::canBeDamaged() const {
+std::expected<bool, StarException> TileEntity::can_be_damaged() const {
   return true;
 }
 
@@ -98,7 +98,7 @@ bool TileEntity::is_interactive() const {
   return false;
 }
 
-List<Vec2I> TileEntity::interactiveSpaces() const {
+List<Vec2I> TileEntity::interactive_spaces() const {
   return spaces();
 }
 
@@ -123,7 +123,7 @@ std::expected<bool, StarException> TileEntity::anySpacesOccupied(List<Vec2I> con
   auto currentWorld = world();
   if (!currentWorld)
     return std::unexpected(std::move(currentWorld.error()));
-  Vec2I tp = tilePosition();
+  Vec2I tp = tile_position();
   for (auto pos : spaces) {
     pos += tp;
     if (is_connectable_material(currentWorld->get().material(pos, TileLayer::Foreground)))
@@ -137,7 +137,7 @@ std::expected<bool, StarException> TileEntity::allSpacesOccupied(List<Vec2I> con
   auto currentWorld = world();
   if (!currentWorld)
     return std::unexpected(std::move(currentWorld.error()));
-  Vec2I tp = tilePosition();
+  Vec2I tp = tile_position();
   for (auto pos : spaces) {
     pos += tp;
     if (!is_connectable_material(currentWorld->get().material(pos, TileLayer::Foreground)))
@@ -153,7 +153,7 @@ std::expected<float, StarException> TileEntity::spacesLiquidFillLevel(List<Vec2I
     return std::unexpected(std::move(currentWorld.error()));
   float total = 0.0f;
   for (auto pos : relativeSpaces) {
-    pos += tilePosition();
+    pos += tile_position();
     total += currentWorld->get().liquidLevel(pos).level;
   }
   return total / relativeSpaces.size();

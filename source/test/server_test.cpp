@@ -201,9 +201,9 @@ public:
   explicit BreakCountingChair(Root& root) : Entity(root), Object(root) {}
   using Object::initialize;
 
-  std::expected<bool, StarException> checkBroken() override {
+  std::expected<bool, StarException> check_broken() override {
     ++checks;
-    return Object::checkBroken();
+    return Object::check_broken();
   }
 
   unsigned checks = 0;
@@ -222,8 +222,8 @@ const GameTestRegistration server_break_clock("GameTimers", "GlobalBreakRequests
     floor.update_collision(CollisionKind::Block);
   }
   auto chair = std::make_shared<BreakCountingChair>(root);
-  chair->initialize(root.objectDatabase().value()->getConfig("woodenchair").value(), JsonObject()).value();
-  chair->setTilePosition(pos).value();
+  chair->initialize(root.object_database().value()->get_config("woodenchair").value(), JsonObject()).value();
+  chair->set_tile_position(pos).value();
   world->addEntity(chair).value();
   WorldServerTestAccess::start_break_clock(*world);
   auto const before = chair->checks;
@@ -598,9 +598,9 @@ const GameTestRegistration falling_block_protection("FallingBlocksWorld", "Prote
     (*floor)->get().foreground = structure_material_id;
     (*floor)->get().update_collision(CollisionKind::Block);
   }
-  auto objects = fixture.root().objectDatabase();
+  auto objects = fixture.root().object_database();
   ASSERT_TRUE(objects);
-  auto chair = (*objects)->createForPlacement(world, "woodenchair", chair_pos, Direction::Left);
+  auto chair = (*objects)->create_for_placement(world, "woodenchair", chair_pos, Direction::Left);
   ASSERT_TRUE(chair && *chair);
   ASSERT_TRUE(world.addEntity(*chair));
   auto spaces = (*chair)->spaces();

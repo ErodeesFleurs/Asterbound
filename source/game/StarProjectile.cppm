@@ -155,8 +155,8 @@ public:
   void setSourceEntity(EntityId source, bool trackSource);
   EntityId sourceEntity() const;
 
-  [[nodiscard]] std::expected<List<PersistentStatusEffect>, StarException> statusEffects() const override;
-  PolyF statusEffectArea() const override;
+  [[nodiscard]] std::expected<List<PersistentStatusEffect>, StarException> status_effects() const override;
+  PolyF status_effect_area() const override;
 
   [[nodiscard]] std::expected<List<PhysicsForceRegion>, StarException> force_regions() const override;
   std::size_t movingCollisionCount() const override;

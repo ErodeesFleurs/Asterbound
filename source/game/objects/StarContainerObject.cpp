@@ -127,17 +127,17 @@ bool is_container_recipe(ItemRecipe const& recipe) {
 
 }
 
-ContainerObject::ContainerObject(Root& rootContext) : Entity(rootContext), Object(rootContext), m_initialized(false), m_count(0), m_currentState(0), m_animationFrameCooldown(0), m_autoCloseCooldown(0), m_itemsUpdated(true), m_runUpdatedCallback(true) {}
+ContainerObject::ContainerObject(ConstructionKey, Root& root) : Entity(root), Object(root), m_initialized(false), m_count(0), m_currentState(0), m_animationFrameCooldown(0), m_autoCloseCooldown(0), m_itemsUpdated(true), m_runUpdatedCallback(true) {}
 
 std::expected<std::shared_ptr<ContainerObject>, StarException> ContainerObject::create(Root& rootContext, std::shared_ptr<ObjectConfig const> config, Json const& parameters) {
-  auto object = std::shared_ptr<ContainerObject>(new ContainerObject(rootContext));
+  auto object = std::make_shared<ContainerObject>(ConstructionKey{}, rootContext);
   auto operation1 = object->initialize(std::move(config), parameters);
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
   object->m_opened.set(0);
   object->m_crafting.set(false);
   object->m_crafting_progress.set(0);
-  auto slotConfigResult = object->configValue("slotCount");
+  auto slotConfigResult = object->config_value("slotCount");
   if (!slotConfigResult)
     return std::unexpected(std::move(slotConfigResult.error()));
   auto slotConfig = std::move(*slotConfigResult);
@@ -146,16 +146,16 @@ std::expected<std::shared_ptr<ContainerObject>, StarException> ContainerObject::
     return std::unexpected(std::move(slotsResult.error()));
   auto slots = std::move(*slotsResult);
   object->m_items = std::make_shared<ItemBag>(rootContext, slots);
-  auto operation2 = object->m_netGroup.add_net_element(object->m_opened);
+  auto operation2 = object->m_net_group.add_net_element(object->m_opened);
   if (!operation2)
     return std::unexpected(std::move(operation2.error()));
-  auto operation3 = object->m_netGroup.add_net_element(object->m_crafting);
+  auto operation3 = object->m_net_group.add_net_element(object->m_crafting);
   if (!operation3)
     return std::unexpected(std::move(operation3.error()));
-  auto operation4 = object->m_netGroup.add_net_element(object->m_crafting_progress);
+  auto operation4 = object->m_net_group.add_net_element(object->m_crafting_progress);
   if (!operation4)
     return std::unexpected(std::move(operation4.error()));
-  auto operation5 = object->m_netGroup.add_net_element(object->m_itemsNetState);
+  auto operation5 = object->m_net_group.add_net_element(object->m_itemsNetState);
   if (!operation5)
     return std::unexpected(std::move(operation5.error()));
   object->m_crafting_progress.set_interpolator(lerp<float, float>);
@@ -175,7 +175,7 @@ std::expected<void, StarException> ContainerObject::init(World& world, EntityId 
       if (!levelResult)
         return std::unexpected(std::move(levelResult.error()));
       auto level = std::move(*levelResult);
-      auto seedConfigResult = configValue("treasureSeed", root().random().next_u64());
+      auto seedConfigResult = config_value("treasureSeed", root().random().next_u64());
       if (!seedConfigResult)
         return std::unexpected(std::move(seedConfigResult.error()));
       auto seedConfig = std::move(*seedConfigResult);
@@ -183,7 +183,7 @@ std::expected<void, StarException> ContainerObject::init(World& world, EntityId 
       if (!seedResult)
         return std::unexpected(std::move(seedResult.error()));
       auto seed = std::move(*seedResult);
-      auto levelConfigResult = configValue("level", level);
+      auto levelConfigResult = config_value("level", level);
       if (!levelConfigResult)
         return std::unexpected(std::move(levelConfigResult.error()));
       auto levelConfig = std::move(*levelConfigResult);
@@ -192,7 +192,7 @@ std::expected<void, StarException> ContainerObject::init(World& world, EntityId 
         return std::unexpected(std::move(objectLevelResult.error()));
       auto objectLevel = std::move(*objectLevelResult);
       level = objectLevel;
-      auto adjustmentConfigResult = configValue("levelAdjustment", 0);
+      auto adjustmentConfigResult = config_value("levelAdjustment", 0);
       if (!adjustmentConfigResult)
         return std::unexpected(std::move(adjustmentConfigResult.error()));
       auto adjustmentConfig = std::move(*adjustmentConfigResult);
@@ -201,12 +201,12 @@ std::expected<void, StarException> ContainerObject::init(World& world, EntityId 
         return std::unexpected(std::move(adjustmentResult.error()));
       auto adjustment = std::move(*adjustmentResult);
       level += adjustment;
-      auto initialItemsResult = configValue("initialItems");
+      auto initialItemsResult = config_value("initialItems");
       if (!initialItemsResult)
         return std::unexpected(std::move(initialItemsResult.error()));
       auto initialItems = std::move(*initialItemsResult);
       if (!initialItems.is_null()) {
-        auto itemsConfigResult = configValue("initialItems");
+        auto itemsConfigResult = config_value("initialItems");
         if (!itemsConfigResult)
           return std::unexpected(std::move(itemsConfigResult.error()));
         auto itemsConfig = std::move(*itemsConfigResult);
@@ -232,12 +232,12 @@ std::expected<void, StarException> ContainerObject::init(World& world, EntityId 
             return std::unexpected(std::move(operation2.error()));
         }
       }
-      auto poolConfigResult = configValue("treasurePools");
+      auto poolConfigResult = config_value("treasurePools");
       if (!poolConfigResult)
         return std::unexpected(std::move(poolConfigResult.error()));
       auto poolConfig = std::move(*poolConfigResult);
       if (!poolConfig.is_null()) {
-        auto poolsConfigResult = configValue("treasurePools");
+        auto poolsConfigResult = config_value("treasurePools");
         if (!poolsConfigResult)
           return std::unexpected(std::move(poolsConfigResult.error()));
         auto poolsConfig = std::move(*poolsConfigResult);
@@ -304,7 +304,7 @@ std::expected<void, StarException> ContainerObject::update(float dt, std::uint64
           m_count = 0;
           m_opened.set(0);
         } else {
-          auto cooldownConfigResult = configValue("autoCloseCooldown");
+          auto cooldownConfigResult = config_value("autoCloseCooldown");
           if (!cooldownConfigResult)
             return std::unexpected(std::move(cooldownConfigResult.error()));
           auto cooldownConfig = std::move(*cooldownConfigResult);
@@ -317,11 +317,11 @@ std::expected<void, StarException> ContainerObject::update(float dt, std::uint64
       }
     }
     m_age_items_timer.update(currentWorld.get().epochTime());
-    auto interval = configValue("ageItemsEvery", 10).and_then([](Json const& value) { return value.to_double(); });
+    auto interval = config_value("ageItemsEvery", 10).and_then([](Json const& value) { return value.to_double(); });
     if (!interval)
       return std::unexpected(std::move(interval.error()));
     if (m_age_items_timer.elapsed_time() > *interval) {
-      auto multiplier = configValue("itemAgeMultiplier", 1.0f).and_then([](Json const& value) { return value.to_double(); });
+      auto multiplier = config_value("itemAgeMultiplier", 1.0f).and_then([](Json const& value) { return value.to_double(); });
       if (!multiplier)
         return std::unexpected(std::move(multiplier.error()));
       double elapsed = m_age_items_timer.elapsed_time() * *multiplier;
@@ -340,13 +340,13 @@ std::expected<void, StarException> ContainerObject::update(float dt, std::uint64
       m_age_items_timer.set_elapsed_time(0.0);
     }
     if (std::exchange(m_runUpdatedCallback, false)) {
-      auto operation4 = recover_lua_script_error(m_scriptComponent.invoke("containerCallback"));
+      auto operation4 = recover_lua_script_error(m_script_component.invoke("containerCallback"));
       if (!operation4)
         return std::unexpected(std::move(operation4.error()));
     }
   } else {
-    setImageKey("key", Star::to_string(m_currentState));
-    setImageKey("state", m_crafting.get() ? String("crafting") : String("idle"));
+    set_image_key("key", Star::to_string(m_currentState));
+    set_image_key("state", m_crafting.get() ? String("crafting") : String("idle"));
     m_animationFrameCooldown -= 1;
   }
   return {};
@@ -360,12 +360,12 @@ std::expected<void, StarException> ContainerObject::collect_render_events(Render
   if (m_animationFrameCooldown <= 0) {
     if (m_opened.get() != m_currentState) {
       if (m_currentState == 0) {
-        auto openConfigResult = configValue("openSounds");
+        auto openConfigResult = config_value("openSounds");
         if (!openConfigResult)
           return std::unexpected(std::move(openConfigResult.error()));
         auto openConfig = std::move(*openConfigResult);
         if (!openConfig.is_null()) {
-          auto soundsConfigResult = configValue("openSounds");
+          auto soundsConfigResult = config_value("openSounds");
           if (!soundsConfigResult)
             return std::unexpected(std::move(soundsConfigResult.error()));
           auto soundsConfig = std::move(*soundsConfigResult);
@@ -390,13 +390,13 @@ std::expected<void, StarException> ContainerObject::collect_render_events(Render
             return std::unexpected(std::move(instanceResult.error()));
           auto instance = std::move(*instanceResult);
           instance->set_position(position());
-          instance->set_range_multiplier(config()->soundEffectRangeMultiplier);
+          instance->set_range_multiplier(config()->sound_effect_range_multiplier);
           auto operation1 = render_callback.add_audio(std::move(instance));
           if (!operation1)
             return std::unexpected(std::move(operation1.error()));
         }
       }
-      auto openFrameConfigResult = configValue("openFrameIndex", 2);
+      auto openFrameConfigResult = config_value("openFrameIndex", 2);
       if (!openFrameConfigResult)
         return std::unexpected(std::move(openFrameConfigResult.error()));
       auto openFrameConfig = std::move(*openFrameConfigResult);
@@ -405,12 +405,12 @@ std::expected<void, StarException> ContainerObject::collect_render_events(Render
         return std::unexpected(std::move(openFrameResult.error()));
       auto openFrame = std::move(*openFrameResult);
       if (m_currentState == openFrame) {
-        auto closeConfigResult = configValue("closeSounds");
+        auto closeConfigResult = config_value("closeSounds");
         if (!closeConfigResult)
           return std::unexpected(std::move(closeConfigResult.error()));
         auto closeConfig = std::move(*closeConfigResult);
         if (!closeConfig.is_null()) {
-          auto soundsConfigResult = configValue("closeSounds");
+          auto soundsConfigResult = config_value("closeSounds");
           if (!soundsConfigResult)
             return std::unexpected(std::move(soundsConfigResult.error()));
           auto soundsConfig = std::move(*soundsConfigResult);
@@ -435,7 +435,7 @@ std::expected<void, StarException> ContainerObject::collect_render_events(Render
             return std::unexpected(std::move(instanceResult.error()));
           auto instance = std::move(*instanceResult);
           instance->set_position(position());
-          instance->set_range_multiplier(config()->soundEffectRangeMultiplier);
+          instance->set_range_multiplier(config()->sound_effect_range_multiplier);
           auto operation2 = render_callback.add_audio(std::move(instance));
           if (!operation2)
             return std::unexpected(std::move(operation2.error()));
@@ -445,7 +445,7 @@ std::expected<void, StarException> ContainerObject::collect_render_events(Render
         m_currentState -= 1;
       else
         m_currentState += 1;
-      auto frameConfigResult = configValue("frameCooldown");
+      auto frameConfigResult = config_value("frameCooldown");
       if (!frameConfigResult)
         return std::unexpected(std::move(frameConfigResult.error()));
       auto frameConfig = std::move(*frameConfigResult);
@@ -718,7 +718,7 @@ std::expected<Json, StarException> ContainerObject::containerGuiConfig() const {
   if (!assetsResult)
     return std::unexpected(std::move(assetsResult.error()));
   auto assets = std::move(*assetsResult);
-  auto configResult = configValue("uiConfig");
+  auto configResult = config_value("uiConfig");
   if (!configResult)
     return std::unexpected(std::move(configResult.error()));
   auto config = std::move(*configResult);
@@ -734,7 +734,7 @@ std::expected<Json, StarException> ContainerObject::containerGuiConfig() const {
 }
 
 std::expected<String, StarException> ContainerObject::containerDescription() const {
-  return Object::shortDescription();
+  return Object::short_description();
 }
 
 std::expected<String, StarException> ContainerObject::containerSubTitle() const {
@@ -750,7 +750,7 @@ std::expected<String, StarException> ContainerObject::containerSubTitle() const 
 }
 
 std::expected<ItemDescriptor, StarException> ContainerObject::iconItem() const {
-  auto configResult = configValue("hasWindowIcon", true);
+  auto configResult = config_value("hasWindowIcon", true);
   if (!configResult)
     return std::unexpected(std::move(configResult.error()));
   auto config = std::move(*configResult);
@@ -773,7 +773,7 @@ std::shared_ptr<ItemBag const> ContainerObject::itemBag() const {
 }
 
 std::expected<void, StarException> ContainerObject::containerOpen() {
-  auto frameConfigResult = configValue("openFrameIndex", 2);
+  auto frameConfigResult = config_value("openFrameIndex", 2);
   if (!frameConfigResult)
     return std::unexpected(std::move(frameConfigResult.error()));
   auto frameConfig = std::move(*frameConfigResult);
@@ -783,7 +783,7 @@ std::expected<void, StarException> ContainerObject::containerOpen() {
   auto frame = std::move(*frameResult);
   m_opened.set(frame);
   m_count++;
-  auto cooldownConfigResult = configValue("autoCloseCooldown");
+  auto cooldownConfigResult = config_value("autoCloseCooldown");
   if (!cooldownConfigResult)
     return std::unexpected(std::move(cooldownConfigResult.error()));
   auto cooldownConfig = std::move(*cooldownConfigResult);
@@ -1146,8 +1146,8 @@ std::expected<void, StarException> ContainerObject::burnContainerContents() {
   return {};
 }
 
-std::expected<void, StarException> ContainerObject::getNetStates(bool initial) {
-  auto operation1 = Object::getNetStates(initial);
+std::expected<void, StarException> ContainerObject::get_net_states(bool initial) {
+  auto operation1 = Object::get_net_states(initial);
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
   if (m_itemsNetState.pull_updated()) {
@@ -1160,8 +1160,8 @@ std::expected<void, StarException> ContainerObject::getNetStates(bool initial) {
   return {};
 }
 
-std::expected<void, StarException> ContainerObject::setNetStates() {
-  auto operation1 = Object::setNetStates();
+std::expected<void, StarException> ContainerObject::set_net_states() {
+  auto operation1 = Object::set_net_states();
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
   if (std::exchange(m_itemsUpdated, false)) {
@@ -1174,8 +1174,8 @@ std::expected<void, StarException> ContainerObject::setNetStates() {
   return {};
 }
 
-std::expected<void, StarException> ContainerObject::readStoredData(Json const& diskStore) {
-  auto operation1 = Object::readStoredData(diskStore);
+std::expected<void, StarException> ContainerObject::read_stored_data(Json const& diskStore) {
+  auto operation1 = Object::read_stored_data(diskStore);
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
   auto openedResult = diskStore.get_int("opened");
@@ -1214,7 +1214,7 @@ std::expected<void, StarException> ContainerObject::readStoredData(Json const& d
   if (!timer)
     return std::unexpected(std::move(timer.error()));
   m_age_items_timer = *timer;
-  auto slotsConfigResult = configValue("slotCount");
+  auto slotsConfigResult = config_value("slotCount");
   if (!slotsConfigResult)
     return std::unexpected(std::move(slotsConfigResult.error()));
   auto slotsConfig = std::move(*slotsConfigResult);
@@ -1230,8 +1230,8 @@ std::expected<void, StarException> ContainerObject::readStoredData(Json const& d
   return {};
 }
 
-std::expected<Json, StarException> ContainerObject::writeStoredData() const {
-  auto storedResult = Object::writeStoredData();
+std::expected<Json, StarException> ContainerObject::write_stored_data() const {
+  auto storedResult = Object::write_stored_data();
   if (!storedResult)
     return std::unexpected(std::move(storedResult.error()));
   auto stored = std::move(*storedResult);
@@ -1252,7 +1252,7 @@ std::expected<ItemRecipe, StarException> ContainerObject::recipe_for_materials()
   auto database = root().itemDatabase();
   if (!database)
     return std::unexpected(std::move(database.error()));
-  auto recipe_group = configValue("recipeGroup");
+  auto recipe_group = config_value("recipeGroup");
   if (!recipe_group)
     return std::unexpected(std::move(recipe_group.error()));
   auto input_slots = [this] {
@@ -1275,7 +1275,7 @@ std::expected<ItemRecipe, StarException> ContainerObject::recipe_for_materials()
         materials.push_back(item->descriptor().to_json());
     }
   }
-  auto result = recover_lua_script_error(m_scriptComponent.invoke<Json>("craftingRecipe", materials));
+  auto result = recover_lua_script_error(m_script_component.invoke<Json>("craftingRecipe", materials));
   if (!result)
     return std::unexpected(std::move(result.error()));
   if (!*result || (*result)->is_null())

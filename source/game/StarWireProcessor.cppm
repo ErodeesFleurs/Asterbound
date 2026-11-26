@@ -23,7 +23,7 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> process();
 
-  [[nodiscard]] std::expected<bool, StarException> readInputConnection(WireConnection const& connection) override;
+  [[nodiscard]] std::expected<bool, StarException> read_input_connection(WireConnection const& connection) override;
 
 private:
   struct WireEntityState {
@@ -53,7 +53,7 @@ using ::Star::WireProcessor;
 using ::Star::WireEntity;
 using ::Star::WorldStorage;
 using ::Star::WireDirection;
-using ::Star::otherWireDirection;
+using ::Star::other_wire_direction;
 using ::Star::WireNode;
 using ::Star::WireConnection;
 using ::Star::WireCoordinator;

@@ -193,7 +193,7 @@ std::expected<void, StarException> FireableItem::fire(FireMode mode, bool, bool 
     m_startTimingFire = true;
     m_mode = mode;
     if (!m_requireEdgeTrigger || edgeTriggered) {
-      setFireTimer(windupTime() + cooldownTime());
+      setFireTimer(windupTime() + cooldown_time());
       if (!m_fireOnRelease) {
         m_fireWhenReady = true;
         m_startWhenReady = true;
@@ -230,7 +230,7 @@ FireMode FireableItem::fireMode() const {
   return m_mode;
 }
 
-float FireableItem::cooldownTime() const {
+float FireableItem::cooldown_time() const {
   return m_cooldownTime;
 }
 
@@ -276,7 +276,7 @@ std::expected<bool, StarException> FireableItem::windup() const {
       return std::unexpected(std::move(invoked.error()));
   }
 
-  return fireTimer() > cooldownTime();
+  return fireTimer() > cooldown_time();
 }
 
 std::expected<void, StarException> FireableItem::update(float dt, FireMode fireMode, bool shifting, HashSet<MoveControlType> const&) {
@@ -325,7 +325,7 @@ std::expected<void, StarException> FireableItem::update(float dt, FireMode fireM
         return std::unexpected(std::move(started.error()));
     }
     if (m_fireWhenReady) {
-      if (fireTimer() <= cooldownTime()) {
+      if (fireTimer() <= cooldown_time()) {
         m_fireWhenReady = false;
         auto fired = fire_triggered();
         if (!fired)
@@ -337,7 +337,7 @@ std::expected<void, StarException> FireableItem::update(float dt, FireMode fireM
 }
 
 std::expected<void, StarException> FireableItem::triggerCooldown() {
-  setFireTimer(cooldownTime());
+  setFireTimer(cooldown_time());
   m_cooldown = true;
   if (m_scriptComponent) {
     auto invoked = recover_lua_script_error(m_scriptComponent->invoke("triggerCooldown"));

@@ -95,10 +95,15 @@ import star.player_lua_bindings;
 import star.warping;
 import star.world_client_state;
 import star.world_tiles;
+import star.collision_block;
 import star.entity_rendering_types;
 import star.item_lua_bindings;
 import star.container_object;
 import star.object;
+import star.object_item;
+import star.material_database;
+import star.material_types;
+import star.tile_entity;
 import star.rpc_promise;
 namespace Star {
 
@@ -330,17 +335,17 @@ const GameTestRegistration scripted_container_recipes("ItemTest", "ScriptedConta
   auto world = WorldServer::create(root, {128, 128}, *storage);
   if (!succeeded(world, "create world")) return;
   auto close = make_scope_exit([&] { succeeded((*world)->close(), "close world"); });
-  auto objects = root.objectDatabase();
+  auto objects = root.object_database();
   auto database = root.itemDatabase();
   auto assets = root.assets();
   if (!succeeded(objects, "load object database") || !succeeded(database, "load item database")
       || !succeeded(assets, "load assets")) return;
-  auto object = (*objects)->createObject("woodenchest", JsonObject{{"slotCount", 5},
+  auto object = (*objects)->create_object("woodenchest", JsonObject{{"slotCount", 5},
       {"scripts", JsonArray{}}, {"recipeGroup", Json()}, {"initialItems", Json()}, {"treasurePools", Json()}});
   if (!succeeded(object, "construct vanilla container")) return;
   auto container = as<ContainerObject>(*object);
   if (!fixture.check(bool(container), "wooden chest is a native container")
-      || !succeeded(container->setTilePosition({32, 32}), "position container")
+      || !succeeded(container->set_tile_position({32, 32}), "position container")
       || !succeeded(container->init(**world, 1, EntityMode::Master), "initialize container")) return;
   auto uninit = make_scope_exit([&] { succeeded(container->uninit(), "uninitialize container"); });
   auto put = [&](std::size_t slot, String const& name, std::uint64_t count, String const& grade) {
@@ -1417,6 +1422,160 @@ const GameTestRegistration filtered_lua_consumption("ItemTest", "FilteredLuaCons
     auto swap_alias = inventory->itemsAt(SwapSlot());
     fixture.check(bag_alias && !*bag_alias && swap_alias && !*swap_alias, "both exhausted aliases are empty");
   }
+});
+
+const GameTestRegistration object_placement_transaction("ItemTest", "ObjectPlacementCommitsOnceOrRestoresStackAndTiles", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(File::create_directories(overlay));
+  ASSERT_TRUE(File::write_file(String(R"({
+    "objectName":"placementtransactionprobe",
+    "hasObjectItem":false,
+    "orientations":[{
+      "image":"/assetmissing.png",
+      "spaces":[[0,0]],
+      "materialSpaces":[[[0,0],"dirt"]]
+    }]
+  })"), File::relative_to(overlay, "placementtransactionprobe.object")));
+  ASSERT_TRUE(File::write_file(String(R"(
+    function attemptedFire()
+      root.setConfiguration("placementAttempts", root.getConfiguration("placementAttempts") + 1)
+    end
+    function fireTriggered()
+      root.setConfiguration("placementTriggers", root.getConfiguration("placementTriggers") + 1)
+    end
+  )"), File::relative_to(overlay, "placementtransactionprobe.lua")));
+  auto settings = fixture.rootSettings();
+  settings.assetSources.push_back(overlay);
+  settings.storageDirectory = File::relative_to(*directory, "storage");
+  settings.runtimeConfigFile = {};
+  settings.logDirectory = {};
+  settings.logFile = {};
+  settings.includeUGC = false;
+  auto root = Root::create(std::move(settings));
+  ASSERT_TRUE(root) << root.error().what();
+  auto storage = File::ephemeral_file((*root)->random());
+  ASSERT_TRUE(storage) << storage.error().what();
+  auto world = WorldServer::create(**root, {2048, 2048}, *storage);
+  ASSERT_TRUE(world) << world.error().what();
+  auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
+  (*world)->setTileProtectionEnabled(false);
+  ASSERT_TRUE((*world)->generateRegion(RectI(1008, 1008, 1040, 1040)));
+
+  auto factory = (*root)->playerFactory();
+  ASSERT_TRUE(factory);
+  auto player = (*factory)->create();
+  ASSERT_TRUE(player);
+  ASSERT_TRUE((*player)->finalizeCreation());
+  auto uuid = (*player)->uuid();
+  ASSERT_TRUE(uuid);
+  auto context = ClientContext::create((*root)->logger(), Uuid((*root)->random()), *uuid, 1, {});
+  ASSERT_TRUE(context);
+  (*player)->set_client_context(*context);
+  Entity& owner = **player;
+  ASSERT_TRUE(owner.init(**world, 100, EntityMode::Master));
+  auto uninit_owner = make_scope_exit([&] { EXPECT_TRUE(owner.uninit()); });
+  ASSERT_TRUE((*player)->moveTo(Vec2F(1024, 1024)));
+
+  auto materials = (*root)->material_database();
+  auto objects = (*root)->object_database();
+  auto configuration = (*root)->configuration();
+  ASSERT_TRUE(materials && objects && configuration);
+  ASSERT_TRUE((*configuration)->set("placementAttempts", 0));
+  ASSERT_TRUE((*configuration)->set("placementTriggers", 0));
+  auto fire_count = [&](String const& key) {
+    return (*configuration)->get(key).and_then([](Json const& value) { return value.to_int(); });
+  };
+  auto dirt = (*materials)->material_id("dirt");
+  ASSERT_TRUE(dirt);
+  ASSERT_EQ((*materials)->is_soil(*dirt), true);
+  MaterialId missing = 0;
+  while (is_real_material(missing) && (*materials)->is_valid_material_id(missing))
+    ++missing;
+  ASSERT_TRUE(is_real_material(missing));
+
+  Vec2I const target(1025, 1024), upper(1025, 1025), neighbor_pos(1026, 1024), support(1026, 1023);
+  auto target_tile = (*world)->modifyServerTile(target);
+  auto upper_tile = (*world)->modifyServerTile(upper);
+  auto support_tile = (*world)->modifyServerTile(support);
+  ASSERT_TRUE(target_tile && *target_tile && upper_tile && *upper_tile && support_tile && *support_tile);
+  auto& target_before = (**target_tile).get();
+  auto& upper_before = (**upper_tile).get();
+  auto& support_before = (**support_tile).get();
+  Vec2I const previous_root = target + Vec2I(-1, 0);
+  target_before.foreground = *dirt;
+  target_before.rootSource = previous_root;
+  target_before.update_object_collision(CollisionKind::None);
+  target_before.update_collision(CollisionKind::None);
+  upper_before.foreground = empty_material_id;
+  upper_before.rootSource.reset();
+  upper_before.update_object_collision(CollisionKind::None);
+  upper_before.update_collision(CollisionKind::None);
+  support_before.foreground = *dirt;
+
+  String const object_name = "placementtransactionprobe";
+  auto neighbor = (*objects)->create_for_placement(**world, object_name, neighbor_pos, Direction::Right, JsonObject{
+    {"customOrientations", JsonArray{JsonObject{
+      {"spaces", JsonArray{JsonArray{0, 0}}}, {"materialSpaces", Json()},
+      {"anchors", JsonArray{"bottom"}}, {"requireSoilAnchors", true}}}}
+  });
+  ASSERT_TRUE(neighbor && *neighbor);
+  ASSERT_TRUE((*world)->addEntity(*neighbor));
+  auto const initial_ids = (*world)->entity_ids();
+  // The candidate has no anchors. This unknown material only fails when
+  // addEntity checks the neighbor, after indexing the candidate and its tiles.
+  support_before.foreground = missing;
+  auto restore_support = make_scope_exit([&] { support_before.foreground = *dirt; });
+
+  auto item = ObjectItem::create(**root, JsonObject{{"itemName", object_name}, {"objectName", object_name},
+      {"rarity", "common"}, {"scripts", JsonArray{"/placementtransactionprobe.lua"}}}, "/",
+      JsonObject{{"uniqueId", "placement-commit-id"}, {"customOrientations", JsonArray{JsonObject{
+          {"spaces", JsonArray{JsonArray{0, 0}, JsonArray{0, 1}}},
+          {"materialSpaces", JsonArray{JsonArray{JsonArray{0, 0}, "dirt"}, JsonArray{JsonArray{0, 1}, "dirt"}}}
+      }}}});
+  ASSERT_TRUE(item) << item.error().what();
+  ASSERT_EQ((*item)->set_count(2), 0u);
+  ASSERT_TRUE((*item)->init(**player, ToolHand::Primary));
+  auto uninit_item = make_scope_exit([&] { EXPECT_TRUE((*item)->uninit()); });
+  (*player)->aim(Vec2F(target) + Vec2F(0.5f, 0.5f));
+  // Only the item's custom orientation includes the upper tile.
+  upper_before.update_collision(CollisionKind::Block);
+  ASSERT_EQ((*item)->can_place(false), false);
+  upper_before.update_collision(CollisionKind::None);
+  ASSERT_EQ((*item)->can_place(false), true);
+  ASSERT_EQ((*item)->place_in_world(FireMode::Primary, false), false);
+  ASSERT_TRUE((*item)->fire(FireMode::Primary, false, true));
+  ASSERT_TRUE((*item)->FireableItem::update(1.0f / 60.0f, FireMode::Primary, false, {}));
+  EXPECT_TRUE(std::ranges::is_permutation((*world)->entity_ids(), initial_ids));
+  EXPECT_EQ(target_before.foreground, *dirt);
+  EXPECT_EQ(target_before.rootSource, previous_root);
+  EXPECT_EQ(target_before.getCollision(), CollisionKind::None);
+  EXPECT_EQ(upper_before.foreground, empty_material_id);
+  EXPECT_FALSE(upper_before.rootSource);
+  EXPECT_EQ(upper_before.getCollision(), CollisionKind::None);
+  EXPECT_EQ((*item)->count(), 2u);
+  EXPECT_TRUE((*item)->ready());
+  EXPECT_EQ(fire_count("placementAttempts"), 0);
+  EXPECT_EQ(fire_count("placementTriggers"), 0);
+
+  support_before.foreground = *dirt;
+  ASSERT_TRUE((*item)->fire(FireMode::Primary, false, true));
+  ASSERT_TRUE((*item)->fire(FireMode::Primary, false, true));
+  EXPECT_EQ((*item)->count(), 1u);
+  EXPECT_FALSE((*item)->ready());
+  EXPECT_EQ(fire_count("placementAttempts"), 1);
+  ASSERT_TRUE((*item)->FireableItem::update(1.0f / 60.0f, FireMode::Primary, false, {}));
+  EXPECT_EQ(fire_count("placementTriggers"), 1);
+  ASSERT_EQ((*world)->entity_ids().size(), initial_ids.size() + 1);
+  auto placed = (*world)->findEntityAtTile(target, [](std::shared_ptr<TileEntity> const&) -> std::expected<bool, StarException> { return true; });
+  ASSERT_TRUE(placed && *placed);
+  EXPECT_EQ((*placed)->uniqueId(), String("placement-commit-id"));
+  EXPECT_EQ(target_before.rootSource, target);
+  EXPECT_EQ(target_before.getCollision(), CollisionKind::Block);
+  EXPECT_EQ(upper_before.foreground, *dirt);
+  EXPECT_EQ(upper_before.rootSource, target);
 });
 
 const GameTestRegistration liquid_collection_overflow("ItemTest", "LiquidCollectionPreflightsOverflowWithoutUpdatingTiles", [](GameTest& fixture) {
@@ -2517,7 +2676,7 @@ const GameTestRegistration
       player.aim(origin + Vec2F(5, 0));
       // Equipping deliberately triggers the real item's cooldown. Advance
       // fixed ticks through it before requiring a visible painting beam.
-      unsigned equipTicks = (unsigned)std::ceil((*item)->cooldownTime() / dt) + 1;
+      unsigned equipTicks = (unsigned)std::ceil((*item)->cooldown_time() / dt) + 1;
       for (unsigned i = 0; i != equipTicks; ++i)
         ASSERT_TRUE((*tools)->tick(dt, false, {}));
       auto warm = beam.nonRotatedDrawables();
@@ -3287,9 +3446,9 @@ end
 
 const GameTestRegistration
   objectConfigDomains("ItemTest", "ObjectConfigPreservesDamageLightingPresenceAndErrorOrder", [](GameTest& fixture) {
-    auto originalDatabase = fixture.root().objectDatabase();
+    auto originalDatabase = fixture.root().object_database();
     ASSERT_TRUE(originalDatabase);
-    auto original = (*originalDatabase)->getConfig("perfectlygenericitem");
+    auto original = (*originalDatabase)->get_config("perfectlygenericitem");
     ASSERT_TRUE(original) << original.error().what();
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
@@ -3375,11 +3534,11 @@ const GameTestRegistration
     settings.includeUGC = false;
     auto root = Root::create(std::move(settings));
     ASSERT_TRUE(root) << root.error().what();
-    auto database = (*root)->objectDatabase();
+    auto database = (*root)->object_database();
     ASSERT_TRUE(database) << database.error().what();
     for (auto const& test : cases) {
       SCOPED_TRACE(test.name);
-      auto config = (*database)->getConfig(test.name);
+      auto config = (*database)->get_config(test.name);
       if (!test.firstError.empty()) {
         ASSERT_FALSE(config);
         EXPECT_TRUE(config.error().is<ObjectException>());
@@ -3394,34 +3553,34 @@ const GameTestRegistration
       EXPECT_EQ((*config)->category, (*original)->category);
       EXPECT_EQ((*config)->orientations.size(), (*original)->orientations.size());
       EXPECT_EQ((*config)->rooting, (*original)->rooting);
-      EXPECT_EQ((*config)->biomePlaced, (*original)->biomePlaced);
+      EXPECT_EQ((*config)->biome_placed, (*original)->biome_placed);
       if (test.name == "domaindefaults") {
-        EXPECT_EQ((*config)->damageTeam.type, TeamType::Environment);
-        EXPECT_EQ((*config)->damageTeam.team, 0u);
+        EXPECT_EQ((*config)->damage_team.type, TeamType::Environment);
+        EXPECT_EQ((*config)->damage_team.team, 0u);
         EXPECT_EQ((*config)->light_type, LightType::Point);
-        EXPECT_FALSE((*config)->lightFlickering);
+        EXPECT_FALSE((*config)->light_flickering);
       } else if (test.name == "domainlighting") {
-        EXPECT_EQ((*config)->damageTeam.type, TeamType::Environment);
-        EXPECT_EQ((*config)->damageTeam.team, 17u);
-        ASSERT_EQ((*config)->lightColors.size(), 1u);
-        auto color = (*config)->lightColors.maybe("default");
+        EXPECT_EQ((*config)->damage_team.type, TeamType::Environment);
+        EXPECT_EQ((*config)->damage_team.team, 17u);
+        ASSERT_EQ((*config)->light_colors.size(), 1u);
+        auto color = (*config)->light_colors.maybe("default");
         ASSERT_TRUE(color);
         EXPECT_EQ(*color, Color::rgb(10, 20, 30));
         EXPECT_EQ((*config)->light_type, LightType::Spread);
         EXPECT_FLOAT_EQ((*config)->point_beam, 0.75f);
         EXPECT_FLOAT_EQ((*config)->beam_ambience, 0.25f);
-        EXPECT_TRUE((*config)->lightFlickering);
+        EXPECT_TRUE((*config)->light_flickering);
       } else if (test.name == "domaincolors") {
-        ASSERT_EQ((*config)->lightColors.size(), 1u);
-        auto color = (*config)->lightColors.maybe("warm");
+        ASSERT_EQ((*config)->light_colors.size(), 1u);
+        auto color = (*config)->light_colors.maybe("warm");
         ASSERT_TRUE(color);
         EXPECT_EQ(*color, Color::rgb(40, 50, 60));
       } else {
-        EXPECT_TRUE((*config)->lightColors.empty());
+        EXPECT_TRUE((*config)->light_colors.empty());
         EXPECT_EQ((*config)->light_type, LightType::Spread);
         EXPECT_FLOAT_EQ((*config)->point_beam, 0.0f);
         EXPECT_FLOAT_EQ((*config)->beam_ambience, 0.0f);
-        EXPECT_FALSE((*config)->lightFlickering);
+        EXPECT_FALSE((*config)->light_flickering);
       }
     }
   });

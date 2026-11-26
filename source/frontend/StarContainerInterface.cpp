@@ -558,7 +558,7 @@ std::expected<void, StarException> ContainerPane::initialize(std::shared_ptr<Wor
           auto fetchChildResult283 = fetchChild<ImageWidget>("objectImage");
           if (!fetchChildResult283)
             return std::unexpected(std::move(fetchChildResult283.error()));
-          auto cursorHintDrawablesResult284 = containerObject->cursorHintDrawables();
+          auto cursorHintDrawablesResult284 = containerObject->cursor_hint_drawables();
           if (!cursorHintDrawablesResult284)
             return std::unexpected(std::move(cursorHintDrawablesResult284.error()));
           auto setDrawablesResult285 = std::move(*fetchChildResult283)->setDrawables(std::move(*cursorHintDrawablesResult284));

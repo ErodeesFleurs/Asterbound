@@ -301,6 +301,17 @@ Contact damage configuration is parsed on demand. A source with no explicit
 shape uses the current movement collision polygon; rotation, damage multiplier
 and team are runtime values, not part of the cached configuration.
 
+### Object placement and presentation
+
+Placement tests must use the item's effective orientations, including
+`customOrientations`, not just the object catalog defaults. The world's
+occupancy and anchor tiles can change between preview and placement; a
+successful preview is not authorization to skip the placement check.
+
+When checking render event retries, compare particle positions, audio instance
+identity, delivery order and the next RNG value against uninterrupted delivery.
+Equal event counts alone do not rule out rerolled particles or restarted loops.
+
 ### Shutdown order
 
 Shutdown stops audio callbacks and client services first, releases SDK/GL owners

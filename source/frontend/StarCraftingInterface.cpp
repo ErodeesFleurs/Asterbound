@@ -1100,7 +1100,7 @@ std::expected<CraftingPane::RecipeListing, StarException> CraftingPane::determin
   if (!printer)
     return std::unexpected(std::move(printer.error()));
   if (*printer) {
-    auto objects = context().root().objectDatabase();
+    auto objects = context().root().object_database();
     if (!objects)
       return std::unexpected(std::move(objects.error()));
     auto print_time = m_settings.get_float("printTime", 0);
@@ -1109,11 +1109,11 @@ std::expected<CraftingPane::RecipeListing, StarException> CraftingPane::determin
     auto print_factor = m_settings.get_float("printCostFactor", 1.0);
     if (!print_factor)
       return std::unexpected(std::move(print_factor.error()));
-    auto names = admin ? (*objects)->allObjects() : StringList::from(m_player->log()->scannedObjects());
+    auto names = admin ? (*objects)->all_objects() : StringList::from(m_player->log()->scannedObjects());
     for (auto const& name : names) {
-      if (!(*objects)->isObject(name))
+      if (!(*objects)->is_object(name))
         continue;
-      auto config = (*objects)->getConfig(name);
+      auto config = (*objects)->get_config(name);
       if (!config)
         return std::unexpected(std::move(config.error()));
       if (!*config || !(*config)->printable || !(*database)->has_item(name))

@@ -141,14 +141,14 @@ import star.material_database;
 
 namespace Star {
 
-FarmableObject::FarmableObject(Root& rootContext) : Entity(rootContext), Object(rootContext), m_stage(0), m_stageAlt(-1), m_stageEnterTime(0), m_nextStageTime(0), m_min_immersion(0), m_max_immersion(2), m_consumeSoilMoisture(true), m_finalStage(false) {}
+FarmableObject::FarmableObject(ConstructionKey, Root& root) : Entity(root), Object(root), m_stage(0), m_stageAlt(-1), m_stageEnterTime(0), m_nextStageTime(0), m_min_immersion(0), m_max_immersion(2), m_consumeSoilMoisture(true), m_finalStage(false) {}
 
 std::expected<std::shared_ptr<FarmableObject>, StarException> FarmableObject::create(Root& rootContext, std::shared_ptr<ObjectConfig const> config, Json const& parameters) {
-  auto object = std::shared_ptr<FarmableObject>(new FarmableObject(rootContext));
+  auto object = std::make_shared<FarmableObject>(ConstructionKey{}, rootContext);
   auto operation1 = object->initialize(std::move(config), parameters);
   if (!operation1)
     return std::unexpected(std::move(operation1.error()));
-  auto stagesConfigResult = object->configValue("stages", JsonArray{JsonObject()});
+  auto stagesConfigResult = object->config_value("stages", JsonArray{JsonObject()});
   if (!stagesConfigResult)
     return std::unexpected(std::move(stagesConfigResult.error()));
   auto stagesConfig = std::move(*stagesConfigResult);
@@ -157,7 +157,7 @@ std::expected<std::shared_ptr<FarmableObject>, StarException> FarmableObject::cr
     return std::unexpected(std::move(stagesResult.error()));
   auto stages = std::move(*stagesResult);
   object->m_stages = std::move(stages);
-  auto startingStageConfigResult = object->configValue("startingStage", 0);
+  auto startingStageConfigResult = object->config_value("startingStage", 0);
   if (!startingStageConfigResult)
     return std::unexpected(std::move(startingStageConfigResult.error()));
   auto startingStageConfig = std::move(*startingStageConfigResult);
@@ -166,17 +166,17 @@ std::expected<std::shared_ptr<FarmableObject>, StarException> FarmableObject::cr
     return std::unexpected(std::move(startingStageResult.error()));
   auto startingStage = std::move(*startingStageResult);
   object->m_stage = std::move(startingStage);
-  auto min_immersion = object->configValue("minImmersion", 0).and_then(&Json::to_float);
+  auto min_immersion = object->config_value("minImmersion", 0).and_then(&Json::to_float);
   if (!min_immersion)
     return std::unexpected(std::move(min_immersion.error()));
-  auto max_immersion = object->configValue("maxImmersion", 2).and_then(&Json::to_float);
+  auto max_immersion = object->config_value("maxImmersion", 2).and_then(&Json::to_float);
   if (!max_immersion)
     return std::unexpected(std::move(max_immersion.error()));
   if (!is_finite(*min_immersion) || !is_finite(*max_immersion) || *min_immersion > *max_immersion)
     return std::unexpected(ObjectException("Expected finite minImmersion <= maxImmersion"));
   object->m_min_immersion = *min_immersion;
   object->m_max_immersion = *max_immersion;
-  auto consumeSoilMoistureConfigResult = object->configValue("consumeSoilMoisture", true);
+  auto consumeSoilMoistureConfigResult = object->config_value("consumeSoilMoisture", true);
   if (!consumeSoilMoistureConfigResult)
     return std::unexpected(std::move(consumeSoilMoistureConfigResult.error()));
   auto consumeSoilMoistureConfig = std::move(*consumeSoilMoistureConfigResult);
@@ -230,12 +230,12 @@ std::expected<void, StarException> FarmableObject::update(float dt, std::uint64_
       if (m_stage == lastStage)
         break;
     }
-    auto sampled = m_immersion->update(dt, [this] { return liquidFillLevel(); });
+    auto sampled = m_immersion->update(dt, [this] { return liquid_fill_level(); });
     if (!sampled)
       return std::unexpected(std::move(sampled.error()));
     auto average = m_immersion->average();
     if (average > m_max_immersion || average < m_min_immersion) {
-      auto operation6 = breakObject(false);
+      auto operation6 = break_object(false);
       if (!operation6)
         return std::unexpected(std::move(operation6.error()));
     }
@@ -243,15 +243,15 @@ std::expected<void, StarException> FarmableObject::update(float dt, std::uint64_
   return {};
 }
 
-std::expected<bool, StarException> FarmableObject::damageTiles(List<Vec2I> const& position, Vec2F const& sourcePosition, TileDamage const& tileDamage) {
+std::expected<bool, StarException> FarmableObject::damage_tiles(List<Vec2I> const& position, Vec2F const& sourcePosition, TileDamage const& tileDamage) {
   if (tileDamage.type != TileDamageType::Beamish && tileDamage.type != TileDamageType::Blockish && tileDamage.type != TileDamageType::Plantish)
-    return Object::damageTiles(position, sourcePosition, tileDamage);
+    return Object::damage_tiles(position, sourcePosition, tileDamage);
   auto harvestedResult = harvest();
   if (!harvestedResult)
     return std::unexpected(std::move(harvestedResult.error()));
   auto harvested = std::move(*harvestedResult);
   if (!harvested)
-    return Object::damageTiles(position, sourcePosition, tileDamage);
+    return Object::damage_tiles(position, sourcePosition, tileDamage);
   return false;
 }
 
@@ -329,7 +329,7 @@ std::expected<bool, StarException> FarmableObject::harvest() {
     if (!operation10)
       return std::unexpected(std::move(operation10.error()));
   } else {
-    auto operation11 = breakObject(true);
+    auto operation11 = break_object(true);
     if (!operation11)
       return std::unexpected(std::move(operation11.error()));
   }
@@ -349,7 +349,7 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
     return std::unexpected(std::move(currentWorldResult.error()));
   auto currentWorld = std::move(*currentWorldResult);
   if (m_consumeSoilMoisture && newStage > m_stage) {
-    if (auto orientation = currentOrientation()) {
+    if (auto orientation = current_orientation()) {
       auto assetsResult = root().assets();
       if (!assetsResult)
         return std::unexpected(std::move(assetsResult.error()));
@@ -363,7 +363,7 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
         return std::unexpected(std::move(wetToDryModsResult.error()));
       auto wetToDryMods = std::move(*wetToDryModsResult);
       for (auto const& anchor : orientation->anchors) {
-        auto pos = tilePosition() + anchor.position;
+        auto pos = tile_position() + anchor.position;
         auto mod_name = materials.mod_name(currentWorld.get().mod(pos, anchor.layer));
         if (!mod_name)
           return std::unexpected(std::move(mod_name.error()));
@@ -404,7 +404,7 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
     return std::unexpected(std::move(treeResult.error()));
   auto tree = std::move(*treeResult);
   if (tree) {
-    auto stemNameConfigResult = configValue("stemName");
+    auto stemNameConfigResult = config_value("stemName");
     if (!stemNameConfigResult)
       return std::unexpected(std::move(stemNameConfigResult.error()));
     auto stemNameConfig = std::move(*stemNameConfigResult);
@@ -412,7 +412,7 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
     if (!stemNameResult)
       return std::unexpected(std::move(stemNameResult.error()));
     auto stemName = std::move(*stemNameResult);
-    auto stemHueShiftConfigResult = configValue("stemHueShift", 0);
+    auto stemHueShiftConfigResult = config_value("stemHueShift", 0);
     if (!stemHueShiftConfigResult)
       return std::unexpected(std::move(stemHueShiftConfigResult.error()));
     auto stemHueShiftConfig = std::move(*stemHueShiftConfigResult);
@@ -420,7 +420,7 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
     if (!stemHueShiftResult)
       return std::unexpected(std::move(stemHueShiftResult.error()));
     auto stemHueShift = std::move(*stemHueShiftResult);
-    auto foliageNameConfigResult = configValue("foliageName", "");
+    auto foliageNameConfigResult = config_value("foliageName", "");
     if (!foliageNameConfigResult)
       return std::unexpected(std::move(foliageNameConfigResult.error()));
     auto foliageNameConfig = std::move(*foliageNameConfigResult);
@@ -428,7 +428,7 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
     if (!foliageNameResult)
       return std::unexpected(std::move(foliageNameResult.error()));
     auto foliageName = std::move(*foliageNameResult);
-    auto foliageHueShiftConfigResult = configValue("foliageHueShift", 0);
+    auto foliageHueShiftConfigResult = config_value("foliageHueShift", 0);
     if (!foliageHueShiftConfigResult)
       return std::unexpected(std::move(foliageHueShiftConfigResult.error()));
     auto foliageHueShiftConfig = std::move(*foliageHueShiftConfigResult);
@@ -436,7 +436,7 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
     if (!foliageHueShiftResult)
       return std::unexpected(std::move(foliageHueShiftResult.error()));
     auto foliageHueShift = std::move(*foliageHueShiftResult);
-    Vec2I plantPosition = tilePosition();
+    Vec2I plantPosition = tile_position();
     auto plantsResult = root().plantDatabase();
     if (!plantsResult)
       return std::unexpected(std::move(plantsResult.error()));
@@ -448,7 +448,7 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
     if (!plantResult)
       return std::unexpected(std::move(plantResult.error()));
     auto plant = std::move(*plantResult);
-    auto operation13 = plant->setTilePosition(plantPosition);
+    auto operation13 = plant->set_tile_position(plantPosition);
     if (!operation13)
       return std::unexpected(std::move(operation13.error()));
     auto occupiedResult = anySpacesOccupied(plant->spaces());
@@ -468,7 +468,7 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
     } else {
       currentWorld.get().timer(2.f / 60.f, [plant](World& world) -> std::expected<void, StarException> { return world.addEntity(plant); });
       m_finalStage = true;
-      return breakObject(true);
+      return break_object(true);
     }
   }
   auto stage = m_stages.get(newStage);
@@ -521,13 +521,13 @@ std::expected<void, StarException> FarmableObject::enterStage(int newStage) {
     m_stageAlt = *alt;
   }
   m_stage = newStage;
-  setImageKey("stage", Star::to_string(m_stage));
-  setImageKey("alt", Star::to_string(m_stageAlt));
+  set_image_key("stage", Star::to_string(m_stage));
+  set_image_key("alt", Star::to_string(m_stageAlt));
   return {};
 }
 
-std::expected<void, StarException> FarmableObject::readStoredData(Json const& diskStore) {
-  auto operation14 = Object::readStoredData(diskStore);
+std::expected<void, StarException> FarmableObject::read_stored_data(Json const& diskStore) {
+  auto operation14 = Object::read_stored_data(diskStore);
   if (!operation14)
     return std::unexpected(std::move(operation14.error()));
   auto stageResult = diskStore.get_int("stage");
@@ -551,13 +551,13 @@ std::expected<void, StarException> FarmableObject::readStoredData(Json const& di
   auto nextStageTime = std::move(*nextStageTimeResult);
   m_nextStageTime = nextStageTime;
   m_finalStage = (m_stage == static_cast<int>(m_stages.size()) - 1);
-  setImageKey("stage", Star::to_string(m_stage));
-  setImageKey("alt", Star::to_string(m_stageAlt));
+  set_image_key("stage", Star::to_string(m_stage));
+  set_image_key("alt", Star::to_string(m_stageAlt));
   return {};
 }
 
-std::expected<Json, StarException> FarmableObject::writeStoredData() const {
-  auto storedResult = Object::writeStoredData();
+std::expected<Json, StarException> FarmableObject::write_stored_data() const {
+  auto storedResult = Object::write_stored_data();
   if (!storedResult)
     return std::unexpected(std::move(storedResult.error()));
   auto stored = std::move(*storedResult);

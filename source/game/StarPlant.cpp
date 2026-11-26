@@ -1144,11 +1144,11 @@ bool Plant::ephemeral() const {
   return m_ephemeral;
 }
 
-Vec2I Plant::tilePosition() const {
+Vec2I Plant::tile_position() const {
   return m_tilePosition;
 }
 
-std::expected<void, StarException> Plant::setTilePosition(Vec2I const& tilePosition) {
+std::expected<void, StarException> Plant::set_tile_position(Vec2I const& tilePosition) {
   m_tilePosition = tilePosition;
   return {};
 }
@@ -1173,7 +1173,7 @@ std::expected<bool, StarException> Plant::should_destroy() const {
   return m_broken || m_pieces.size() == 0;
 }
 
-std::expected<bool, StarException> Plant::checkBroken() {
+std::expected<bool, StarException> Plant::check_broken() {
   if (!m_broken) {
     auto result627 = allSpacesOccupied(m_roots);
 if (!result627) return std::unexpected(std::move(result627.error()));
@@ -1608,7 +1608,7 @@ m_piecesNetState.set(std::move(*result588));
   return {};
 }
 
-std::expected<bool, StarException> Plant::damageTiles(List<Vec2I> const& positions, Vec2F const& sourcePosition, TileDamage const& tileDamage) {
+std::expected<bool, StarException> Plant::damage_tiles(List<Vec2I> const& positions, Vec2F const& sourcePosition, TileDamage const& tileDamage) {
   auto result584 = baseDamagePosition(positions);
 if (!result584) return std::unexpected(std::move(result584.error()));
 auto position = std::move(*result584);
@@ -1618,8 +1618,8 @@ if (!result585) return std::unexpected(std::move(result585.error()));
 auto geometry = result585->get().geometry();
 
   m_tileDamageStatus->damage(m_tileDamageParameters, tileDamage);
-  m_tileDamageX = geometry.diff(position[0], tilePosition()[0]);
-  m_tileDamageY = position[1] - tilePosition()[1];
+  m_tileDamageX = geometry.diff(position[0], tile_position()[0]);
+  m_tileDamageY = position[1] - tile_position()[1];
   m_tileDamageEvent = true;
   m_tileDamageEventTrigger = true;
 
@@ -1642,7 +1642,7 @@ std::expected<void, StarException> Plant::breakAtPosition(Vec2I const& position,
   auto result575 = world();
 if (!result575) return std::unexpected(std::move(result575.error()));
 auto geometry = result575->get().geometry();
-  Vec2I internalPos = geometry.diff(position, tilePosition());
+  Vec2I internalPos = geometry.diff(position, tile_position());
   std::size_t idx = std::numeric_limits<std::size_t>::max();
   int segmentIdx = std::numeric_limits<int>::max();
   for (std::size_t i = 0; i < m_pieces.size(); ++i) {
@@ -1673,7 +1673,7 @@ auto geometry = result575->get().geometry();
     return {};
 
   PlantPiece breakPiece = m_pieces[idx];
-  Vec2F breakPoint = Vec2F(position) - Vec2F(tilePosition());
+  Vec2F breakPoint = Vec2F(position) - Vec2F(tile_position());
   if (breakPiece.spaces.size()) {
     RectF bounds = RectF::null();
     for (auto space : breakPiece.spaces) {
@@ -1720,7 +1720,7 @@ auto geometry = result575->get().geometry();
     }
   }
 
-  Vec2F worldSpaceBreakPoint = breakPoint + Vec2F(tilePosition());
+  Vec2F worldSpaceBreakPoint = breakPoint + Vec2F(tile_position());
 
   List<int> segmentOrder;
   Map<int, List<PlantPiece>> segments;

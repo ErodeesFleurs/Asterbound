@@ -9,41 +9,41 @@ import star.data_stream_extra;
 
 namespace Star {
 
-WireDirection otherWireDirection(WireDirection direction) {
+WireDirection other_wire_direction(WireDirection direction) {
   return direction == WireDirection::Input ? WireDirection::Output : WireDirection::Input;
 }
 
-bool WireConnection::operator==(WireConnection const& wireConnection) const {
-  return std::tie(entityLocation, nodeIndex) == std::tie(wireConnection.entityLocation, wireConnection.nodeIndex);
+bool WireConnection::operator==(WireConnection const& wire_connection) const {
+  return std::tie(entity_location, node_index) == std::tie(wire_connection.entity_location, wire_connection.node_index);
 }
 
-std::size_t ValueHash<WireConnection>::operator()(WireConnection const& wireConnection) const {
-  return hash_of(wireConnection.entityLocation, wireConnection.nodeIndex);
+std::size_t ValueHash<WireConnection>::operator()(WireConnection const& wire_connection) const {
+  return hash_of(wire_connection.entity_location, wire_connection.node_index);
 }
 
-std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, WireConnection& wireConnection) {
-  if (auto r = ds.viread(wireConnection.entityLocation[0]); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = ds.viread(wireConnection.entityLocation[1]); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = ds.vuread(wireConnection.nodeIndex); !r) return std::unexpected(std::move(r.error()));
+std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, WireConnection& wire_connection) {
+  if (auto r = ds.viread(wire_connection.entity_location[0]); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = ds.viread(wire_connection.entity_location[1]); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = ds.vuread(wire_connection.node_index); !r) return std::unexpected(std::move(r.error()));
   return std::ref(ds);
 }
 
-std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, WireConnection const& wireConnection) {
-  if (auto r = ds.viwrite(wireConnection.entityLocation[0]); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = ds.viwrite(wireConnection.entityLocation[1]); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = ds.vuwrite(wireConnection.nodeIndex); !r) return std::unexpected(std::move(r.error()));
+std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, WireConnection const& wire_connection) {
+  if (auto r = ds.viwrite(wire_connection.entity_location[0]); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = ds.viwrite(wire_connection.entity_location[1]); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = ds.vuwrite(wire_connection.node_index); !r) return std::unexpected(std::move(r.error()));
   return std::ref(ds);
 }
 
-std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, WireNode& wireNode) {
-  if (auto r = ds.read(wireNode.direction); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = ds.vuread(wireNode.nodeIndex); !r) return std::unexpected(std::move(r.error()));
+std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, WireNode& wire_node) {
+  if (auto r = ds.read(wire_node.direction); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = ds.vuread(wire_node.node_index); !r) return std::unexpected(std::move(r.error()));
   return std::ref(ds);
 }
 
-std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, WireNode const& wireNode) {
-  if (auto r = ds.write(wireNode.direction); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = ds.vuwrite(wireNode.nodeIndex); !r) return std::unexpected(std::move(r.error()));
+std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, WireNode const& wire_node) {
+  if (auto r = ds.write(wire_node.direction); !r) return std::unexpected(std::move(r.error()));
+  if (auto r = ds.vuwrite(wire_node.node_index); !r) return std::unexpected(std::move(r.error()));
   return std::ref(ds);
 }
 

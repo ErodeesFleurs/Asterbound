@@ -34,21 +34,21 @@ public:
 
   // If this entity can be entered into the player log, will return the log
   // identifier.
-  [[nodiscard]] virtual std::expected<std::optional<String>, StarException> inspectionLogName() const;
+  [[nodiscard]] virtual std::expected<std::optional<String>, StarException> inspection_log_name() const;
 
   // Long description to display when inspected, if any
-  [[nodiscard]] virtual std::expected<std::optional<String>, StarException> inspectionDescription(String const& species) const;
+  [[nodiscard]] virtual std::expected<std::optional<String>, StarException> inspection_description(String const& species) const;
 };
 
 inline bool InspectableEntity::inspectable() const {
   return true;
 }
 
-[[nodiscard]] inline std::expected<std::optional<String>, StarException> InspectableEntity::inspectionLogName() const {
+[[nodiscard]] inline std::expected<std::optional<String>, StarException> InspectableEntity::inspection_log_name() const {
   return {};
 }
 
-[[nodiscard]] inline std::expected<std::optional<String>, StarException> InspectableEntity::inspectionDescription(String const&) const {
+[[nodiscard]] inline std::expected<std::optional<String>, StarException> InspectableEntity::inspection_description(String const&) const {
   return {};
 }
 

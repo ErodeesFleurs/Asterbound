@@ -128,11 +128,11 @@ public:
 
   // Forces the plant to check if it has been invalidly placed in some way, and
   // should die.  shouldDie does not, by default, do this expensive calculation
-  [[nodiscard]] std::expected<bool, StarException> checkBroken() override;
+  [[nodiscard]] std::expected<bool, StarException> check_broken() override;
 
   // Base tile grid position
-  Vec2I tilePosition() const override;
-  [[nodiscard]] std::expected<void, StarException> setTilePosition(Vec2I const& tilePosition) override;
+  Vec2I tile_position() const override;
+  [[nodiscard]] std::expected<void, StarException> set_tile_position(Vec2I const& tilePosition) override;
 
   // Spaces this plant currently occupies
   List<Vec2I> spaces() const override;
@@ -146,7 +146,7 @@ public:
 
   [[nodiscard]] std::expected<void, StarException> render(RenderCallback& render_callback) override;
 
-  [[nodiscard]] std::expected<bool, StarException> damageTiles(List<Vec2I> const& position, Vec2F const& sourcePosition, TileDamage const& tileDamage) override;
+  [[nodiscard]] std::expected<bool, StarException> damage_tiles(List<Vec2I> const& position, Vec2F const& sourcePosition, TileDamage const& tileDamage) override;
 
   // Central root position
   Vec2I primaryRoot() const;

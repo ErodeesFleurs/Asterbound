@@ -74,7 +74,11 @@ namespace Star {
 class Root;
 
 class ContainerObject : public Object, public virtual ContainerEntity {
+  struct ConstructionKey { explicit ConstructionKey() = default; };
+
 public:
+  ContainerObject(ConstructionKey, Root& root);
+
   void query_type(TypeQuery& query) const noexcept override {
     query_type_of<ContainerObject, Object, ContainerEntity>(*this, query);
   }
@@ -119,14 +123,13 @@ public:
   [[nodiscard]] std::expected<RpcPromise<List<std::shared_ptr<Item>>>, StarException> clearContainer() override;
 
 protected:
-  [[nodiscard]] std::expected<void, StarException> getNetStates(bool initial) override;
-  [[nodiscard]] std::expected<void, StarException> setNetStates() override;
+  [[nodiscard]] std::expected<void, StarException> get_net_states(bool initial) override;
+  [[nodiscard]] std::expected<void, StarException> set_net_states() override;
 
-  [[nodiscard]] std::expected<void, StarException> readStoredData(Json const& diskStore) override;
-  [[nodiscard]] std::expected<Json, StarException> writeStoredData() const override;
+  [[nodiscard]] std::expected<void, StarException> read_stored_data(Json const& diskStore) override;
+  [[nodiscard]] std::expected<Json, StarException> write_stored_data() const override;
 
 private:
-  explicit ContainerObject(Root& rootContext);
   using ContainerCallback = std::function<void(ContainerObject&)>;
 
   enum class CraftResolution { Idle, Resolving, Cancelled };

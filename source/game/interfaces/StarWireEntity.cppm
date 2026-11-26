@@ -48,16 +48,16 @@ public:
 
   ~WireEntity() override = default;
 
-  virtual std::size_t nodeCount(WireDirection direction) const = 0;
-  [[nodiscard]] virtual std::expected<Vec2I, StarException> nodePosition(WireNode wireNode) const = 0;
-  [[nodiscard]] virtual std::expected<List<WireConnection>, StarException> connectionsForNode(WireNode wireNode) const = 0;
-  [[nodiscard]] virtual std::expected<bool, StarException> nodeState(WireNode wireNode) const = 0;
+  virtual std::size_t node_count(WireDirection direction) const = 0;
+  [[nodiscard]] virtual std::expected<Vec2I, StarException> node_position(WireNode wire_node) const = 0;
+  [[nodiscard]] virtual std::expected<List<WireConnection>, StarException> connections_for_node(WireNode wire_node) const = 0;
+  [[nodiscard]] virtual std::expected<bool, StarException> node_state(WireNode wire_node) const = 0;
 
-  [[nodiscard]] virtual std::expected<Color, StarException> nodeColor(WireNode wireNode) const = 0;
-  [[nodiscard]] virtual std::expected<String, StarException> nodeIcon(WireNode wireNode) const = 0;
+  [[nodiscard]] virtual std::expected<Color, StarException> node_color(WireNode wire_node) const = 0;
+  [[nodiscard]] virtual std::expected<String, StarException> node_icon(WireNode wire_node) const = 0;
 
-  [[nodiscard]] virtual std::expected<void, StarException> addNodeConnection(WireNode wireNode, WireConnection nodeConnection) = 0;
-  [[nodiscard]] virtual std::expected<void, StarException> removeNodeConnection(WireNode wireNode, WireConnection nodeConnection) = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> add_node_connection(WireNode wire_node, WireConnection node_connection) = 0;
+  [[nodiscard]] virtual std::expected<void, StarException> remove_node_connection(WireNode wire_node, WireConnection node_connection) = 0;
 
   [[nodiscard]] virtual std::expected<void, StarException> evaluate(WireCoordinator& coordinator) = 0;
 };

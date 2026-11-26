@@ -167,13 +167,13 @@ std::expected<StringSet, StarException> categorizeObject(Root& root, String cons
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  auto objects = root.objectDatabase();
+  auto objects = root.object_database();
   if (!objects)
     return std::unexpected(std::move(objects.error()));
   auto defaults = (*assets)->json("/objects/defaultCategories.config");
   if (!defaults)
     return std::unexpected(std::move(defaults.error()));
-  auto config = (*objects)->getConfig(objectName);
+  auto config = (*objects)->get_config(objectName);
   if (!config)
     return std::unexpected(std::move(config.error()));
   StringSet categories;
@@ -182,7 +182,7 @@ std::expected<StringSet, StarException> categorizeObject(Root& root, String cons
     return std::unexpected(std::move(category.error()));
   if ((*config)->category != *category)
     categories.insert("objects-by-category/" + (*config)->category);
-  for (auto const& tag : (*config)->colonyTags)
+  for (auto const& tag : (*config)->colony_tags)
     categories.insert("objects-by-colonytag/" + tag);
   auto type = defaults->get_string("objectType");
   if (!type)
@@ -233,18 +233,18 @@ std::expected<void, StarException> defineObjectOrientation(Root& root, TilesetUp
   if (!assetsResult)
     return std::unexpected(std::move(assetsResult.error()));
   auto assets = *assetsResult;
-  auto objectsResult = root.objectDatabase();
+  auto objectsResult = root.object_database();
   if (!objectsResult)
     return std::unexpected(std::move(objectsResult.error()));
   auto objects = *objectsResult;
 
   std::shared_ptr<::Star::ObjectOrientation> orientation = orientations[orientationIndex];
 
-  Vec2I imagePosition = Vec2I(orientation->imagePosition * tile_pixels);
+  Vec2I imagePosition = Vec2I(orientation->image_position * tile_pixels);
 
   List<std::shared_ptr<::Star::Image const>> layers;
   unsigned width = 0, height = 0;
-  for (auto const& imageLayer : orientation->imageLayers) {
+  for (auto const& imageLayer : orientation->image_layers) {
     auto path = AssetPath::join(imageLayer.image_part().image);
     String imageName = path.replace_tags(StringMap<String>{}, true, "default");
     auto loaded = assets->image(imageName);
@@ -272,7 +272,7 @@ std::expected<void, StarException> defineObjectOrientation(Root& root, TilesetUp
   }
 
   // Overlay the image with the wiring nodes:
-  auto objectConfig = objects->getConfig(objectName);
+  auto objectConfig = objects->get_config(objectName);
   if (!objectConfig)
     return std::unexpected(std::move(objectConfig.error()));
   auto inputNodes = (*objectConfig)->config.get_array("inputNodes", {});
@@ -287,10 +287,10 @@ std::expected<void, StarException> defineObjectOrientation(Root& root, TilesetUp
   auto outputsDrawn = drawNodes(*assets, combinedImage, imagePosition, *outputNodes, OutboundNode);
   if (!outputsDrawn)
     return std::unexpected(std::move(outputsDrawn.error()));
-  auto example = objects->createObject(objectName);
+  auto example = objects->create_object(objectName);
   if (!example)
     return std::unexpected(std::move(example.error()));
-  auto shortDescription = (*example)->shortDescription();
+  auto shortDescription = (*example)->short_description();
   if (!shortDescription)
     return std::unexpected(std::move(shortDescription.error()));
   auto description = (*example)->description();
@@ -302,7 +302,7 @@ std::expected<void, StarException> defineObjectOrientation(Root& root, TilesetUp
       {"//shortdescription", *shortDescription}, {"//description", *description}};
   if (orientation->direction_affinity.has_value()) {
     Direction direction = *orientation->direction_affinity;
-    if (orientation->flipImages)
+    if (orientation->flip_images)
       direction = -direction;
     auto directionName = enum_name<direction_names>(direction);
     if (!directionName)
@@ -333,11 +333,11 @@ std::expected<void, StarException> defineObjectOrientation(Root& root, TilesetUp
 
 [[nodiscard]]
 std::expected<void, StarException> scanObjects(Root& root, TilesetUpdater& updater) {
-  auto objects = root.objectDatabase();
+  auto objects = root.object_database();
   if (!objects)
     return std::unexpected(std::move(objects.error()));
-  for (String const& objectName : (*objects)->allObjects()) {
-    auto orientations = (*objects)->getOrientations(objectName);
+  for (String const& objectName : (*objects)->all_objects()) {
+    auto orientations = (*objects)->get_orientations(objectName);
     if (!orientations)
       return std::unexpected(std::move(orientations.error()));
     if ((*orientations)->empty()) {
@@ -351,7 +351,7 @@ std::expected<void, StarException> scanObjects(Root& root, TilesetUpdater& updat
     if (!first)
       return std::unexpected(std::move(first.error()));
     for (unsigned i = 1; i < (*orientations)->size(); ++i) {
-      if (i >= 2 || orientation->imagePosition != (**orientations)[i]->imagePosition) {
+      if (i >= 2 || orientation->image_position != (**orientations)[i]->image_position) {
         auto exported = defineObjectOrientation(root, updater, objectName, **orientations, i);
         if (!exported)
           return std::unexpected(std::move(exported.error()));

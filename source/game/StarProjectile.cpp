@@ -784,11 +784,11 @@ EntityId Projectile::sourceEntity() const {
   return m_sourceEntity;
 }
 
-std::expected<List<PersistentStatusEffect>, StarException> Projectile::statusEffects() const {
+std::expected<List<PersistentStatusEffect>, StarException> Projectile::status_effects() const {
   return m_config->persistentStatusEffects;
 }
 
-PolyF Projectile::statusEffectArea() const {
+PolyF Projectile::status_effect_area() const {
   return m_config->statusEffectArea;
 }
 

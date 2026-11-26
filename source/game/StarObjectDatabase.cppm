@@ -75,36 +75,36 @@ struct ObjectOrientation {
   };
 
   struct ParticleEmissionEntry {
-    float particleEmissionRate;
-    float particleEmissionRateVariance;
+    float particle_emission_rate;
+    float particle_emission_rate_variance;
     // Particle positions are considered relative to image pixels, and are
     // flipped with image flipping
     Particle particle;
-    Particle particleVariance;
-    bool placeInSpaces;
+    Particle particle_variance;
+    bool place_in_spaces;
   };
 
   // The JSON values that were used to configure this orientation.
   Json config;
 
-  EntityRenderLayer renderLayer;
-  List<Drawable> imageLayers;
-  bool flipImages;
+  EntityRenderLayer render_layer;
+  List<Drawable> image_layers;
+  bool flip_images;
 
   // Offset of image from (0, 0) object position, in tile coordinates
-  Vec2F imagePosition;
+  Vec2F image_position;
 
   // If an object has frames > 1, then the image name will have the marker
   // "{frame}" replaced with an integer in [0, frames)
-  unsigned frames;
-  float animationCycle;
+  int frames = 1;
+  float animation_cycle = 1.0f;
 
   // Spaces the object occupies.  By default, this is simply the single space
   // at the object position, but can be specified in config as either a list of
   // Vec2I, or by setting a threshold value using "spaceScanning", which will
   // scan the image (frame 1) for non-transparent pixels.
   List<Vec2I> spaces;
-  RectI boundBox;
+  RectI bound_box;
 
   // Allow an orientation to override the metaboundbox in case you don't want to
   // specify spaces
@@ -119,27 +119,27 @@ struct ObjectOrientation {
 
   // if true, only one anchor needs to be valid for the orientation to be valid,
   // otherwise all anchors must be valid
-  bool anchorAny;
+  bool anchor_any;
 
   std::optional<Direction> direction_affinity;
 
   // Optional list of material spaces
-  List<MaterialSpace> materialSpaces;
+  List<MaterialSpace> material_spaces;
 
   // optionally override the default spaces used for interaction
-  std::optional<List<Vec2I>> interactiveSpaces;
+  std::optional<List<Vec2I>> interactive_spaces;
 
-  Vec2F lightPosition;
+  Vec2F light_position;
   float beam_angle;
 
-  List<ParticleEmissionEntry> particleEmitters;
+  List<ParticleEmissionEntry> particle_emitters;
 
-  std::optional<PolyF> statusEffectArea;
-  Json touchDamageConfig;
+  std::optional<PolyF> status_effect_area;
+  Json touch_damage_config;
 
-  [[nodiscard]] static std::expected<ParticleEmissionEntry, StarException> parseParticleEmitter(Root& root, String const& path, Json const& config);
-  [[nodiscard]] std::expected<bool, StarException> placementValid(World const& world, Vec2I const& position) const;
-  [[nodiscard]] std::expected<bool, StarException> anchorsValid(World const& world, Vec2I const& position) const;
+  [[nodiscard]] static std::expected<ParticleEmissionEntry, StarException> parse_particle_emitter(Root& root, String const& path, Json const& config);
+  [[nodiscard]] std::expected<bool, StarException> placement_valid(World const& world, Vec2I const& position) const;
+  [[nodiscard]] std::expected<bool, StarException> anchors_valid(World const& world, Vec2I const& position) const;
 };
 
 // TODO: This is used very strangely and inconsistently. We go to all the trouble of populating
@@ -150,7 +150,9 @@ struct ObjectOrientation {
 struct ObjectConfig {
   // Returns the index of the best valid orientation.  If no orientations are
   // valid, returns npos
-  [[nodiscard]] std::expected<std::size_t, StarException> find_valid_orientation(World const& world, Vec2I const& position, std::optional<Direction> direction_affinity = std::optional<Direction>()) const;
+  [[nodiscard]] static std::expected<std::size_t, StarException> find_valid_orientation(
+      std::span<std::shared_ptr<ObjectOrientation> const> orientations, World const& world, Vec2I const& position,
+      std::optional<Direction> direction_affinity = {});
 
   String path;
   // The JSON values that were used to configure this Object
@@ -160,9 +162,9 @@ struct ObjectConfig {
   String type;
   String race;
   String category;
-  StringList colonyTags;
+  StringList colony_tags;
   StringList scripts;
-  StringList animationScripts;
+  StringList animation_scripts;
 
   unsigned price;
   bool printable;
@@ -170,45 +172,45 @@ struct ObjectConfig {
 
   bool interactive;
 
-  StringMap<Color> lightColors;
+  StringMap<Color> light_colors;
   LightType light_type;
   float point_beam;
   float beam_ambience;
-  std::optional<PeriodicFunction<float>> lightFlickering;
+  std::optional<PeriodicFunction<float>> light_flickering;
 
-  String soundEffect;
-  float soundEffectRangeMultiplier;
+  String sound_effect;
+  float sound_effect_range_multiplier;
 
-  List<PersistentStatusEffect> statusEffects;
-  Json touchDamageConfig;
+  List<PersistentStatusEffect> status_effects;
+  Json touch_damage_config;
 
-  bool hasObjectItem;
-  bool retainObjectParametersInItem;
+  bool has_object_item;
+  bool retain_object_parameters_in_item;
 
   bool smashable;
-  bool smashOnBreak;
+  bool smash_on_break;
   bool unbreakable;
-  String smashDropPool;
-  List<List<ItemDescriptor>> smashDropOptions;
-  StringList smashSoundOptions;
-  JsonArray smashParticles;
+  String smash_drop_pool;
+  List<List<ItemDescriptor>> smash_drop_options;
+  StringList smash_sound_options;
+  JsonArray smash_particles;
 
-  String breakDropPool;
-  List<List<ItemDescriptor>> breakDropOptions;
+  String break_drop_pool;
+  List<List<ItemDescriptor>> break_drop_options;
 
-  TileDamageParameters tileDamageParameters;
-  float damageShakeMagnitude;
-  String damageMaterialKind;
+  TileDamageParameters tile_damage_parameters;
+  float damage_shake_magnitude;
+  String damage_material_kind;
 
-  EntityDamageTeam damageTeam;
+  EntityDamageTeam damage_team;
 
-  std::optional<float> minimumLiquidLevel;
-  std::optional<float> maximumLiquidLevel;
+  std::optional<float> minimum_liquid_level;
+  std::optional<float> maximum_liquid_level;
   float liquid_check_interval;
 
   float health;
 
-  Json animationConfig;
+  Json animation_config;
 
   List<std::shared_ptr<ObjectOrientation>> orientations;
 
@@ -217,48 +219,72 @@ struct ObjectConfig {
   // blocks will be redirected to the object
   bool rooting;
 
-  bool biomePlaced;
+  bool biome_placed;
+};
+
+struct ObjectPlacementPreview {
+  List<Drawable> drawables;
+  bool placeable = false;
 };
 
 class ObjectDatabase {
-public:
-  static List<Vec2I> scanImageSpaces(std::shared_ptr<Image const> const& image, Vec2F const& position, float fillLimit, bool flip = false);
-  [[nodiscard]] static std::expected<Json, StarException> parseTouchDamage(Root& root, String const& path, Json const& touchDamage);
-  [[nodiscard]] static std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> parseOrientations(Root& root, String const& path, Json const& configList, Json const& baseConfig);
+  struct ConstructionKey { explicit ConstructionKey() = default; };
 
+public:
+  [[nodiscard]] static std::expected<Json, StarException> parse_touch_damage(Root& root, String const& path, Json const& touch_damage);
+  [[nodiscard]] static std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> parse_orientations(
+      Root& root, String const& path, Json const& config_list, Json const& base_config);
+
+  ObjectDatabase(ConstructionKey, Root& root);
   [[nodiscard]] static std::expected<std::shared_ptr<ObjectDatabase>, StarException> create(Root& root);
 
   void cleanup();
 
-  StringList allObjects() const;
-  bool isObject(String const& name) const;
+  StringList all_objects() const;
+  bool is_object(String const& name) const;
 
-  [[nodiscard]] std::expected<std::shared_ptr<ObjectConfig>, StarException> getConfig(String const& objectName) const;
-  [[nodiscard]] std::expected<std::shared_ptr<List<std::shared_ptr<ObjectOrientation>> const>, StarException> getOrientations(String const& objectName) const;
+  [[nodiscard]] std::expected<std::shared_ptr<ObjectConfig>, StarException> get_config(String const& object_name) const;
+  [[nodiscard]] std::expected<std::shared_ptr<List<std::shared_ptr<ObjectOrientation>> const>, StarException> get_orientations(String const& object_name) const;
 
-  [[nodiscard]] std::expected<std::shared_ptr<Object>, StarException> createObject(String const& objectName, Json const& objectParameters = JsonObject()) const;
-  [[nodiscard]] std::expected<std::shared_ptr<Object>, StarException> diskLoadObject(Json const& diskStore) const;
+  [[nodiscard]] std::expected<std::shared_ptr<Object>, StarException> create_object(String const& object_name, Json const& object_parameters = JsonObject()) const;
+  [[nodiscard]] std::expected<std::shared_ptr<Object>, StarException> disk_load_object(Json const& disk_store) const;
   [[nodiscard]] std::expected<std::shared_ptr<Object>, StarException> net_load_object(ByteArray const& net_store, NetCompatibilityRules rules = {}) const;
 
-  [[nodiscard]] std::expected<bool, StarException> canPlaceObject(World const& world, Vec2I const& position, String const& objectName) const;
+  [[nodiscard]] std::expected<bool, StarException> can_place_object(World const& world, Vec2I const& position,
+      String const& object_name, Json const& parameters = {}, std::optional<Direction> direction_affinity = {}) const;
   // If the object is placeable in the given position, creates the given object
   // and sets its position and direction and returns it, otherwise returns
   // null.
-  [[nodiscard]] std::expected<std::shared_ptr<Object>, StarException> createForPlacement(World const& world, String const& objectName, Vec2I const& position,
+  [[nodiscard]] std::expected<std::shared_ptr<Object>, StarException> create_for_placement(World const& world, String const& object_name, Vec2I const& position,
       Direction direction, Json const& parameters = JsonObject()) const;
 
-  [[nodiscard]] std::expected<List<Drawable>, StarException> cursorHintDrawables(World const& world, String const& objectName, Vec2I const& position,
-      Direction direction, Json parameters = {}) const;
+  // An explicit placement image does not need a placement query when the tool is out of range.
+  [[nodiscard]] std::expected<ObjectPlacementPreview, StarException> cursor_hint_drawables(World const& world,
+      String const& object_name, Vec2I const& position, Direction direction, Json const& parameters = {},
+      bool test_placement = true) const;
 
 private:
-  explicit ObjectDatabase(Root& root);
-  [[nodiscard]] std::expected<std::shared_ptr<ObjectConfig>, StarException> readConfig(String const& path) const;
+  friend class Object;
+
+  struct ConfigLoad {
+    std::condition_variable completed;
+    bool finished = false;
+  };
+
+  [[nodiscard]] static std::expected<List<std::shared_ptr<ObjectOrientation>>, StarException> parse_orientations_impl(
+      Root& root, String const& path, Json const& config_list, Json const& base_config, bool load_emitters);
+  [[nodiscard]] static std::expected<std::optional<List<std::shared_ptr<ObjectOrientation>>>, StarException>
+  parse_custom_orientations(Root& root, ObjectConfig const& config, Json const& parameters, bool load_emitters);
+  [[nodiscard]] std::expected<std::shared_ptr<Object>, StarException> construct_object(
+      std::shared_ptr<ObjectConfig const> const& config, Json const& parameters) const;
+  [[nodiscard]] std::expected<std::shared_ptr<ObjectConfig>, StarException> read_config(String const& path) const;
 
   Root& m_root;
 
   StringMap<String> m_paths;
-  mutable std::mutex m_cacheMutex;
-  mutable HashTtlCache<String, std::shared_ptr<ObjectConfig>> m_configCache;
+  mutable std::mutex m_cache_mutex;
+  mutable HashTtlCache<String, std::shared_ptr<ObjectConfig>> m_config_cache;
+  mutable StringMap<std::shared_ptr<ConfigLoad>> m_config_loads;
 
   std::shared_ptr<Rebuilder> m_rebuilder;
 };
@@ -277,6 +303,7 @@ export namespace Star {
   using ::Star::ObjectOrientation;
   using ::Star::ObjectConfig;
   using ::Star::ObjectDatabase;
+  using ::Star::ObjectPlacementPreview;
   using ::Star::LuaRoot;
   using ::Star::Rebuilder;
 }
