@@ -157,7 +157,7 @@ local function updateThresholdCanvas(canvas, dB)
 		canvas:drawLine({1, MID}, {loudnessEnd, MID}, lineColor, 4 * scale)
 	end
 
-	local label = fmt("^shadow;%sdB", math.floor(dB * 10) * 0.1)
+	local label = fmt("^shadow;%.1f dB", dB)
 	canvas:drawText(label, {position = {84, MID}, horizontalAnchor = "mid", verticalAnchor = "mid"}, 16, {255, 255, 255, 255})
 end
 
@@ -242,6 +242,15 @@ function inputVolume(mouse, button)
 	handleVolume(inputCanvas, mouse, INPUT_MAX, function(v) set("inputVolume", v) end)
 end
 
+function resetVoiceControl(name)
+	if name == "resetOutput" then
+		updateVolumeCanvas(voiceCanvas, set("outputVolume", 1) / VOICE_MAX, VOICE_MAX)
+	elseif name == "resetInput" then
+		updateVolumeCanvas(inputCanvas, set("inputVolume", 1) / INPUT_MAX, INPUT_MAX)
+	elseif name == "resetThreshold" then
+		updateThresholdCanvas(thresholdCanvas, set("threshold", -50))
+	end
+end
 function threshold(mouse, button)
 	if button ~= 0 then return end
 	if not mouseInSlider(mouse) then return end
