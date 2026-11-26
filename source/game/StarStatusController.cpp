@@ -669,10 +669,10 @@ std::expected<void, StarException> StatusController::tickMaster(float dt) {
   m_recent_damage_given.tick();
   m_recent_damage_taken.tick();
   bool statusImmune = statPositive("statusImmunity");
-  if (!statusImmune && m_movement_controller->get().liquidPercentage() > m_minimumLiquidStatusEffectPercentage) {
+  if (!statusImmune && m_movement_controller->get().liquid_percentage() > m_minimumLiquidStatusEffectPercentage) {
     auto database = m_root.liquids_database();
     if (!database) return std::unexpected(std::move(database.error()));
-    if (auto settings = (*database)->liquid_settings(m_movement_controller->get().liquidId())) {
+    if (auto settings = (*database)->liquid_settings(m_movement_controller->get().liquid_id())) {
       for (auto const& value : settings->get().status_effects) {
         auto effect = jsonToEphemeralStatusEffect(value);
         if (!effect) return std::unexpected(std::move(effect.error()));
@@ -681,17 +681,17 @@ std::expected<void, StarException> StatusController::tickMaster(float dt) {
     }
   }
   if (m_environment_status_effect_update_timer.wrap_tick(m_root.timing().time_step)) {
-    PolyF collisionBody = m_movement_controller->get().collisionBody();
+    PolyF collision_body = m_movement_controller->get().collision_body();
     auto world = m_parentEntity->get().world();
     if (!world) return std::unexpected(std::move(world.error()));
     List<PersistentStatusEffect> entityEffects;
     if (!statusImmune) {
-      auto visited = world->get().forEachEntity(collisionBody.bounding_box(),
-        [world = *world, collisionBody, &entityEffects](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
+      auto visited = world->get().forEachEntity(collision_body.bounding_box(),
+        [world = *world, collision_body, &entityEffects](std::shared_ptr<Entity> const& entity) -> std::expected<void, StarException> {
           if (auto effectEntity = as<StatusEffectEntity>(entity)) {
             auto area = effectEntity->statusEffectArea();
             area.translate(effectEntity->position());
-            auto intersects = world.get().geometry().poly_intersects_poly(area, collisionBody);
+            auto intersects = world.get().geometry().poly_intersects_poly(area, collision_body);
             if (!intersects) return std::unexpected(std::move(intersects.error()));
             if (*intersects) {
               auto effects = effectEntity->statusEffects();

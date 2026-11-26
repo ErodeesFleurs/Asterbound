@@ -692,8 +692,8 @@ const GameTestRegistration moving_collision_filter("MovementController", "Moving
   auto scan = (*controller)->for_each_moving_collision(RectF(2047.25f, 256, 2047.75f, 257),
       [&](MovingCollisionId id, CollisionKind kind, PolyF&& poly, RectF const& bounds) -> std::expected<bool, StarException> {
         ++visits;
-        EXPECT_EQ(id.physicsEntityId, (*object)->entityId());
-        EXPECT_EQ(id.collisionIndex, 1u);
+        EXPECT_EQ(id.physics_entity_id, (*object)->entityId());
+        EXPECT_EQ(id.collision_index, 1u);
         EXPECT_EQ(kind, CollisionKind::Platform);
         EXPECT_EQ(bounds, RectF(2047, 256, 2049, 257));
         retained = std::move(poly);
@@ -711,7 +711,73 @@ public:
   using MovementController::initialize;
   using MovementController::applied_force_region;
   using MovementController::update_force_regions;
+  using MovementController::surface_velocity;
 };
+
+const GameTestRegistration moving_platform_detachment("MovementController", "MovingPlatformLaunchMomentum", [](GameTest& fixture) {
+  auto& root = fixture.root();
+  auto storage = File::ephemeral_file(root.random());
+  if (!fixture.check(bool(storage), "create ephemeral platform world storage")) return;
+  auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
+  if (!fixture.check(bool(world), "create platform world")) return;
+  auto close = make_scope_exit([&] { fixture.check(bool((*world)->close()), "close platform world"); });
+  if (!fixture.check(bool((*world)->generateRegion(RectI(1008, 1008, 1040, 1040))), "generate platform region")) return;
+  if (!fixture.check(bool((*world)->setDungeonGravity(no_dungeon_id, 60)), "set deck gravity")) return;
+  auto shapes = Json::parse(R"({"deck":{"collision":[[-2,0],[2,0],[2,1],[-2,1]]}})");
+  if (!fixture.check(bool(shapes), "parse platform shape")) return;
+  auto deck = PhysicsObject::create(root, unanchored_physics_config(), JsonObject{{"physicsCollisions", *shapes}});
+  if (!fixture.check(bool(deck) && bool((*deck)->setTilePosition({1024, 1024})) && bool((*world)->addEntity(*deck)), "place deck")) return;
+  auto remove = make_scope_exit([&] { fixture.check(bool((*world)->removeEntity((*deck)->entityId(), false)), "remove deck"); });
+
+  ForceTestController rider(root);
+  MovementParameters parameters;
+  parameters.collision_poly = PolyF(RectF(-0.25f, -0.25f, 0.25f, 0.25f));
+  parameters.friction_enabled = false;
+  parameters.gravity_enabled = true;
+  parameters.gravity_multiplier = 1;
+  parameters.air_buoyancy = 1;
+  parameters.liquid_buoyancy = 1;
+  parameters.enable_surface_slope_correction = true;
+  parameters.speed_limit = 1000;
+  parameters.max_movement_per_step = 0;
+  parameters.bounce_factor = 0;
+  if (!fixture.check(bool(rider.initialize(parameters)), "initialize rider")) return;
+  rider.init(**world);
+  auto release = make_scope_exit([&] { rider.uninit(); });
+  rider.set_position({1024, 1025.375f});
+  rider.set_velocity({0, -30});
+  constexpr float dt = 1.0f / 60;
+  if (!fixture.check(bool(rider.tick_master(dt)) && rider.y_position() == 1025.25f, "land on moving deck")) return;
+  if (!fixture.check(bool((*deck)->setTilePosition({1025, 1024})), "shift supporting deck")) return;
+  rider.set_velocity({0, 30});
+  if (!fixture.check(bool(rider.tick_master(dt)), "launch from translated deck")) return;
+  fixture.check(rider.position() == Vec2F(1025, 1025.75f) && rider.velocity() == Vec2F(1 / dt, 30),
+                "launch inherits deck motion exactly once");
+  fixture.check(rider.surface_velocity() == Vec2F{}, "detached rider has no supporting surface velocity");
+
+  auto next_deck = PhysicsObject::create(root, unanchored_physics_config(), JsonObject{{"physicsCollisions", *shapes}});
+  if (!fixture.check(bool(next_deck) && bool((*next_deck)->setTilePosition({1031, 1024})) &&
+                     bool((*world)->addEntity(*next_deck)), "place second deck")) return;
+  auto remove_next = make_scope_exit([&] { fixture.check(bool((*world)->removeEntity((*next_deck)->entityId(), false)), "remove second deck"); });
+  rider.set_position({1025, 1025.375f});
+  rider.set_velocity({0, -30});
+  if (!fixture.check(bool(rider.tick_master(dt)) && rider.y_position() == 1025.25f, "land back on first deck")) return;
+  if (!fixture.check(bool((*deck)->setTilePosition({1026, 1024})), "translate first deck again")) return;
+  rider.set_velocity({300, -7.5f});
+  if (!fixture.check(bool(rider.tick_master(dt)), "cross directly to second deck")) return;
+  if (!fixture.check(rider.position() == Vec2F(1031, 1025.25f),
+        std::format("land on second deck, got ({}, {})", rider.x_position(), rider.y_position()))) return;
+  if (!fixture.check(rider.surface_velocity() == Vec2F{}, "second deck must not inherit first deck velocity")) return;
+  rider.set_velocity({0, -7.5f});
+  if (!fixture.check(bool(rider.tick_master(dt)), "stay on second deck")) return;
+  if (!fixture.check(rider.position() == Vec2F(1031, 1025.25f),
+        std::format("stay on second deck, got ({}, {})", rider.x_position(), rider.y_position()))) return;
+  auto velocity_before_pause = rider.velocity();
+  if (!fixture.check(bool((*next_deck)->setTilePosition({1032, 1024})), "translate deck while paused")) return;
+  if (!fixture.check(bool(rider.tick_master(0)), "synchronize attached rider at zero timestep")) return;
+  fixture.check(rider.position() == Vec2F(1032, 1025.25f) && rider.velocity() == velocity_before_pause,
+                std::format("paused deck: pos ({}, {}), velocity ({}, {})", rider.x_position(), rider.y_position(), rider.x_velocity(), rider.y_velocity()));
+});
 
 const GameTestRegistration force_narrow_phase("MovementController", "ForceRegionNarrowPhaseAndOrder", [](GameTest& fixture) {
   auto storage = File::ephemeral_file(fixture.root().random());
@@ -741,24 +807,24 @@ const GameTestRegistration force_narrow_phase("MovementController", "ForceRegion
 
   MovementParameters parameters;
   parameters.mass = 1;
-  parameters.collisionPoly = PolyF(RectF(-0.25f, -0.25f, 0.25f, 0.25f));
+  parameters.collision_poly = PolyF(RectF(-0.25f, -0.25f, 0.25f, 0.25f));
   ForceTestController controller(fixture.root());
   ASSERT_TRUE(controller.initialize(parameters));
   controller.init(**world);
   auto release = make_scope_exit([&] { controller.uninit(); });
-  controller.setTimestep(1);
+  controller.set_timestep(1);
   auto sample = [&](String category, Vec2F offset, float initial, float expected, bool applied) {
     SCOPED_TRACE(Star::format("{} at {} from {}", category, offset, initial));
     MovementParameters patch;
     patch.physics_effect_categories = StringSet{std::move(category)};
-    ASSERT_TRUE(controller.applyParameters(patch));
-    controller.setPosition(Vec2F(0, 256) + offset);
-    controller.setVelocity({initial, 0});
+    ASSERT_TRUE(controller.apply_parameters(patch));
+    controller.set_position(Vec2F(0, 256) + offset);
+    controller.set_velocity({initial, 0});
     auto update = controller.update_force_regions();
     ASSERT_TRUE(update) << update.error().what();
     EXPECT_EQ(controller.applied_force_region(), applied);
-    EXPECT_NEAR(controller.xVelocity(), expected, 0.00001f);
-    EXPECT_NEAR(controller.yVelocity(), 0, 0.00001f);
+    EXPECT_NEAR(controller.x_velocity(), expected, 0.00001f);
+    EXPECT_NEAR(controller.y_velocity(), 0, 0.00001f);
   };
   sample("ring", {-6, 0}, 0, -4, true); // Beyond the old half-width, across the world seam.
   sample("ring", {6, 6}, 0, 0, false); // In the bounding square, outside the circle.
@@ -779,8 +845,8 @@ const GameTestRegistration force_narrow_phase("MovementController", "ForceRegion
   sample("rejected", {1, 0}, 1, 1, false);
   for (auto const& degenerate : {PolyF(Vec2F{}), PolyF{}}) {
     MovementParameters body;
-    body.collisionPoly = degenerate;
-    ASSERT_TRUE(controller.applyParameters(body));
+    body.collision_poly = degenerate;
+    ASSERT_TRUE(controller.apply_parameters(body));
     sample("ordered", {2, 0}, 0, 0, false);
     sample("ring", {2, 0}, 0, 4, true);
   }
@@ -814,7 +880,7 @@ const GameTestRegistration force_path_reset("MovementController", "ForceRegionRe
     (*actor)->init(**world);
     auto release = make_scope_exit([&] { (*actor)->uninit(); });
     Vec2F start(1030, inside ? 1024.25f : 1030.25f);
-    (*actor)->setPosition(start);
+    (*actor)->set_position(start);
     ASSERT_TRUE((*actor)->tick_master(1.f / 60));
     auto request = (*actor)->control_path_move(start + Vec2F(3, 0), false, search);
     ASSERT_TRUE(request) << request.error().what();

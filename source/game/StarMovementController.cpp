@@ -61,14 +61,14 @@ import star.math_common;
 import star.algorithm;
 namespace Star {
 
-std::expected<MovementParameters, StarException> MovementParameters::sensibleDefaults(Root& root) {
+std::expected<MovementParameters, StarException> MovementParameters::sensible_defaults(Root& root) {
   auto assets = root.assets();
   if (!assets) return std::unexpected(std::move(assets.error()));
   auto config = (*assets)->json("/default_movement.config");
   if (!config) return std::unexpected(std::move(config.error()));
-  auto object = config->to_object();
-  if (!object) return std::unexpected(std::move(object.error()));
-  return create(Json(std::move(*object)));
+  if (config->type() != Json::Type::Object)
+    return std::unexpected(config->object_ptr().error());
+  return create(*config);
 }
 
 MovementParameters::MovementParameters() = default;
@@ -78,82 +78,82 @@ std::expected<MovementParameters, StarException> MovementParameters::create(Json
   if (config.is_null())
     return value;
 
-  auto massResult = config.opt_float("mass");
-  if (!massResult) return std::unexpected(std::move(massResult.error()));
-  value.mass = *massResult;
-  auto gravityMultiplierResult = config.opt_float("gravityMultiplier");
-  if (!gravityMultiplierResult) return std::unexpected(std::move(gravityMultiplierResult.error()));
-  value.gravityMultiplier = *gravityMultiplierResult;
-  auto liquidBuoyancyResult = config.opt_float("liquidBuoyancy");
-  if (!liquidBuoyancyResult) return std::unexpected(std::move(liquidBuoyancyResult.error()));
-  value.liquidBuoyancy = *liquidBuoyancyResult;
-  auto airBuoyancyResult = config.opt_float("airBuoyancy");
-  if (!airBuoyancyResult) return std::unexpected(std::move(airBuoyancyResult.error()));
-  value.airBuoyancy = *airBuoyancyResult;
-  auto bounceFactorResult = config.opt_float("bounceFactor");
-  if (!bounceFactorResult) return std::unexpected(std::move(bounceFactorResult.error()));
-  value.bounceFactor = *bounceFactorResult;
-  auto stopOnFirstBounceResult = config.opt_bool("stopOnFirstBounce");
-  if (!stopOnFirstBounceResult) return std::unexpected(std::move(stopOnFirstBounceResult.error()));
-  value.stopOnFirstBounce = *stopOnFirstBounceResult;
-  auto enableSurfaceSlopeCorrectionResult = config.opt_bool("enableSurfaceSlopeCorrection");
-  if (!enableSurfaceSlopeCorrectionResult) return std::unexpected(std::move(enableSurfaceSlopeCorrectionResult.error()));
-  value.enableSurfaceSlopeCorrection = *enableSurfaceSlopeCorrectionResult;
-  auto slopeSlidingFactorResult = config.opt_float("slopeSlidingFactor");
-  if (!slopeSlidingFactorResult) return std::unexpected(std::move(slopeSlidingFactorResult.error()));
-  value.slopeSlidingFactor = *slopeSlidingFactorResult;
-  auto maxMovementPerStepResult = config.opt_float("maxMovementPerStep");
-  if (!maxMovementPerStepResult) return std::unexpected(std::move(maxMovementPerStepResult.error()));
-  value.maxMovementPerStep = *maxMovementPerStepResult;
-  auto maximumCorrectionResult = config.opt_float("maximumCorrection");
-  if (!maximumCorrectionResult) return std::unexpected(std::move(maximumCorrectionResult.error()));
-  value.maximumCorrection = *maximumCorrectionResult;
-  auto speedLimitResult = config.opt_float("speedLimit");
-  if (!speedLimitResult) return std::unexpected(std::move(speedLimitResult.error()));
-  value.speedLimit = *speedLimitResult;
-  auto discontinuityThresholdResult = config.opt_float("discontinuityThreshold");
-  if (!discontinuityThresholdResult) return std::unexpected(std::move(discontinuityThresholdResult.error()));
-  value.discontinuityThreshold = *discontinuityThresholdResult;
-  auto collisionPolyConfig = config.opt("collisionPoly");
-  if (!collisionPolyConfig) return std::unexpected(std::move(collisionPolyConfig.error()));
-  if (*collisionPolyConfig) {
-    auto collisionPolyValue = json_to_polyf(**collisionPolyConfig);
-    if (!collisionPolyValue) return std::unexpected(std::move(collisionPolyValue.error()));
-    value.collisionPoly = std::move(*collisionPolyValue);
+  if (auto result = config.opt_float("mass"); result)
+    value.mass = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_float("gravityMultiplier"); result)
+    value.gravity_multiplier = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_float("liquidBuoyancy"); result)
+    value.liquid_buoyancy = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_float("airBuoyancy"); result)
+    value.air_buoyancy = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_float("bounceFactor"); result)
+    value.bounce_factor = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_bool("stopOnFirstBounce"); result)
+    value.stop_on_first_bounce = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_bool("enableSurfaceSlopeCorrection"); result)
+    value.enable_surface_slope_correction = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_float("slopeSlidingFactor"); result)
+    value.slope_sliding_factor = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_float("maxMovementPerStep"); result)
+    value.max_movement_per_step = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_float("maximumCorrection"); result)
+    value.maximum_correction = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_float("speedLimit"); result)
+    value.speed_limit = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_float("discontinuityThreshold"); result)
+    value.discontinuity_threshold = *result;
+  else return std::unexpected(std::move(result.error()));
+  auto collision_poly_config = config.opt("collisionPoly");
+  if (!collision_poly_config) return std::unexpected(std::move(collision_poly_config.error()));
+  if (*collision_poly_config) {
+    auto collision_poly_value = json_to_polyf(**collision_poly_config);
+    if (!collision_poly_value) return std::unexpected(std::move(collision_poly_value.error()));
+    value.collision_poly = std::move(*collision_poly_value);
   }
-  auto stickyCollisionResult = config.opt_bool("stickyCollision");
-  if (!stickyCollisionResult) return std::unexpected(std::move(stickyCollisionResult.error()));
-  value.stickyCollision = *stickyCollisionResult;
-  auto stickyForceResult = config.opt_float("stickyForce");
-  if (!stickyForceResult) return std::unexpected(std::move(stickyForceResult.error()));
-  value.stickyForce = *stickyForceResult;
-  auto airFrictionResult = config.opt_float("airFriction");
-  if (!airFrictionResult) return std::unexpected(std::move(airFrictionResult.error()));
-  value.airFriction = *airFrictionResult;
-  auto liquidFrictionResult = config.opt_float("liquidFriction");
-  if (!liquidFrictionResult) return std::unexpected(std::move(liquidFrictionResult.error()));
-  value.liquidFriction = *liquidFrictionResult;
-  auto groundFrictionResult = config.opt_float("groundFriction");
-  if (!groundFrictionResult) return std::unexpected(std::move(groundFrictionResult.error()));
-  value.groundFriction = *groundFrictionResult;
-  auto collisionEnabledResult = config.opt_bool("collisionEnabled");
-  if (!collisionEnabledResult) return std::unexpected(std::move(collisionEnabledResult.error()));
-  value.collisionEnabled = *collisionEnabledResult;
-  auto frictionEnabledResult = config.opt_bool("frictionEnabled");
-  if (!frictionEnabledResult) return std::unexpected(std::move(frictionEnabledResult.error()));
-  value.frictionEnabled = *frictionEnabledResult;
-  auto gravityEnabledResult = config.opt_bool("gravityEnabled");
-  if (!gravityEnabledResult) return std::unexpected(std::move(gravityEnabledResult.error()));
-  value.gravityEnabled = *gravityEnabledResult;
-  auto ignorePlatformCollisionResult = config.opt_bool("ignorePlatformCollision");
-  if (!ignorePlatformCollisionResult) return std::unexpected(std::move(ignorePlatformCollisionResult.error()));
-  value.ignorePlatformCollision = *ignorePlatformCollisionResult;
-  auto maximumPlatformCorrectionResult = config.opt_float("maximumPlatformCorrection");
-  if (!maximumPlatformCorrectionResult) return std::unexpected(std::move(maximumPlatformCorrectionResult.error()));
-  value.maximumPlatformCorrection = *maximumPlatformCorrectionResult;
-  auto maximumPlatformCorrectionVelocityFactorResult = config.opt_float("maximumPlatformCorrectionVelocityFactor");
-  if (!maximumPlatformCorrectionVelocityFactorResult) return std::unexpected(std::move(maximumPlatformCorrectionVelocityFactorResult.error()));
-  value.maximumPlatformCorrectionVelocityFactor = *maximumPlatformCorrectionVelocityFactorResult;
+  if (auto result = config.opt_bool("stickyCollision"); result)
+    value.sticky_collision = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_float("stickyForce"); result)
+    value.sticky_force = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_float("airFriction"); result)
+    value.air_friction = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_float("liquidFriction"); result)
+    value.liquid_friction = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_float("groundFriction"); result)
+    value.ground_friction = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_bool("collisionEnabled"); result)
+    value.collision_enabled = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_bool("frictionEnabled"); result)
+    value.friction_enabled = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_bool("gravityEnabled"); result)
+    value.gravity_enabled = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_bool("ignorePlatformCollision"); result)
+    value.ignore_platform_collision = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_float("maximumPlatformCorrection"); result)
+    value.maximum_platform_correction = *result;
+  else return std::unexpected(std::move(result.error()));
+  if (auto result = config.opt_float("maximumPlatformCorrectionVelocityFactor"); result)
+    value.maximum_platform_correction_velocity_factor = *result;
+  else return std::unexpected(std::move(result.error()));
   auto categories_config = config.opt("physicsEffectCategories");
   if (!categories_config) return std::unexpected(std::move(categories_config.error()));
   if (*categories_config) {
@@ -161,136 +161,184 @@ std::expected<MovementParameters, StarException> MovementParameters::create(Json
     if (!categories) return std::unexpected(std::move(categories.error()));
     value.physics_effect_categories = std::move(*categories);
   }
-  auto restDurationResult = config.opt_int("restDuration");
-  if (!restDurationResult) return std::unexpected(std::move(restDurationResult.error()));
-  value.restDuration = *restDurationResult;
+  if (auto result = config.opt_int("restDuration"); result)
+    value.rest_duration = *result;
+  else return std::unexpected(std::move(result.error()));
   return value;
 }
 
-MovementParameters MovementParameters::merge(MovementParameters const& rhs) const {
+namespace {
+template <std::copyable T>
+void merge_field(std::optional<T>& dest, std::optional<T> const& patch) {
+  if (patch)
+    dest = patch;
+}
+
+void merge_field(std::optional<PolyF>& dest, std::optional<PolyF> const& patch) {
+  // Use coordinate bits so even a serialized signed-zero change is retained.
+  auto same_vertex = [](Vec2F const& lhs, Vec2F const& rhs) {
+    return std::bit_cast<std::uint32_t>(lhs[0]) == std::bit_cast<std::uint32_t>(rhs[0])
+        && std::bit_cast<std::uint32_t>(lhs[1]) == std::bit_cast<std::uint32_t>(rhs[1]);
+  };
+  if (patch && (!dest || !std::ranges::equal(*dest, *patch, same_vertex)))
+    dest = patch;
+}
+
+bool same_category_sequence(StringSet const& lhs, StringSet const& rhs) {
+  if (lhs.size() != rhs.size())
+    return false;
+  auto other = rhs.begin();
+  for (auto const& category : lhs) {
+    if (category != *other)
+      return false;
+    ++other;
+  }
+  return true;
+}
+
+void merge_field(std::optional<StringSet>& dest, std::optional<StringSet> const& patch) {
+  // JSON and wire serialize the set in iteration order.
+  if (patch && (!dest || !same_category_sequence(*dest, *patch)))
+    dest = patch;
+}
+
+template <std::copyable T>
+void merge_field(std::optional<T>& dest, std::optional<T> const& base, std::optional<T> const& patch) {
+  dest = patch ? patch : base;
+}
+
+template <class T>
+concept movement_parameter_source = std::same_as<T, MovementParameters>;
+
+template <movement_parameter_source... Sources>
+  requires (sizeof...(Sources) == 1 || sizeof...(Sources) == 2)
+void merge_fields(MovementParameters& dest, Sources const&... sources) {
+  merge_field(dest.mass, sources.mass...);
+  merge_field(dest.gravity_multiplier, sources.gravity_multiplier...);
+  merge_field(dest.liquid_buoyancy, sources.liquid_buoyancy...);
+  merge_field(dest.air_buoyancy, sources.air_buoyancy...);
+  merge_field(dest.bounce_factor, sources.bounce_factor...);
+  merge_field(dest.stop_on_first_bounce, sources.stop_on_first_bounce...);
+  merge_field(dest.enable_surface_slope_correction, sources.enable_surface_slope_correction...);
+  merge_field(dest.slope_sliding_factor, sources.slope_sliding_factor...);
+  merge_field(dest.max_movement_per_step, sources.max_movement_per_step...);
+  merge_field(dest.maximum_correction, sources.maximum_correction...);
+  merge_field(dest.speed_limit, sources.speed_limit...);
+  merge_field(dest.discontinuity_threshold, sources.discontinuity_threshold...);
+  merge_field(dest.collision_poly, sources.collision_poly...);
+  merge_field(dest.sticky_collision, sources.sticky_collision...);
+  merge_field(dest.sticky_force, sources.sticky_force...);
+  merge_field(dest.air_friction, sources.air_friction...);
+  merge_field(dest.liquid_friction, sources.liquid_friction...);
+  merge_field(dest.ground_friction, sources.ground_friction...);
+  merge_field(dest.collision_enabled, sources.collision_enabled...);
+  merge_field(dest.friction_enabled, sources.friction_enabled...);
+  merge_field(dest.gravity_enabled, sources.gravity_enabled...);
+  merge_field(dest.ignore_platform_collision, sources.ignore_platform_collision...);
+  merge_field(dest.maximum_platform_correction, sources.maximum_platform_correction...);
+  merge_field(dest.maximum_platform_correction_velocity_factor, sources.maximum_platform_correction_velocity_factor...);
+  merge_field(dest.physics_effect_categories, sources.physics_effect_categories...);
+  merge_field(dest.rest_duration, sources.rest_duration...);
+}
+}
+
+MovementParameters MovementParameters::merge(MovementParameters const& patch) const {
   MovementParameters merged;
-
-  merged.mass = (rhs.mass ? rhs.mass : mass);
-  merged.gravityMultiplier = (rhs.gravityMultiplier ? rhs.gravityMultiplier : gravityMultiplier);
-  merged.liquidBuoyancy = (rhs.liquidBuoyancy ? rhs.liquidBuoyancy : liquidBuoyancy);
-  merged.airBuoyancy = (rhs.airBuoyancy ? rhs.airBuoyancy : airBuoyancy);
-  merged.bounceFactor = (rhs.bounceFactor ? rhs.bounceFactor : bounceFactor);
-  merged.stopOnFirstBounce = (rhs.stopOnFirstBounce ? rhs.stopOnFirstBounce : stopOnFirstBounce);
-  merged.enableSurfaceSlopeCorrection = (rhs.enableSurfaceSlopeCorrection ? rhs.enableSurfaceSlopeCorrection : enableSurfaceSlopeCorrection);
-  merged.slopeSlidingFactor = (rhs.slopeSlidingFactor ? rhs.slopeSlidingFactor : slopeSlidingFactor);
-  merged.maxMovementPerStep = (rhs.maxMovementPerStep ? rhs.maxMovementPerStep : maxMovementPerStep);
-  merged.maximumCorrection = (rhs.maximumCorrection ? rhs.maximumCorrection : maximumCorrection);
-  merged.speedLimit = (rhs.speedLimit ? rhs.speedLimit : speedLimit);
-  merged.discontinuityThreshold = (rhs.discontinuityThreshold ? rhs.discontinuityThreshold : discontinuityThreshold);
-  merged.collisionPoly = (rhs.collisionPoly ? rhs.collisionPoly : collisionPoly);
-  merged.stickyCollision = (rhs.stickyCollision ? rhs.stickyCollision : stickyCollision);
-  merged.stickyForce = (rhs.stickyForce ? rhs.stickyForce : stickyForce);
-  merged.airFriction = (rhs.airFriction ? rhs.airFriction : airFriction);
-  merged.liquidFriction = (rhs.liquidFriction ? rhs.liquidFriction : liquidFriction);
-  merged.groundFriction = (rhs.groundFriction ? rhs.groundFriction : groundFriction);
-  merged.collisionEnabled = (rhs.collisionEnabled ? rhs.collisionEnabled : collisionEnabled);
-  merged.frictionEnabled = (rhs.frictionEnabled ? rhs.frictionEnabled : frictionEnabled);
-  merged.gravityEnabled = (rhs.gravityEnabled ? rhs.gravityEnabled : gravityEnabled);
-  merged.ignorePlatformCollision = (rhs.ignorePlatformCollision ? rhs.ignorePlatformCollision : ignorePlatformCollision);
-  merged.maximumPlatformCorrection = (rhs.maximumPlatformCorrection ? rhs.maximumPlatformCorrection : maximumPlatformCorrection);
-  merged.maximumPlatformCorrectionVelocityFactor = (rhs.maximumPlatformCorrectionVelocityFactor ? rhs.maximumPlatformCorrectionVelocityFactor : maximumPlatformCorrectionVelocityFactor);
-  merged.physics_effect_categories = rhs.physics_effect_categories ? rhs.physics_effect_categories : physics_effect_categories;
-  merged.restDuration = (rhs.restDuration ? rhs.restDuration : restDuration);
-
+  merge_fields(merged, *this, patch);
   return merged;
 }
 
-std::expected<Json, StarException> MovementParameters::toJson() const {
-  auto collisionPolyJson = json_from_optional(collisionPoly, json_from_polyf);
-  if (!collisionPolyJson) return std::unexpected(std::move(collisionPolyJson.error()));
+std::expected<Json, StarException> MovementParameters::to_json() const {
+  auto collision_poly_json = json_from_optional(collision_poly, json_from_polyf);
+  if (!collision_poly_json) return std::unexpected(std::move(collision_poly_json.error()));
   auto categories_json = json_from_optional(physics_effect_categories, json_from_string_set);
   if (!categories_json) return std::unexpected(std::move(categories_json.error()));
 
   return JsonObject{
     {"mass", json_from_optional(mass)},
-    {"gravityMultiplier", json_from_optional(gravityMultiplier)},
-    {"liquidBuoyancy", json_from_optional(liquidBuoyancy)},
-    {"airBuoyancy", json_from_optional(airBuoyancy)},
-    {"stopOnFirstBounce", json_from_optional(stopOnFirstBounce)},
-    {"enableSurfaceSlopeCorrection", json_from_optional(enableSurfaceSlopeCorrection)},
-    {"slopeSlidingFactor", json_from_optional(slopeSlidingFactor)},
-    {"maxMovementPerStep", json_from_optional(maxMovementPerStep)},
-    {"maximumCorrection", json_from_optional(maximumCorrection)},
-    {"speedLimit", json_from_optional(speedLimit)},
-    {"discontinuityThreshold", json_from_optional(discontinuityThreshold)},
-    {"collisionPoly", *collisionPolyJson},
-    {"stickyCollision", json_from_optional(stickyCollision)},
-    {"stickyForce", json_from_optional(stickyForce)},
-    {"airFriction", json_from_optional(airFriction)},
-    {"liquidFriction", json_from_optional(liquidFriction)},
-    {"groundFriction", json_from_optional(groundFriction)},
-    {"collisionEnabled", json_from_optional(collisionEnabled)},
-    {"frictionEnabled", json_from_optional(frictionEnabled)},
-    {"gravityEnabled", json_from_optional(gravityEnabled)},
-    {"ignorePlatformCollision", json_from_optional(ignorePlatformCollision)},
-    {"maximumPlatformCorrection", json_from_optional(maximumPlatformCorrection)},
-    {"maximumPlatformCorrectionVelocityFactor", json_from_optional(maximumPlatformCorrectionVelocityFactor)},
+    {"gravityMultiplier", json_from_optional(gravity_multiplier)},
+    {"liquidBuoyancy", json_from_optional(liquid_buoyancy)},
+    {"airBuoyancy", json_from_optional(air_buoyancy)},
+    {"stopOnFirstBounce", json_from_optional(stop_on_first_bounce)},
+    {"enableSurfaceSlopeCorrection", json_from_optional(enable_surface_slope_correction)},
+    {"slopeSlidingFactor", json_from_optional(slope_sliding_factor)},
+    {"maxMovementPerStep", json_from_optional(max_movement_per_step)},
+    {"maximumCorrection", json_from_optional(maximum_correction)},
+    {"speedLimit", json_from_optional(speed_limit)},
+    {"discontinuityThreshold", json_from_optional(discontinuity_threshold)},
+    {"collisionPoly", *collision_poly_json},
+    {"stickyCollision", json_from_optional(sticky_collision)},
+    {"stickyForce", json_from_optional(sticky_force)},
+    {"airFriction", json_from_optional(air_friction)},
+    {"liquidFriction", json_from_optional(liquid_friction)},
+    {"groundFriction", json_from_optional(ground_friction)},
+    {"collisionEnabled", json_from_optional(collision_enabled)},
+    {"frictionEnabled", json_from_optional(friction_enabled)},
+    {"gravityEnabled", json_from_optional(gravity_enabled)},
+    {"ignorePlatformCollision", json_from_optional(ignore_platform_collision)},
+    {"maximumPlatformCorrection", json_from_optional(maximum_platform_correction)},
+    {"maximumPlatformCorrectionVelocityFactor", json_from_optional(maximum_platform_correction_velocity_factor)},
     {"physicsEffectCategories", *categories_json},
-    {"restDuration", json_from_optional(restDuration)}
+    {"restDuration", json_from_optional(rest_duration)}
   };
 }
 
-std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, MovementParameters& movementParameters) {
-  if (auto result = ds.read(movementParameters.mass); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.gravityMultiplier); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.liquidBuoyancy); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.airBuoyancy); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.stopOnFirstBounce); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.enableSurfaceSlopeCorrection); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.slopeSlidingFactor); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.maxMovementPerStep); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.maximumCorrection); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.speedLimit); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.discontinuityThreshold); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.collisionPoly); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.stickyCollision); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.stickyForce); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.airFriction); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.liquidFriction); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.groundFriction); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.collisionEnabled); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.frictionEnabled); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.gravityEnabled); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.ignorePlatformCollision); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.maximumPlatformCorrection); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.maximumPlatformCorrectionVelocityFactor); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.physics_effect_categories); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.read(movementParameters.restDuration); !result) return std::unexpected(std::move(result.error()));
+std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, MovementParameters& movement_parameters) {
+  if (auto result = ds.read(movement_parameters.mass); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.gravity_multiplier); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.liquid_buoyancy); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.air_buoyancy); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.stop_on_first_bounce); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.enable_surface_slope_correction); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.slope_sliding_factor); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.max_movement_per_step); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.maximum_correction); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.speed_limit); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.discontinuity_threshold); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.collision_poly); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.sticky_collision); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.sticky_force); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.air_friction); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.liquid_friction); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.ground_friction); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.collision_enabled); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.friction_enabled); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.gravity_enabled); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.ignore_platform_collision); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.maximum_platform_correction); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.maximum_platform_correction_velocity_factor); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.physics_effect_categories); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.read(movement_parameters.rest_duration); !result) return std::unexpected(std::move(result.error()));
 
   return std::ref(ds);
 }
 
-std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, MovementParameters const& movementParameters) {
-  if (auto result = ds.write(movementParameters.mass); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.gravityMultiplier); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.liquidBuoyancy); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.airBuoyancy); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.stopOnFirstBounce); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.enableSurfaceSlopeCorrection); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.slopeSlidingFactor); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.maxMovementPerStep); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.maximumCorrection); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.speedLimit); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.discontinuityThreshold); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.collisionPoly); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.stickyCollision); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.stickyForce); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.airFriction); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.liquidFriction); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.groundFriction); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.collisionEnabled); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.frictionEnabled); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.gravityEnabled); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.ignorePlatformCollision); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.maximumPlatformCorrection); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.maximumPlatformCorrectionVelocityFactor); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.physics_effect_categories); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = ds.write(movementParameters.restDuration); !result) return std::unexpected(std::move(result.error()));
+std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, MovementParameters const& movement_parameters) {
+  if (auto result = ds.write(movement_parameters.mass); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.gravity_multiplier); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.liquid_buoyancy); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.air_buoyancy); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.stop_on_first_bounce); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.enable_surface_slope_correction); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.slope_sliding_factor); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.max_movement_per_step); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.maximum_correction); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.speed_limit); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.discontinuity_threshold); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.collision_poly); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.sticky_collision); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.sticky_force); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.air_friction); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.liquid_friction); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.ground_friction); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.collision_enabled); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.friction_enabled); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.gravity_enabled); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.ignore_platform_collision); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.maximum_platform_correction); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.maximum_platform_correction_velocity_factor); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.physics_effect_categories); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = ds.write(movement_parameters.rest_duration); !result) return std::unexpected(std::move(result.error()));
 
   return std::ref(ds);
 }
@@ -298,76 +346,99 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
 MovementController::MovementController(Root& root) : m_root(root) {
   m_resting = false;
 
-  m_timeStep = root.timing().time_step;
+  m_time_step = root.timing().time_step;
 
-  m_liquidPercentage = 0.0f;
-  m_liquidId = empty_liquid_id;
+  m_liquid_percentage = 0.0f;
+  m_liquid_id = empty_liquid_id;
 
-  m_xPosition.set_fixed_point_base(0.0125f);
-  m_yPosition.set_fixed_point_base(0.0125f);
-  m_xVelocity.set_fixed_point_base(0.00625f);
-  m_yVelocity.set_fixed_point_base(0.00625f);
+  m_x_position.set_fixed_point_base(0.0125f);
+  m_y_position.set_fixed_point_base(0.0125f);
+  m_x_velocity.set_fixed_point_base(0.00625f);
+  m_y_velocity.set_fixed_point_base(0.00625f);
   m_rotation.set_fixed_point_base(0.01f);
-  m_xRelativeSurfaceMovingCollisionPosition.set_fixed_point_base(0.0125f);
-  m_yRelativeSurfaceMovingCollisionPosition.set_fixed_point_base(0.0125f);
+  m_x_relative_surface_moving_collision_position.set_fixed_point_base(0.0125f);
+  m_y_relative_surface_moving_collision_position.set_fixed_point_base(0.0125f);
 
-  m_xVelocity.set_interpolator(lerp<float, float>);
-  m_yVelocity.set_interpolator(lerp<float, float>);
+  m_x_velocity.set_interpolator(lerp<float, float>);
+  m_y_velocity.set_interpolator(lerp<float, float>);
   m_rotation.set_interpolator(angle_lerp<float, float>);
-  m_xRelativeSurfaceMovingCollisionPosition.set_interpolator(lerp<float, float>);
-  m_yRelativeSurfaceMovingCollisionPosition.set_interpolator(lerp<float, float>);
+  m_x_relative_surface_moving_collision_position.set_interpolator(lerp<float, float>);
+  m_y_relative_surface_moving_collision_position.set_interpolator(lerp<float, float>);
 
   m_world.reset();
 }
 
 std::expected<std::shared_ptr<MovementController>, StarException> MovementController::create(Root& root, MovementParameters const& parameters) {
-  auto controller = std::shared_ptr<MovementController>(new MovementController(root));
+  struct MakeShared final : MovementController {
+    explicit MakeShared(Root& root) : MovementController(root) {}
+  };
+  auto controller = std::make_shared<MakeShared>(root);
   auto initialized = controller->initialize(parameters);
   if (!initialized) return std::unexpected(std::move(initialized.error()));
   return controller;
 }
 
 std::expected<void, StarException> MovementController::initialize(MovementParameters const& parameters) {
-  if (auto result = add_net_element(m_collisionPoly); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_collision_poly); !result) return std::unexpected(std::move(result.error()));
   if (auto result = add_net_element(m_mass); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = add_net_element(m_xPosition); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = add_net_element(m_yPosition); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = add_net_element(m_xVelocity); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = add_net_element(m_yVelocity); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_x_position); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_y_position); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_x_velocity); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_y_velocity); !result) return std::unexpected(std::move(result.error()));
   if (auto result = add_net_element(m_rotation); !result) return std::unexpected(std::move(result.error()));
   if (auto result = add_net_element(m_colliding); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = add_net_element(m_collisionStuck); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = add_net_element(m_nullColliding); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = add_net_element(m_stickingDirection); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = add_net_element(m_onGround); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = add_net_element(m_zeroG); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_collision_stuck); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_null_colliding); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_sticking_direction); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_on_ground); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_zero_g); !result) return std::unexpected(std::move(result.error()));
 
-  if (auto result = add_net_element(m_surfaceMovingCollision); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = add_net_element(m_xRelativeSurfaceMovingCollisionPosition); !result) return std::unexpected(std::move(result.error()));
-  if (auto result = add_net_element(m_yRelativeSurfaceMovingCollisionPosition); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_surface_moving_collision); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_x_relative_surface_moving_collision_position); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = add_net_element(m_y_relative_surface_moving_collision_position); !result) return std::unexpected(std::move(result.error()));
 
-  return resetParameters(parameters);
+  return reset_parameters(parameters);
 }
 
 MovementParameters const& MovementController::parameters() const {
   return m_parameters;
 }
 
-std::expected<void, StarException> MovementController::applyParameters(MovementParameters const& parameters) {
-  return updateParameters(m_parameters.merge(parameters));
+std::expected<void, StarException> MovementController::apply_parameters(MovementParameters const& parameters) {
+  // An engaged mass marks a set that has already passed full validation.
+  if (!m_parameters.mass) {
+    if (auto validated = validate_parameters(parameters); !validated)
+      return validated;
+    auto complete = parameters;
+    m_parameters = std::move(complete);
+    update_parameters(true);
+    return {};
+  }
+  bool const refresh_interpolators = parameters.discontinuity_threshold
+      && m_parameters.discontinuity_threshold != parameters.discontinuity_threshold;
+  merge_fields(m_parameters, parameters);
+  update_parameters(refresh_interpolators);
+  return {};
 }
 
-std::expected<void, StarException> MovementController::resetParameters(MovementParameters const& parameters) {
-  auto defaults = MovementParameters::sensibleDefaults(m_root);
+std::expected<void, StarException> MovementController::reset_parameters(MovementParameters const& parameters) {
+  auto defaults = MovementParameters::sensible_defaults(m_root);
   if (!defaults) return std::unexpected(std::move(defaults.error()));
-  return updateParameters(defaults->merge(parameters));
+  merge_fields(*defaults, parameters);
+  if (auto validated = validate_parameters(*defaults); !validated)
+    return validated;
+  bool const refresh_interpolators = !m_parameters.mass
+      || m_parameters.discontinuity_threshold != defaults->discontinuity_threshold;
+  m_parameters = std::move(*defaults);
+  update_parameters(refresh_interpolators);
+  return {};
 }
 
 Root& MovementController::root() const {
   return m_root;
 }
 
-Json MovementController::storeState() const {
+Json MovementController::store_state() const {
   return JsonObject{
     {"position", json_from_vec2f(position())},
     {"velocity", json_from_vec2f(velocity())},
@@ -375,20 +446,20 @@ Json MovementController::storeState() const {
   };
 }
 
-std::expected<void, StarException> MovementController::loadState(Json const& state) {
-  auto positionJson = state.get("position");
-  if (!positionJson) return std::unexpected(std::move(positionJson.error()));
-  auto positionValue = json_to_vec2f(*positionJson);
-  if (!positionValue) return std::unexpected(std::move(positionValue.error()));
-  auto velocityJson = state.get("velocity");
-  if (!velocityJson) return std::unexpected(std::move(velocityJson.error()));
-  auto velocityValue = json_to_vec2f(*velocityJson);
-  if (!velocityValue) return std::unexpected(std::move(velocityValue.error()));
-  auto rotationValue = state.get_float("rotation");
-  if (!rotationValue) return std::unexpected(std::move(rotationValue.error()));
-  setPosition(*positionValue);
-  setVelocity(*velocityValue);
-  setRotation(*rotationValue);
+std::expected<void, StarException> MovementController::load_state(Json const& state) {
+  auto position_json = state.get("position");
+  if (!position_json) return std::unexpected(std::move(position_json.error()));
+  auto position_value = json_to_vec2f(*position_json);
+  if (!position_value) return std::unexpected(std::move(position_value.error()));
+  auto velocity_json = state.get("velocity");
+  if (!velocity_json) return std::unexpected(std::move(velocity_json.error()));
+  auto velocity_value = json_to_vec2f(*velocity_json);
+  if (!velocity_value) return std::unexpected(std::move(velocity_value.error()));
+  auto rotation_value = state.get_float("rotation");
+  if (!rotation_value) return std::unexpected(std::move(rotation_value.error()));
+  set_position(*position_value);
+  set_velocity(*velocity_value);
+  set_rotation(*rotation_value);
   return {};
 }
 
@@ -396,393 +467,397 @@ float MovementController::mass() const {
   return m_mass.get();
 }
 
-PolyF const& MovementController::collisionPoly() const {
-  return m_collisionPoly.get();
+PolyF const& MovementController::collision_poly() const {
+  return m_collision_poly.get();
 }
 
-void MovementController::setCollisionPoly(PolyF const& poly) {
-  m_collisionPoly.set(poly);
+void MovementController::set_collision_poly(PolyF const& poly) {
+  m_collision_poly.set(poly);
 }
 
 Vec2F MovementController::position() const {
-  return {m_xPosition.get(), m_yPosition.get()};
+  return {m_x_position.get(), m_y_position.get()};
 }
 
-float MovementController::xPosition() const {
-  return m_xPosition.get();
+float MovementController::x_position() const {
+  return m_x_position.get();
 }
 
-float MovementController::yPosition() const {
-  return m_yPosition.get();
+float MovementController::y_position() const {
+  return m_y_position.get();
 }
 
 Vec2F MovementController::velocity() const {
-  return {m_xVelocity.get(), m_yVelocity.get()};
+  return {m_x_velocity.get(), m_y_velocity.get()};
 }
 
-float MovementController::xVelocity() const {
-  return m_xVelocity.get();
+float MovementController::x_velocity() const {
+  return m_x_velocity.get();
 }
 
-float MovementController::yVelocity() const {
-  return m_yVelocity.get();
+float MovementController::y_velocity() const {
+  return m_y_velocity.get();
 }
 
 float MovementController::rotation() const {
   return m_rotation.get();
 }
 
-PolyF MovementController::collisionBody() const {
-  auto poly = collisionPoly();
+PolyF MovementController::collision_body() const {
+  auto poly = collision_poly();
   poly.rotate(rotation());
   poly.translate(position());
   return poly;
 }
 
-RectF MovementController::localBoundBox() const {
-  auto poly = collisionPoly();
+RectF MovementController::local_bound_box() const {
+  auto poly = collision_poly();
   poly.rotate(rotation());
   return poly.bounding_box();
 }
 
-RectF MovementController::collisionBoundBox() const {
-  return collisionBody().bounding_box();
+RectF MovementController::collision_bound_box() const {
+  return collision_body().bounding_box();
 }
 
-bool MovementController::isColliding() const {
+bool MovementController::is_colliding() const {
   return m_colliding.get();
 }
 
-bool MovementController::isNullColliding() const {
-  return m_nullColliding.get();
+bool MovementController::is_null_colliding() const {
+  return m_null_colliding.get();
 }
 
-bool MovementController::isCollisionStuck() const {
-  return m_collisionStuck.get();
+bool MovementController::is_collision_stuck() const {
+  return m_collision_stuck.get();
 }
 
-std::optional<float> MovementController::stickingDirection() const {
-  return m_stickingDirection.get();
+std::optional<float> MovementController::sticking_direction() const {
+  return m_sticking_direction.get();
 }
 
-float MovementController::liquidPercentage() const {
-  return m_liquidPercentage;
+float MovementController::liquid_percentage() const {
+  return m_liquid_percentage;
 }
 
-LiquidId MovementController::liquidId() const {
-  return m_liquidId;
+LiquidId MovementController::liquid_id() const {
+  return m_liquid_id;
 }
 
-bool MovementController::onGround() const {
-  return m_onGround.get();
+bool MovementController::on_ground() const {
+  return m_on_ground.get();
 }
 
-bool MovementController::zeroG() const {
-  return m_zeroG.get();
+bool MovementController::zero_g() const {
+  return m_zero_g.get();
 }
 
-bool MovementController::atWorldLimit(bool bottomOnly) const {
+bool MovementController::at_world_limit(bool bottom_only) const {
   if (m_world) {
-    if (!collisionPoly().empty()) {
-      auto bounds = collisionBoundBox();
-      return bounds.y_min() <= 0 || (!bottomOnly && bounds.y_max() >= m_world->get().geometry().height());
+    if (!collision_poly().empty()) {
+      auto bounds = collision_bound_box();
+      return bounds.y_min() <= 0 || (!bottom_only && bounds.y_max() >= m_world->get().geometry().height());
     } else {
-      return yPosition() <= 0 || (!bottomOnly && yPosition() >= m_world->get().geometry().height());
+      return y_position() <= 0 || (!bottom_only && y_position() >= m_world->get().geometry().height());
     }
   }
   return false;
 }
 
-void MovementController::setPosition(Vec2F position) {
+void MovementController::set_position(Vec2F position) {
   if (m_world)
     position = m_world->get().geometry().limit(position);
 
-  if (position[0] != m_xPosition.get() || position[1] != m_yPosition.get())
+  if (position[0] != m_x_position.get() || position[1] != m_y_position.get())
     m_resting = false;
 
-  m_xPosition.set(position[0]);
-  m_yPosition.set(position[1]);
+  m_x_position.set(position[0]);
+  m_y_position.set(position[1]);
 }
 
-void MovementController::setXPosition(float xPosition) {
-  setPosition({xPosition, yPosition()});
+void MovementController::set_x_position(float x_position) {
+  set_position({x_position, y_position()});
 }
 
-void MovementController::setYPosition(float yPosition) {
-  setPosition({xPosition(), yPosition});
+void MovementController::set_y_position(float y_position) {
+  set_position({x_position(), y_position});
 }
 
 void MovementController::translate(Vec2F const& direction) {
-  setPosition(position() + direction);
+  set_position(position() + direction);
 }
 
-void MovementController::setVelocity(Vec2F vel) {
-  if (m_parameters.speedLimit && vel.magnitude() > (*m_parameters.speedLimit)) {
+void MovementController::set_velocity(Vec2F vel) {
+  if (m_parameters.speed_limit && vel.magnitude() > (*m_parameters.speed_limit)) {
     vel.normalize();
-    vel *= (*m_parameters.speedLimit);
+    vel *= (*m_parameters.speed_limit);
   }
 
   if ((velocity() - vel).magnitude() > 0.0001)
     m_resting = false;
 
-  m_xVelocity.set(vel[0]);
-  m_yVelocity.set(vel[1]);
+  m_x_velocity.set(vel[0]);
+  m_y_velocity.set(vel[1]);
 }
 
-void MovementController::setXVelocity(float xVelocity) {
-  setVelocity({xVelocity, yVelocity()});
+void MovementController::set_x_velocity(float x_velocity) {
+  set_velocity({x_velocity, y_velocity()});
 }
 
-void MovementController::setYVelocity(float yVelocity) {
-  setVelocity({xVelocity(), yVelocity});
+void MovementController::set_y_velocity(float y_velocity) {
+  set_velocity({x_velocity(), y_velocity});
 }
 
-void MovementController::addMomentum(Vec2F const& momentum) {
-  setVelocity(velocity() + momentum / mass());
+void MovementController::add_momentum(Vec2F const& momentum) {
+  set_velocity(velocity() + momentum / mass());
 }
 
-void MovementController::setRotation(float rotation) {
+void MovementController::set_rotation(float rotation) {
   m_resting = false;
 
   m_rotation.set(rotation);
 }
 
-void MovementController::rotate(float rotationRate) {
-  if (rotationRate == 0.0)
+void MovementController::rotate(float rotation_rate) {
+  if (rotation_rate == 0.0)
     return;
 
   m_resting = false;
-  m_rotation.set(std::fmod(rotation() + rotationRate * m_timeStep, 2 * std::numbers::pi));
+  m_rotation.set(std::fmod(rotation() + rotation_rate * m_time_step, 2 * std::numbers::pi));
 }
 
 void MovementController::accelerate(Vec2F const& acceleration) {
-  setVelocity(velocity() + acceleration * m_timeStep);
+  set_velocity(velocity() + acceleration * m_time_step);
 }
 
 void MovementController::force(Vec2F const& force) {
-  setVelocity(velocity() + force / mass() * m_timeStep);
+  set_velocity(velocity() + force / mass() * m_time_step);
 }
 
-void MovementController::approachVelocity(Vec2F const& targetVelocity, float maxControlForce) {
+void MovementController::approach_velocity(Vec2F const& target_velocity, float max_control_force) {
   // Instead of applying the force directly, work backwards and figure out the
   // maximum acceleration that could be achieved by the current control force,
   // and maximize the change in velocity based on that.
 
-  Vec2F diff = targetVelocity - velocity();
-  float diffMagnitude = vmag(diff);
+  Vec2F diff = target_velocity - velocity();
+  float diff_magnitude = vmag(diff);
 
-  if (diffMagnitude == 0.0f)
+  if (diff_magnitude == 0.0f)
     return;
 
-  float maximumAcceleration = maxControlForce / mass() * m_timeStep;
-  float clampedMagnitude = clamp(diffMagnitude, 0.0f, maximumAcceleration);
+  float maximum_acceleration = max_control_force / mass() * m_time_step;
+  float clamped_magnitude = clamp(diff_magnitude, 0.0f, maximum_acceleration);
 
-  setVelocity(velocity() + diff * (clampedMagnitude / diffMagnitude));
+  set_velocity(velocity() + diff * (clamped_magnitude / diff_magnitude));
 }
 
-void MovementController::approachVelocityAlongAngle(float angle, float targetVelocity, float maxControlForce, bool positiveOnly) {
-  // Same strategy as approachVelocity, work backwards to figure out the
+void MovementController::approach_velocity_along_angle(float angle, float target_velocity, float max_control_force, bool positive_only) {
+  // Same strategy as approach_velocity, work backwards to figure out the
   // maximum acceleration and apply that.
 
   // Project the current velocity along the axis normal, the velocity
-  // difference is the difference between the targetVelocity and this
+  // difference is the difference between the target_velocity and this
   // projection.
 
   Vec2F axis = Vec2F::with_angle(angle, 1.0f);
 
-  float velocityAlongAxis = velocity() * axis;
-  float diff = targetVelocity - velocityAlongAxis;
+  float velocity_along_axis = velocity() * axis;
+  float diff = target_velocity - velocity_along_axis;
   if (diff == 0.0f)
     return;
-  if (positiveOnly && diff < 0)
+  if (positive_only && diff < 0)
     return;
 
-  float maximumAcceleration = maxControlForce / mass() * m_timeStep;
+  float maximum_acceleration = max_control_force / mass() * m_time_step;
 
-  float diffMagnitude = std::fabs(diff);
-  float clampedMagnitude = clamp(diffMagnitude, 0.0f, maximumAcceleration);
+  float diff_magnitude = std::fabs(diff);
+  float clamped_magnitude = clamp(diff_magnitude, 0.0f, maximum_acceleration);
 
-  setVelocity(velocity() + axis * diff * (clampedMagnitude / diffMagnitude));
+  set_velocity(velocity() + axis * diff * (clamped_magnitude / diff_magnitude));
 }
 
-void MovementController::approachXVelocity(float targetXVelocity, float maxControlForce) {
-  approachVelocityAlongAngle(0.0f, targetXVelocity, maxControlForce, false);
+void MovementController::approach_x_velocity(float target_x_velocity, float max_control_force) {
+  approach_velocity_along_angle(0.0f, target_x_velocity, max_control_force, false);
 }
 
-void MovementController::approachYVelocity(float targetYVelocity, float maxControlForce) {
-  approachVelocityAlongAngle(std::numbers::pi / 2, targetYVelocity, maxControlForce, false);
+void MovementController::approach_y_velocity(float target_y_velocity, float max_control_force) {
+  approach_velocity_along_angle(std::numbers::pi / 2, target_y_velocity, max_control_force, false);
 }
 
 void MovementController::init(World& world) {
   m_world = std::ref(world);
-  setPosition(position());
-  updatePositionInterpolators();
+  set_position(position());
+  update_position_interpolators();
 }
 
 void MovementController::uninit() {
   m_world.reset();
-  updatePositionInterpolators();
+  update_position_interpolators();
 }
 
-void MovementController::setTimestep(float dt) {
-  m_timeStep = dt;
+void MovementController::set_timestep(float dt) {
+  m_time_step = dt;
 }
 
-std::expected<void, StarException> MovementController::tickMaster(float dt) {
-  auto activeWorld = world();
-  if (!activeWorld) return std::unexpected(std::move(activeWorld.error()));
-  World& worldRef = activeWorld->get();
-  setTimestep(dt);
-  auto geometry = worldRef.geometry();
-
-  bool zeroGravity = !(*m_parameters.gravityEnabled) || (*m_parameters.gravityMultiplier) == 0;
-  if (!zeroGravity) {
-    auto gravityValue = worldRef.gravity(position());
-    if (!gravityValue) return std::unexpected(std::move(gravityValue.error()));
-    zeroGravity = *gravityValue == 0;
-  }
-  m_zeroG.set(zeroGravity);
-
-  std::optional<PhysicsMovingCollision> surfaceCollision;
-  if (auto movingCollisionId = m_surfaceMovingCollision.get()) {
-    if (auto physicsEntity = worldRef.get<PhysicsEntity>(movingCollisionId->physicsEntityId))
-      {
-      auto collision = physicsEntity->movingCollision(movingCollisionId->collisionIndex);
+namespace {
+std::expected<std::optional<Vec2F>, StarException> surface_position(World& world, std::optional<MovingCollisionId> const& id) {
+  if (id) {
+    if (auto entity = world.get<PhysicsEntity>(id->physics_entity_id)) {
+      auto collision = entity->movingCollision(id->collision_index);
       if (!collision) return std::unexpected(std::move(collision.error()));
-      surfaceCollision = std::move(*collision);
+      if (*collision)
+        return (*collision)->position;
     }
   }
+  return {};
+}
+}
 
-  if (surfaceCollision) {
-    Vec2F surfacePositionDelta = geometry.diff(surfaceCollision->position, m_surfaceMovingCollisionPosition);
-    setPosition(position() + surfacePositionDelta);
-    Vec2F newSurfaceVelocity = surfacePositionDelta / dt;
-    setVelocity(velocity() - m_surfaceVelocity + newSurfaceVelocity);
-    m_surfaceVelocity = newSurfaceVelocity;
-  } else {
-    m_surfaceMovingCollision.set({});
-    m_surfaceMovingCollisionPosition = {};
-    m_surfaceVelocity = {};
+std::expected<void, StarException> MovementController::tick_master(float dt) {
+  auto active_world = world();
+  if (!active_world) return std::unexpected(std::move(active_world.error()));
+  World& world_ref = active_world->get();
+  set_timestep(dt);
+  auto geometry = world_ref.geometry();
+
+  bool zero_gravity = !(*m_parameters.gravity_enabled) || (*m_parameters.gravity_multiplier) == 0;
+  if (!zero_gravity) {
+    auto gravity_value = world_ref.gravity(position());
+    if (!gravity_value) return std::unexpected(std::move(gravity_value.error()));
+    zero_gravity = *gravity_value == 0;
+  }
+  m_zero_g.set(zero_gravity);
+
+  auto previous_surface_id = m_surface_moving_collision.get();
+  auto previous_surface_pos = surface_position(world_ref, previous_surface_id);
+  if (!previous_surface_pos) return std::unexpected(std::move(previous_surface_pos.error()));
+  Vec2F carried_velocity;
+  if (*previous_surface_pos) {
+    auto surface_delta = geometry.diff(**previous_surface_pos, m_surface_moving_collision_position);
+    set_position(position() + surface_delta);
+    if (dt == 0.0f) {
+      // A zero-time update can sync the anchor but cannot measure velocity.
+      carried_velocity = m_surface_velocity;
+    } else {
+      carried_velocity = surface_delta / dt;
+      set_velocity(velocity() - m_surface_velocity + carried_velocity);
+    }
   }
 
   if (m_resting) {
-    m_restTicks -= 1;
-    if (m_restTicks < 0) {
+    if (m_rest_ticks <= 0)
       m_resting = false;
+    else
+      --m_rest_ticks;
+  }
+
+  // Skip integration and collision checks when resting.
+  Vec2F relative_velocity = m_resting ? Vec2F() : velocity();
+  Vec2F original_movement = relative_velocity * dt;
+  relative_velocity -= carried_velocity;
+
+  unsigned steps = 0;
+  if (!m_resting) {
+    steps = 1;
+    float max_movement_per_step = *m_parameters.max_movement_per_step;
+    if (max_movement_per_step > 0.0f) {
+      float step_count = std::floor(vmag(relative_velocity) * dt / max_movement_per_step) + 1;
+      if (!is_finite(step_count) || step_count < 1 || static_cast<double>(step_count) > std::numeric_limits<unsigned>::max())
+        return std::unexpected(MovementControllerException("Movement substep count is out of range"));
+      steps = static_cast<unsigned>(step_count);
     }
   }
 
-  // don't integrate velocity when resting
-  Vec2F relativeVelocity = m_resting ? Vec2F() : velocity();
-  Vec2F originalMovement = relativeVelocity * dt;
-  if (surfaceCollision)
-    relativeVelocity -= m_surfaceVelocity;
-
-  m_collisionCorrection = {};
-  m_surfaceSlope = Vec2F(1, 0);
-  m_surfaceMovingCollision.set({});
-
-  unsigned steps;
-  float maxMovementPerStep = (*m_parameters.maxMovementPerStep);
-  if (maxMovementPerStep > 0.0f)
-    steps = std::floor(vmag(relativeVelocity) * dt / maxMovementPerStep) + 1;
-  else
-    steps = 1;
-
-  // skip collision checks when resting (there's no movement anyway)
-  if (m_resting)
-    steps = 0;
-
+  m_collision_correction = {};
+  m_surface_slope = Vec2F(1, 0);
+  std::optional<MovingCollisionId> current_surface_id;
+  float step_dt = steps ? dt / steps : 0.0f;
+  bool check_collision = *m_parameters.collision_enabled && !collision_poly().empty();
   for (unsigned i = 0; i < steps; ++i) {
-    float dtSteps = dt / steps;
-    Vec2F movement = relativeVelocity * dtSteps;
+    Vec2F movement = relative_velocity * step_dt;
 
-    if (!(*m_parameters.collisionEnabled) || collisionPoly().empty()) {
-      setPosition(position() + movement);
-      m_surfaceSlope = Vec2F(1, 0);
-      m_surfaceVelocity = Vec2F(0, 0);
-
+    if (!check_collision) {
+      set_position(position() + movement);
       m_colliding.set(false);
-      m_collisionStuck.set(false);
-      m_nullColliding.set(false);
-      m_stickingDirection.set({});
-      m_onGround.set(false);
+      m_collision_stuck.set(false);
+      m_null_colliding.set(false);
+      m_sticking_direction.set({});
+      m_on_ground.set(false);
 
     } else {
-      auto body = collisionBody();
+      auto body = collision_body();
 
-      float velocityMagnitude = vmag(relativeVelocity);
-      Vec2F velocityDirection = relativeVelocity / velocityMagnitude;
+      float velocity_magnitude = vmag(relative_velocity);
+      bool ignore_platforms = *m_parameters.ignore_platform_collision || relative_velocity[1] > 0;
+      float maximum_correction = *m_parameters.maximum_correction;
+      float maximum_platform_correction = *m_parameters.maximum_platform_correction
+          + *m_parameters.maximum_platform_correction_velocity_factor * velocity_magnitude;
+      Vec2F body_center = body.center();
 
-      bool ignorePlatforms = (*m_parameters.ignorePlatformCollision) || relativeVelocity[1] > 0;
-      float maximumCorrection = (*m_parameters.maximumCorrection);
-      float maximumPlatformCorrection = (*m_parameters.maximumPlatformCorrection)
-          + (*m_parameters.maximumPlatformCorrectionVelocityFactor) * velocityMagnitude;
-      Vec2F bodyCenter = body.center();
+      RectF query_bounds = body.bounding_box().padded(maximum_correction);
+      query_bounds.combine(query_bounds.translated(movement));
+      if (auto query = query_collisions(query_bounds); !query) return std::unexpected(std::move(query.error()));
+      auto result = collision_move(m_working_collisions, body, movement, ignore_platforms, *m_parameters.enable_surface_slope_correction && !zero_g(),
+          maximum_correction, maximum_platform_correction, body_center, step_dt);
 
-      RectF queryBounds = body.bounding_box().padded(maximumCorrection);
-      queryBounds.combine(queryBounds.translated(movement));
-      if (auto result = query_collisions(queryBounds); !result) return std::unexpected(std::move(result.error()));
-      auto result = collision_move(m_working_collisions, body, movement, ignorePlatforms, (*m_parameters.enableSurfaceSlopeCorrection) && !zeroG(),
-          maximumCorrection, maximumPlatformCorrection, bodyCenter, dtSteps);
-
-      setPosition(position() + result.movement);
+      set_position(position() + result.movement);
 
       if (result.collision_kind == CollisionKind::Null) {
-        m_nullColliding.set(true);
+        m_null_colliding.set(true);
         break;
       } else {
-        m_nullColliding.set(false);
+        m_null_colliding.set(false);
       }
 
       Vec2F correction = result.correction;
-      Vec2F normCorrection = vnorm(correction);
 
-      m_surfaceSlope = result.ground_slope;
-      m_surfaceMovingCollision.set(result.surface_moving_collision_id);
-      m_collisionCorrection += correction;
+      m_surface_slope = result.ground_slope;
+      current_surface_id = result.surface_moving_collision_id;
+      m_collision_correction += correction;
       m_colliding.set(correction != Vec2F() || result.is_stuck);
-      m_onGround.set(!zeroG() && result.on_ground);
-      m_collisionStuck.set(result.is_stuck);
+      m_on_ground.set(!zero_g() && result.on_ground);
+      m_collision_stuck.set(result.is_stuck);
 
       // If we have collided, apply either sticky or normal (bouncing) collision physics
       if (correction != Vec2F()) {
-        if ((*m_parameters.stickyCollision) && result.collision_kind != CollisionKind::Slippery) {
-          // When sticking, cancel all velocity and apply stickyForce in the
+        if ((*m_parameters.sticky_collision) && result.collision_kind != CollisionKind::Slippery) {
+          // When sticking, cancel all velocity and apply sticky_force in the
           // opposite of the direction of collision correction.
-          relativeVelocity = -normCorrection * (*m_parameters.stickyForce) / mass() * dtSteps;
-          m_stickingDirection.set(-normCorrection.angle());
+          Vec2F norm_correction = vnorm(correction);
+          relative_velocity = -norm_correction * *m_parameters.sticky_force / mass() * step_dt;
+          m_sticking_direction.set(-norm_correction.angle());
           break;
         } else {
-          m_stickingDirection.set({});
+          m_sticking_direction.set({});
 
-          float correctionMagnitude = vmag(correction);
-          Vec2F correctionDirection = correction / correctionMagnitude;
-
-          if ((*m_parameters.bounceFactor) != 0.0f) {
-            Vec2F adjustment = correctionDirection * (velocityMagnitude * (correctionDirection * -velocityDirection));
-            relativeVelocity += adjustment + (*m_parameters.bounceFactor) * adjustment;
-            if ((*m_parameters.stopOnFirstBounce)) {
+          if (*m_parameters.bounce_factor != 0.0f) {
+            if (!(velocity_magnitude > 0.0f))
+              continue;
+            Vec2F velocity_direction = relative_velocity / velocity_magnitude;
+            Vec2F correction_direction = correction / vmag(correction);
+            Vec2F adjustment = correction_direction * (velocity_magnitude * (correction_direction * -velocity_direction));
+            relative_velocity += adjustment + *m_parameters.bounce_factor * adjustment;
+            if ((*m_parameters.stop_on_first_bounce)) {
               // When bouncing, stop integrating at the moment of bounce.  This
               // prevents the frame of contact from being missed due to multiple
               // iterations per frame.
               break;
             }
-          } else {
+          } else if (dt != 0.0f) {
             // Only adjust the velocity to the extent that the collision was
             // caused by the velocity in each axis, to eliminate collision
             // induced velocity in a platformery way (each axis considered
             // independently).
 
-            if (relativeVelocity[0] < 0 && correction[0] > 0)
-              relativeVelocity[0] = std::min(0.0f, relativeVelocity[0] + correction[0] / dt);
-            else if (relativeVelocity[0] > 0 && correction[0] < 0)
-              relativeVelocity[0] = std::max(0.0f, relativeVelocity[0] + correction[0] / dt);
+            if (relative_velocity[0] < 0 && correction[0] > 0)
+              relative_velocity[0] = std::min(0.0f, relative_velocity[0] + correction[0] / dt);
+            else if (relative_velocity[0] > 0 && correction[0] < 0)
+              relative_velocity[0] = std::max(0.0f, relative_velocity[0] + correction[0] / dt);
 
-            if (relativeVelocity[1] < 0 && correction[1] > 0)
-              relativeVelocity[1] = std::min(0.0f, relativeVelocity[1] + correction[1] / dt);
-            else if (relativeVelocity[1] > 0 && correction[1] < 0)
-              relativeVelocity[1] = std::max(0.0f, relativeVelocity[1] + correction[1] / dt);
+            if (relative_velocity[1] < 0 && correction[1] > 0)
+              relative_velocity[1] = std::min(0.0f, relative_velocity[1] + correction[1] / dt);
+            else if (relative_velocity[1] > 0 && correction[1] < 0)
+              relative_velocity[1] = std::max(0.0f, relative_velocity[1] + correction[1] / dt);
           }
         }
       }
@@ -790,66 +865,77 @@ std::expected<void, StarException> MovementController::tickMaster(float dt) {
   }
   
   if (!m_colliding.get())
-    m_stickingDirection.set({});
-  
-  Vec2F newVelocity = relativeVelocity + m_surfaceVelocity;
+    m_sticking_direction.set({});
 
-  if (auto result = updateLiquidPercentage(); !result) return std::unexpected(std::move(result.error()));
+  // Keep the velocity inherited from the previous platform even if we no
+  // longer use that platform as the frame of reference for ground friction.
+  Vec2F new_velocity = relative_velocity + carried_velocity;
+  auto const final_pos = position();
+  auto const final_body = collision_body();
+  auto const final_bounds = final_body.empty() ? RectF(final_pos, final_pos) : final_body.bounding_box();
+  if (auto result = sample_liquid(world_ref, final_pos, final_bounds); !result)
+    return std::unexpected(std::move(result.error()));
 
-  if (auto movingCollisionId = m_surfaceMovingCollision.get()) {
-    if (auto physicsEntity = worldRef.get<PhysicsEntity>(movingCollisionId->physicsEntityId))
-      {
-      auto collision = physicsEntity->movingCollision(movingCollisionId->collisionIndex);
-      if (!collision) return std::unexpected(std::move(collision.error()));
-      surfaceCollision = std::move(*collision);
-    }
-  }
-
-  if (surfaceCollision) {
-    m_surfaceMovingCollisionPosition = surfaceCollision->position;
-    m_xRelativeSurfaceMovingCollisionPosition.set(geometry.diff(xPosition(), m_surfaceMovingCollisionPosition[0]));
-    m_yRelativeSurfaceMovingCollisionPosition.set(yPosition() - m_surfaceMovingCollisionPosition[1]);
+  auto current_surface_pos = surface_position(world_ref, current_surface_id);
+  if (!current_surface_pos) return std::unexpected(std::move(current_surface_pos.error()));
+  m_surface_moving_collision_position = current_surface_pos->value_or(Vec2F());
+  m_surface_velocity = {};
+  if (*current_surface_pos) {
+    if (*previous_surface_pos && *previous_surface_id == *current_surface_id)
+      m_surface_velocity = carried_velocity;
+    m_x_relative_surface_moving_collision_position.set(geometry.diff(x_position(), m_surface_moving_collision_position[0]));
+    m_y_relative_surface_moving_collision_position.set(y_position() - m_surface_moving_collision_position[1]);
   } else {
-    m_surfaceMovingCollisionPosition = {};
-    m_surfaceVelocity = {};
+    current_surface_id.reset();
   }
-  
+  m_surface_moving_collision.set(current_surface_id);
+
+  auto calculate_final_gravity = [&]() -> std::expected<float, StarException> {
+    float buoyancy = *m_parameters.liquid_buoyancy * m_liquid_percentage + *m_parameters.air_buoyancy * (1.0f - liquid_percentage());
+    auto gravity_value = world_ref.gravity(final_pos);
+    if (!gravity_value) return std::unexpected(std::move(gravity_value.error()));
+    return *gravity_value * *m_parameters.gravity_multiplier * (1.0f - buoyancy);
+  };
+  std::optional<float> final_gravity;
+
   // In order to make control work accurately, passive forces need to be
   // applied to velocity *after* integrating.  This prevents control from
   // having to account for one timestep of passive forces in order to result
   // in the correct controlled movement.
-  if (!zeroG() && !stickingDirection()) {
-    float buoyancy = (*m_parameters.liquidBuoyancy) * m_liquidPercentage + (*m_parameters.airBuoyancy) * (1.0f - liquidPercentage());
-    auto gravityValue = worldRef.gravity(position());
-    if (!gravityValue) return std::unexpected(std::move(gravityValue.error()));
-    float gravity = *gravityValue * (*m_parameters.gravityMultiplier) * (1.0f - buoyancy);
-    Vec2F environmentVelocity;
-    environmentVelocity[1] -= gravity * dt;
+  if (!zero_g() && !sticking_direction()) {
+    auto gravity = calculate_final_gravity();
+    if (!gravity) return std::unexpected(std::move(gravity.error()));
+    final_gravity = *gravity;
+    Vec2F environment_velocity;
+    environment_velocity[1] -= *final_gravity * dt;
 
-    if (onGround() && (*m_parameters.slopeSlidingFactor) != 0 && m_surfaceSlope[1] != 0)
-      environmentVelocity += -m_surfaceSlope * (m_surfaceSlope[0] * m_surfaceSlope[1]) * (*m_parameters.slopeSlidingFactor);
+    if (on_ground() && (*m_parameters.slope_sliding_factor) != 0 && m_surface_slope[1] != 0)
+      environment_velocity += -m_surface_slope * (m_surface_slope[0] * m_surface_slope[1]) * *m_parameters.slope_sliding_factor;
 
-    newVelocity += environmentVelocity;
+    new_velocity += environment_velocity;
   }
 
   // If original movement was entirely (almost) in the direction of gravity
   // and was entirely (almost) cancelled by collision correction, put the
-  // entity into rest for restDuration
-  if (!m_resting && !stickingDirection() && std::abs(originalMovement[0]) < 0.0001) {
-    auto restGravity = gravity();
-    if (!restGravity) return std::unexpected(std::move(restGravity.error()));
-    if (originalMovement[1] * *restGravity <= 0.0 && std::abs(originalMovement[1] + m_collisionCorrection[1]) < 0.0001) {
+  // entity into rest for rest_duration
+  if (!m_resting && !sticking_direction() && std::abs(original_movement[0]) < 0.0001) {
+    if (!final_gravity) {
+      auto gravity = calculate_final_gravity();
+      if (!gravity) return std::unexpected(std::move(gravity.error()));
+      final_gravity = *gravity;
+    }
+    if (original_movement[1] * *final_gravity <= 0.0 && std::abs(original_movement[1] + m_collision_correction[1]) < 0.0001) {
       m_resting = true;
-      m_restTicks = m_parameters.restDuration.value_or(0);
+      m_rest_ticks = m_parameters.rest_duration.value_or(0);
     }
   }
 
-  if ((*m_parameters.frictionEnabled)) {
-    Vec2F refVel;
-    float friction = liquidPercentage() * (*m_parameters.liquidFriction) + (1.0f - liquidPercentage()) * (*m_parameters.airFriction);
-    if (onGround()) {
-      friction = std::max(friction, (*m_parameters.groundFriction));
-      refVel = m_surfaceVelocity;
+  if ((*m_parameters.friction_enabled)) {
+    Vec2F reference_velocity;
+    float friction = liquid_percentage() * (*m_parameters.liquid_friction) + (1.0f - liquid_percentage()) * (*m_parameters.air_friction);
+    if (on_ground()) {
+      friction = std::max(friction, (*m_parameters.ground_friction));
+      reference_velocity = m_surface_velocity;
     }
 
     // The equation for friction here is effectively:
@@ -857,42 +943,31 @@ std::expected<void, StarException> MovementController::tickMaster(float dt) {
     // but it is applied here as a multiplicitave factor from [0, 1] so it does
     // not induce oscillation at very high friction and so it cannot be
     // negative.
-    float frictionFactor = std::clamp(friction / mass() * dt, 0.0f, 1.0f);
-    newVelocity = lerp(frictionFactor, newVelocity, refVel);
-  }
-  
-  setVelocity(newVelocity);
-
-  if (auto result = update_force_regions(); !result) return std::unexpected(std::move(result.error()));
-  return {};
-}
-
-std::expected<void, StarException> MovementController::tickSlave(float dt) {
-  auto activeWorld = world();
-  if (!activeWorld) return std::unexpected(std::move(activeWorld.error()));
-  World& worldRef = activeWorld->get();
-  setTimestep(dt);
-  if (auto movingCollisionId = m_surfaceMovingCollision.get()) {
-    if (auto physicsEntity = worldRef.get<PhysicsEntity>(movingCollisionId->physicsEntityId)) {
-      auto collisionResult = physicsEntity->movingCollision(movingCollisionId->collisionIndex);
-      if (!collisionResult) return std::unexpected(std::move(collisionResult.error()));
-      if (auto collision = *collisionResult) {
-        m_xPosition.set(m_xRelativeSurfaceMovingCollisionPosition.get() + collision->position[0]);
-        m_yPosition.set(m_yRelativeSurfaceMovingCollisionPosition.get() + collision->position[1]);
-      }
-    }
+    float friction_factor = std::clamp(friction / mass() * dt, 0.0f, 1.0f);
+    new_velocity = lerp(friction_factor, new_velocity, reference_velocity);
   }
 
-  auto liquid = worldRef.liquidLevel(collisionBody().bounding_box());
-  if (!liquid) return std::unexpected(std::move(liquid.error()));
-  LiquidLevel cll = *liquid;
-  m_liquidPercentage = std::clamp(cll.level, 0.0f, 1.0f);
-  m_liquidId = cll.liquid;
-  return {};
+  set_velocity(new_velocity);
+  return apply_force_regions(world_ref, final_pos, final_body, final_bounds);
 }
 
-void MovementController::setIgnorePhysicsEntities(Set<EntityId> ignorePhysicsEntities) {
-  m_ignorePhysicsEntities = std::move(ignorePhysicsEntities);
+std::expected<void, StarException> MovementController::tick_slave(float dt) {
+  auto active_world = world();
+  if (!active_world) return std::unexpected(std::move(active_world.error()));
+  World& world_ref = active_world->get();
+  set_timestep(dt);
+  auto surface_pos = surface_position(world_ref, m_surface_moving_collision.get());
+  if (!surface_pos) return std::unexpected(std::move(surface_pos.error()));
+  if (*surface_pos) {
+    m_x_position.set(m_x_relative_surface_moving_collision_position.get() + (**surface_pos)[0]);
+    m_y_position.set(m_y_relative_surface_moving_collision_position.get() + (**surface_pos)[1]);
+  }
+
+  return sample_liquid(world_ref, position(), collision_body().bounding_box());
+}
+
+void MovementController::set_ignore_physics_entities(Set<EntityId> ignore_physics_entities) {
+  m_ignore_physics_entities = std::move(ignore_physics_entities);
 }
 
 std::expected<void, StarException> MovementController::for_each_moving_collision(RectF const& region, MovingCollisionCallback const& callback) {
@@ -904,7 +979,7 @@ std::expected<void, StarException> MovementController::for_each_moving_collision
   if (!physics_entities) return std::unexpected(std::move(physics_entities.error()));
   static StringSet const empty_categories;
   for (auto const& entity : *physics_entities) {
-    if (m_ignorePhysicsEntities.contains(entity->entityId()))
+    if (m_ignore_physics_entities.contains(entity->entityId()))
       continue;
     for (std::size_t i = 0; i < entity->movingCollisionCount(); ++i) {
       auto collision = entity->movingCollision(i);
@@ -940,11 +1015,15 @@ std::expected<void, StarException> MovementController::update_force_regions() {
   auto active_world = world();
   if (!active_world) return std::unexpected(std::move(active_world.error()));
   World& world_ref = active_world->get();
-  auto const geometry = world_ref.geometry();
   auto const pos = position();
-  auto const body = collisionBody();
+  auto const body = collision_body();
   // An empty collision polygon still has a position for point-based radial forces.
   auto const bounds = body.empty() ? RectF(pos, pos) : body.bounding_box();
+  return apply_force_regions(world_ref, pos, body, bounds);
+}
+
+std::expected<void, StarException> MovementController::apply_force_regions(World& world_ref, Vec2F const& pos, PolyF const& body, RectF const& bounds) {
+  auto const geometry = world_ref.geometry();
   static StringSet const empty_categories;
   auto const& categories = m_parameters.physics_effect_categories ? *m_parameters.physics_effect_categories : empty_categories;
   std::optional<float> body_area;
@@ -971,7 +1050,7 @@ std::expected<void, StarException> MovementController::update_force_regions() {
         return false;
       if (region.target_radial_velocity < 0)
         direction = -direction;
-      approachVelocityAlongAngle(direction.angle(), std::abs(region.target_radial_velocity), control, true);
+      approach_velocity_along_angle(direction.angle(), std::abs(region.target_radial_velocity), control, true);
     } else {
       if constexpr (std::same_as<Region, DirectionalForceRegion>) {
         if ((!region.x_target_velocity && !region.y_target_velocity) || region.control_force == 0)
@@ -991,9 +1070,9 @@ std::expected<void, StarException> MovementController::update_force_regions() {
         if (!(control > 0))
           return false;
         if (region.x_target_velocity)
-          approachXVelocity(*region.x_target_velocity, control);
+          approach_x_velocity(*region.x_target_velocity, control);
         if (region.y_target_velocity)
-          approachYVelocity(*region.y_target_velocity, control);
+          approach_y_velocity(*region.y_target_velocity, control);
       } else {
         if (!(region.gradient.length() > 0))
           return false;
@@ -1002,7 +1081,7 @@ std::expected<void, StarException> MovementController::update_force_regions() {
         float control = region.base_control_force * effect;
         if (!(control > 0))
           return false;
-        approachVelocityAlongAngle(region.gradient.angle(), region.base_target_velocity * effect, control, true);
+        approach_velocity_along_angle(region.gradient.angle(), region.base_target_velocity * effect, control, true);
       }
     }
     return true;
@@ -1019,7 +1098,7 @@ std::expected<void, StarException> MovementController::update_force_regions() {
   auto entities = world_ref.query<PhysicsEntity>(bounds);
   if (!entities) return std::unexpected(std::move(entities.error()));
   for (auto const& entity : *entities) {
-    if (m_ignorePhysicsEntities.contains(entity->entityId()))
+    if (m_ignore_physics_entities.contains(entity->entityId()))
       continue;
     auto forces = entity->force_regions();
     if (!forces) return std::unexpected(std::move(forces.error()));
@@ -1028,46 +1107,45 @@ std::expected<void, StarException> MovementController::update_force_regions() {
   return apply_forces(world_ref.force_regions());
 }
 
-std::expected<void, StarException> MovementController::updateLiquidPercentage() {
-  auto activeWorld = world();
-  if (!activeWorld) return std::unexpected(std::move(activeWorld.error()));
-  World& worldRef = activeWorld->get();
-  auto pos = position();
-  auto body = collisionBody();
-  RectF boundBox = body.bounding_box();
+std::expected<void, StarException> MovementController::update_liquid_percentage() {
+  auto active_world = world();
+  if (!active_world) return std::unexpected(std::move(active_world.error()));
+  return sample_liquid(active_world->get(), position(), collision_body().bounding_box());
+}
 
-  LiquidLevel cll;
-  if (boundBox.is_empty())
-    cll = worldRef.liquidLevel(Vec2I::floor(pos));
-  else {
-    auto liquid = worldRef.liquidLevel(boundBox);
+std::expected<void, StarException> MovementController::sample_liquid(World& world_ref, Vec2F const& pos, RectF const& bounds) {
+  LiquidLevel level;
+  if (bounds.is_empty()) {
+    level = world_ref.liquidLevel(Vec2I::floor(pos));
+  } else {
+    auto liquid = world_ref.liquidLevel(bounds);
     if (!liquid) return std::unexpected(std::move(liquid.error()));
-    cll = *liquid;
+    level = *liquid;
   }
 
-  m_liquidPercentage = std::clamp(cll.level, 0.0f, 1.0f);
-  m_liquidId = cll.liquid;
+  m_liquid_percentage = std::clamp(level.level, 0.0f, 1.0f);
+  m_liquid_id = level.liquid;
   return {};
 }
 
-void MovementController::setOnGround(bool onGround) {
-  m_onGround.set(onGround);
+void MovementController::set_on_ground(bool on_ground) {
+  m_on_ground.set(on_ground);
 }
 
 bool MovementController::applied_force_region() const {
   return m_applied_force_region;
 }
 
-Vec2F MovementController::collisionCorrection() const {
-  return m_collisionCorrection;
+Vec2F MovementController::collision_correction() const {
+  return m_collision_correction;
 }
 
-Vec2F MovementController::surfaceSlope() const {
-  return m_surfaceSlope;
+Vec2F MovementController::surface_slope() const {
+  return m_surface_slope;
 }
 
-Vec2F MovementController::surfaceVelocity() const {
-  return m_surfaceVelocity;
+Vec2F MovementController::surface_velocity() const {
+  return m_surface_velocity;
 }
 
 std::expected<std::reference_wrapper<World>, StarException> MovementController::world() {
@@ -1291,49 +1369,52 @@ MovementController::CollisionSeparation MovementController::collision_separate(L
   return separation;
 }
 
-std::expected<void, StarException> MovementController::updateParameters(MovementParameters parameters) {
-  if (!parameters.speedLimit) return std::unexpected(MovementControllerException("Missing movement parameter 'speedLimit'"));
-  if (!parameters.gravityEnabled) return std::unexpected(MovementControllerException("Missing movement parameter 'gravityEnabled'"));
-  if (!parameters.gravityMultiplier) return std::unexpected(MovementControllerException("Missing movement parameter 'gravityMultiplier'"));
-  if (!parameters.maxMovementPerStep) return std::unexpected(MovementControllerException("Missing movement parameter 'maxMovementPerStep'"));
-  if (!parameters.collisionEnabled) return std::unexpected(MovementControllerException("Missing movement parameter 'collisionEnabled'"));
-  if (!parameters.ignorePlatformCollision) return std::unexpected(MovementControllerException("Missing movement parameter 'ignorePlatformCollision'"));
-  if (!parameters.maximumCorrection) return std::unexpected(MovementControllerException("Missing movement parameter 'maximumCorrection'"));
-  if (!parameters.maximumPlatformCorrection) return std::unexpected(MovementControllerException("Missing movement parameter 'maximumPlatformCorrection'"));
-  if (!parameters.maximumPlatformCorrectionVelocityFactor) return std::unexpected(MovementControllerException("Missing movement parameter 'maximumPlatformCorrectionVelocityFactor'"));
-  if (!parameters.enableSurfaceSlopeCorrection) return std::unexpected(MovementControllerException("Missing movement parameter 'enableSurfaceSlopeCorrection'"));
-  if (!parameters.stickyCollision) return std::unexpected(MovementControllerException("Missing movement parameter 'stickyCollision'"));
-  if (!parameters.stickyForce) return std::unexpected(MovementControllerException("Missing movement parameter 'stickyForce'"));
-  if (!parameters.bounceFactor) return std::unexpected(MovementControllerException("Missing movement parameter 'bounceFactor'"));
-  if (!parameters.stopOnFirstBounce) return std::unexpected(MovementControllerException("Missing movement parameter 'stopOnFirstBounce'"));
-  if (!parameters.liquidBuoyancy) return std::unexpected(MovementControllerException("Missing movement parameter 'liquidBuoyancy'"));
-  if (!parameters.airBuoyancy) return std::unexpected(MovementControllerException("Missing movement parameter 'airBuoyancy'"));
-  if (!parameters.slopeSlidingFactor) return std::unexpected(MovementControllerException("Missing movement parameter 'slopeSlidingFactor'"));
-  if (!parameters.frictionEnabled) return std::unexpected(MovementControllerException("Missing movement parameter 'frictionEnabled'"));
-  if (!parameters.liquidFriction) return std::unexpected(MovementControllerException("Missing movement parameter 'liquidFriction'"));
-  if (!parameters.airFriction) return std::unexpected(MovementControllerException("Missing movement parameter 'airFriction'"));
-  if (!parameters.groundFriction) return std::unexpected(MovementControllerException("Missing movement parameter 'groundFriction'"));
-  if (!parameters.collisionPoly) return std::unexpected(MovementControllerException("Missing movement parameter 'collisionPoly'"));
+std::expected<void, StarException> MovementController::validate_parameters(MovementParameters const& parameters) {
+  if (!parameters.speed_limit) return std::unexpected(MovementControllerException("Missing movement parameter 'speedLimit'"));
+  if (!parameters.gravity_enabled) return std::unexpected(MovementControllerException("Missing movement parameter 'gravityEnabled'"));
+  if (!parameters.gravity_multiplier) return std::unexpected(MovementControllerException("Missing movement parameter 'gravityMultiplier'"));
+  if (!parameters.max_movement_per_step) return std::unexpected(MovementControllerException("Missing movement parameter 'maxMovementPerStep'"));
+  if (!parameters.collision_enabled) return std::unexpected(MovementControllerException("Missing movement parameter 'collisionEnabled'"));
+  if (!parameters.ignore_platform_collision) return std::unexpected(MovementControllerException("Missing movement parameter 'ignorePlatformCollision'"));
+  if (!parameters.maximum_correction) return std::unexpected(MovementControllerException("Missing movement parameter 'maximumCorrection'"));
+  if (!parameters.maximum_platform_correction) return std::unexpected(MovementControllerException("Missing movement parameter 'maximumPlatformCorrection'"));
+  if (!parameters.maximum_platform_correction_velocity_factor) return std::unexpected(MovementControllerException("Missing movement parameter 'maximumPlatformCorrectionVelocityFactor'"));
+  if (!parameters.enable_surface_slope_correction) return std::unexpected(MovementControllerException("Missing movement parameter 'enableSurfaceSlopeCorrection'"));
+  if (!parameters.sticky_collision) return std::unexpected(MovementControllerException("Missing movement parameter 'stickyCollision'"));
+  if (!parameters.sticky_force) return std::unexpected(MovementControllerException("Missing movement parameter 'stickyForce'"));
+  if (!parameters.bounce_factor) return std::unexpected(MovementControllerException("Missing movement parameter 'bounceFactor'"));
+  if (!parameters.stop_on_first_bounce) return std::unexpected(MovementControllerException("Missing movement parameter 'stopOnFirstBounce'"));
+  if (!parameters.liquid_buoyancy) return std::unexpected(MovementControllerException("Missing movement parameter 'liquidBuoyancy'"));
+  if (!parameters.air_buoyancy) return std::unexpected(MovementControllerException("Missing movement parameter 'airBuoyancy'"));
+  if (!parameters.slope_sliding_factor) return std::unexpected(MovementControllerException("Missing movement parameter 'slopeSlidingFactor'"));
+  if (!parameters.friction_enabled) return std::unexpected(MovementControllerException("Missing movement parameter 'frictionEnabled'"));
+  if (!parameters.liquid_friction) return std::unexpected(MovementControllerException("Missing movement parameter 'liquidFriction'"));
+  if (!parameters.air_friction) return std::unexpected(MovementControllerException("Missing movement parameter 'airFriction'"));
+  if (!parameters.ground_friction) return std::unexpected(MovementControllerException("Missing movement parameter 'groundFriction'"));
+  if (!parameters.collision_poly) return std::unexpected(MovementControllerException("Missing movement parameter 'collisionPoly'"));
   if (!parameters.mass) return std::unexpected(MovementControllerException("Missing movement parameter 'mass'"));
-  bool const refresh_interpolators = !m_parameters.mass || m_parameters.discontinuityThreshold != parameters.discontinuityThreshold;
-  m_parameters = std::move(parameters);
-  m_collisionPoly.set((*m_parameters.collisionPoly));
-  m_mass.set((*m_parameters.mass));
-  if (refresh_interpolators)
-    updatePositionInterpolators();
   return {};
 }
 
-void MovementController::updatePositionInterpolators() {
+void MovementController::update_parameters(bool refresh_interpolators) {
+  // Live network fields can diverge from their configured values. Restore
+  // them even for a patch that omits collision_poly and mass.
+  m_collision_poly.set(*m_parameters.collision_poly);
+  m_mass.set(*m_parameters.mass);
+  if (refresh_interpolators)
+    update_position_interpolators();
+}
+
+void MovementController::update_position_interpolators() {
   if (m_world)
-    m_xPosition.set_interpolator(m_world->get().geometry().x_lerp_function(m_parameters.discontinuityThreshold));
+    m_x_position.set_interpolator(m_world->get().geometry().x_lerp_function(m_parameters.discontinuity_threshold));
   else
-    m_xPosition.set_interpolator(
-      [limit = m_parameters.discontinuityThreshold](float const& offset, float const& from, float const& to) {
+    m_x_position.set_interpolator(
+      [limit = m_parameters.discontinuity_threshold](float const& offset, float const& from, float const& to) {
         return lerp_with_limit<float, float>(limit, offset, from, to);
       });
-  m_yPosition.set_interpolator(
-    [limit = m_parameters.discontinuityThreshold](float const& offset, float const& from, float const& to) {
+  m_y_position.set_interpolator(
+    [limit = m_parameters.discontinuity_threshold](float const& offset, float const& from, float const& to) {
       return lerp_with_limit<float, float>(limit, offset, from, to);
     });
 }
@@ -1378,16 +1459,6 @@ std::expected<void, StarException> MovementController::query_collisions(RectF co
     m_working_collisions.emplace_back(CollisionPoly{std::move(poly), bounds, center, id, kind, {}});
     return true;
   });
-}
-
-std::expected<float, StarException> MovementController::gravity() {
-  auto activeWorld = world();
-  if (!activeWorld) return std::unexpected(std::move(activeWorld.error()));
-  World& worldRef = activeWorld->get();
-  float buoyancy = (*m_parameters.liquidBuoyancy) * m_liquidPercentage + (*m_parameters.airBuoyancy) * (1.0f - liquidPercentage());
-  auto gravityValue = worldRef.gravity(position());
-  if (!gravityValue) return std::unexpected(std::move(gravityValue.error()));
-  return *gravityValue * (*m_parameters.gravityMultiplier) * (1.0f - buoyancy);
 }
 
 }

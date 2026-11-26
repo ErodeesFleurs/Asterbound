@@ -56,8 +56,8 @@ struct MovementCollisionBenchmarkAccess {
                        bits(result.movement[0]), bits(result.movement[1]), bits(result.correction[0]),
                        bits(result.correction[1]), bits(result.ground_slope[0]), bits(result.ground_slope[1]),
                        result.is_stuck, result.on_ground, static_cast<unsigned>(result.collision_kind),
-                       result.surface_moving_collision_id ? result.surface_moving_collision_id->physicsEntityId : 0,
-                       result.surface_moving_collision_id ? result.surface_moving_collision_id->collisionIndex : 0);
+                       result.surface_moving_collision_id ? result.surface_moving_collision_id->physics_entity_id : 0,
+                       result.surface_moving_collision_id ? result.surface_moving_collision_id->collision_index : 0);
   }
   static std::uint64_t permutation(List<Candidate> const& candidates) {
     std::uint64_t hash = 14695981039346656037ull;
@@ -69,8 +69,8 @@ struct MovementCollisionBenchmarkAccess {
     };
     for (auto const& candidate : candidates) {
       append(static_cast<unsigned>(candidate.collision_kind));
-      append(candidate.moving_collision_id ? candidate.moving_collision_id->physicsEntityId : 0);
-      append(candidate.moving_collision_id ? candidate.moving_collision_id->collisionIndex : 0);
+      append(candidate.moving_collision_id ? candidate.moving_collision_id->physics_entity_id : 0);
+      append(candidate.moving_collision_id ? candidate.moving_collision_id->collision_index : 0);
       for (auto const& vertex : candidate.poly) {
         append(std::bit_cast<std::uint32_t>(vertex[0]));
         append(std::bit_cast<std::uint32_t>(vertex[1]));
@@ -86,8 +86,8 @@ struct MovementCollisionBenchmarkAccess {
     };
     bool same_id = a.surface_moving_collision_id.has_value() == b.surface_moving_collision_id.has_value();
     if (same_id && a.surface_moving_collision_id)
-      same_id = a.surface_moving_collision_id->physicsEntityId == b.surface_moving_collision_id->physicsEntityId
-        && a.surface_moving_collision_id->collisionIndex == b.surface_moving_collision_id->collisionIndex;
+      same_id = a.surface_moving_collision_id->physics_entity_id == b.surface_moving_collision_id->physics_entity_id
+        && a.surface_moving_collision_id->collision_index == b.surface_moving_collision_id->collision_index;
     return sameVector(a.movement, b.movement) && sameVector(a.correction, b.correction)
       && sameVector(a.ground_slope, b.ground_slope) && same_id && a.is_stuck == b.is_stuck && a.on_ground == b.on_ground
       && a.collision_kind == b.collision_kind;
@@ -239,8 +239,8 @@ struct MovementCollisionBenchmarkAccess {
 
     // Simple boundary invariants supplement the recorded complex-fixture oracle.
     if (fixture.name == "MovingPlatformIdentity"
-        && (!reference.surface_moving_collision_id || reference.surface_moving_collision_id->physicsEntityId != 42
-            || reference.surface_moving_collision_id->collisionIndex != 3 || !reference.on_ground || reference.is_stuck)) {
+        && (!reference.surface_moving_collision_id || reference.surface_moving_collision_id->physics_entity_id != 42
+            || reference.surface_moving_collision_id->collision_index != 3 || !reference.on_ground || reference.is_stuck)) {
       session.fail(state, std::format("Moving platform contact identity/ground invariant failed: {}", expected));
       return;
     }

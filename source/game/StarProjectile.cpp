@@ -219,7 +219,7 @@ std::expected<void, StarException> Projectile::init(World& world, EntityId entit
   auto result948 = Entity::init(world, entityId, mode);
 if (!result948) return std::unexpected(std::move(result948.error()));
   m_movement_controller->init(world);
-  m_movement_controller->setIgnorePhysicsEntities({entityId});
+  m_movement_controller->set_ignore_physics_entities({entityId});
 
   auto result949 = m_parameters.get_float("timeToLive", m_config->timeToLive);
 if (!result949) return std::unexpected(std::move(result949.error()));
@@ -515,10 +515,10 @@ auto geometry = result919->get().geometry();
           Vec2F checkVec = m_movement_controller->velocity().normalized() * 5;
           Vec2F nearMin = geometry.nearest_to(hitPoly->center(), m_movement_controller->position() - checkVec);
           if (auto intersection = hitPoly->line_intersection(Line2F(nearMin, nearMin + checkVec * 2)))
-            m_movement_controller->setPosition(intersection->point);
+            m_movement_controller->set_position(intersection->point);
         }
       }
-      m_movement_controller->setVelocity({0, 0});
+      m_movement_controller->set_velocity({0, 0});
       m_collision = true;
       m_timeToLive = 0.0f;
     }
@@ -532,7 +532,7 @@ std::expected<void, StarException> Projectile::update(float dt, std::uint64_t) {
   capturePresentationRotation(m_movement_controller->rotation());
   m_previousAnimationTimer = m_animationTimer;
   m_previousTimeToLive = m_timeToLive;
-  m_movement_controller->setTimestep(dt);
+  m_movement_controller->set_timestep(dt);
 
   if (isMaster()) {
     m_timeToLive -= dt;
@@ -542,16 +542,16 @@ std::expected<void, StarException> Projectile::update(float dt, std::uint64_t) {
     m_effectEmitter->add_effect_sources("normal", m_config->emitters);
 
     if (m_referenceVelocity)
-      m_movement_controller->setVelocity(m_movement_controller->velocity() - *m_referenceVelocity);
+      m_movement_controller->set_velocity(m_movement_controller->velocity() - *m_referenceVelocity);
 
     auto result905 = recover_lua_script_error(m_scriptComponent.update(m_scriptComponent.update_dt(dt)));
 if (!result905) return std::unexpected(std::move(result905.error()));
     m_movement_controller->accelerate(m_movement_controller->velocity().normalized() * m_acceleration);
 
     if (m_referenceVelocity)
-      m_movement_controller->setVelocity(m_movement_controller->velocity() + *m_referenceVelocity);
+      m_movement_controller->set_velocity(m_movement_controller->velocity() + *m_referenceVelocity);
 
-    auto result906 = m_movement_controller->tickMaster(dt);
+    auto result906 = m_movement_controller->tick_master(dt);
 if (!result906) return std::unexpected(std::move(result906.error()));
     m_travelLine.min() = m_travelLine.max();
     m_travelLine.max() = m_movement_controller->position();
@@ -571,10 +571,10 @@ if (auto sourceEntity = result908->get().entity(m_sourceEntity)) {
       }
     }
 
-    if (m_movement_controller->atWorldLimit())
+    if (m_movement_controller->at_world_limit())
       m_timeToLive = 0.0f;
 
-    if ((m_movement_controller->isColliding() || m_movement_controller->stickingDirection()) && !m_movement_controller->isNullColliding()) {
+    if ((m_movement_controller->is_colliding() || m_movement_controller->sticking_direction()) && !m_movement_controller->is_null_colliding()) {
       if (!m_wasColliding)
         m_collisionEvent.trigger();
       m_wasColliding = true;
@@ -582,8 +582,8 @@ if (auto sourceEntity = result908->get().entity(m_sourceEntity)) {
       m_wasColliding = false;
     }
 
-    if (m_movement_controller->isColliding()) {
-      if (m_movement_controller->isNullColliding()) {
+    if (m_movement_controller->is_colliding()) {
+      if (m_movement_controller->is_null_colliding()) {
         // Don't trigger collision action, just silently die if we collide with a
         // null block.
         m_timeToLive = 0.0f;
@@ -592,10 +592,10 @@ if (auto sourceEntity = result908->get().entity(m_sourceEntity)) {
 if (!result909) return std::unexpected(std::move(result909.error()));
         if (m_bounces > 0)
           --m_bounces;
-      } else if (m_falldown && !(m_movement_controller->onGround() || m_movement_controller->isCollisionStuck() || m_movement_controller->stickingDirection())) {
+      } else if (m_falldown && !(m_movement_controller->on_ground() || m_movement_controller->is_collision_stuck() || m_movement_controller->sticking_direction())) {
         // Wait til this projectile actually hits the ground before dying
 
-      } else if (!m_movement_controller->stickingDirection()) {
+      } else if (!m_movement_controller->sticking_direction()) {
         m_collision = true;
         m_timeToLive = 0.0f;
         // Move slightly less than one tile unit in the direction that the projectile
@@ -629,7 +629,7 @@ auto liquid = result911->get().liquidLevel(Vec2I::floor(position()));
   } else {
     auto result912 = m_netGroup.tick_net_interpolation(dt);
 if (!result912) return std::unexpected(std::move(result912.error()));
-    auto result913 = m_movement_controller->tickSlave(dt);
+    auto result913 = m_movement_controller->tick_slave(dt);
 if (!result913) return std::unexpected(std::move(result913.error()));
     m_travelLine.min() = m_travelLine.max();
     m_travelLine.max() = m_movement_controller->position();
@@ -643,7 +643,7 @@ if (!result914) return std::unexpected(std::move(result914.error()));
   auto result915 = world();
   if (!result915) return std::unexpected(std::move(result915.error()));
   if (result915->get().isClient()) {
-    this->root().spatialLogger().log_poly("world", m_movement_controller->collisionBody(), Color::palette_red.to_rgba());
+    this->root().spatialLogger().log_poly("world", m_movement_controller->collision_body(), Color::palette_red.to_rgba());
   }
   return {};
 }
@@ -728,9 +728,9 @@ String Projectile::projectileType() const {
 }
 
 void Projectile::setReferenceVelocity(std::optional<Vec2F> const& velocity) {
-  m_movement_controller->setVelocity(m_movement_controller->velocity() - m_referenceVelocity.value_or(Vec2F{}));
+  m_movement_controller->set_velocity(m_movement_controller->velocity() - m_referenceVelocity.value_or(Vec2F{}));
   m_referenceVelocity = velocity;
-  m_movement_controller->setVelocity(m_movement_controller->velocity() + velocity.value_or(Vec2F{}));
+  m_movement_controller->set_velocity(m_movement_controller->velocity() + velocity.value_or(Vec2F{}));
   m_effectEmitter->set_base_velocity(velocity.value_or(Vec2F{}));
 }
 
@@ -744,17 +744,17 @@ void Projectile::setInitialSpeed(float speed) {
 
 void Projectile::setInitialPosition(Vec2F const& position) {
   resetPresentation();
-  m_movement_controller->setPosition(position);
+  m_movement_controller->set_position(position);
 }
 
 void Projectile::setInitialDirection(Vec2F const& direction) {
-  m_movement_controller->setVelocity(vnorm(direction) * m_initialSpeed + m_referenceVelocity.value_or(Vec2F{}));
-  m_movement_controller->setRotation(direction.angle());
+  m_movement_controller->set_velocity(vnorm(direction) * m_initialSpeed + m_referenceVelocity.value_or(Vec2F{}));
+  m_movement_controller->set_rotation(direction.angle());
 }
 
 void Projectile::setInitialVelocity(Vec2F const& velocity) {
-  m_movement_controller->setVelocity(velocity + m_referenceVelocity.value_or(Vec2F{}));
-  m_movement_controller->setRotation(velocity.angle());
+  m_movement_controller->set_velocity(velocity + m_referenceVelocity.value_or(Vec2F{}));
+  m_movement_controller->set_rotation(velocity.angle());
 }
 
 void Projectile::setSourceEntity(EntityId source, bool trackSource) {
@@ -1572,10 +1572,10 @@ if (!result884) return std::unexpected(std::move(result884.error()));
 }
 
 std::expected<void, StarException> Projectile::tickShared(float dt) {
-  if (!m_config->orientationLocked && !m_movement_controller->stickingDirection()) {
+  if (!m_config->orientationLocked && !m_movement_controller->sticking_direction()) {
     auto apparentVelocity = m_movement_controller->velocity() - m_referenceVelocity.value_or(Vec2F{});
     if (apparentVelocity != Vec2F())
-      m_movement_controller->setRotation(apparentVelocity.angle());
+      m_movement_controller->set_rotation(apparentVelocity.angle());
   }
 
   m_animationTimer += dt;

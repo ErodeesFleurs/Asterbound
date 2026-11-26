@@ -55,17 +55,17 @@ struct MovingCollisionId {
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, MovingCollisionId& mci);
   friend std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, MovingCollisionId const& mci);
   MovingCollisionId();
-  MovingCollisionId(EntityId physicsEntityId, std::size_t collisionIndex);
+  MovingCollisionId(EntityId physics_entity_id, std::size_t collision_index);
 
-  bool operator==(MovingCollisionId const& rhs);
+  bool operator==(MovingCollisionId const&) const = default;
 
   // Returns true if the MovingCollisionId is not empty, i.e. default
   // constructed
   bool valid() const;
   operator bool() const;
 
-  EntityId physicsEntityId;
-  std::size_t collisionIndex;
+  EntityId physics_entity_id;
+  std::size_t collision_index;
 };
 
 [[nodiscard]] std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, MovingCollisionId& mci);

@@ -169,7 +169,7 @@ std::expected<std::shared_ptr<ItemDrop>, StarException> ItemDrop::create(Root& r
   auto position = store.get("position").and_then([](Json const& value) { return json_to_vec2f(value); });
   if (!position)
     return std::unexpected(std::move(position.error()));
-  drop->m_movement_controller->setPosition(*position);
+  drop->m_movement_controller->set_position(*position);
   auto mode_name = store.get_string("mode");
   if (!mode_name)
     return std::unexpected(std::move(mode_name.error()));
@@ -437,27 +437,27 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
             close_drop.m_mode.set(Mode::Taken);
             m_item_descriptor.set(m_item->descriptor());
             m_drop_age.set_elapsed_time(std::min(m_drop_age.elapsed_time(), close_drop.m_drop_age.elapsed_time()));
-            m_movement_controller->setPosition(receiver_position + displacement / 2.0f);
-            m_movement_controller->setVelocity((m_movement_controller->velocity() + close_drop.velocity()) / 2.0f);
+            m_movement_controller->set_position(receiver_position + displacement / 2.0f);
+            m_movement_controller->set_velocity((m_movement_controller->velocity() + close_drop.velocity()) / 2.0f);
             return true;
           });
         if (!found)
           return std::unexpected(std::move(found.error()));
       }
       auto const& current = m_movement_controller->parameters();
-      if (current.collisionEnabled != true || current.gravityEnabled != true) {
+      if (current.collision_enabled != true || current.gravity_enabled != true) {
         MovementParameters parameters;
-        parameters.collisionEnabled = true;
-        parameters.gravityEnabled = true;
-        if (auto applied = m_movement_controller->applyParameters(parameters); !applied)
+        parameters.collision_enabled = true;
+        parameters.gravity_enabled = true;
+        if (auto applied = m_movement_controller->apply_parameters(parameters); !applied)
           return std::unexpected(std::move(applied.error()));
       }
     }
-    if (auto ticked = m_movement_controller->tickMaster(dt); !ticked)
+    if (auto ticked = m_movement_controller->tick_master(dt); !ticked)
       return std::unexpected(std::move(ticked.error()));
     m_intangible_timer.tick(dt);
     m_age_items_timer.update(world.epochTime());
-    if ((m_mode.get() == Mode::Intangible || m_mode.get() == Mode::Available) && m_movement_controller->atWorldLimit())
+    if ((m_mode.get() == Mode::Intangible || m_mode.get() == Mode::Available) && m_movement_controller->at_world_limit())
       m_mode.set(Mode::Dead);
     if (m_mode.get() == Mode::Intangible && m_intangible_timer.ready())
       m_mode.set(Mode::Available);
@@ -519,10 +519,10 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
       } else {
         if (auto taken = update_taken(false); !taken)
           return std::unexpected(std::move(taken.error()));
-        if (auto ticked = m_movement_controller->tickMaster(dt); !ticked)
+        if (auto ticked = m_movement_controller->tick_master(dt); !ticked)
           return std::unexpected(std::move(ticked.error()));
       }
-    } else if (auto ticked = m_movement_controller->tickSlave(dt); !ticked) {
+    } else if (auto ticked = m_movement_controller->tick_slave(dt); !ticked) {
       return std::unexpected(std::move(ticked.error()));
     }
   }
@@ -530,7 +530,7 @@ std::expected<void, StarException> ItemDrop::update(float dt, std::uint64_t) {
     auto takeable = can_take();
     if (!takeable)
       return std::unexpected(std::move(takeable.error()));
-    root().spatialLogger().log_poly("world", m_movement_controller->collisionBody(),
+    root().spatialLogger().log_poly("world", m_movement_controller->collision_body(),
                                     (*takeable ? Color::palette_green : Color::palette_red).to_rgba());
   }
   return {};
@@ -701,7 +701,7 @@ std::expected<std::shared_ptr<Item>, StarException> ItemDrop::take() {
 
 void ItemDrop::set_position(Vec2F const& position) {
   resetPresentation();
-  m_movement_controller->setPosition(position);
+  m_movement_controller->set_position(position);
 }
 
 Vec2F ItemDrop::velocity() const {
@@ -709,7 +709,7 @@ Vec2F ItemDrop::velocity() const {
 }
 
 void ItemDrop::set_velocity(Vec2F const& velocity) {
-  m_movement_controller->setVelocity(velocity);
+  m_movement_controller->set_velocity(velocity);
 }
 
 std::expected<EnumMap<ItemDrop::Mode>, StarException> const ItemDrop::mode_names = EnumMap<Mode>::create({
@@ -746,11 +746,11 @@ std::expected<void, StarException> ItemDrop::initialize() {
     return std::unexpected(std::move(parameters.error()));
   if (!parameters->physics_effect_categories)
     parameters->physics_effect_categories = StringSet({"itemdrop"});
-  if (parameters->collisionPoly)
-    m_bound_box = parameters->collisionPoly->bounding_box();
+  if (parameters->collision_poly)
+    m_bound_box = parameters->collision_poly->bounding_box();
   else
     m_bound_box = RectF{-0.499, -0.499, 0.499, 0.499};
-  if (auto applied = m_movement_controller->applyParameters(*parameters); !applied)
+  if (auto applied = m_movement_controller->apply_parameters(*parameters); !applied)
     return std::unexpected(std::move(applied.error()));
   if (auto added = m_net_group.add_net_element(m_mode); !added)
     return std::unexpected(std::move(added.error()));
@@ -824,7 +824,7 @@ std::expected<void, StarException> ItemDrop::update_taken(bool master) {
     Vec2F velocity = diff.normalized() * m_velocity * std::min(1.0f, magnitude);
     if (auto player_entity = as_ref<Player>(*owning_entity))
       velocity += player_entity->get().velocity();
-    m_movement_controller->approachVelocity(velocity, overhead ? m_overhead_approach : m_velocity_approach);
+    m_movement_controller->approach_velocity(velocity, overhead ? m_overhead_approach : m_velocity_approach);
     if (master && !overhead && magnitude < m_pickup_distance)
       m_mode.set(Mode::Dead);
 
@@ -834,13 +834,13 @@ std::expected<void, StarException> ItemDrop::update_taken(bool master) {
   }
 
   auto const& current = m_movement_controller->parameters();
-  if (current.maxMovementPerStep == 1000.0f && current.collisionEnabled == false && current.gravityEnabled == false)
+  if (current.max_movement_per_step == 1000.0f && current.collision_enabled == false && current.gravity_enabled == false)
     return {};
   MovementParameters parameters;
-  parameters.maxMovementPerStep = 1000.0f;
-  parameters.collisionEnabled = false;
-  parameters.gravityEnabled = false;
-  return m_movement_controller->applyParameters(parameters);
+  parameters.max_movement_per_step = 1000.0f;
+  parameters.collision_enabled = false;
+  parameters.gravity_enabled = false;
+  return m_movement_controller->apply_parameters(parameters);
 }
 
 std::expected<std::optional<LuaValue>, StarException> ItemDrop::call_script(String const& func, LuaVariadic<LuaValue> const& args) {

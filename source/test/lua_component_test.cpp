@@ -1134,7 +1134,7 @@ const GameTestRegistration
                         ASSERT_TRUE(world);
                         auto close = make_scope_exit([&] { EXPECT_TRUE((*world)->close()); });
                         (*controller)->init(**world);
-                        (*controller)->setPosition(Vec2F(1024, 1024));
+                        (*controller)->set_position(Vec2F(1024, 1024));
                         auto unbind = make_scope_exit([&] { (*controller)->uninit(); });
                         LuaActorScript component(fixture.root());
                         auto cleanup = make_scope_exit([&] { EXPECT_TRUE(component.uninit()); });
@@ -1180,7 +1180,7 @@ const GameTestRegistration
                         ASSERT_TRUE((*controller)->tick_master(1.0f / 60.0f));
                         // The jump uses the speed queued by Lua and the fraction
                         // queued natively; later sparse patches must retain both.
-                        EXPECT_FLOAT_EQ((*controller)->yVelocity(), 3.0f);
+                        EXPECT_FLOAT_EQ((*controller)->y_velocity(), 3.0f);
                         auto active = component.eval<Json>(R"LUA(
     local p = mcontroller.parameters()
     return {p.stopOnFirstBounce, p.enableSurfaceSlopeCorrection, p.gravityMultiplier}

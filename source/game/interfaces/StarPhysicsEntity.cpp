@@ -81,17 +81,13 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(Data
   return ds << pmc.position << pmc.collision << pmc.collisionKind << pmc.categoryFilter;
 }
 
-MovingCollisionId::MovingCollisionId() : physicsEntityId(null_entity_id), collisionIndex(0) {}
+MovingCollisionId::MovingCollisionId() : physics_entity_id(null_entity_id), collision_index(0) {}
 
-MovingCollisionId::MovingCollisionId(EntityId physicsEntityId, std::size_t collisionIndex)
-  : physicsEntityId(physicsEntityId), collisionIndex(collisionIndex) {}
-
-bool MovingCollisionId::operator==(MovingCollisionId const& rhs) {
-  return std::tie(physicsEntityId, collisionIndex) == std::tie(rhs.physicsEntityId, rhs.collisionIndex);
-}
+MovingCollisionId::MovingCollisionId(EntityId physics_entity_id, std::size_t collision_index)
+  : physics_entity_id(physics_entity_id), collision_index(collision_index) {}
 
 bool MovingCollisionId::valid() const {
-  return physicsEntityId != null_entity_id;
+  return physics_entity_id != null_entity_id;
 }
 
 MovingCollisionId::operator bool() const {
@@ -100,10 +96,10 @@ MovingCollisionId::operator bool() const {
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(DataStream& ds, MovingCollisionId& mci) {
   MovingCollisionId decoded;
-  auto id = ds.read(decoded.physicsEntityId);
+  auto id = ds.read(decoded.physics_entity_id);
   if (!id)
     return std::unexpected(std::move(id.error()));
-  auto index = ds.read_vlq_s(decoded.collisionIndex);
+  auto index = ds.read_vlq_s(decoded.collision_index);
   if (!index)
     return std::unexpected(std::move(index.error()));
   mci = decoded;
@@ -111,10 +107,10 @@ std::expected<std::reference_wrapper<DataStream>, StarException> operator>>(Data
 }
 
 std::expected<std::reference_wrapper<DataStream>, StarException> operator<<(DataStream& ds, MovingCollisionId const& mci) {
-  auto id = ds.write(mci.physicsEntityId);
+  auto id = ds.write(mci.physics_entity_id);
   if (!id)
     return std::unexpected(std::move(id.error()));
-  auto index = ds.write_vlq_s(mci.collisionIndex);
+  auto index = ds.write_vlq_s(mci.collision_index);
   if (!index)
     return std::unexpected(std::move(index.error()));
   return std::ref(ds);

@@ -348,7 +348,7 @@ if (!result43) return std::unexpected(std::move(result43.error()));
 
 
   m_movement_controller->init(world);
-  m_movement_controller->setIgnorePhysicsEntities({entityId});
+  m_movement_controller->set_ignore_physics_entities({entityId});
   auto result44 = m_status_controller->init(*this, *m_movement_controller);
 if (!result44) return std::unexpected(std::move(result44.error()));
 
@@ -515,7 +515,7 @@ RectF Monster::meta_bound_box() const {
 }
 
 RectF Monster::collision_area() const {
-  return m_movement_controller->collisionPoly().bounding_box();
+  return m_movement_controller->collision_poly().bounding_box();
 }
 
 Vec2F Monster::velocity() const {
@@ -998,7 +998,7 @@ std::expected<void, StarException> Monster::update(float dt, std::uint64_t) {
   if (!inWorld())
     return {};
 
-  m_movement_controller->setTimestep(dt);
+  m_movement_controller->set_timestep(dt);
 
   if (isMaster()) {
     m_networked_animator->setFlipped((m_movement_controller->facing_direction() == Direction::Left) != m_monster_variant.reversed);
@@ -1038,7 +1038,7 @@ std::expected<void, StarException> Monster::update(float dt, std::uint64_t) {
   if (!animation) return std::unexpected(std::move(animation.error()));
   auto& spatial_log = root().spatialLogger();
   if (spatial_log.observed())
-    spatial_log.log_poly("world", m_movement_controller->collisionBody(), {255, 0, 0, 255});
+    spatial_log.log_poly("world", m_movement_controller->collision_body(), {255, 0, 0, 255});
   return {};
 }
 
@@ -1112,7 +1112,7 @@ std::expected<void, StarException> Monster::render_light_sources(RenderCallback&
 
 void Monster::setPosition(Vec2F const& pos) {
   resetPresentation();
-  m_movement_controller->setPosition(pos);
+  m_movement_controller->set_position(pos);
 }
 
 MessageResponseResult Monster::receive_message(ConnectionId sending_connection, String const& message, JsonArray const& args) {

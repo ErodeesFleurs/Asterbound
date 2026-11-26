@@ -729,7 +729,7 @@ std::expected<Json, StarException> ActorMovementController::store_state() const 
 }
 
 std::expected<void, StarException> ActorMovementController::load_state(Json const& state) {
-  auto loaded = MovementController::loadState(state);
+  auto loaded = MovementController::load_state(state);
   if (!loaded) return std::unexpected(std::move(loaded.error()));
   auto moving_name = state.get_string("movingDirection");
   if (!moving_name) return std::unexpected(std::move(moving_name.error()));
@@ -996,9 +996,9 @@ std::expected<void, StarException> ActorMovementController::tick_master(float dt
     m_ground_movement.set(false);
     m_liquid_movement.set(false);
 
-    setVelocity((m_entity_anchor->position - MovementController::position()) / dt);
-    if (auto result = MovementController::tickMaster(dt); !result) return std::unexpected(std::move(result.error()));
-    setPosition(m_entity_anchor->position);
+    set_velocity((m_entity_anchor->position - MovementController::position()) / dt);
+    if (auto result = MovementController::tick_master(dt); !result) return std::unexpected(std::move(result.error()));
+    set_position(m_entity_anchor->position);
   } else {
     auto const merged = m_control_parameters.transform([this](ActorMovementParameters const& patch) {
       return m_base_parameters.merge(patch);
@@ -1043,13 +1043,13 @@ std::expected<void, StarException> ActorMovementController::tick_master(float dt
           m_walking.set(a == Action::Walk && !m_control_path_move->second);
           m_running.set(a == Action::Walk && m_control_path_move->second);
           m_flying.set(a == Action::Fly || a == Action::Swim);
-          m_falling.set((a == Action::Arc && yVelocity() < 0.0f) || a == Action::Drop);
-          m_jumping.set(a == Action::Arc && yVelocity() >= 0.0f);
+          m_falling.set((a == Action::Arc && y_velocity() < 0.0f) || a == Action::Drop);
+          m_jumping.set(a == Action::Arc && y_velocity() >= 0.0f);
 
           on_ground = a == Action::Walk || a == Action::Drop || a == Action::Jump;
 
           if (a == Action::Land || a== Action::Jump) {
-            auto in_liquid = liquidPercentage() >= active_parameters.minimum_liquid_percentage.value_or(1.0);
+            auto in_liquid = liquid_percentage() >= active_parameters.minimum_liquid_percentage.value_or(1.0);
             m_liquid_movement.set(in_liquid);
             m_ground_movement.set(!in_liquid);
             on_ground = !in_liquid && on_ground;
@@ -1069,10 +1069,10 @@ std::expected<void, StarException> ActorMovementController::tick_master(float dt
         if (auto result = apply_mc_parameters(active_parameters); !result) return std::unexpected(std::move(result.error()));
 
         // MovementController still handles updating liquid percentage and updating force regions
-        if (auto result = updateLiquidPercentage(); !result) return std::unexpected(std::move(result.error()));
+        if (auto result = update_liquid_percentage(); !result) return std::unexpected(std::move(result.error()));
         if (auto result = update_force_regions(); !result) return std::unexpected(std::move(result.error()));
-        // onGround flag needs to be manually set, won't be set by MovementController::tickMaster
-        setOnGround(on_ground);
+        // Set the ground flag manually on this path, which skips MovementController::tick_master.
+        set_on_ground(on_ground);
         // Hold the receipt until the next request, not the finished edge list.
         if (m_path_move_result)
           m_path_controller->reset();
@@ -1106,13 +1106,13 @@ std::expected<void, StarException> ActorMovementController::tick_master(float dt
     force(m_control_force);
 
     for (auto const& approach : m_control_approach_velocities)
-      approachVelocity(approach.target_velocity * active_modifiers.speed_modifier, approach.max_control_force);
+      approach_velocity(approach.target_velocity * active_modifiers.speed_modifier, approach.max_control_force);
 
     for (auto const& approach : m_control_approach_velocity_along_angles)
-      approachVelocityAlongAngle(approach.along_angle, approach.target_velocity * active_modifiers.speed_modifier, approach.max_control_force, approach.positive_only);
+      approach_velocity_along_angle(approach.along_angle, approach.target_velocity * active_modifiers.speed_modifier, approach.max_control_force, approach.positive_only);
 
-    m_liquid_movement.set(liquidPercentage() >= (*active_parameters.minimum_liquid_percentage));
-    float liquid_impedance = (*active_parameters.liquid_impedance) * liquidPercentage();
+    m_liquid_movement.set(liquid_percentage() >= (*active_parameters.minimum_liquid_percentage));
+    float liquid_impedance = (*active_parameters.liquid_impedance) * liquid_percentage();
 
     std::optional<Direction> updated_moving_direction;
     bool running = m_control_run && !active_modifiers.running_suppressed;
@@ -1123,9 +1123,9 @@ std::expected<void, StarException> ActorMovementController::tick_master(float dt
         fly_velocity = fly_velocity.normalized() * (*active_parameters.fly_speed);
 
       if (m_liquid_movement.get())
-        approachVelocity(fly_velocity * (1.0f - liquid_impedance) * active_modifiers.speed_modifier, (*active_parameters.liquid_force) * active_modifiers.liquid_movement_modifier);
+        approach_velocity(fly_velocity * (1.0f - liquid_impedance) * active_modifiers.speed_modifier, (*active_parameters.liquid_force) * active_modifiers.liquid_movement_modifier);
       else
-        approachVelocity(fly_velocity * active_modifiers.speed_modifier, (*active_parameters.air_force));
+        approach_velocity(fly_velocity * active_modifiers.speed_modifier, (*active_parameters.air_force));
 
       if (fly_velocity[0] > 0)
         updated_moving_direction = Direction::Right;
@@ -1158,10 +1158,10 @@ std::expected<void, StarException> ActorMovementController::tick_master(float dt
       float max_ground_sustain = (*active_parameters.ground_movement_maximum_sustain);
       float ground_check_distance = (*active_parameters.ground_movement_check_distance);
       m_ground_movement_sustain_timer.tick(dt);
-      if (onGround()) {
+      if (on_ground()) {
         m_ground_movement_sustain_timer = GameTimer(max_ground_sustain);
       } else if (!m_ground_movement_sustain_timer.ready() && ground_check_distance > 0.0f && max_ground_sustain - m_ground_movement_sustain_timer.remaining > min_ground_sustain) {
-        PolyF collision_body = MovementController::collisionBody();
+        PolyF collision_body = MovementController::collision_body();
         collision_body.translate(Vec2F(0, -ground_check_distance));
         auto collision = world_ref.poly_collision(collision_body, {CollisionKind::Block, CollisionKind::Dynamic, CollisionKind::Platform, CollisionKind::Slippery});
         if (!collision) return std::unexpected(std::move(collision.error()));
@@ -1180,7 +1180,7 @@ std::expected<void, StarException> ActorMovementController::tick_master(float dt
         if (standing_jumpable || (*jump_profile.multi_jump) || m_control_jump_anyway)
           start_jump = true;
       } else if (m_jumping.get() && control_jump && (!m_jump_hold_timer || !m_jump_hold_timer->ready())) {
-        if (!(*jump_profile.collision_cancelled) || collisionCorrection()[1] >= 0.0f)
+        if (!(*jump_profile.collision_cancelled) || collision_correction()[1] >= 0.0f)
           hold_jump = true;
       }
 
@@ -1193,7 +1193,7 @@ std::expected<void, StarException> ActorMovementController::tick_master(float dt
         else
           m_jump_hold_timer = {};
 
-        setYVelocity(yVelocity() + (*jump_profile.jump_speed) * (*jump_profile.jump_initial_percentage) * jump_modifier);
+        set_y_velocity(y_velocity() + (*jump_profile.jump_speed) * (*jump_profile.jump_initial_percentage) * jump_modifier);
 
         m_ground_movement_sustain_timer = GameTimer(0);
 
@@ -1202,7 +1202,7 @@ std::expected<void, StarException> ActorMovementController::tick_master(float dt
         if (m_jump_hold_timer)
           m_jump_hold_timer->tick(dt);
 
-        approachYVelocity((*jump_profile.jump_speed) * jump_modifier, (*jump_profile.jump_control_force) * jump_modifier);
+        approach_y_velocity((*jump_profile.jump_speed) * jump_modifier, (*jump_profile.jump_control_force) * jump_modifier);
 
       } else {
         m_jumping.set(false);
@@ -1226,22 +1226,22 @@ std::expected<void, StarException> ActorMovementController::tick_master(float dt
       if (m_liquid_movement.get())
         m_target_horizontal_ambulating_velocity *= (1.0f - liquid_impedance);
 
-      Vec2F surface_velocity = MovementController::surfaceVelocity();
+      Vec2F surface_velocity = MovementController::surface_velocity();
 
       // don't ambulate if we're already moving faster than the target velocity in the direction of ambulation
-      bool ambulation_would_accelerate = std::abs(m_target_horizontal_ambulating_velocity + surface_velocity[0]) > std::abs(xVelocity())
-          || (m_target_horizontal_ambulating_velocity < 0) != (xVelocity() < 0);
+      bool ambulation_would_accelerate = std::abs(m_target_horizontal_ambulating_velocity + surface_velocity[0]) > std::abs(x_velocity())
+          || (m_target_horizontal_ambulating_velocity < 0) != (x_velocity() < 0);
 
       if (m_target_horizontal_ambulating_velocity != 0.0f && ambulation_would_accelerate) {
         float ambulating_accel;
-        if (onGround())
+        if (on_ground())
           ambulating_accel = (*active_parameters.ground_force) * active_modifiers.ground_movement_modifier;
         else if (m_liquid_movement.get())
           ambulating_accel = (*active_parameters.liquid_force) * active_modifiers.liquid_movement_modifier;
         else
           ambulating_accel = (*active_parameters.air_force);
 
-        approachXVelocity(m_target_horizontal_ambulating_velocity + surface_velocity[0], ambulating_accel);
+        approach_x_velocity(m_target_horizontal_ambulating_velocity + surface_velocity[0], ambulating_accel);
       }
     }
 
@@ -1265,10 +1265,10 @@ std::expected<void, StarException> ActorMovementController::tick_master(float dt
     }
     m_flying.set(static_cast<bool>(m_control_fly));
 
-    bool falling = (yVelocity() < (*active_parameters.fall_status_speed_min)) && !m_ground_movement.get();
+    bool falling = (y_velocity() < (*active_parameters.fall_status_speed_min)) && !m_ground_movement.get();
     m_falling.set(falling);
 
-    if (auto result = MovementController::tickMaster(dt); !result) return std::unexpected(std::move(result.error()));
+    if (auto result = MovementController::tick_master(dt); !result) return std::unexpected(std::move(result.error()));
 
     m_last_control_jump = m_control_jump;
     m_last_control_down = m_control_down;
@@ -1287,7 +1287,7 @@ std::expected<void, StarException> ActorMovementController::tick_slave(float dt)
   auto active_world = world();
   if (!active_world) return std::unexpected(std::move(active_world.error()));
   World& world_ref = active_world->get();
-  if (auto result = MovementController::tickSlave(dt); !result) return std::unexpected(std::move(result.error()));
+  if (auto result = MovementController::tick_slave(dt); !result) return std::unexpected(std::move(result.error()));
 
   m_entity_anchor.reset();
   if (auto anchor_state = m_anchor_state.get()) {
@@ -1338,55 +1338,55 @@ std::expected<void, StarException> ActorMovementController::apply_mc_parameters(
 
   mc_parameters.mass = parameters.mass;
 
-  mc_parameters.gravityMultiplier = parameters.gravity_multiplier;
+  mc_parameters.gravity_multiplier = parameters.gravity_multiplier;
 
-  mc_parameters.liquidBuoyancy = parameters.liquid_buoyancy;
-  mc_parameters.airBuoyancy = parameters.air_buoyancy;
-  mc_parameters.bounceFactor = parameters.bounce_factor;
-  mc_parameters.stopOnFirstBounce = parameters.stop_on_first_bounce;
-  mc_parameters.enableSurfaceSlopeCorrection = parameters.enable_surface_slope_correction;
-  mc_parameters.slopeSlidingFactor = parameters.slope_sliding_factor;
-  mc_parameters.maxMovementPerStep = parameters.max_movement_per_step;
+  mc_parameters.liquid_buoyancy = parameters.liquid_buoyancy;
+  mc_parameters.air_buoyancy = parameters.air_buoyancy;
+  mc_parameters.bounce_factor = parameters.bounce_factor;
+  mc_parameters.stop_on_first_bounce = parameters.stop_on_first_bounce;
+  mc_parameters.enable_surface_slope_correction = parameters.enable_surface_slope_correction;
+  mc_parameters.slope_sliding_factor = parameters.slope_sliding_factor;
+  mc_parameters.max_movement_per_step = parameters.max_movement_per_step;
 
   if (m_crouching.get())
-    mc_parameters.collisionPoly = (*parameters.crouching_poly);
+    mc_parameters.collision_poly = (*parameters.crouching_poly);
   else
-    mc_parameters.collisionPoly = (*parameters.standing_poly);
+    mc_parameters.collision_poly = (*parameters.standing_poly);
 
-  mc_parameters.stickyCollision = parameters.sticky_collision;
-  mc_parameters.stickyForce = parameters.sticky_force;
+  mc_parameters.sticky_collision = parameters.sticky_collision;
+  mc_parameters.sticky_force = parameters.sticky_force;
 
-  mc_parameters.airFriction = parameters.air_friction;
-  mc_parameters.liquidFriction = parameters.liquid_friction;
+  mc_parameters.air_friction = parameters.air_friction;
+  mc_parameters.liquid_friction = parameters.liquid_friction;
 
   // If we are traveling in the correct direction while in a movement mode that
   // requires contact with the ground (ambulating i.e. walking or running), and
   // not traveling faster than our target horizontal movement, then apply the
   // special 'ambulatingGroundFriction'.
-  float relative_xvelocity = xVelocity() - surfaceVelocity()[0];
+  float relative_xvelocity = x_velocity() - surface_velocity()[0];
   bool use_ambulating_ground_friction = (m_walking.get() || m_running.get())
       && std::copysign(1, m_target_horizontal_ambulating_velocity) == std::copysign(1, relative_xvelocity)
       && std::fabs(relative_xvelocity) <= std::fabs(m_target_horizontal_ambulating_velocity);
 
   if (use_ambulating_ground_friction)
-    mc_parameters.groundFriction = parameters.ambulating_ground_friction;
+    mc_parameters.ground_friction = parameters.ambulating_ground_friction;
   else
-    mc_parameters.groundFriction = parameters.normal_ground_friction;
+    mc_parameters.ground_friction = parameters.normal_ground_friction;
 
-  mc_parameters.collisionEnabled = parameters.collision_enabled;
-  mc_parameters.frictionEnabled = parameters.friction_enabled;
-  mc_parameters.gravityEnabled = parameters.gravity_enabled;
+  mc_parameters.collision_enabled = parameters.collision_enabled;
+  mc_parameters.friction_enabled = parameters.friction_enabled;
+  mc_parameters.gravity_enabled = parameters.gravity_enabled;
 
-  mc_parameters.ignorePlatformCollision = m_fall_through_sustain > 0 || m_control_fly || m_control_down;
-  mc_parameters.maximumPlatformCorrection = parameters.maximum_platform_correction;
-  mc_parameters.maximumPlatformCorrectionVelocityFactor = parameters.maximum_platform_correction_velocity_factor;
+  mc_parameters.ignore_platform_collision = m_fall_through_sustain > 0 || m_control_fly || m_control_down;
+  mc_parameters.maximum_platform_correction = parameters.maximum_platform_correction;
+  mc_parameters.maximum_platform_correction_velocity_factor = parameters.maximum_platform_correction_velocity_factor;
 
   mc_parameters.physics_effect_categories = parameters.physics_effect_categories;
 
-  mc_parameters.maximumCorrection = parameters.maximum_correction;
-  mc_parameters.speedLimit = parameters.speed_limit;
+  mc_parameters.maximum_correction = parameters.maximum_correction;
+  mc_parameters.speed_limit = parameters.speed_limit;
 
-  return MovementController::applyParameters(mc_parameters);
+  return MovementController::apply_parameters(mc_parameters);
 }
 
 std::expected<void, StarException> ActorMovementController::do_set_anchor_state(std::optional<EntityAnchorState> anchor_state) {
@@ -1409,11 +1409,11 @@ std::expected<void, StarException> ActorMovementController::do_set_anchor_state(
   m_entity_anchor = std::move(entity_anchor);
 
   if (m_entity_anchor) {
-    setPosition(m_entity_anchor->position);
+    set_position(m_entity_anchor->position);
   } else if (previous_anchor && previous_anchor->exitBottomPosition) {
-    auto bounds = MovementController::localBoundBox();
+    auto bounds = MovementController::local_bound_box();
     Vec2F bottom_center = {bounds.center()[0], bounds.y_min()};
-    setPosition(*previous_anchor->exitBottomPosition - bottom_center);
+    set_position(*previous_anchor->exitBottomPosition - bottom_center);
   }
   return {};
 }
@@ -1467,9 +1467,9 @@ PathController::find_path(ActorMovementController& movement_controller, Vec2F co
   // starting a new path, or the target position moved by more than 2 blocks
   if (!m_target_position || (!m_path && !m_path_finder)
       || m_world.get().geometry().diff(*m_target_position, target_position).magnitude() > 2.0) {
-    auto grounded = movement_controller.onGround();
+    auto grounded = movement_controller.on_ground();
     if (m_path) {
-      // if already moving on a path, collision will be disabled and we can't use MovementController::onGround() to check for ground collision
+      // if already moving on a path, collision will be disabled and we can't use MovementController::on_ground() to check for ground collision
       auto const ground_collision =
         CollisionSet{CollisionKind::Null, CollisionKind::Block, CollisionKind::Slippery, CollisionKind::Platform};
       auto grounded_result = on_ground(movement_controller, movement_controller.position(), ground_collision);
@@ -1477,7 +1477,7 @@ PathController::find_path(ActorMovementController& movement_controller, Vec2F co
         return std::unexpected(std::move(grounded_result.error()));
       grounded = *grounded_result;
     }
-    if (*movement_controller.parameters().gravityEnabled && !grounded && !movement_controller.liquid_movement()) {
+    if (*movement_controller.parameters().gravity_enabled && !grounded && !movement_controller.liquid_movement()) {
       return {};
     }
     m_start_position = movement_controller.position();
@@ -1688,9 +1688,9 @@ std::expected<std::optional<bool>, StarException> PathController::move(ActorMove
     }
 
     auto current_velocity = source_velocity + ((target_velocity - source_velocity) * edge_progress);
-    movement_controller.setVelocity(current_velocity);
+    movement_controller.set_velocity(current_velocity);
     auto movement = (current_velocity + source_velocity) / 2.0 * m_edge_timer;
-    movement_controller.setPosition(edge.source.position + movement);
+    movement_controller.set_position(edge.source.position + movement);
 
     if (auto direction = direction_of(delta[0]))
       m_control_face = direction;
@@ -1700,8 +1700,8 @@ std::expected<std::optional<bool>, StarException> PathController::move(ActorMove
   }
 
   if (auto last_edge = m_path->back_value()) {
-    movement_controller.setPosition(last_edge->target.position);
-    movement_controller.setVelocity(Vec2F());
+    movement_controller.set_position(last_edge->target.position);
+    movement_controller.set_velocity(Vec2F());
   }
 
   // reached the end of the path, success unless we're also currently pathfinding to a new position
@@ -1740,7 +1740,7 @@ std::expected<bool, StarException> PathController::validate_edge(ActorMovementCo
     }
     return opened;
   };
-  auto poly = movement_controller.collisionPoly();
+  auto poly = movement_controller.collision_poly();
   poly.translate(edge.target.position);
   auto world_collision = m_world.get().poly_collision(poly);
   if (!world_collision)
@@ -1767,7 +1767,7 @@ std::expected<bool, StarException> PathController::validate_edge(ActorMovementCo
   }
   auto in_liquid = [&movement_controller,
                     &world = m_world.get()](Vec2F const& position) -> std::expected<bool, StarException> {
-    auto bounds = movement_controller.localBoundBox().translated(position);
+    auto bounds = movement_controller.local_bound_box().translated(position);
     auto liquid = world.liquidLevel(bounds);
     if (!liquid)
       return std::unexpected(std::move(liquid.error()));
@@ -1816,7 +1816,7 @@ std::expected<bool, StarException> PathController::moving_collision(ActorMovemen
 std::expected<bool, StarException> PathController::on_ground(ActorMovementController const& movement_controller,
                                                              Vec2F const& position,
                                                              CollisionSet const& collision_set) const {
-  auto bounds = RectI::integral(movement_controller.localBoundBox().translated(position));
+  auto bounds = RectI::integral(movement_controller.local_bound_box().translated(position));
   Vec2I min = Vec2I(bounds.x_min(), bounds.y_min() - 1);
   Vec2I max = Vec2I(bounds.x_max(), bounds.y_min());
   return m_world.get().rectTileCollision(RectI(min, max), collision_set);

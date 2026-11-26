@@ -3157,7 +3157,7 @@ const GameTestRegistration monster_damage_sources("RootTest", "MonsterDamageSour
   }
   auto monster = Monster::create(root, MonsterVariant(*variant), level);
   ASSERT_TRUE(monster) << monster.error().what();
-  (*monster)->movement_controller().setPosition(Vec2F(origin) + Vec2F(0.5f, 0.5f));
+  (*monster)->movement_controller().set_position(Vec2F(origin) + Vec2F(0.5f, 0.5f));
   ASSERT_TRUE((*world)->addEntity(*monster, 17));
 
   auto script = [&](String const& code) {

@@ -349,10 +349,10 @@ std::expected<void, StarException> Player::initialize(std::shared_ptr<PlayerConf
   auto movementParametersResult = ActorMovementParameters::create(json_merge(humanoid()->default_movement_parameters(), humanoid()->player_movement_parameters().value_or(m_config->movementParameters)));
   if (!movementParametersResult)
     return std::unexpected(std::move(movementParametersResult.error()));
-  auto movementParameters = std::move(*movementParametersResult);
-  if (!movementParameters.physics_effect_categories)
-    movementParameters.physics_effect_categories = StringSet({"player"});
-  auto movementControllerResult = ActorMovementController::create(root(), movementParameters);
+  auto movement_parameters = std::move(*movementParametersResult);
+  if (!movement_parameters.physics_effect_categories)
+    movement_parameters.physics_effect_categories = StringSet({"player"});
+  auto movementControllerResult = ActorMovementController::create(root(), movement_parameters);
   if (!movementControllerResult)
     return std::unexpected(std::move(movementControllerResult.error()));
   auto movementController = std::move(*movementControllerResult);
@@ -718,8 +718,8 @@ std::expected<void, StarException> Player::net_load(ByteArray const& net_store, 
   auto movementParametersResult = ActorMovementParameters::create(json_merge(humanoid()->default_movement_parameters(), humanoid()->player_movement_parameters().value_or(m_config->movementParameters)));
   if (!movementParametersResult)
     return std::unexpected(std::move(movementParametersResult.error()));
-  auto movementParameters = std::move(*movementParametersResult);
-  if (auto result = m_movement_controller->reset_base_parameters(movementParameters); !result)
+  auto movement_parameters = std::move(*movementParametersResult);
+  if (auto result = m_movement_controller->reset_base_parameters(movement_parameters); !result)
     return std::unexpected(std::move(result.error()));
   m_deathParticleBurst.set(humanoid()->default_death_particles());
   return {};
@@ -910,8 +910,8 @@ std::expected<void, StarException> Player::diskLoad(Json const& diskStore) {
   auto movementParametersResult = ActorMovementParameters::create(json_merge(humanoid()->default_movement_parameters(), humanoid()->player_movement_parameters().value_or(m_config->movementParameters)));
   if (!movementParametersResult)
     return std::unexpected(std::move(movementParametersResult.error()));
-  auto movementParameters = std::move(*movementParametersResult);
-  if (auto result = m_movement_controller->reset_base_parameters(movementParameters); !result)
+  auto movement_parameters = std::move(*movementParametersResult);
+  if (auto result = m_movement_controller->reset_base_parameters(movement_parameters); !result)
     return std::unexpected(std::move(result.error()));
   m_effectsAnimator->setGlobalTag("effectDirectives", speciesDef->effectDirectives());
   m_deathParticleBurst.set(humanoid()->default_death_particles());
@@ -1015,7 +1015,7 @@ std::expected<void, StarException> Player::init(World& world, EntityId entityId,
   if (auto result = m_tools->init(*this); !result)
     return std::unexpected(std::move(result.error()));
   m_movement_controller->init(world);
-  m_movement_controller->setIgnorePhysicsEntities({entityId});
+  m_movement_controller->set_ignore_physics_entities({entityId});
   if (auto result = m_statusController->init(*this, *m_movement_controller); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = m_techController->init(*this, *m_movement_controller, *m_statusController); !result)
@@ -1030,7 +1030,7 @@ std::expected<void, StarException> Player::init(World& world, EntityId entityId,
   auto speciesDefinition = std::move(*speciesDefinitionResult);
   if (mode == EntityMode::Master) {
     m_scriptedAnimationParameters.clear();
-    m_movement_controller->setRotation(0);
+    m_movement_controller->set_rotation(0);
     m_statusController->setStatusProperty("ouchNoise", speciesDefinition->ouchNoise(m_identity.gender));
     m_emoteState = HumanoidEmote::Idle;
     if (auto result = m_questManager->init(*this, world); !result)
@@ -1365,7 +1365,7 @@ std::expected<std::optional<HitType>, StarException> Player::queryHit(DamageSour
   if (!currentWorldResult)
     return std::unexpected(std::move(currentWorldResult.error()));
   auto& currentWorld = currentWorldResult->get();
-  auto intersectsResult = source.intersects_with_poly(currentWorld.geometry(), m_movement_controller->collisionBody());
+  auto intersectsResult = source.intersects_with_poly(currentWorld.geometry(), m_movement_controller->collision_body());
   if (!intersectsResult)
     return std::unexpected(std::move(intersectsResult.error()));
   auto intersects = std::move(*intersectsResult);
@@ -1375,7 +1375,7 @@ std::expected<std::optional<HitType>, StarException> Player::queryHit(DamageSour
 }
 
 std::expected<std::optional<PolyF>, StarException> Player::hitPoly() const {
-  return m_movement_controller->collisionBody();
+  return m_movement_controller->collision_body();
 }
 
 std::expected<List<DamageNotification>, StarException> Player::applyDamage(DamageRequest const& request) {
@@ -1593,7 +1593,7 @@ std::expected<Vec2F, StarException> Player::mouth_position(bool ignore_adjustmen
 }
 
 RectF Player::collision_area() const {
-  return m_movement_controller->collisionPoly().bounding_box();
+  return m_movement_controller->collision_poly().bounding_box();
 }
 
 std::expected<void, StarException> Player::revive(Vec2F const& footPosition) {
@@ -1616,8 +1616,8 @@ std::expected<void, StarException> Player::revive(Vec2F const& footPosition) {
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
   resetPresentation();
-  m_movement_controller->setPosition(footPosition - offset);
-  m_movement_controller->setVelocity(Vec2F());
+  m_movement_controller->set_position(footPosition - offset);
+  m_movement_controller->set_velocity(Vec2F());
   if (auto result = m_techController->reloadTech(); !result)
     return std::unexpected(std::move(result.error()));
   float moneyCost = m_inventory->currency("money") * m_modeConfig.reviveCostPercentile;
@@ -1934,7 +1934,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
   if (!currentWorldResult)
     return std::unexpected(std::move(currentWorldResult.error()));
   auto& currentWorld = currentWorldResult->get();
-  m_movement_controller->setTimestep(dt);
+  m_movement_controller->set_timestep(dt);
 
   if (isMaster()) {
     // Requests from postUpdate, messages before this tick, or a prior world
@@ -1965,7 +1965,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
 
     m_lastDamagedOtherTimer += dt;
 
-    if (m_movement_controller->zeroG())
+    if (m_movement_controller->zero_g())
       m_movement_controller->control_parameters(m_zeroGMovementParameters);
 
     if (isTeleporting()) {
@@ -2478,7 +2478,7 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
   m_pendingMoves.clear();
 
   if (isClient)
-    root().spatialLogger().log_poly("world", m_movement_controller->collisionBody(),
+    root().spatialLogger().log_poly("world", m_movement_controller->collision_body(),
                                     isMaster() ? Color::palette_orange.to_rgba() : Color::palette_yellow.to_rgba());
   return {};
 }
@@ -3628,7 +3628,7 @@ std::expected<void, StarException> Player::processStateChanges(float dt) {
     // we're doing and do some state transition logic
     State oldState = m_state;
 
-    if (m_movement_controller->zeroG()) {
+    if (m_movement_controller->zero_g()) {
       if (m_movement_controller->flying())
         m_state = State::Swim;
       else if (m_state != State::Lounge)
@@ -3674,7 +3674,7 @@ std::expected<void, StarException> Player::processStateChanges(float dt) {
           return std::unexpected(std::move(result.error()));
       }
 
-    if (!m_movement_controller->isNullColliding()) {
+    if (!m_movement_controller->is_null_colliding()) {
       if (oldState == State::Fall && oldState != m_state && m_state != State::Swim && m_state != State::SwimIdle
           && m_state != State::Jump) {
         {
@@ -4172,8 +4172,8 @@ std::expected<void, StarException> Player::moveTo(Vec2F const& footPosition) {
     return std::unexpected(std::move(offsetResult.error()));
   auto offset = std::move(*offsetResult);
   resetPresentation();
-  m_movement_controller->setPosition(footPosition - offset);
-  m_movement_controller->setVelocity(Vec2F());
+  m_movement_controller->set_position(footPosition - offset);
+  m_movement_controller->set_velocity(Vec2F());
   return {};
 }
 

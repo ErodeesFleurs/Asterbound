@@ -78,31 +78,31 @@ private:
   callbacks.remove_callback("setVelocity");
   if (auto result = callbacks.register_callback("setVelocity", [&self = *this](Vec2F const& velocity) {
     self.m_reset_path_move = true;
-    self.m_movement_controller->get().setVelocity(velocity);
+    self.m_movement_controller->get().set_velocity(velocity);
   }); !result)
     return std::unexpected(std::move(result.error()));
   callbacks.remove_callback("setXVelocity");
   if (auto result = callbacks.register_callback("setXVelocity", [&self = *this](float velocity) {
     self.m_reset_path_move = true;
-    self.m_movement_controller->get().setXVelocity(velocity);
+    self.m_movement_controller->get().set_x_velocity(velocity);
   }); !result)
     return std::unexpected(std::move(result.error()));
   callbacks.remove_callback("setYVelocity");
   if (auto result = callbacks.register_callback("setYVelocity", [&self = *this](float velocity) {
     self.m_reset_path_move = true;
-    self.m_movement_controller->get().setYVelocity(velocity);
+    self.m_movement_controller->get().set_y_velocity(velocity);
   }); !result)
     return std::unexpected(std::move(result.error()));
   callbacks.remove_callback("addMomentum");
   if (auto result = callbacks.register_callback("addMomentum", [&self = *this](Vec2F const& momentum) {
     self.m_reset_path_move = true;
-    self.m_movement_controller->get().addMomentum(momentum);
+    self.m_movement_controller->get().add_momentum(momentum);
   }); !result)
     return std::unexpected(std::move(result.error()));
   callbacks.remove_callback("setRotation");
   if (auto result = callbacks.register_callback("setRotation", [&self = *this](float rotation) {
     self.m_reset_path_move = true;
-    self.m_movement_controller->get().setRotation(rotation);
+    self.m_movement_controller->get().set_rotation(rotation);
   }); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = callbacks.register_callback("setAnchorState",
@@ -266,7 +266,7 @@ inline void LuaScriptMovement::set_auto_clear_controls(bool enabled) { m_auto_cl
     m_movement_controller->get().control_crouch();
   if (m_control_jump)
     m_movement_controller->get().control_jump(*m_control_jump);
-  if (m_control_hold_jump && !m_movement_controller->get().onGround())
+  if (m_control_hold_jump && !m_movement_controller->get().on_ground())
     m_movement_controller->get().control_jump();
   if (m_control_fly)
     m_movement_controller->get().control_fly(*m_control_fly);

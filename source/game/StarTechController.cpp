@@ -322,7 +322,7 @@ void TechController::setAimPosition(Vec2F const& aimPosition) {
 
 std::expected<void, StarException> TechController::tickMaster(float dt) {
   // if there's no gravity, fly instead of walking
-  if (m_movement_controller->get().zeroG()) {
+  if (m_movement_controller->get().zero_g()) {
     if (m_moveRight || m_moveLeft || m_moveUp || m_moveDown) {
       Vec2F flightControl = {0, 0};
 
@@ -344,7 +344,7 @@ std::expected<void, StarException> TechController::tickMaster(float dt) {
     if (m_moveJump && !m_moveDown)
       m_movement_controller->get().control_jump();
 
-    if (m_movement_controller->get().onGround() && m_moveDown && !m_moveJump)
+    if (m_movement_controller->get().on_ground() && m_moveDown && !m_moveJump)
       m_movement_controller->get().control_crouch();
     else if (m_moveDown)
       m_movement_controller->get().control_down();

@@ -367,7 +367,7 @@ const GameTestRegistration
       actor->init(world);
       auto uninit = make_scope_exit([&] { actor->uninit(); });
       Vec2F start = origin + Vec2F(0, 8.25f);
-      actor->setPosition(start);
+      actor->set_position(start);
       PathController controller(world);
       auto initial = controller.find_path(*actor, start + Vec2F(6, 0));
       ASSERT_TRUE(initial) << initial.error().what();
@@ -383,7 +383,7 @@ const GameTestRegistration
       ASSERT_FALSE(controller.pathfinding());
       EXPECT_EQ(controller.target_position(), start - Vec2F(6, 0));
       EXPECT_EQ(controller.current_action(), PlatformerAStar::Action::Fly);
-      actor->setVelocity(Vec2F(-8, 0));
+      actor->set_velocity(Vec2F(-8, 0));
       ASSERT_TRUE(controller.move(*actor, parameters, actor->base_modifiers(), false, 0.0f));
       // Same Fly action and source, different target: retaining the old timer
       // teleports half a tile left here. A new edge must begin exactly at t=0.
@@ -413,7 +413,7 @@ const GameTestRegistration actor_path_budget("PathController", "ActorCollectsOne
     auto uninit = make_scope_exit([&] { actor.uninit(); });
     Vec2F start = origin + Vec2F(0, 8.25f);
     Vec2F blocked = origin + Vec2F(2, 3.25f); // Inside the fixture's wall.
-    actor.setPosition(start);
+    actor.set_position(start);
     auto expect_step = [](auto result, std::optional<bool> expected) {
       ASSERT_TRUE(result) << result.error().what();
       EXPECT_EQ(*result, expected);
@@ -468,7 +468,7 @@ const GameTestRegistration lua_path_timing("PathController", "LuaObservesImmedia
     auto uninit = make_scope_exit([&] { actor.uninit(); });
     Vec2F start = origin + Vec2F(0, 8.25f);
     Vec2F blocked = origin + Vec2F(2, 3.25f);
-    actor.setPosition(start);
+    actor.set_position(start);
     LuaActorScript script(fixture.root());
     ASSERT_TRUE(script.add_actor_movement_callbacks(actor));
     ASSERT_TRUE(script.init(world));

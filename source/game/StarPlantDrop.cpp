@@ -156,7 +156,7 @@ if (!result362) return std::unexpected(std::move(result362.error()));
   m_spawnedDropEffects = false;
   m_time = 5000;
   m_description = description;
-  m_movement_controller->setPosition(position);
+  m_movement_controller->set_position(position);
   if (!upsideDown) {
     m_rotationRate = std::copysign(0.00001f, -strikeVector[0] + random);
     m_rotationFallThreshold = std::numbers::pi / (3 + random);
@@ -321,13 +321,13 @@ std::expected<void, StarException> PlantDrop::init(World& world, EntityId entity
 if (!result337) return std::unexpected(std::move(result337.error()));
   m_movement_controller->init(world);
 
-  PolyF collisionPoly = PolyF(RectF::with_center(m_collisionRect.center(), m_collisionRect.size() / 2.0f));
+  PolyF collision_poly = PolyF(RectF::with_center(m_collisionRect.center(), m_collisionRect.size() / 2.0f));
   MovementParameters parameters;
-  parameters.collisionPoly = collisionPoly;
-  parameters.ignorePlatformCollision = true;
-  parameters.gravityMultiplier = 0.2f;
+  parameters.collision_poly = collision_poly;
+  parameters.ignore_platform_collision = true;
+  parameters.gravity_multiplier = 0.2f;
   parameters.physics_effect_categories = StringSet({"plantdrop"});
-  auto result338 = m_movement_controller->applyParameters(parameters);
+  auto result338 = m_movement_controller->apply_parameters(parameters);
 if (!result338) return std::unexpected(std::move(result338.error()));
   return {};
 }
@@ -361,7 +361,7 @@ std::expected<void, StarException> PlantDrop::update(float dt, std::uint64_t) {
   capturePresentationRotation(m_movement_controller->rotation());
   m_time -= dt;
 
-  m_movement_controller->setTimestep(dt);
+  m_movement_controller->set_timestep(dt);
   if (isMaster()) {
     if (m_spawnedDropEffects && !m_spawnedDrops.get())
       m_spawnedDropEffects = false; // false positive assumption over already having done the effect
@@ -383,18 +383,18 @@ auto rotationAcceleration = 0.01f * std::move(*result308) * std::copysign(1.0f, 
     m_presentationRotationTravel = m_rotationRate * dt;
     m_movement_controller->rotate(m_rotationRate);
 
-    PolyF collisionPoly = PolyF(RectF::with_center(m_collisionRect.center(), m_collisionRect.size() / 2.0f));
+    PolyF collision_poly = PolyF(RectF::with_center(m_collisionRect.center(), m_collisionRect.size() / 2.0f));
 
     if (m_time > 0) {
       MovementParameters parameters;
-      parameters.collisionPoly = collisionPoly;
-      parameters.gravityEnabled = std::fabs(m_movement_controller->rotation()) >= m_rotationFallThreshold;
-      auto result309 = m_movement_controller->applyParameters(parameters);
+      parameters.collision_poly = collision_poly;
+      parameters.gravity_enabled = std::fabs(m_movement_controller->rotation()) >= m_rotationFallThreshold;
+      auto result309 = m_movement_controller->apply_parameters(parameters);
 if (!result309) return std::unexpected(std::move(result309.error()));
 
-      auto result310 = m_movement_controller->tickMaster(dt);
+      auto result310 = m_movement_controller->tick_master(dt);
 if (!result310) return std::unexpected(std::move(result310.error()));
-      if (m_movement_controller->onGround())
+      if (m_movement_controller->on_ground())
         m_time = 0;
     }
 
@@ -499,7 +499,7 @@ if (!result334) return std::unexpected(std::move(result334.error()));
     if (m_spawnedDrops.get())
       m_firstTick = false;
 
-    auto result335 = m_movement_controller->tickSlave(dt);
+    auto result335 = m_movement_controller->tick_slave(dt);
 if (!result335) return std::unexpected(std::move(result335.error()));
   }
   return {};

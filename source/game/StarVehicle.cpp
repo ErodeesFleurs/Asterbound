@@ -381,10 +381,10 @@ for (auto const& partPair : std::move(*result1083)) {
 if (!result1086) return std::unexpected(std::move(result1086.error()));
 auto result1087 = MovementParameters::create(std::move(*result1086));
 if (!result1087) return std::unexpected(std::move(result1087.error()));
-auto movementParameters = std::move(*result1087);
-  if (!movementParameters.physics_effect_categories)
-    movementParameters.physics_effect_categories = StringSet({"vehicle"});
-  auto result1088 = m_movement_controller->resetParameters(movementParameters);
+auto movement_parameters = std::move(*result1087);
+  if (!movement_parameters.physics_effect_categories)
+    movement_parameters.physics_effect_categories = StringSet({"vehicle"});
+  auto result1088 = m_movement_controller->reset_parameters(movement_parameters);
 if (!result1088) return std::unexpected(std::move(result1088.error()));
 
   auto result1089 = m_netGroup.add_net_element(m_interactive);
@@ -463,7 +463,7 @@ if (!result1273) return std::unexpected(std::move(result1273.error()));
 auto result1274 = m_scriptComponent.get_script_storage();
 if (!result1274) return std::unexpected(std::move(result1274.error()));
 return JsonObject{
-    {"movement", m_movement_controller->storeState()},
+    {"movement", m_movement_controller->store_state()},
     {"damageTeam", std::move(*result1273)},
     {"persistent", persistent()},
     {"scriptStorage", std::move(*result1274)}
@@ -473,7 +473,7 @@ return JsonObject{
 std::expected<void, StarException> Vehicle::diskLoad(Json diskStore) {
   auto result1266 = diskStore.get("movement");
 if (!result1266) return std::unexpected(std::move(result1266.error()));
-auto result1267 = m_movement_controller->loadState(std::move(*result1266));
+auto result1267 = m_movement_controller->load_state(std::move(*result1266));
 if (!result1267) return std::unexpected(std::move(result1267.error()));
   auto result1268 = diskStore.get("damageTeam");
 if (!result1268) return std::unexpected(std::move(result1268.error()));
@@ -501,7 +501,7 @@ ClientEntityMode Vehicle::client_entity_mode() const {
 std::expected<std::optional<HitType>, StarException> Vehicle::queryHit(DamageSource const& source) const {
   auto result1264 = world();
 if (!result1264) return std::unexpected(std::move(result1264.error()));
-auto result1265 = source.intersects_with_poly(result1264->get().geometry(), m_movement_controller->collisionBody());
+auto result1265 = source.intersects_with_poly(result1264->get().geometry(), m_movement_controller->collision_body());
 if (!result1265) return std::unexpected(std::move(result1265.error()));
 if (std::move(*result1265))
     return HitType::Hit;
@@ -510,7 +510,7 @@ if (std::move(*result1265))
 }
 
 std::expected<std::optional<PolyF>, StarException> Vehicle::hitPoly() const {
-  return m_movement_controller->collisionBody();
+  return m_movement_controller->collision_body();
 }
 
 std::expected<List<DamageNotification>, StarException> Vehicle::applyDamage(DamageRequest const& damage) {
@@ -532,7 +532,7 @@ std::expected<void, StarException> Vehicle::init(World& world, EntityId entityId
   auto result1241 = Entity::init(world, entityId, mode);
 if (!result1241) return std::unexpected(std::move(result1241.error()));
   m_movement_controller->init(world);
-  m_movement_controller->setIgnorePhysicsEntities({entityId});
+  m_movement_controller->set_ignore_physics_entities({entityId});
   if (isMaster()) {
     auto result1242 = makeVehicleCallbacks();
 if (!result1242) return std::unexpected(std::move(result1242.error()));
@@ -627,7 +627,7 @@ RectF Vehicle::meta_bound_box() const {
 }
 
 RectF Vehicle::collision_area() const {
-  return m_movement_controller->collisionPoly().bounding_box();
+  return m_movement_controller->collision_poly().bounding_box();
 }
 
 Vec2F Vehicle::velocity() const {
@@ -671,7 +671,7 @@ if (!result1203) return std::unexpected(std::move(result1203.error()));
   }
 
   if (isMaster()) {
-    auto result1204 = m_movement_controller->tickMaster(dt);
+    auto result1204 = m_movement_controller->tick_master(dt);
 if (!result1204) return std::unexpected(std::move(result1204.error()));
     auto result1205 = recover_lua_script_error(m_scriptComponent.update(m_scriptComponent.update_dt(dt)));
 if (!result1205) return std::unexpected(std::move(result1205.error()));
@@ -692,7 +692,7 @@ if (!result1205) return std::unexpected(std::move(result1205.error()));
     auto result1206 = m_netGroup.tick_net_interpolation(dt);
 if (!result1206) return std::unexpected(std::move(result1206.error()));
 
-    auto result1207 = m_movement_controller->tickSlave(dt);
+    auto result1207 = m_movement_controller->tick_slave(dt);
 if (!result1207) return std::unexpected(std::move(result1207.error()));
 
     bool heartbeat = m_slave_heartbeat_timer.wrap_tick(root().timing().time_step);
@@ -770,7 +770,7 @@ if (!result1224) return std::unexpected(std::move(result1224.error()));
   auto result1225 = world();
   if (!result1225) return std::unexpected(std::move(result1225.error()));
   if (result1225->get().isClient()) {
-    this->root().spatialLogger().log_poly("world", m_movement_controller->collisionBody(), {255, 255, 0, 255});
+    this->root().spatialLogger().log_poly("world", m_movement_controller->collision_body(), {255, 255, 0, 255});
   }
   return {};
 }
@@ -1181,7 +1181,7 @@ MovementController& Vehicle::movement_controller() {
 
 void Vehicle::setPosition(Vec2F const& position) {
   resetPresentation();
-  m_movement_controller->setPosition(position);
+  m_movement_controller->set_position(position);
 }
 
 EntityRenderLayer Vehicle::render_layer(VehicleLayer vehicle_layer) const {

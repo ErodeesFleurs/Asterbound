@@ -541,8 +541,8 @@ const GameTestRegistration transientMovementAnimation(
     parameters.collision_enabled = false;
     parameters.friction_enabled = false;
     ASSERT_TRUE(movement.update_base_parameters(parameters));
-    movement.setPosition(Vec2F(1024, 1024));
-    auto nativeCollisionPoly = movement.collisionPoly();
+    movement.set_position(Vec2F(1024, 1024));
+    auto nativeCollisionPoly = movement.collision_poly();
 
     // The real Lua callback rejects other humanoid states, not just unknown
     // names, and accepts nil. No fixture implementation stands in for it.
@@ -600,9 +600,9 @@ const GameTestRegistration transientMovementAnimation(
         EXPECT_EQ(remotes[i]->humanoid()->moving_backwards(), player.humanoid()->moving_backwards());
         EXPECT_EQ(remotes[i]->movement_controller().moving_direction(), networkDirection);
         EXPECT_NEAR(remotes[i]->movement_controller().rotation(), movement.rotation(), .011f);
-        EXPECT_FALSE(remotes[i]->movement_controller().onGround());
+        EXPECT_FALSE(remotes[i]->movement_controller().on_ground());
         EXPECT_FALSE(remotes[i]->movement_controller().crouching());
-        EXPECT_EQ(remotes[i]->movement_controller().collisionPoly(), nativeCollisionPoly);
+        EXPECT_EQ(remotes[i]->movement_controller().collision_poly(), nativeCollisionPoly);
         auto rendered = remotes[i]->humanoid()->render();
         ASSERT_TRUE(rendered) << rendered.error().what();
         EXPECT_FALSE(rendered->empty());
@@ -612,23 +612,23 @@ const GameTestRegistration transientMovementAnimation(
     std::array<std::string_view, 6> names{"idle", "walk", "run", "jump", "fall", "duck"};
     auto nativeDirection = movement.moving_direction();
     for (float rotation : {0.f, std::numbers::pi_v<float> / 2, std::numbers::pi_v<float>, -std::numbers::pi_v<float> / 2}) {
-      movement.setRotation(rotation);
+      movement.set_rotation(rotation);
       auto tangent = Vec2F::with_angle(rotation);
       for (std::size_t i = 0; i != states.size(); ++i) {
         player.setGenericProperty("poseFixture", Json(String(names[i])));
         for (auto facing : {Direction::Left, Direction::Right}) {
           for (auto direction : {Direction::Left, Direction::Right}) {
             movement.control_face(facing);
-            movement.setVelocity(tangent * (direction == Direction::Left ? -14.f : 14.f));
+            movement.set_velocity(tangent * (direction == Direction::Left ? -14.f : 14.f));
             ASSERT_TRUE(tick());
             EXPECT_EQ(player.humanoid()->state(), states[i]);
             EXPECT_EQ(player.humanoid()->facing_direction(), facing);
             EXPECT_EQ(player.humanoid()->moving_backwards(), facing != direction);
             EXPECT_EQ(movement.moving_direction(), nativeDirection);
-            EXPECT_FALSE(movement.onGround());
-            EXPECT_TRUE(movement.zeroG());
+            EXPECT_FALSE(movement.on_ground());
+            EXPECT_TRUE(movement.zero_g());
             EXPECT_FALSE(movement.crouching());
-            EXPECT_EQ(movement.collisionPoly(), nativeCollisionPoly);
+            EXPECT_EQ(movement.collision_poly(), nativeCollisionPoly);
             sync(states[i], direction);
             // Exercise Duck both on the existing incremental stream and a
             // complete legacy/current packet, without a new presentation field.
@@ -641,18 +641,18 @@ const GameTestRegistration transientMovementAnimation(
 
     // Native direction must keep updating underneath an active wire override.
     // In particular ceiling rightward motion has negative world-X velocity.
-    movement.setRotation(std::numbers::pi_v<float>);
+    movement.set_rotation(std::numbers::pi_v<float>);
     player.setGenericProperty("poseFixture", "run");
     for (auto direction : {Direction::Right, Direction::Left}) {
       movement.control_move(direction);
       movement.control_face(Direction::Right);
-      movement.setVelocity(Vec2F(-14.f, 0.f));
+      movement.set_velocity(Vec2F(-14.f, 0.f));
       ASSERT_TRUE(tick());
       EXPECT_EQ(movement.moving_direction(), direction);
       sync(Humanoid::Run, Direction::Right);
     }
     nativeDirection = movement.moving_direction();
-    movement.setVelocity(Vec2F());
+    movement.set_velocity(Vec2F());
     ASSERT_TRUE(tick());
     EXPECT_FALSE(player.humanoid()->moving_backwards());
     sync(Humanoid::Run, player.humanoid()->facing_direction());
@@ -689,7 +689,7 @@ const GameTestRegistration transientMovementAnimation(
     EXPECT_EQ(player.humanoid()->state(), Humanoid::SwimIdle);
     sync(Humanoid::SwimIdle, movement.moving_direction());
     player.setGenericProperty("poseFixture", "duck");
-    movement.setVelocity(Vec2F());
+    movement.set_velocity(Vec2F());
     movement.control_face(Direction::Right);
     ASSERT_TRUE(tick());
     sync(Humanoid::Duck, Direction::Right);

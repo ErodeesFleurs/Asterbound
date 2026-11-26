@@ -253,7 +253,7 @@ public:
   bool falling() const;
   bool can_jump() const;
   bool jumping() const;
-  // Slightly different than onGround, in that this is sustained for a few
+  // Slightly different than on_ground(), in that this is sustained for a few
   // extra frames of movement before it becomes false.
   bool ground_movement() const;
   bool liquid_movement() const;

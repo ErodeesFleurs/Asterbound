@@ -105,13 +105,13 @@ const GameTestRegistration drop_physics("ItemDrop", "TickRestoresDropPhysicsAfte
   if (!fixture.check(bool(drop.update(1.0f / 60, 1)), "advance drop before modifying controller")) return;
   auto& controller = drop.movement_controller();
   MovementParameters changed;
-  changed.gravityEnabled = false;
-  changed.collisionEnabled = false;
-  changed.maxMovementPerStep = 2.0f;
-  if (!fixture.check(bool(controller.applyParameters(changed)), "change live drop physics")) return;
+  changed.gravity_enabled = false;
+  changed.collision_enabled = false;
+  changed.max_movement_per_step = 2.0f;
+  if (!fixture.check(bool(controller.apply_parameters(changed)), "change live drop physics")) return;
   if (!fixture.check(bool(drop.update(1.0f / 60, 2)), "advance drop after controller change")) return;
   auto const& current = controller.parameters();
-  fixture.check(current.gravityEnabled == true && current.collisionEnabled == true && current.maxMovementPerStep == 2.0f,
+  fixture.check(current.gravity_enabled == true && current.collision_enabled == true && current.max_movement_per_step == 2.0f,
       "drop restores gravity and collision without resetting unrelated movement settings");
 });
 
@@ -302,7 +302,7 @@ const GameTestRegistration transient_snapshots("EntitySnapshot", "TransientState
 
     auto mobile = as<MobileEntity>(entity);
     ASSERT_TRUE(mobile);
-    mobile->movement_controller().setPosition(Vec2F(1035, 1041));
+    mobile->movement_controller().set_position(Vec2F(1035, 1041));
     auto movedSnapshot = snapshot(setup, entity->entityId());
     ASSERT_TRUE(movedSnapshot) << movedSnapshot.error().what();
     auto movedData = movedSnapshot->get("data");

@@ -228,10 +228,10 @@ if (!result12) return std::unexpected(std::move(result12.error()));
 if (!result13) return std::unexpected(std::move(result13.error()));
 auto result14 = ActorMovementParameters::create(json_merge(std::move(*result13)->default_movement_parameters(), m_npcVariant.movementParameters));
 if (!result14) return std::unexpected(std::move(result14.error()));
-auto movementParameters = std::move(*result14);
-  if (!movementParameters.physics_effect_categories)
-    movementParameters.physics_effect_categories = StringSet({"npc"});
-  auto result15 = ActorMovementController::create(this->root(), movementParameters);
+auto movement_parameters = std::move(*result14);
+  if (!movement_parameters.physics_effect_categories)
+    movement_parameters.physics_effect_categories = StringSet({"npc"});
+  auto result15 = ActorMovementController::create(this->root(), movement_parameters);
 if (!result15) return std::unexpected(std::move(result15.error()));
 m_movement_controller = std::move(*result15);
   m_identityUpdated = false;
@@ -478,7 +478,7 @@ std::expected<void, StarException> Npc::init(World& world, EntityId entityId, En
 if (!result80) return std::unexpected(std::move(result80.error()));
 
   m_movement_controller->init(world);
-  m_movement_controller->setIgnorePhysicsEntities({entityId});
+  m_movement_controller->set_ignore_physics_entities({entityId});
   auto result81 = m_statusController->init(*this, *m_movement_controller);
 if (!result81) return std::unexpected(std::move(result81.error()));
 
@@ -736,7 +736,7 @@ std::expected<Vec2F, StarException> Npc::legsArmorOffset() const {
 }
 
 RectF Npc::collision_area() const {
-  return m_movement_controller->collisionPoly().bounding_box();
+  return m_movement_controller->collision_poly().bounding_box();
 }
 
 std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Npc::write_net_state(std::uint64_t fromVersion, NetCompatibilityRules rules) {
@@ -752,10 +752,10 @@ std::expected<std::pair<ByteArray, std::uint64_t>, StarException> Npc::write_net
   if (condition166) {
       if (auto mode = entityMode()) {
         if (auto owner = connection_for_entity(entityId()); *mode == EntityMode::Master && owner && *owner != server_connection_id) {
-          PolyF poly = m_movement_controller->collisionPoly();
-          m_movement_controller->setCollisionPoly({ { 0.0f, -3.402823466e+38F }});
+          PolyF poly = m_movement_controller->collision_poly();
+          m_movement_controller->set_collision_poly({ { 0.0f, -3.402823466e+38F }});
           auto result = m_netGroup.write_net_state(fromVersion, rules);
-          m_movement_controller->setCollisionPoly(poly);
+          m_movement_controller->set_collision_poly(poly);
           return result;
         }
       }
@@ -803,7 +803,7 @@ std::expected<std::optional<HitType>, StarException> Npc::queryHit(DamageSource 
   {
   auto result169 = world();
   if (!result169) return std::unexpected(std::move(result169.error()));
-  auto result170 = source.intersects_with_poly(result169->get().geometry(), m_movement_controller->collisionBody());
+  auto result170 = source.intersects_with_poly(result169->get().geometry(), m_movement_controller->collision_body());
   if (!result170) return std::unexpected(std::move(result170.error()));
   if (std::move(*result170))
       return HitType::Hit;
@@ -813,7 +813,7 @@ std::expected<std::optional<HitType>, StarException> Npc::queryHit(DamageSource 
 }
 
 std::expected<std::optional<PolyF>, StarException> Npc::hitPoly() const {
-  return m_movement_controller->collisionBody();
+  return m_movement_controller->collision_body();
 }
 
 std::expected<List<DamageNotification>, StarException> Npc::applyDamage(DamageRequest const& damage) {
@@ -920,7 +920,7 @@ std::expected<void, StarException> Npc::update(float dt, std::uint64_t) {
   if (!inWorld())
     return {};
 
-  m_movement_controller->setTimestep(dt);
+  m_movement_controller->set_timestep(dt);
 
   if (isMaster()) {
     auto result185 = recover_lua_script_error(m_scriptComponent.update(m_scriptComponent.update_dt(dt)));
@@ -1054,7 +1054,7 @@ if (!result208) return std::unexpected(std::move(result208.error()));
 
 }
       } else if (m_movement_controller->liquid_movement()) {
-        if (std::abs(m_movement_controller->xVelocity()) > 0)
+        if (std::abs(m_movement_controller->x_velocity()) > 0)
           {
   auto result217 = humanoid();
   if (!result217) return std::unexpected(std::move(result217.error()));
@@ -1071,7 +1071,7 @@ if (!result208) return std::unexpected(std::move(result208.error()));
 
 }
       } else {
-        if (m_movement_controller->yVelocity() > 0)
+        if (m_movement_controller->y_velocity() > 0)
           {
   auto result221 = humanoid();
   if (!result221) return std::unexpected(std::move(result221.error()));
@@ -1141,7 +1141,7 @@ if (!result235) return std::unexpected(std::move(result235.error()));
   auto result236 = world();
   if (!result236) return std::unexpected(std::move(result236.error()));
   if (result236->get().isClient())
-    this->root().spatialLogger().log_poly("world", m_movement_controller->collisionBody(), {0, 255, 0, 255});
+    this->root().spatialLogger().log_poly("world", m_movement_controller->collision_body(), {0, 255, 0, 255});
 }
   return {};
 }
@@ -1260,7 +1260,7 @@ std::expected<void, StarException> Npc::render_light_sources(RenderCallback& ren
 
 void Npc::setPosition(Vec2F const& pos) {
   resetPresentation();
-  m_movement_controller->setPosition(pos);
+  m_movement_controller->set_position(pos);
 }
 
 std::expected<float, StarException> Npc::maxHealth() const {
@@ -2238,7 +2238,7 @@ std::expected<InteractAction, StarException> Npc::interact(InteractRequest const
 }
 
 RectF Npc::interactiveBoundBox() const {
-  return m_movement_controller->collisionPoly().bounding_box();
+  return m_movement_controller->collision_poly().bounding_box();
 }
 
 std::optional<EntityAnchorState> Npc::loungingIn() const {
@@ -2546,7 +2546,7 @@ auto damageSources = std::move(*result515);
     condition518 = static_cast<bool>(!std::move(*result517));
   }
   if (condition518) {
-        auto result519 = config.set("poly", json_from_polyf(m_movement_controller->collisionPoly()));
+        auto result519 = config.set("poly", json_from_polyf(m_movement_controller->collision_poly()));
   if (!result519) return std::unexpected(std::move(result519.error()));
   config = std::move(*result519);
       }
