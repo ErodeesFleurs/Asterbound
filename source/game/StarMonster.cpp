@@ -279,7 +279,7 @@ if (!result26) return std::unexpected(std::move(result26.error()));
 m_drop_pool = std::move(*result26);
   auto result27 = diskStore.get("effectEmitter");
 if (!result27) return std::unexpected(std::move(result27.error()));
-auto result28 = m_effect_emitter->fromJson(std::move(*result27));
+auto result28 = m_effect_emitter->from_json(std::move(*result27));
 if (!result28) return std::unexpected(std::move(result28.error()));
 
   auto result29 = diskStore.get_object("scriptStorage");
@@ -311,7 +311,7 @@ std::expected<Json, StarException> Monster::diskStore() const {
 if (!result35) return std::unexpected(std::move(result35.error()));
 auto result36 = m_status_controller->diskStore();
 if (!result36) return std::unexpected(std::move(result36.error()));
-auto result37 = m_effect_emitter->toJson();
+auto result37 = m_effect_emitter->to_json();
 if (!result37) return std::unexpected(std::move(result37.error()));
 auto result38 = this->root().monster_database();
 if (!result38) return std::unexpected(std::move(result38.error()));
@@ -1067,7 +1067,7 @@ if (!result162) return std::unexpected(std::move(result162.error()));
   auto result163 = render_callback.add_audios(m_status_controller->pullNewAudios());
 if (!result163) return std::unexpected(std::move(result163.error()));
 
-  auto result164 = m_effect_emitter->collectRenderEvents(render_callback);
+  auto result164 = m_effect_emitter->collect_render_events(render_callback);
 if (!result164) return std::unexpected(std::move(result164.error()));
   auto result166 = render_callback.add_audios(m_scripted_animator.pull_new_audios());
 if (!result166) return std::unexpected(std::move(result166.error()));
@@ -1165,10 +1165,10 @@ Vec2F Monster::absolute_position(Vec2F relative_position) const {
 
 std::expected<void, StarException> Monster::update_status(float dt) {
   auto origin = position();
-  m_effect_emitter->setSourcePosition("normal", origin);
-  m_effect_emitter->setSourcePosition("mouth", origin + mouth_offset());
-  m_effect_emitter->setSourcePosition("feet", origin + feet_offset());
-  m_effect_emitter->setDirection(m_movement_controller->facing_direction());
+  m_effect_emitter->set_source_position("normal", origin);
+  m_effect_emitter->set_source_position("mouth", origin + mouth_offset());
+  m_effect_emitter->set_source_position("feet", origin + feet_offset());
+  m_effect_emitter->set_direction(m_movement_controller->facing_direction());
   return m_effect_emitter->tick(dt, *entityMode());
 }
 

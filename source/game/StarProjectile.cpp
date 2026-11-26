@@ -539,7 +539,7 @@ std::expected<void, StarException> Projectile::update(float dt, std::uint64_t) {
     if (m_timeToLive < 0)
       m_timeToLive = 0;
 
-    m_effectEmitter->addEffectSources("normal", m_config->emitters);
+    m_effectEmitter->add_effect_sources("normal", m_config->emitters);
 
     if (m_referenceVelocity)
       m_movement_controller->setVelocity(m_movement_controller->velocity() - *m_referenceVelocity);
@@ -659,7 +659,7 @@ if (!result900) return std::unexpected(std::move(result900.error()));
   if (m_persistentAudio)
     m_persistentAudio->set_position(position());
 
-  auto result901 = m_effectEmitter->collectRenderEvents(render_callback);
+  auto result901 = m_effectEmitter->collect_render_events(render_callback);
 if (!result901) return std::unexpected(std::move(result901.error()));
 
   return {};
@@ -731,7 +731,7 @@ void Projectile::setReferenceVelocity(std::optional<Vec2F> const& velocity) {
   m_movement_controller->setVelocity(m_movement_controller->velocity() - m_referenceVelocity.value_or(Vec2F{}));
   m_referenceVelocity = velocity;
   m_movement_controller->setVelocity(m_movement_controller->velocity() + velocity.value_or(Vec2F{}));
-  m_effectEmitter->setBaseVelocity(velocity.value_or(Vec2F{}));
+  m_effectEmitter->set_base_velocity(velocity.value_or(Vec2F{}));
 }
 
 float Projectile::initialSpeed() const {
@@ -1581,8 +1581,8 @@ std::expected<void, StarException> Projectile::tickShared(float dt) {
   m_animationTimer += dt;
   setFrame(getFrame());
 
-  m_effectEmitter->setSourcePosition("normal", position());
-  m_effectEmitter->setDirection(get_angle_side(m_movement_controller->rotation(), true).second);
+  m_effectEmitter->set_source_position("normal", position());
+  m_effectEmitter->set_direction(get_angle_side(m_movement_controller->rotation(), true).second);
   auto result719 = m_effectEmitter->tick(dt, *entityMode());
 if (!result719) return std::unexpected(std::move(result719.error()));
 

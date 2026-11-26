@@ -287,7 +287,7 @@ std::expected<void, StarException> ToolUser::append_light_sources(List<LightSour
     if (auto item = as<EffectSourceItem>(entry.second)) {
       auto sources = item->effectSources();
       if (!sources) return std::unexpected(std::move(sources.error()));
-      emitter.addEffectSources(entry.first, std::move(*sources));
+      emitter.add_effect_sources(entry.first, std::move(*sources));
     }
   }
   return {};

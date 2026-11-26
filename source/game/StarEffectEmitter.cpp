@@ -130,41 +130,41 @@ EffectEmitter::~EffectEmitter() = default;
 
 std::expected<std::shared_ptr<EffectEmitter>, StarException> EffectEmitter::create(Root& root) {
   auto emitter = std::shared_ptr<EffectEmitter>(new EffectEmitter(root));
-  auto registered = emitter->add_net_element(emitter->m_activeSources);
+  auto registered = emitter->add_net_element(emitter->m_active_sources);
   if (!registered)
     return std::unexpected(std::move(registered.error()));
   return emitter;
 }
 
-void EffectEmitter::addEffectSources(String const& position, StringSet const& effectSources) {
-  for (auto const& name : effectSources)
-    m_newSources.emplace(position, name);
+void EffectEmitter::add_effect_sources(String const& position, StringSet const& effect_sources) {
+  for (auto const& name : effect_sources)
+    m_new_sources.emplace(position, name);
 }
 
-void EffectEmitter::setSourcePosition(String name, Vec2F const& position) {
+void EffectEmitter::set_source_position(String name, Vec2F const& position) {
   m_positions[std::move(name)] = position;
 }
 
-void EffectEmitter::setDirection(Direction direction) {
+void EffectEmitter::set_direction(Direction direction) {
   m_direction = direction;
 }
 
-void EffectEmitter::setBaseVelocity(Vec2F const& velocity) {
-  m_baseVelocity = velocity;
+void EffectEmitter::set_base_velocity(Vec2F const& velocity) {
+  m_base_velocity = velocity;
 }
 
 std::expected<void, StarException> EffectEmitter::tick(float dt, EntityMode mode) {
   if (mode == EntityMode::Master) {
-    if (m_activeSources.get() != m_newSources)
-      m_activeSources.push(std::move(m_newSources));
-    m_newSources.clear();
-  } else if (!m_newSources.empty()) {
+    if (m_active_sources.get() != m_new_sources)
+      m_active_sources.push(std::move(m_new_sources));
+    m_new_sources.clear();
+  } else if (!m_new_sources.empty()) {
     return std::unexpected(StarException("EffectEmitters can only be added to the master entity."));
   }
-  if (!m_collectsEvents)
+  if (!m_collects_events)
     return {};
 
-  if (m_activeSources.pull_updated())
+  if (m_active_sources.pull_updated())
     m_reconcile = true;
   bool expired = false;
   for (auto const& running : m_sources) {
@@ -194,8 +194,8 @@ std::expected<void, StarException> EffectEmitter::reconcile_sources() {
     String const& spelling;
   };
   List<Request> ordered;
-  ordered.reserve(m_activeSources.get().size());
-  for (auto const& [position, name] : m_activeSources.get()) {
+  ordered.reserve(m_active_sources.get().size());
+  for (auto const& [position, name] : m_active_sources.get()) {
     auto kind = name.to_lower();
     if (!kind)
       return std::unexpected(std::move(kind.error()));
@@ -237,12 +237,12 @@ void EffectEmitter::reset() {
   m_pending_events.reset();
   m_reconcile = true;
   m_sources.clear();
-  m_newSources.clear();
-  m_activeSources.set({});
+  m_new_sources.clear();
+  m_active_sources.set({});
 }
 
-std::expected<void, StarException> EffectEmitter::collectRenderEvents(RenderCallback& render_callback) {
-  m_collectsEvents = true;
+std::expected<void, StarException> EffectEmitter::collect_render_events(RenderCallback& render_callback) {
+  m_collects_events = true;
   std::shared_ptr<ParticleDatabase const> database;
   if (m_pending_events) {
     auto submitted = m_pending_events->submit(m_root, render_callback, database);
@@ -256,7 +256,7 @@ std::expected<void, StarException> EffectEmitter::collectRenderEvents(RenderCall
       return std::unexpected(std::move(position.error()));
     if (!source->has_pending_events())
       continue;
-    PendingEvents batch{*source, source->take_stages(), position->get(), m_baseVelocity, m_direction};
+    PendingEvents batch{*source, source->take_stages(), position->get(), m_base_velocity, m_direction};
     auto submitted = batch.submit(m_root, render_callback, database);
     if (!submitted) {
       m_pending_events = std::make_unique<PendingEvents>(std::move(batch));
@@ -266,8 +266,8 @@ std::expected<void, StarException> EffectEmitter::collectRenderEvents(RenderCall
   return {};
 }
 
-std::expected<Json, StarException> EffectEmitter::toJson() const {
-  auto sources = json_from_set<Set<std::pair<String, String>>>(m_activeSources.get(),
+std::expected<Json, StarException> EffectEmitter::to_json() const {
+  auto sources = json_from_set<Set<std::pair<String, String>>>(m_active_sources.get(),
       [](std::pair<String, String> const& entry) {
         return JsonObject{{"position", entry.first}, {"source", entry.second}};
       });
@@ -276,8 +276,8 @@ std::expected<Json, StarException> EffectEmitter::toJson() const {
   return JsonObject{{"activeSources", std::move(*sources)}};
 }
 
-std::expected<void, StarException> EffectEmitter::fromJson(Json const& diskStore) {
-  auto config = diskStore.get("activeSources");
+std::expected<void, StarException> EffectEmitter::from_json(Json const& disk_store) {
+  auto config = disk_store.get("activeSources");
   if (!config)
     return std::unexpected(std::move(config.error()));
   auto sources = json_to_set<Set<std::pair<String, String>>>(*config,
@@ -292,7 +292,7 @@ std::expected<void, StarException> EffectEmitter::fromJson(Json const& diskStore
       });
   if (!sources)
     return std::unexpected(std::move(sources.error()));
-  m_activeSources.set(std::move(*sources));
+  m_active_sources.set(std::move(*sources));
   return {};
 }
 

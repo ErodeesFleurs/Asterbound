@@ -349,7 +349,7 @@ m_damageOnTouch.set(std::move(*result48));
 
   auto result49 = diskStore.get("effectEmitter");
 if (!result49) return std::unexpected(std::move(result49.error()));
-auto result50 = m_effectEmitter->fromJson(std::move(*result49));
+auto result50 = m_effectEmitter->from_json(std::move(*result49));
 if (!result50) return std::unexpected(std::move(result50.error()));
 
 
@@ -430,7 +430,7 @@ if (!result74) return std::unexpected(std::move(result74.error()));
 if (!humanoid_emote_names) return std::unexpected(humanoid_emote_names.error());
 auto result75 = humanoid_emote_names->get_right(std::move(*result74)->emote_state());
 if (!result75) return std::unexpected(std::move(result75.error()));
-auto result76 = m_effectEmitter->toJson();
+auto result76 = m_effectEmitter->to_json();
 if (!result76) return std::unexpected(std::move(result76.error()));
 auto result77 = m_scriptComponent.get_script_storage();
 if (!result77) return std::unexpected(std::move(result77.error()));
@@ -953,7 +953,7 @@ if (!result185) return std::unexpected(std::move(result185.error()));
       auto result190 = m_statusController->setPersistentEffects("lounging", loungeAnchor->get().statusEffects);
 if (!result190) return std::unexpected(std::move(result190.error()));
 
-      m_effectEmitter->addEffectSources("normal", loungeAnchor->get().effectEmitters);
+      m_effectEmitter->add_effect_sources("normal", loungeAnchor->get().effectEmitters);
       switch (loungeAnchor->get().orientation) {
         case LoungeOrientation::Sit:
           {
@@ -1166,7 +1166,7 @@ if (!result251) return std::unexpected(std::move(result251.error()));
   if (!splash) return std::unexpected(std::move(splash.error()));
   if (auto submitted = render_callback.add_particles(std::move(*splash)); !submitted)
     return std::unexpected(std::move(submitted.error()));
-  auto result261 = m_effectEmitter->collectRenderEvents(render_callback);
+  auto result261 = m_effectEmitter->collect_render_events(render_callback);
 if (!result261) return std::unexpected(std::move(result261.error()));
 
   auto result262 = m_songbook->collectRenderEvents(render_callback);
@@ -1340,29 +1340,29 @@ auto result268 = m_songbook->update(*entityMode(), result267->get());
 if (!result268) return std::unexpected(std::move(result268.error()));
 
 
-  m_effectEmitter->setSourcePosition("normal", position());
+  m_effectEmitter->set_source_position("normal", position());
   auto result269 = mouthOffset(true);
 if (!result269) return std::unexpected(std::move(result269.error()));
-m_effectEmitter->setSourcePosition("mouth", position() + std::move(*result269));
+m_effectEmitter->set_source_position("mouth", position() + std::move(*result269));
   auto result270 = feetOffset();
 if (!result270) return std::unexpected(std::move(result270.error()));
-m_effectEmitter->setSourcePosition("feet", position() + std::move(*result270));
+m_effectEmitter->set_source_position("feet", position() + std::move(*result270));
   auto result271 = headArmorOffset();
 if (!result271) return std::unexpected(std::move(result271.error()));
-m_effectEmitter->setSourcePosition("headArmor", std::move(*result271) + position());
+m_effectEmitter->set_source_position("headArmor", std::move(*result271) + position());
   auto result272 = chestArmorOffset();
 if (!result272) return std::unexpected(std::move(result272.error()));
-m_effectEmitter->setSourcePosition("chestArmor", std::move(*result272) + position());
+m_effectEmitter->set_source_position("chestArmor", std::move(*result272) + position());
   auto result273 = legsArmorOffset();
 if (!result273) return std::unexpected(std::move(result273.error()));
-m_effectEmitter->setSourcePosition("legsArmor", std::move(*result273) + position());
+m_effectEmitter->set_source_position("legsArmor", std::move(*result273) + position());
   auto result274 = backArmorOffset();
 if (!result274) return std::unexpected(std::move(result274.error()));
-m_effectEmitter->setSourcePosition("backArmor", std::move(*result274) + position());
+m_effectEmitter->set_source_position("backArmor", std::move(*result274) + position());
 
   auto result275 = humanoid();
 if (!result275) return std::unexpected(std::move(result275.error()));
-m_effectEmitter->setDirection(std::move(*result275)->facing_direction());
+m_effectEmitter->set_direction(std::move(*result275)->facing_direction());
   auto result276 = m_effectEmitter->tick(dt, *entityMode());
 if (!result276) return std::unexpected(std::move(result276.error()));
 
@@ -2491,7 +2491,7 @@ std::expected<void, StarException> Npc::interact(InteractAction) {
 }
 
 std::expected<void, StarException> Npc::addEffectEmitters(StringSet const& emitters) {
-  m_effectEmitter->addEffectSources("normal", emitters);
+  m_effectEmitter->add_effect_sources("normal", emitters);
   return {};
 }
 

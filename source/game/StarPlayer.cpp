@@ -2351,50 +2351,50 @@ std::expected<void, StarException> Player::update(float dt, std::uint64_t) {
       return std::unexpected(std::move(result.error()));
   }
 
-  m_effectEmitter->setSourcePosition("normal", position());
+  m_effectEmitter->set_source_position("normal", position());
   auto mouthOffsetResult = mouthOffset(true);
   if (!mouthOffsetResult)
     return std::unexpected(std::move(mouthOffsetResult.error()));
   auto mouthOffset = std::move(*mouthOffsetResult);
-  m_effectEmitter->setSourcePosition("mouth", mouthOffset + position());
+  m_effectEmitter->set_source_position("mouth", mouthOffset + position());
   auto feetOffsetResult = feetOffset();
   if (!feetOffsetResult)
     return std::unexpected(std::move(feetOffsetResult.error()));
   auto feetOffset = std::move(*feetOffsetResult);
-  m_effectEmitter->setSourcePosition("feet", feetOffset + position());
+  m_effectEmitter->set_source_position("feet", feetOffset + position());
   auto headArmorOffsetResult = headArmorOffset();
   if (!headArmorOffsetResult)
     return std::unexpected(std::move(headArmorOffsetResult.error()));
   auto headArmorOffset = std::move(*headArmorOffsetResult);
-  m_effectEmitter->setSourcePosition("headArmor", headArmorOffset + position());
+  m_effectEmitter->set_source_position("headArmor", headArmorOffset + position());
   auto chestArmorOffsetResult = chestArmorOffset();
   if (!chestArmorOffsetResult)
     return std::unexpected(std::move(chestArmorOffsetResult.error()));
   auto chestArmorOffset = std::move(*chestArmorOffsetResult);
-  m_effectEmitter->setSourcePosition("chestArmor", chestArmorOffset + position());
+  m_effectEmitter->set_source_position("chestArmor", chestArmorOffset + position());
   auto legsArmorOffsetResult = legsArmorOffset();
   if (!legsArmorOffsetResult)
     return std::unexpected(std::move(legsArmorOffsetResult.error()));
   auto legsArmorOffset = std::move(*legsArmorOffsetResult);
-  m_effectEmitter->setSourcePosition("legsArmor", legsArmorOffset + position());
+  m_effectEmitter->set_source_position("legsArmor", legsArmorOffset + position());
   auto backArmorOffsetResult = backArmorOffset();
   if (!backArmorOffsetResult)
     return std::unexpected(std::move(backArmorOffsetResult.error()));
   auto backArmorOffset = std::move(*backArmorOffsetResult);
-  m_effectEmitter->setSourcePosition("backArmor", backArmorOffset + position());
+  m_effectEmitter->set_source_position("backArmor", backArmorOffset + position());
 
   auto primary_offset_result = hand_position(ToolHand::Primary);
   if (!primary_offset_result)
     return std::unexpected(std::move(primary_offset_result.error()));
   auto primary_offset = std::move(*primary_offset_result);
-  m_effectEmitter->setSourcePosition("primary", primary_offset + position());
+  m_effectEmitter->set_source_position("primary", primary_offset + position());
   auto alt_offset_result = hand_position(ToolHand::Alt);
   if (!alt_offset_result)
     return std::unexpected(std::move(alt_offset_result.error()));
   auto alt_offset = std::move(*alt_offset_result);
-  m_effectEmitter->setSourcePosition("alt", alt_offset + position());
+  m_effectEmitter->set_source_position("alt", alt_offset + position());
 
-  m_effectEmitter->setDirection(facingDirection);
+  m_effectEmitter->set_direction(facingDirection);
 
   {
     if (auto result = m_effectEmitter->tick(dt, *entityMode()); !result)
@@ -2604,7 +2604,7 @@ std::expected<void, StarException> Player::collectRenderEvents(RenderCallback& c
     return std::unexpected(std::move(result.error()));
   if (auto result = m_tools->collectRenderEvents(render_callback); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = m_effectEmitter->collectRenderEvents(render_callback); !result)
+  if (auto result = m_effectEmitter->collect_render_events(render_callback); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = m_songbook->collectRenderEvents(render_callback); !result)
     return std::unexpected(std::move(result.error()));
@@ -4542,7 +4542,7 @@ std::expected<void, StarException> Player::addEffectEmitters(StringSet const& em
   if constexpr (Star::debug_enabled) {
     Star::star_assert_failed((!isSlave()));
   }
-  m_effectEmitter->addEffectSources("normal", emitters);
+  m_effectEmitter->add_effect_sources("normal", emitters);
   return {};
 }
 

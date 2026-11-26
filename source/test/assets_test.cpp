@@ -2037,13 +2037,13 @@ const GameTestRegistration effect_identity_wire("EffectSourceTest", "CanonicalRu
   ASSERT_TRUE(master);
   ASSERT_TRUE(slave);
   EffectEventSink sink;
-  ASSERT_TRUE((*master)->collectRenderEvents(sink));
-  ASSERT_TRUE((*slave)->collectRenderEvents(sink));
-  (*master)->addEffectSources("hand", {"SPARK", "spark"});
+  ASSERT_TRUE((*master)->collect_render_events(sink));
+  ASSERT_TRUE((*slave)->collect_render_events(sink));
+  (*master)->add_effect_sources("hand", {"SPARK", "spark"});
   ASSERT_TRUE((*master)->tick(0, EntityMode::Master));
   auto disk = Json::parse(R"({"activeSources":[{"position":"hand","source":"SPARK"},{"position":"hand","source":"spark"}]})");
   ASSERT_TRUE(disk);
-  EXPECT_EQ((*master)->toJson(), *disk);
+  EXPECT_EQ((*master)->to_json(), *disk);
   Set<std::pair<String, String>> const raw{{"hand", "SPARK"}, {"hand", "spark"}};
   DataStreamBuffer packet, legacy;
   ASSERT_TRUE(legacy << raw);
@@ -2052,34 +2052,34 @@ const GameTestRegistration effect_identity_wire("EffectSourceTest", "CanonicalRu
   ASSERT_TRUE(packet.seek(0));
   ASSERT_TRUE((*slave)->net_load(packet, {}));
   ASSERT_TRUE((*slave)->tick(0, EntityMode::Slave));
-  EXPECT_FALSE((*slave)->collectRenderEvents(sink)); // Position errors still precede event work.
-  (*slave)->setSourcePosition("hand", {1, 2});
-  ASSERT_TRUE((*slave)->collectRenderEvents(sink)); // Pure audio must not load the invalid particle DB.
+  EXPECT_FALSE((*slave)->collect_render_events(sink)); // Position errors still precede event work.
+  (*slave)->set_source_position("hand", {1, 2});
+  ASSERT_TRUE((*slave)->collect_render_events(sink)); // Pure audio must not load the invalid particle DB.
   ASSERT_EQ(sink.accepted, "a");
   for (auto const& spelling : StringList{"sParK", "spark", "SPARK"}) {
     Json updated = JsonObject{{"activeSources", JsonArray{JsonObject{{"position", "hand"}, {"source", spelling}}}}};
-    ASSERT_TRUE((*slave)->fromJson(updated));
+    ASSERT_TRUE((*slave)->from_json(updated));
     ASSERT_TRUE((*slave)->tick(0, EntityMode::Slave));
-    ASSERT_TRUE((*slave)->collectRenderEvents(sink));
-    EXPECT_EQ((*slave)->toJson(), updated);
+    ASSERT_TRUE((*slave)->collect_render_events(sink));
+    EXPECT_EQ((*slave)->to_json(), updated);
     EXPECT_EQ(sink.accepted, "a");
   }
   // Expiry, unlike a mere case change, must restart a still-requested one-shot.
   (*master)->reset();
-  (*master)->setSourcePosition("hand", {5, 6});
+  (*master)->set_source_position("hand", {5, 6});
   for (std::size_t frame = 0; frame != 5; ++frame) {
-    (*master)->addEffectSources("hand", {"PULSE"});
+    (*master)->add_effect_sources("hand", {"PULSE"});
     ASSERT_TRUE((*master)->tick(0, EntityMode::Master));
-    ASSERT_TRUE((*master)->collectRenderEvents(sink));
+    ASSERT_TRUE((*master)->collect_render_events(sink));
   }
   EXPECT_EQ(sink.accepted, "aaaa"); // start, final, start, final, start
 
   // A failed reconciliation is retried even with an unchanged network field.
   (*master)->reset();
   for (std::size_t frame = 0; frame != 2; ++frame) {
-    (*master)->addEffectSources("hand", {"Spark", "unknown"});
+    (*master)->add_effect_sources("hand", {"Spark", "unknown"});
     EXPECT_FALSE((*master)->tick(0, EntityMode::Master));
-    ASSERT_TRUE((*master)->collectRenderEvents(sink));
+    ASSERT_TRUE((*master)->collect_render_events(sink));
     EXPECT_EQ(sink.accepted, "aaaaa");
   }
 });
@@ -2105,20 +2105,20 @@ const GameTestRegistration effect_emission_retry("EffectSourceTest", "RetriesOnl
     auto emitter = EffectEmitter::create(**root);
     ASSERT_TRUE(emitter);
     EffectEventSink sink;
-    ASSERT_TRUE((*emitter)->collectRenderEvents(sink));
-    (*emitter)->setSourcePosition("a", {5, 6});
-    (*emitter)->setSourcePosition("b", {7, 8});
-    (*emitter)->addEffectSources("a", {"burst"});
-    (*emitter)->addEffectSources("b", {"BURST"});
+    ASSERT_TRUE((*emitter)->collect_render_events(sink));
+    (*emitter)->set_source_position("a", {5, 6});
+    (*emitter)->set_source_position("b", {7, 8});
+    (*emitter)->add_effect_sources("a", {"burst"});
+    (*emitter)->add_effect_sources("b", {"BURST"});
     ASSERT_TRUE((*emitter)->tick(0, EntityMode::Master));
     sink.fail_at = failure;
-    auto result = (*emitter)->collectRenderEvents(sink);
+    auto result = (*emitter)->collect_render_events(sink);
     if (failure) {
       ASSERT_FALSE(result);
       ASSERT_EQ(sink.accepted.size(), *failure);
       auto particle_index = sink.particles.size();
       auto audio_index = sink.sounds.size();
-      ASSERT_TRUE((*emitter)->collectRenderEvents(sink));
+      ASSERT_TRUE((*emitter)->collect_render_events(sink));
       if (sink.rejected_particle) {
         ASSERT_LT(particle_index, sink.particles.size());
         EXPECT_EQ(sink.particles[particle_index], *sink.rejected_particle);
@@ -2131,7 +2131,7 @@ const GameTestRegistration effect_emission_retry("EffectSourceTest", "RetriesOnl
       ASSERT_TRUE(result) << result.error().what();
     }
     ASSERT_EQ(sink.accepted, "ppaappaa");
-    ASSERT_TRUE((*emitter)->collectRenderEvents(sink));
+    ASSERT_TRUE((*emitter)->collect_render_events(sink));
     ASSERT_EQ(sink.accepted, "ppaappaa");
     auto next = (*root)->random().next_u64();
     if (!failure) {
@@ -2149,7 +2149,7 @@ const GameTestRegistration effect_emission_retry("EffectSourceTest", "RetriesOnl
     }
     for (std::size_t frame = 0; frame < 2; ++frame) {
       ASSERT_TRUE((*emitter)->tick(0, EntityMode::Master));
-      ASSERT_TRUE((*emitter)->collectRenderEvents(sink));
+      ASSERT_TRUE((*emitter)->collect_render_events(sink));
     }
     std::array<std::int16_t, 8> samples;
     ASSERT_TRUE(mixer.read(samples, samples.size()));
@@ -2160,17 +2160,17 @@ const GameTestRegistration effect_emission_retry("EffectSourceTest", "RetriesOnl
   auto emitter = EffectEmitter::create(**root);
   ASSERT_TRUE(emitter);
   EffectEventSink sink;
-  ASSERT_TRUE((*emitter)->collectRenderEvents(sink));
-  (*emitter)->setSourcePosition("a", {0, 0});
-  (*emitter)->addEffectSources("a", {"burst"});
+  ASSERT_TRUE((*emitter)->collect_render_events(sink));
+  (*emitter)->set_source_position("a", {0, 0});
+  (*emitter)->add_effect_sources("a", {"burst"});
   ASSERT_TRUE((*emitter)->tick(0, EntityMode::Master));
   sink.fail_at = 1;
-  ASSERT_FALSE((*emitter)->collectRenderEvents(sink));
+  ASSERT_FALSE((*emitter)->collect_render_events(sink));
   (*emitter)->reset();
-  (*emitter)->setSourcePosition("a", {100, 100});
-  (*emitter)->addEffectSources("a", {"burst"});
+  (*emitter)->set_source_position("a", {100, 100});
+  (*emitter)->add_effect_sources("a", {"burst"});
   ASSERT_TRUE((*emitter)->tick(0, EntityMode::Master));
-  ASSERT_TRUE((*emitter)->collectRenderEvents(sink));
+  ASSERT_TRUE((*emitter)->collect_render_events(sink));
   EXPECT_EQ(sink.accepted, "pppaa");
   ASSERT_EQ(sink.particles.size(), 3u);
   EXPECT_GT(sink.particles[1][0], 98);
@@ -2190,21 +2190,21 @@ const GameTestRegistration effect_audio_repair("EffectSourceTest", "AudioRepairR
   auto emitter = EffectEmitter::create(**root);
   ASSERT_TRUE(emitter);
   EffectEventSink sink;
-  ASSERT_TRUE((*emitter)->collectRenderEvents(sink));
-  (*emitter)->setSourcePosition("hand", {2, 3});
-  (*emitter)->addEffectSources("hand", {"Burst"});
+  ASSERT_TRUE((*emitter)->collect_render_events(sink));
+  (*emitter)->set_source_position("hand", {2, 3});
+  (*emitter)->add_effect_sources("hand", {"Burst"});
   ASSERT_TRUE((*emitter)->tick(0, EntityMode::Master));
-  ASSERT_FALSE((*emitter)->collectRenderEvents(sink));
+  ASSERT_FALSE((*emitter)->collect_render_events(sink));
   ASSERT_EQ(sink.accepted, "p");
-  (*emitter)->setSourcePosition("hand", {12, 13});
-  (*emitter)->addEffectSources("hand", {"BURST"});
+  (*emitter)->set_source_position("hand", {12, 13});
+  (*emitter)->add_effect_sources("hand", {"BURST"});
   ASSERT_TRUE((*emitter)->tick(2, EntityMode::Master));
   auto assets = (*root)->assets();
   ASSERT_TRUE(assets);
   auto wave = std::bit_cast<std::array<char, pcm_test_wave.size()>>(pcm_test_wave);
   ASSERT_TRUE(File::write_file(std::span<char const>(wave), File::relative_to(*directory, "assets/broken.wav")));
   (*assets)->hot_reload();
-  auto resumed = (*emitter)->collectRenderEvents(sink);
+  auto resumed = (*emitter)->collect_render_events(sink);
   ASSERT_TRUE(resumed) << resumed.error().what();
   EXPECT_EQ(sink.accepted, "paap");
   EXPECT_EQ(sink.particles, (List<Vec2F>{{2, 3}, {12, 13}}));

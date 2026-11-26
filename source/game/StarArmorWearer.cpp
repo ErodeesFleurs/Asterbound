@@ -167,7 +167,7 @@ std::expected<void, StarException> ArmorWearer::effects(EffectEmitter& effect_em
   // Do not emit a partial tick if a later item's virtual query fails.
   for (std::size_t i = 0; i != groups.size(); ++i)
     if (!groups[i].empty())
-      effect_emitter.addEffectSources(positions[i], std::move(groups[i]));
+      effect_emitter.add_effect_sources(positions[i], std::move(groups[i]));
   return {};
 }
 

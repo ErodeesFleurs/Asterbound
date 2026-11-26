@@ -23,18 +23,18 @@ public:
   [[nodiscard]] static std::expected<std::shared_ptr<EffectEmitter>, StarException> create(Root& root);
   ~EffectEmitter() override;
 
-  void addEffectSources(String const& position, StringSet const& effectSources);
-  void setSourcePosition(String name, Vec2F const& position);
-  void setDirection(Direction direction);
-  void setBaseVelocity(Vec2F const& velocity);
+  void add_effect_sources(String const& position, StringSet const& effect_sources);
+  void set_source_position(String name, Vec2F const& position);
+  void set_direction(Direction direction);
+  void set_base_velocity(Vec2F const& velocity);
 
   [[nodiscard]] std::expected<void, StarException> tick(float dt, EntityMode mode);
   void reset();
 
-  [[nodiscard]] std::expected<void, StarException> collectRenderEvents(RenderCallback& render_callback);
+  [[nodiscard]] std::expected<void, StarException> collect_render_events(RenderCallback& render_callback);
 
-  [[nodiscard]] std::expected<Json, StarException> toJson() const;
-  [[nodiscard]] std::expected<void, StarException> fromJson(Json const& diskStore);
+  [[nodiscard]] std::expected<Json, StarException> to_json() const;
+  [[nodiscard]] std::expected<void, StarException> from_json(Json const& disk_store);
 
 private:
   explicit EffectEmitter(Root& root);
@@ -46,17 +46,17 @@ private:
   struct PendingEvents;
   [[nodiscard]] std::expected<void, StarException> reconcile_sources();
   Root& m_root;
-  Set<SourceKey> m_newSources;
+  Set<SourceKey> m_new_sources;
   List<RunningSource> m_sources;
-  NetElementData<Set<SourceKey>> m_activeSources;
+  NetElementData<Set<SourceKey>> m_active_sources;
   std::unique_ptr<PendingEvents> m_pending_events;
   bool m_reconcile = true;
 
   StringMap<Vec2F> m_positions;
   Direction m_direction = Direction::Right;
-  Vec2F m_baseVelocity;
+  Vec2F m_base_velocity;
 
-  bool m_collectsEvents = false;
+  bool m_collects_events = false;
 };
 
 }
