@@ -140,7 +140,9 @@ Returns an array of status effects applied by the given liquid.
 
 #### `String` root.generateName(`String` assetPath, [`unsigned` seed])
 
-Returns a randomly generated name using the specified name gen config and seed.
+Generates a name from the specified rules asset. An explicit seed uses a private random stream; omitting it draws a seed from the game's random stream. If all 100 candidates are empty or rejected by the profanity filter, the call reports an error instead of returning the last rejected candidate.
+
+A single Markov walk allows up to 4096 transitions after the initial prefix. A name may finish on that last transition; a rule that requires another transition reports an error.
 
 ---
 

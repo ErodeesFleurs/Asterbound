@@ -174,7 +174,7 @@ public:
   [[nodiscard]] std::expected<std::shared_ptr<VehicleDatabase const>, StarException> vehicleDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<PlayerFactory const>, StarException> playerFactory();
   [[nodiscard]] std::expected<std::shared_ptr<EntityFactory const>, StarException> entityFactory();
-  [[nodiscard]] std::expected<std::shared_ptr<PatternedNameGenerator const>, StarException> nameGenerator();
+  [[nodiscard]] std::expected<std::shared_ptr<PatternedNameGenerator const>, StarException> name_generator();
   [[nodiscard]] std::expected<std::shared_ptr<ItemDatabase const>, StarException> itemDatabase();
   [[nodiscard]] std::expected<std::shared_ptr<MaterialDatabase const>, StarException> material_database();
   [[nodiscard]] std::expected<std::shared_ptr<TerrainDatabase const>, StarException> terrainDatabase();
@@ -306,8 +306,8 @@ private:
   std::shared_ptr<EntityFactory> m_entityFactory;
   std::mutex m_entityFactoryMutex;
 
-  std::shared_ptr<PatternedNameGenerator> m_nameGenerator;
-  std::mutex m_nameGeneratorMutex;
+  std::shared_ptr<PatternedNameGenerator> m_name_generator;
+  std::mutex m_name_generator_mutex;
 
   std::shared_ptr<ItemDatabase> m_itemDatabase;
   std::mutex m_itemDatabaseMutex;

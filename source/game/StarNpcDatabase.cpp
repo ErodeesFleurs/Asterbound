@@ -223,32 +223,30 @@ auto result19 = json_merge(result.humanoid_parameters, std::move(*result18)).to_
 if (!result19) return std::unexpected(std::move(result19.error()));
 variant.humanoid_parameters = std::move(*result19);
 
-  {
-  auto result20 = config.contains("npcname");
-  if (!result20) return std::unexpected(std::move(result20.error()));
-  if (std::move(*result20))
-      {
-    auto result21 = config.get_string("npcname");
-    if (!result21) return std::unexpected(std::move(result21.error()));
-    identity.name = std::move(*result21);
+  auto has_explicit_name = config.contains("npcname");
+  if (!has_explicit_name) return std::unexpected(std::move(has_explicit_name.error()));
+  if (*has_explicit_name) {
+    auto name = config.get_string("npcname");
+    if (!name) return std::unexpected(std::move(name.error()));
+    identity.name = std::move(*name);
+  } else {
+    auto has_name_gen = config.contains("nameGen");
+    if (!has_name_gen) return std::unexpected(std::move(has_name_gen.error()));
+    if (*has_name_gen) {
+      auto generator = m_root.name_generator();
+      if (!generator) return std::unexpected(std::move(generator.error()));
+      auto rules = config.get("nameGen");
+      if (!rules) return std::unexpected(std::move(rules.error()));
+      auto rules_by_gender = json_to_string_list(*rules);
+      if (!rules_by_gender) return std::unexpected(std::move(rules_by_gender.error()));
+      auto gender_index = static_cast<std::size_t>(identity.gender);
+      if (gender_index >= rules_by_gender->size())
+        return std::unexpected(NpcException::format("NPC type '{}' nameGen has no entry for gender index {}", typeName, gender_index));
+      auto name = (*generator)->generate_name((*rules_by_gender)[gender_index], randSource);
+      if (!name) return std::unexpected(std::move(name.error()));
+      identity.name = std::move(*name);
+    }
   }
-    else {
-    auto result22 = config.contains("nameGen");
-    if (!result22) return std::unexpected(std::move(result22.error()));
-    if (std::move(*result22)) {
-        auto result23 = m_root.nameGenerator();
-    if (!result23) return std::unexpected(std::move(result23.error()));
-    auto result24 = config.get("nameGen");
-    if (!result24) return std::unexpected(std::move(result24.error()));
-    auto result25 = json_to_string_list(std::move(*result24));
-    if (!result25) return std::unexpected(std::move(result25.error()));
-    auto result26 =
-      std::move(*result23)->generateName(std::move(*result25)[static_cast<int>(identity.gender)], randSource);
-    if (!result26) return std::unexpected(std::move(result26.error()));
-    identity.name = std::move(*result26);
-      }
-  }
-}
   // we're going to kinda end up doing this twice just to make sure it ends up generating with the right personality array
   // its dumb that personality is the only identity value that isn't in the customization screen but comes from the humanoid config
   // therefore we have to do this little dance here for the npcs that get unique humanoid configs, which is silly since if they

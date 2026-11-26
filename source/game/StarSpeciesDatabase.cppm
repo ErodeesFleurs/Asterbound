@@ -98,7 +98,7 @@ public:
   SpeciesOption const& options() const;
   [[nodiscard]] std::expected<Json, StarException> humanoid_config() const;
   List<Personality> const& personalities() const;
-  String nameGen(Gender gender) const;
+  String const& name_gen(Gender gender) const;
   String ouchNoise(Gender gender) const;
   List<ItemDescriptor> defaultItems() const;
   List<ItemDescriptor> defaultBlueprints() const;
@@ -120,7 +120,7 @@ private:
   String m_humanoid_config;
   Json m_humanoid_overrides;
   List<Personality> m_personalities;
-  List<String> m_nameGen;
+  List<String> m_name_gen;
   List<String> m_ouchNoises;
   SpeciesOption m_options;
   List<ItemDescriptor> m_defaultItems;

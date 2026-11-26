@@ -405,7 +405,7 @@ std::expected<void, StarException> Root::reload() {
     std::lock_guard functionDatabaseLock(m_functionDatabaseMutex);
     std::lock_guard image_metadata_database_lock(m_image_metadata_database_mutex);
     std::lock_guard tenantDatabaseLock(m_tenantDatabaseMutex);
-    std::lock_guard nameGeneratorLock(m_nameGeneratorMutex);
+    std::lock_guard name_generator_lock(m_name_generator_mutex);
     std::lock_guard dance_database_lock(m_dance_database_mutex);
     std::lock_guard spawnTypeDatabaseLock(m_spawnTypeDatabaseMutex);
     std::lock_guard radioMessageDatabaseLock(m_radioMessageDatabaseMutex);
@@ -452,7 +452,7 @@ std::expected<void, StarException> Root::reload() {
     m_functionDatabase.reset();
     m_image_metadata_database.reset();
     m_tenantDatabase.reset();
-    m_nameGenerator.reset();
+    m_name_generator.reset();
     m_dance_database.reset();
     m_dance_database_generation.fetch_add(1, std::memory_order_relaxed);
     m_spawnTypeDatabase.reset();
@@ -510,7 +510,7 @@ std::expected<void, StarException> Root::fullyLoad() {
   add(&Root::functionDatabase);
   add(&Root::image_metadata_database);
   add(&Root::tenantDatabase);
-  add(&Root::nameGenerator);
+  add(&Root::name_generator);
   add(&Root::dance_database);
   add(&Root::spawnTypeDatabase);
   add(&Root::radioMessageDatabase);
@@ -776,8 +776,8 @@ std::expected<std::shared_ptr<EntityFactory const>, StarException> Root::entityF
   return loadMember(m_entityFactory, m_entityFactoryMutex, "EntityFactory", *this);
 }
 
-std::expected<std::shared_ptr<PatternedNameGenerator const>, StarException> Root::nameGenerator() {
-  return loadMember(m_nameGenerator, m_nameGeneratorMutex, "NameGenerator", *this);
+std::expected<std::shared_ptr<PatternedNameGenerator const>, StarException> Root::name_generator() {
+  return loadMember(m_name_generator, m_name_generator_mutex, "NameGenerator", *this);
 }
 
 std::expected<std::shared_ptr<ItemDatabase const>, StarException> Root::itemDatabase() {

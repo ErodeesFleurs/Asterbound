@@ -71,6 +71,8 @@ import star.player_log;
 import star.radio_message_database;
 import star.npc;
 import star.npc_database;
+import star.name_generator;
+import star.species_database;
 import star.item_descriptor;
 import star.plant_database;
 import star.quest_template_database;
@@ -538,7 +540,7 @@ const GameTestRegistration rootAll("RootTest", "All", [](GameTest& fixture) {
     ASSERT_NO_FATAL_FAILURE(expectCatalog("npcDatabase", root.npcDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("playerFactory", root.playerFactory()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("entityFactory", root.entityFactory()));
-    ASSERT_NO_FATAL_FAILURE(expectCatalog("nameGenerator", root.nameGenerator()));
+    ASSERT_NO_FATAL_FAILURE(expectCatalog("nameGenerator", root.name_generator()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("itemDatabase", root.itemDatabase()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("materialDatabase", root.material_database()));
     ASSERT_NO_FATAL_FAILURE(expectCatalog("terrainDatabase", root.terrainDatabase()));
@@ -715,6 +717,49 @@ const GameTestRegistration liquid_config_binding("LiquidsDatabaseTest", "LuaLook
     return root.liquidName(id) == "water"
   )LUA");
   fixture.check(checked && *checked, checked ? "liquid name round-trip" : checked.error().what());
+});
+
+const GameTestRegistration lua_name_seed("NameGeneratorConsumerTest", "LuaSeedOnlyDrawsFromRootWhenOmitted", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto settings = isolationSettings(fixture.rootSettings(), *directory, "lua-name-seed");
+  ASSERT_TRUE(settings) << settings.error().what();
+  auto created = Root::create(std::move(*settings));
+  ASSERT_TRUE(created) << created.error().what();
+  auto& root = **created;
+  auto species = root.speciesDatabase();
+  ASSERT_TRUE(species) << species.error().what();
+  auto human = (*species)->species("human");
+  ASSERT_TRUE(human) << human.error().what();
+  auto generator = root.name_generator();
+  ASSERT_TRUE(generator) << generator.error().what();
+  auto lua = isolationLua(root);
+  ASSERT_TRUE(lua) << lua.error().what();
+  auto context = (*lua)->create_context(StringList{});
+  ASSERT_TRUE(context) << context.error().what();
+
+  auto const& rules = (*human)->name_gen(Gender::Male);
+  constexpr std::uint64_t global_seed = 31097;
+  RandomService reference(global_seed);
+  root.random().seed(global_seed);
+  auto seeded = context->eval<String>(R"LUA(
+    return root.generateName(root.assetJson("/species/human.species").nameGen[1], 0)
+  )LUA");
+  auto expected_seeded = (*generator)->generate_name(rules, std::uint64_t{0});
+  ASSERT_TRUE(seeded) << seeded.error().what();
+  ASSERT_TRUE(expected_seeded) << expected_seeded.error().what();
+  EXPECT_EQ(*seeded, *expected_seeded);
+  EXPECT_EQ(root.random().next_u64(), reference.next_u64());
+
+  auto unseeded = context->eval<String>(R"LUA(
+    return root.generateName(root.assetJson("/species/human.species").nameGen[1])
+  )LUA");
+  auto expected_unseeded = (*generator)->generate_name(rules, reference.next_u64());
+  ASSERT_TRUE(unseeded) << unseeded.error().what();
+  ASSERT_TRUE(expected_unseeded) << expected_unseeded.error().what();
+  EXPECT_EQ(*unseeded, *expected_unseeded);
+  EXPECT_EQ(root.random().next_u64(), reference.next_u64());
 });
 
 const GameTestRegistration material_config_binding("MaterialDatabaseTest", "LuaLookupDistinguishesRealAndMetaAssets", [](GameTest& fixture) {
@@ -2191,6 +2236,70 @@ const GameTestRegistration bushShapeBoundaries("RootTest", "BushShapeBoundaries"
   EXPECT_TRUE(variant->shapes[1].mods.empty());
   for (auto const& name : {"borrowed-null-selection", "borrowed-invalid-base", "borrowed-null-shape"})
     EXPECT_FALSE((*database)->buildBushVariant(String(std::string_view(name)), 0.0f, "flower", 0.0f));
+});
+
+const GameTestRegistration gender_name_rules("NameGeneratorConsumerTest", "SpeciesAndNpcUseTheirOwnGenderRules", [](GameTest& fixture) {
+  auto directory = File::temporary_directory(fixture.root().random());
+  ASSERT_TRUE(directory) << directory.error().what();
+  auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
+  auto settings = isolationSettings(fixture.rootSettings(), *directory, "gender-name-rules");
+  ASSERT_TRUE(settings) << settings.error().what();
+  auto overlay = File::relative_to(*directory, "assets");
+  ASSERT_TRUE(File::create_directory(File::relative_to(overlay, "species")));
+  auto written = writeIsolationModules(overlay, {
+    {"species/human.species.patch",
+     R"([{"op":"replace","path":"/nameGen","value":["/species-male-fixture.namegen","/species-female-fixture.namegen"]}])"},
+    {"species-male-fixture.namegen", R"([{"mode":"serie"},"SpeciesMaleFixture"])"},
+    {"species-female-fixture.namegen", R"([{"mode":"serie"},"SpeciesFemaleFixture"])"},
+    {"npc-male-fixture.namegen", R"([{"mode":"serie"},"NpcMaleFixture"])"},
+    {"npc-female-fixture.namegen", R"([{"mode":"serie"},"NpcFemaleFixture"])"},
+  });
+  ASSERT_TRUE(written) << written.error().what();
+  auto root = Root::create(std::move(*settings));
+  ASSERT_TRUE(root) << root.error().what();
+  auto species = (*root)->speciesDatabase();
+  ASSERT_TRUE(species) << species.error().what();
+  auto npcs = (*root)->npcDatabase();
+  ASSERT_TRUE(npcs) << npcs.error().what();
+
+  auto generate_npc = [&](std::uint64_t seed, JsonObject overrides) {
+    return (*npcs)->generateNpcVariant("human", "villager", 1.0f, seed, std::move(overrides));
+  };
+  constexpr std::uint64_t male_seed = 1;
+  constexpr std::uint64_t female_seed = 0;
+  JsonArray full_rules{"/npc-male-fixture.namegen", "/npc-female-fixture.namegen"};
+  for (auto gender : {Gender::Male, Gender::Female}) {
+    bool male = gender == Gender::Male;
+    // Force the species gender opposite to the one selected by this seed.
+    auto humanoid = (*species)->generate_humanoid("human", male ? female_seed : male_seed, gender);
+    ASSERT_TRUE(humanoid) << humanoid.error().what();
+    EXPECT_EQ(humanoid->identity.gender, gender);
+    EXPECT_EQ(humanoid->identity.name, std::string_view(male ? "SpeciesMaleFixture" : "SpeciesFemaleFixture"));
+
+    auto npc = generate_npc(male ? male_seed : female_seed, JsonObject{{"nameGen", full_rules}});
+    ASSERT_TRUE(npc) << npc.error().what();
+    EXPECT_EQ(npc->humanoid_identity.gender, gender);
+    EXPECT_EQ(npc->humanoid_identity.name, std::string_view(male ? "NpcMaleFixture" : "NpcFemaleFixture"));
+  }
+
+  JsonArray male_only{"/npc-male-fixture.namegen"};
+  auto male_npc = generate_npc(male_seed, JsonObject{{"nameGen", male_only}, {"identity", JsonObject{{"gender", "female"}}}});
+  ASSERT_TRUE(male_npc) << male_npc.error().what();
+  EXPECT_EQ(male_npc->humanoid_identity.gender, Gender::Female);
+  EXPECT_EQ(male_npc->humanoid_identity.name, "NpcMaleFixture");
+
+  auto missing_female = generate_npc(female_seed, JsonObject{{"nameGen", male_only}});
+  ASSERT_FALSE(missing_female);
+  EXPECT_TRUE(missing_female.error().is<NpcException>());
+  EXPECT_NE(std::string_view(missing_female.error().what()).find("gender index 1"), std::string_view::npos);
+  auto missing_male = generate_npc(male_seed, JsonObject{{"nameGen", JsonArray{}}});
+  ASSERT_FALSE(missing_male);
+  EXPECT_TRUE(missing_male.error().is<NpcException>());
+  EXPECT_NE(std::string_view(missing_male.error().what()).find("gender index 0"), std::string_view::npos);
+
+  auto literal = generate_npc(female_seed, JsonObject{{"npcname", "LiteralFixture"}, {"nameGen", JsonArray{}}});
+  ASSERT_TRUE(literal) << literal.error().what();
+  EXPECT_EQ(literal->humanoid_identity.name, "LiteralFixture");
 });
 
 const GameTestRegistration npcEquipmentBoundaries("RootTest", "NpcEquipmentBoundaries", [](GameTest& fixture) {

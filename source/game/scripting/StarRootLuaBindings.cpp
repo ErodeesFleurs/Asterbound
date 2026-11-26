@@ -168,7 +168,7 @@ namespace Star::LuaBindings {
     [[nodiscard]] std::expected<Json, StarException> tenantConfig(Root& root, String const& tenantName);
     [[nodiscard]] std::expected<JsonArray, StarException> getMatchingTenants(Root& root, StringMap<unsigned> const& colonyTags);
     [[nodiscard]] std::expected<Json, StarException> liquid_status_effects(Root& root, LiquidId liquid_id);
-    [[nodiscard]] std::expected<String, StarException> generateName(Root& root, String const& rulesAsset, std::optional<std::uint64_t> seed);
+    [[nodiscard]] std::expected<String, StarException> generate_name(Root& root, String const& rules_asset, std::optional<std::uint64_t> seed);
     [[nodiscard]] std::expected<Json, StarException> questConfig(Root& root, String const& templateId);
     [[nodiscard]] std::expected<JsonArray, StarException> npcPortrait(Root& root, std::optional<std::reference_wrapper<ItemDatabase const>> itemCatalog,
         String const& portraitMode,
@@ -374,7 +374,7 @@ std::expected<LuaCallbacks, StarException> LuaBindings::makeRootCallbacks(Root& 
           .register_callback_with_signature<std::expected<String, StarException>, String, std::optional<std::uint64_t>>(
             "generateName",
             [&root](String const& rules, std::optional<std::uint64_t> seed) {
-              return RootCallbacks::generateName(root, rules, seed);
+              return RootCallbacks::generate_name(root, rules, seed);
             });
       !r)
     return std::unexpected(std::move(r.error()));
@@ -1059,10 +1059,12 @@ std::expected<Json, StarException> LuaBindings::RootCallbacks::liquid_status_eff
   return Json();
 }
 
-std::expected<String, StarException> LuaBindings::RootCallbacks::generateName(Root& root, String const& rulesAsset, std::optional<std::uint64_t> seed) {
-  auto generator = root.nameGenerator();
+std::expected<String, StarException> LuaBindings::RootCallbacks::generate_name(Root& root, String const& rules_asset, std::optional<std::uint64_t> seed) {
+  auto generator = root.name_generator();
   if (!generator) return std::unexpected(std::move(generator.error()));
-  return (*generator)->generateName(rulesAsset, seed.value_or(root.random().next_u64()));
+  if (seed)
+    return (*generator)->generate_name(rules_asset, *seed);
+  return (*generator)->generate_name(rules_asset);
 }
 
 std::expected<Json, StarException> LuaBindings::RootCallbacks::questConfig(Root& root, String const& templateId) {

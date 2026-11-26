@@ -692,10 +692,10 @@ std::expected<std::shared_ptr<SystemObject>, StarException> SystemObject::create
   auto object = std::shared_ptr<SystemObject>(new SystemObject(root, std::move(config), std::move(uuid), position, spawnTime, std::move(parameters)));
   for (auto const& entry : object->m_config.generatedParameters) {
     if (!object->m_parameters.contains(entry.first)) {
-      auto generator = root.nameGenerator();
+      auto generator = root.name_generator();
       if (!generator)
         return std::unexpected(std::move(generator.error()));
-      auto name = (*generator)->generateName(entry.second);
+      auto name = (*generator)->generate_name(entry.second);
       if (!name)
         return std::unexpected(std::move(name.error()));
       object->m_parameters[entry.first] = std::move(*name);

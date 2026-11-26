@@ -304,9 +304,9 @@ std::expected<CharacterCreationResult, StarException> SpeciesDatabase::generate_
   auto definition = species(species_choice);
   if (!definition) return std::unexpected(std::move(definition.error()));
   auto chosen_gender = gender.value_or(rand_source.next_bool() ? Gender::Male : Gender::Female);
-  auto generator = m_root.nameGenerator();
+  auto generator = m_root.name_generator();
   if (!generator) return std::unexpected(std::move(generator.error()));
-  auto name = (*generator)->generateName((*definition)->nameGen(chosen_gender), rand_source);
+  auto name = (*generator)->generate_name((*definition)->name_gen(chosen_gender), rand_source);
   if (!name) return std::unexpected(std::move(name.error()));
   return create_humanoid(std::move(*name), species_choice, static_cast<unsigned>(chosen_gender), rand_source.next_u32(),
                         rand_source.next_u32(), rand_source.next_u32(), rand_source.next_u32(), rand_source.next_u32(),
@@ -357,9 +357,9 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
   m_tooltip.description = std::move(*description);
   auto names = config.get("nameGen");
   if (!names) return std::unexpected(std::move(names.error()));
-  auto nameList = json_to_string_list(*names);
-  if (!nameList) return std::unexpected(std::move(nameList.error()));
-  m_nameGen = std::move(*nameList);
+  auto name_list = json_to_string_list(*names);
+  if (!name_list) return std::unexpected(std::move(name_list.error()));
+  m_name_gen = std::move(*name_list);
   auto labels = readStrings("charGenTextLabels", JsonArray{}, m_charGenTextLabels);
   if (!labels) return std::unexpected(std::move(labels.error()));
   auto skull = config.get_string("skull", "/humanoid/any/dead.png");
@@ -370,10 +370,10 @@ std::expected<void, StarException> SpeciesDefinition::init(Json const& config) {
   auto noiseList = json_to_string_list(*noises);
   if (!noiseList) return std::unexpected(std::move(noiseList.error()));
   m_ouchNoises = std::move(*noiseList);
-  if (m_nameGen.size() < gender_names.size() || m_ouchNoises.size() < gender_names.size())
+  if (m_name_gen.size() < gender_names.size() || m_ouchNoises.size() < gender_names.size())
     return std::unexpected(
       StarException::format("Species '{}' must have at least {} nameGen and {} ouchNoises entries, has {} and {}",
-                            m_kind, gender_names.size(), gender_names.size(), m_nameGen.size(), m_ouchNoises.size()));
+                            m_kind, gender_names.size(), gender_names.size(), m_name_gen.size(), m_ouchNoises.size()));
   auto items = config.get_array("defaultItems", JsonArray{});
   if (!items) return std::unexpected(std::move(items.error()));
   for (auto const& value : *items) {
@@ -518,7 +518,7 @@ String SpeciesDefinition::kind() const {
   return m_kind;
 }
 
-String SpeciesDefinition::nameGen(Gender gender) const { return m_nameGen[static_cast<unsigned>(gender)]; }
+String const& SpeciesDefinition::name_gen(Gender gender) const { return m_name_gen[static_cast<std::size_t>(gender)]; }
 
 String SpeciesDefinition::ouchNoise(Gender gender) const { return m_ouchNoises[static_cast<unsigned>(gender)]; }
 

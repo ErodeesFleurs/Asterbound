@@ -239,7 +239,7 @@ std::expected<void, StarException> CharCreationPane::init(
       return std::unexpected(std::move(result.error()));
     if (auto result = randomize(); !result)
       return std::unexpected(std::move(result.error()));
-    return randomizeName();
+    return randomize_name();
   });
   for (auto const& [callback, member, increment, clothing] : {
       std::tuple{std::string_view("mainSkinColor.up"), &CharCreationPane::m_bodyColor, true, false},
@@ -275,7 +275,7 @@ std::expected<void, StarException> CharCreationPane::init(
     });
   }
   guiReader.registerCallback("toggleClothing", [this](Widget&) { return changed(); });
-  guiReader.registerCallback("randomName", [this](Widget&) { return randomizeName(); });
+  guiReader.registerCallback("randomName", [this](Widget&) { return randomize_name(); });
   guiReader.registerCallback("randomize", [this](Widget&) { return randomize(); });
   guiReader.registerCallback("name", [this](Widget& object) { return nameBoxCallback(object); });
   guiReader.registerCallback("species", [this](Widget& widget) -> std::expected<void, StarException> {
@@ -287,7 +287,7 @@ std::expected<void, StarException> CharCreationPane::init(
       m_speciesChoice = choice;
       if (auto result = randomize(); !result)
         return std::unexpected(std::move(result.error()));
-      return randomizeName();
+      return randomize_name();
     }
     return {};
   });
@@ -318,7 +318,7 @@ std::expected<void, StarException> CharCreationPane::init(
   m_modeChoice = 1;
   if (auto result = randomize(); !result)
     return std::unexpected(std::move(result.error()));
-  return randomizeName();
+  return randomize_name();
 }
 
 std::expected<void, StarException> CharCreationPane::createPlayer() {
@@ -395,28 +395,29 @@ std::expected<bool, StarException> CharCreationPane::sendEvent(InputEvent const&
   return Pane::sendEvent(event);
 }
 
-std::expected<void, StarException> CharCreationPane::randomizeName() {
+std::expected<void, StarException> CharCreationPane::randomize_name() {
   auto database = context().root().speciesDatabase();
   if (!database)
     return std::unexpected(std::move(database.error()));
   auto species = (*database)->species(m_speciesList[m_speciesChoice]);
   if (!species)
     return std::unexpected(std::move(species.error()));
-  auto textBox = requireChild<TextBoxWidget>("name");
-  if (!textBox)
-    return std::unexpected(std::move(textBox.error()));
-  auto genderOption = (*species)->options().genderOptions.wrap(m_genderChoice);
-  if (!genderOption)
-    return std::unexpected(std::move(genderOption.error()));
-  auto generator = context().root().nameGenerator();
+  auto text_box = requireChild<TextBoxWidget>("name");
+  if (!text_box)
+    return std::unexpected(std::move(text_box.error()));
+  auto gender_option = (*species)->options().genderOptions.wrap(m_genderChoice);
+  if (!gender_option)
+    return std::unexpected(std::move(gender_option.error()));
+  auto generator = context().root().name_generator();
   if (!generator)
     return std::unexpected(std::move(generator.error()));
+  auto const& rules = (*species)->name_gen(gender_option->get().gender);
   int limiter = 100;
   while (true) {
-    auto name = (*generator)->generateName((*species)->nameGen(genderOption->get().gender));
+    auto name = (*generator)->generate_name(rules);
     if (!name)
       return std::unexpected(std::move(name.error()));
-    auto accepted = (*textBox)->setText(*name);
+    auto accepted = (*text_box)->setText(*name);
     if (!accepted)
       return std::unexpected(std::move(accepted.error()));
     if (*accepted || limiter == 0)

@@ -71,7 +71,7 @@ public:
   [[nodiscard]] static std::expected<std::shared_ptr<CharCreationPane>, StarException> create(GuiContext& guiContext, std::function<std::expected<void, StarException>(std::shared_ptr<Player>)> requestCloseFunc);
 
   [[nodiscard]] std::expected<void, StarException> randomize();
-  [[nodiscard]] std::expected<void, StarException> randomizeName();
+  [[nodiscard]] std::expected<void, StarException> randomize_name();
 
   [[nodiscard]] std::expected<void, StarException> tick(float dt) override;
   [[nodiscard]] std::expected<bool, StarException> sendEvent(InputEvent const& event) override;
