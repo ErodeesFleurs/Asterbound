@@ -31,9 +31,9 @@ std::expected<std::shared_ptr<Player>, StarException> create_player(Root& root, 
   auto player = (*factory)->create();
   if (!player)
     return std::unexpected(std::move(player.error()));
-  if (auto named = (*player)->setName(name); !named)
+  if (auto named = (*player)->set_name(name); !named)
     return std::unexpected(std::move(named.error()));
-  if (auto finalized = (*player)->finalizeCreation(); !finalized)
+  if (auto finalized = (*player)->finalize_creation(); !finalized)
     return std::unexpected(std::move(finalized.error()));
   return std::move(*player);
 }
@@ -149,7 +149,7 @@ const GameTestRegistration changedSaveRetry(
     ASSERT_TRUE(File::write_file(String("owned collision"), stage));
     // An acknowledged, unchanged player does not attempt a replacement.
     EXPECT_TRUE(storage->savePlayer(*player));
-    ASSERT_TRUE((*player)->setName("Changed durable name"));
+    ASSERT_TRUE((*player)->set_name("Changed durable name"));
     EXPECT_FALSE(storage->savePlayer(*player));
     EXPECT_EQ(storage->getPlayerData(*uuid), *original);
     auto old_bytes = VersionedJson::read_file(path);

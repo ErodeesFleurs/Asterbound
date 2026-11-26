@@ -894,7 +894,7 @@ void benchmark_player_codexes(benchmark::State& state, BenchmarkSession& session
     if (!lua) return session.fail(state, lua.error());
     auto context = (*lua)->create_context();
     if (!context) return session.fail(state, context.error());
-    auto callbacks = LuaBindings::makePlayerCallbacks(session.root, **player);
+    auto callbacks = LuaBindings::make_player_callbacks(session.root, **player);
     if (!callbacks) return session.fail(state, callbacks.error());
     auto installed = context->set_callbacks("player", *callbacks);
     if (!installed) return session.fail(state, installed.error());

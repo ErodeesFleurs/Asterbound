@@ -363,7 +363,7 @@ std::expected<void, StarException> InventoryPane::initialize(std::shared_ptr<Pla
       }
       else if (auto swapSlot = inventory->swapSlotItem()) {
         if (std::holds_alternative<EquipmentSlot>(slot)) {
-          if (inventory->itemAllowedAsEquipment(swapSlot, std::get<EquipmentSlot>(slot)))
+          if (inventory->item_allowed_as_equipment(swapSlot, std::get<EquipmentSlot>(slot)))
             {
               auto takeResult19 = swapSlot->take(1);
               if (!takeResult19)
@@ -852,7 +852,7 @@ std::expected<std::shared_ptr<Pane>, StarException> InventoryPane::createTooltip
           return std::unexpected(std::move(fetchChildResult110.error()));
         if (auto techIcon = std::move(*fetchChildResult110)) {
           if (techIcon->screenBoundRect().contains(screenPosition)) {
-            if (auto techModule = m_player->techs()->equippedTechs().maybe(p.first))
+            if (auto techModule = m_player->techs()->equipped_techs().maybe(p.first))
               if (techDatabase->contains(*techModule))
                 {
                   auto techResult111 = techDatabase->tech(*techModule);
@@ -934,7 +934,7 @@ std::expected<bool, StarException> InventoryPane::giveContainerResult(ContainerR
 
   for (auto& item : result) {
     auto inv = m_player->inventory();
-    auto triggerPickupEventsResult120 = m_player->triggerPickupEvents(item);
+    auto triggerPickupEventsResult120 = m_player->trigger_pickup_events(item);
     if (!triggerPickupEventsResult120)
       return std::unexpected(std::move(triggerPickupEventsResult120.error()));
 
@@ -944,7 +944,7 @@ std::expected<bool, StarException> InventoryPane::giveContainerResult(ContainerR
     auto remainder = std::move(*stackWithResult121);
     if (remainder && !remainder->empty())
       {
-        auto giveItemResult122 = m_player->giveItem(remainder);
+        auto giveItemResult122 = m_player->give_item(remainder);
         if (!giveItemResult122)
           return std::unexpected(std::move(giveItemResult122.error()));
         
@@ -1085,7 +1085,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
         if (!fetchChildResult138)
           return std::unexpected(std::move(fetchChildResult138.error()));
         if (auto techIcon = std::move(*fetchChildResult138)) {
-          if (auto techModule = m_player->techs()->equippedTechs().maybe(p.first)) {
+          if (auto techModule = m_player->techs()->equipped_techs().maybe(p.first)) {
             if (techDatabase->contains(*techModule)) {
               auto techResult139 = techDatabase->tech(*techModule);
               if (!techResult139)
@@ -1169,7 +1169,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
 
   for (auto& techOverlay : m_disabledTechOverlays)
     {
-      auto setVisibilityResult150 = techOverlay->setVisibility(m_player->techOverridden());
+      auto setVisibilityResult150 = techOverlay->setVisibility(m_player->tech_overridden());
       if (!setVisibilityResult150)
         return std::unexpected(std::move(setVisibilityResult150.error()));
       
@@ -1189,7 +1189,7 @@ std::expected<void, StarException> InventoryPane::update(float dt) {
   if (!fetchChildResult154)
     return std::unexpected(std::move(fetchChildResult154.error()));
   auto energyLabel = std::move(*fetchChildResult154);
-  auto maxEnergyResult155 = m_player->maxEnergy();
+  auto maxEnergyResult155 = m_player->max_energy();
   if (!maxEnergyResult155)
     return std::unexpected(std::move(maxEnergyResult155.error()));
   auto setTextResult156 = energyLabel->setText(Star::format("{:.1f}", std::move(*maxEnergyResult155)));

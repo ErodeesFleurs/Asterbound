@@ -207,7 +207,7 @@ public:
     return m_dance_database_generation.load(std::memory_order_relaxed);
   }
   [[nodiscard]] std::expected<std::shared_ptr<SpawnTypeDatabase const>, StarException> spawnTypeDatabase();
-  [[nodiscard]] std::expected<std::shared_ptr<RadioMessageDatabase const>, StarException> radioMessageDatabase();
+  [[nodiscard]] std::expected<std::shared_ptr<RadioMessageDatabase const>, StarException> radio_message_database();
   [[nodiscard]] std::expected<std::shared_ptr<CollectionDatabase const>, StarException> collection_database();
 
   Settings& settings();
@@ -391,8 +391,8 @@ private:
   std::shared_ptr<SpawnTypeDatabase> m_spawnTypeDatabase;
   std::mutex m_spawnTypeDatabaseMutex;
 
-  std::shared_ptr<RadioMessageDatabase> m_radioMessageDatabase;
-  std::mutex m_radioMessageDatabaseMutex;
+  std::shared_ptr<RadioMessageDatabase> m_radio_message_database;
+  std::mutex m_radio_message_database_mutex;
 
   std::shared_ptr<CollectionDatabase> m_collection_database;
   std::mutex m_collection_database_mutex;

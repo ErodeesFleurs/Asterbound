@@ -148,7 +148,7 @@ struct PlayerWorldContext {
     if (!made)
       return std::unexpected(std::move(made.error()));
     player = std::move(*made);
-    if (auto finalized = player->finalizeCreation(); !finalized)
+    if (auto finalized = player->finalize_creation(); !finalized)
       return std::unexpected(std::move(finalized.error()));
     auto uuid = player->uuid();
     if (!uuid)
@@ -420,19 +420,19 @@ const GameTestRegistration quest_focus("PlayerQuestFocus", "RetainsPublishesAndS
   std::uint64_t step = 0;
   auto warm = player.update(1.0f / 60, ++step);
   if (!fixture.check(bool(warm), warm ? "equip the scanner" : warm.error().what())
-      || !fixture.check(player.inspecting() && player.canUseTool() && !player.lounging_in(),
+      || !fixture.check(player.inspecting() && player.can_use_tool() && !player.lounging_in(),
           "standing player can use the scanner")) return;
   for (std::size_t i = 0; i < probes.size(); ++i) {
     auto name = probes[i]->inspection_log_name();
     if (!fixture.check(name && *name && **name == String(probe_names[i]), "scan probe has its authored log name")) return;
-    auto highlight = player.inspectionHighlight(probes[i]);
+    auto highlight = player.inspection_highlight(probes[i]);
     if (!fixture.check(bool(highlight), highlight ? "read baseline scan highlight" : highlight.error().what())
         || !fixture.check(highlight->level > 0 && highlight->type == EntityHighlightEffectType::Inspectable,
             std::format("baseline scan for {} has level {} and type {}", probe_names[i], highlight->level,
                 std::to_underlying(highlight->type)))) return;
   }
 
-  auto manager = player.questManager();
+  auto manager = player.quest_manager();
   auto offer = [&](String id, String template_id) -> std::expected<void, StarException> {
     auto arc = QuestArcDescriptor::fromJson(**root, JsonObject{{"quests", JsonArray{JsonObject{
         {"questId", std::move(id)}, {"templateId", std::move(template_id)}, {"parameters", JsonObject{}}}}}});
@@ -453,7 +453,7 @@ const GameTestRegistration quest_focus("PlayerQuestFocus", "RetainsPublishesAndS
 
   auto check_tick = [&](String const& mode, std::array<bool, probe_names.size()> interesting, bool bad = false,
       std::source_location at = std::source_location::current()) {
-    player.setGenericProperty("zzFocusMode", mode);
+    player.set_generic_property("zzFocusMode", mode);
     auto result = player.update(1.0f / 60, ++step);
     if (bad) {
       if (!fixture.check(!result && result.error().is<JsonException>(),
@@ -462,7 +462,7 @@ const GameTestRegistration quest_focus("PlayerQuestFocus", "RetainsPublishesAndS
       return false;
     }
     for (std::size_t i = 0; i < probes.size(); ++i) {
-      auto highlight = player.inspectionHighlight(probes[i]);
+      auto highlight = player.inspection_highlight(probes[i]);
       auto expected = interesting[i] ? EntityHighlightEffectType::Interesting : EntityHighlightEffectType::Inspectable;
       if (!fixture.check(bool(highlight), highlight ? "read scan highlight" : highlight.error().what(), at)
           || !fixture.check(highlight->level > 0 && highlight->type == expected,
@@ -492,7 +492,7 @@ const GameTestRegistration handheld_light_units(
     auto& root = fixture.root();
     if (!fixture.check(bool(setup.init(root)), "initialize player world")) return;
     auto& player = *setup.player;
-    if (!fixture.check(bool(player.moveTo(Vec2F(100, 100))), "position player")) return;
+    if (!fixture.check(bool(player.move_to(Vec2F(100, 100))), "position player")) return;
     player.aim(player.position() + Vec2F(20, 0));
     auto tools = ToolUser::create(root);
     if (!fixture.check(tools && (*tools)->init(player), "initialize tool hands")) return;
@@ -564,8 +564,8 @@ const GameTestRegistration self_damage_history(
 
     auto request = DamageRequest::create(JsonObject{{"damage", 3}});
     ASSERT_TRUE(request) << request.error().what();
-    ASSERT_TRUE(player.hitOther(41, *request));
-    ASSERT_TRUE(player.hitOther(42, *request));
+    ASSERT_TRUE(player.hit_other(41, *request));
+    ASSERT_TRUE(player.hit_other(42, *request));
     ASSERT_TRUE(player.damaged_other(pending->front()));
     auto inflicted = context->eval<Json>(R"LUA(
       local hits, cursor = status.inflictedHitsSince()
@@ -614,18 +614,18 @@ const GameTestRegistration armor_retry("ArmorWearerTest", "BadLegacyCosmeticCanR
   auto item = (*database)->item(*descriptor);
   if (!fixture.check(item && *item, "instantiate head armor")) return;
   auto stored = (*database)->disk_store(*item);
-  if (!fixture.check(stored && sender.setSecretProperty("armorWearer.replicating", true)
-      && sender.setSecretProperty("armorWearer.cosmetic1.version", 1)
-      && sender.setSecretProperty("armorWearer.cosmetic1.data", *stored)
+  if (!fixture.check(stored && sender.set_secret_property("armorWearer.replicating", true)
+      && sender.set_secret_property("armorWearer.cosmetic1.version", 1)
+      && sender.set_secret_property("armorWearer.cosmetic1.data", *stored)
       && sync(), "apply first cosmetic packet")) return;
   auto read_slot = [&] { return (*replica)->inventory()->itemsAt(EquipmentSlot::Cosmetic1); };
   auto previous = read_slot();
   if (!fixture.check(previous && *previous, "replica received armor")) return;
-  if (!fixture.check(sender.setSecretProperty("armorWearer.cosmetic1.version", 2)
-      && sender.setSecretProperty("armorWearer.cosmetic1.data", JsonObject{{"bad", true}}), "set bad save")) return;
+  if (!fixture.check(sender.set_secret_property("armorWearer.cosmetic1.version", 2)
+      && sender.set_secret_property("armorWearer.cosmetic1.data", JsonObject{{"bad", true}}), "set bad save")) return;
   fixture.check(!sync(), "bad cosmetic save rejected");
   fixture.check(read_slot() == *previous, "bad save preserves previous cosmetic");
-  if (!fixture.check(sender.setSecretProperty("armorWearer.cosmetic1.data", Json()) && sync(), "retry same revision")) return;
+  if (!fixture.check(sender.set_secret_property("armorWearer.cosmetic1.data", Json()) && sync(), "retry same revision")) return;
   fixture.check(read_slot() == nullptr, "corrected revision clears cosmetic");
 });
 
@@ -765,7 +765,7 @@ const GameTestRegistration player_lounge_cosmetics(
     for (std::size_t i = 0; i != switch_phases.size(); ++i)
       if (!sit("override", seats.front(), override_marker) || !sit(switch_phases[i], seats[i + 1], inventory_marker)) return;
     if (!sit("override before leaving", seats.front(), override_marker)
-        || !fixture.check(bool(player.stopLounging()), "leave the override chair")
+        || !fixture.check(bool(player.stop_lounging()), "leave the override chair")
         || !tick() || !check_cosmetic("leave override", null_entity_id, inventory_marker)
         || !fixture.check(player.status_controller().stat("loungeProbe") == 0.f, "clear persistent lounge status on leave")
         || !tick() || !tick()) return;
@@ -1003,7 +1003,7 @@ const GameTestRegistration transientMovementAnimation(
     ASSERT_TRUE(lua);
     auto context = (*lua)->create_context(StringList{});
     ASSERT_TRUE(context);
-    auto callbacks = LuaBindings::makePlayerCallbacks(**root, player);
+    auto callbacks = LuaBindings::make_player_callbacks(**root, player);
     ASSERT_TRUE(callbacks);
     ASSERT_TRUE(context->set_callbacks("player", *callbacks));
     auto valid = context->eval<bool>(R"LUA(
@@ -1068,7 +1068,7 @@ const GameTestRegistration transientMovementAnimation(
       movement.set_rotation(rotation);
       auto tangent = Vec2F::with_angle(rotation);
       for (std::size_t i = 0; i != states.size(); ++i) {
-        player.setGenericProperty("poseFixture", Json(String(names[i])));
+        player.set_generic_property("poseFixture", Json(String(names[i])));
         for (auto facing : {Direction::Left, Direction::Right}) {
           for (auto direction : {Direction::Left, Direction::Right}) {
             movement.control_face(facing);
@@ -1095,7 +1095,7 @@ const GameTestRegistration transientMovementAnimation(
     // Native direction must keep updating underneath an active wire override.
     // In particular ceiling rightward motion has negative world-X velocity.
     movement.set_rotation(std::numbers::pi_v<float>);
-    player.setGenericProperty("poseFixture", "run");
+    player.set_generic_property("poseFixture", "run");
     for (auto direction : {Direction::Right, Direction::Left}) {
       movement.control_move(direction);
       movement.control_face(Direction::Right);
@@ -1109,31 +1109,31 @@ const GameTestRegistration transientMovementAnimation(
     ASSERT_TRUE(tick());
     EXPECT_FALSE(player.humanoid()->moving_backwards());
     sync(Humanoid::Run, player.humanoid()->facing_direction());
-    player.setGenericProperty("poseFixture", "duck");
+    player.set_generic_property("poseFixture", "duck");
     ASSERT_TRUE(tick());
     sync(Humanoid::Duck, player.humanoid()->facing_direction());
 
-    player.setGenericProperty("poseFixture", Json());
+    player.set_generic_property("poseFixture", Json());
     ASSERT_TRUE(tick());
     EXPECT_EQ(player.humanoid()->state(), Humanoid::SwimIdle);
     EXPECT_EQ(movement.moving_direction(), nativeDirection);
     sync(Humanoid::SwimIdle, nativeDirection);
-    player.setGenericProperty("poseFixture", "duck");
-    player.setGenericProperty("poseRevoke", true);
+    player.set_generic_property("poseFixture", "duck");
+    player.set_generic_property("poseRevoke", true);
     ASSERT_TRUE(tick());
     EXPECT_EQ(player.humanoid()->state(), Humanoid::SwimIdle);
     sync(Humanoid::SwimIdle, nativeDirection);
-    player.setGenericProperty("poseFixture", Json());
-    player.setGenericProperty("poseRevoke", false);
-    player.setGenericProperty("poseLate", true);
+    player.set_generic_property("poseFixture", Json());
+    player.set_generic_property("poseRevoke", false);
+    player.set_generic_property("poseLate", true);
     ASSERT_TRUE(tick());
     ASSERT_TRUE(tick());
     EXPECT_EQ(player.humanoid()->state(), Humanoid::SwimIdle);
     sync(Humanoid::SwimIdle, nativeDirection);
-    player.setGenericProperty("poseLate", false);
-    player.setGenericProperty("poseFixture", "duck");
+    player.set_generic_property("poseLate", false);
+    player.set_generic_property("poseFixture", "duck");
     ASSERT_TRUE(tick());
-    player.setGenericProperty("poseFixture", Json());
+    player.set_generic_property("poseFixture", Json());
     ASSERT_TRUE(player.uninit());
     ASSERT_TRUE(player.init(*setup.world, 100, EntityMode::Master));
     ASSERT_TRUE(player.refresh_humanoid());
@@ -1141,29 +1141,29 @@ const GameTestRegistration transientMovementAnimation(
     ASSERT_TRUE(tick());
     EXPECT_EQ(player.humanoid()->state(), Humanoid::SwimIdle);
     sync(Humanoid::SwimIdle, movement.moving_direction());
-    player.setGenericProperty("poseFixture", "duck");
+    player.set_generic_property("poseFixture", "duck");
     movement.set_velocity(Vec2F());
     movement.control_face(Direction::Right);
     ASSERT_TRUE(tick());
     sync(Humanoid::Duck, Direction::Right);
-    ASSERT_TRUE(player.teleportOut());
+    ASSERT_TRUE(player.teleport_out());
     // A higher-priority state can start between update and packet generation.
     for (std::size_t i = 0; i != remotes.size(); ++i) {
       auto packet = player.write_net_state(versions[i], rules[i]);
       ASSERT_TRUE(packet);
       versions[i] = packet->second;
       ASSERT_TRUE(remotes[i]->read_net_state(packet->first, 0.f, rules[i]));
-      EXPECT_TRUE(remotes[i]->isTeleporting());
+      EXPECT_TRUE(remotes[i]->is_teleporting());
       EXPECT_EQ(remotes[i]->movement_controller().moving_direction(), movement.moving_direction());
     }
     ASSERT_TRUE(tick());
-    EXPECT_TRUE(player.isTeleporting());
+    EXPECT_TRUE(player.is_teleporting());
     // Teleport freezes the previous humanoid cycle, but must send its native
     // teleport state and restore native movingDirection, not the request.
     sync(player.humanoid()->state(), movement.moving_direction());
     for (auto const& remote : remotes)
-      EXPECT_TRUE(remote->isTeleporting());
-    ASSERT_TRUE(player.teleportAbort());
+      EXPECT_TRUE(remote->is_teleporting());
+    ASSERT_TRUE(player.teleport_abort());
     // Abort starts TeleportIn; it does not end teleportation immediately.
     // Finish its real configured timer before testing the independent death
     // transition, otherwise the native teleport freeze retains the old cycle.
@@ -1174,15 +1174,15 @@ const GameTestRegistration transientMovementAnimation(
     auto abortSeconds = abortTime->to_float();
     ASSERT_TRUE(abortSeconds);
     auto abortTicks = static_cast<unsigned>(std::ceil(*abortSeconds / dt)) + 1;
-    for (unsigned i = 0; i < abortTicks && player.isTeleporting(); ++i)
+    for (unsigned i = 0; i < abortTicks && player.is_teleporting(); ++i)
       ASSERT_TRUE(tick());
-    ASSERT_FALSE(player.isTeleporting());
+    ASSERT_FALSE(player.is_teleporting());
     ASSERT_EQ(player.humanoid()->state(), Humanoid::Duck);
     sync(Humanoid::Duck, Direction::Right);
     ASSERT_TRUE(player.kill());
-    ASSERT_TRUE(player.isDead());
+    ASSERT_TRUE(player.is_dead());
     ASSERT_TRUE(tick());
-    ASSERT_TRUE(player.isDead());
+    ASSERT_TRUE(player.is_dead());
     EXPECT_NE(player.humanoid()->state(), Humanoid::Duck);
     sync(player.humanoid()->state(), movement.moving_direction());
   });
@@ -1759,7 +1759,7 @@ const GameTestRegistration playerPresentationEvents(
     auto initialized = setup.init(root);
     ASSERT_TRUE(initialized) << initialized.error().what();
     auto& player = *setup.player;
-    ASSERT_TRUE(player.moveTo(Vec2F(1024, 1024)));
+    ASSERT_TRUE(player.move_to(Vec2F(1024, 1024)));
 
     struct Events : NullRenderCallback {
       unsigned particles = 0;
@@ -1852,7 +1852,7 @@ const GameTestRegistration playerPresentationEvents(
     EXPECT_TRUE(*reset);
     EXPECT_GT(player.presentation_epoch(), epoch);
     epoch = player.presentation_epoch();
-    ASSERT_TRUE(player.moveTo(Vec2F(1200, 1100)));
+    ASSERT_TRUE(player.move_to(Vec2F(1200, 1100)));
     EXPECT_GT(player.presentation_epoch(), epoch);
   });
 

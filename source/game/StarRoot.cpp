@@ -410,7 +410,7 @@ std::expected<void, StarException> Root::reload() {
     std::lock_guard name_generator_lock(m_name_generator_mutex);
     std::lock_guard dance_database_lock(m_dance_database_mutex);
     std::lock_guard spawnTypeDatabaseLock(m_spawnTypeDatabaseMutex);
-    std::lock_guard radioMessageDatabaseLock(m_radioMessageDatabaseMutex);
+    std::lock_guard radio_message_database_lock(m_radio_message_database_mutex);
     std::lock_guard collection_database_lock(m_collection_database_mutex);
 
     // Configuration and Assets are at the very bottom of the hierarchy.
@@ -458,7 +458,7 @@ std::expected<void, StarException> Root::reload() {
     m_dance_database.reset();
     m_dance_database_generation.fetch_add(1, std::memory_order_relaxed);
     m_spawnTypeDatabase.reset();
-    m_radioMessageDatabase.reset();
+    m_radio_message_database.reset();
     m_collection_database.reset();
     m_assets.reset();
     m_configuration.reset();
@@ -515,7 +515,7 @@ std::expected<void, StarException> Root::fullyLoad() {
   add(&Root::name_generator);
   add(&Root::dance_database);
   add(&Root::spawnTypeDatabase);
-  add(&Root::radioMessageDatabase);
+  add(&Root::radio_message_database);
   add(&Root::collection_database);
   add(&Root::statisticsDatabase);
   add(&Root::speciesDatabase);
@@ -929,8 +929,8 @@ std::expected<std::shared_ptr<SpawnTypeDatabase const>, StarException> Root::spa
   });
 }
 
-std::expected<std::shared_ptr<RadioMessageDatabase const>, StarException> Root::radioMessageDatabase() {
-  return loadMember(m_radioMessageDatabase, m_radioMessageDatabaseMutex, "RadioMessageDatabase", *this);
+std::expected<std::shared_ptr<RadioMessageDatabase const>, StarException> Root::radio_message_database() {
+  return loadMember(m_radio_message_database, m_radio_message_database_mutex, "RadioMessageDatabase", *this);
 }
 
 std::expected<std::shared_ptr<CollectionDatabase const>, StarException> Root::collection_database() {

@@ -311,7 +311,7 @@ std::expected<void, StarException> TeleportDialog::initialize(Request request) {
   if (!destList) return std::unexpected(std::move(destList.error()));
   (*destList)->registerMemberCallback("editBookmark", [this](Widget& button) { return editBookmark(button); });
   for (auto& dest : request.destinations) {
-    if (dest.prerequisite && !m_client->mainPlayer()->questManager()->hasCompleted(*dest.prerequisite)) continue;
+    if (dest.prerequisite && !m_client->mainPlayer()->quest_manager()->hasCompleted(*dest.prerequisite)) continue;
     if (auto alias = std::get_if<WarpAlias>(&dest.warp); alias && *alias == WarpAlias::OrbitedWorld) {
       auto canBeamDown = m_client->canBeamDown(dest.deploy);
       if (!canBeamDown) return std::unexpected(std::move(canBeamDown.error()));
@@ -361,7 +361,7 @@ std::expected<void, StarException> TeleportDialog::initialize(Request request) {
     }
   }
   if (request.includeBookmarks) {
-    auto bookmarks = m_client->mainPlayer()->universeMap()->teleportBookmarks();
+    auto bookmarks = m_client->mainPlayer()->universe_map()->teleportBookmarks();
     if (!bookmarks) return std::unexpected(std::move(bookmarks.error()));
     auto sorted = sort_by_key(*bookmarks, [](TeleportBookmark const& bookmark) { return bookmark.bookmarkName.to_lower(); });
     if (!sorted) return std::unexpected(std::move(sorted.error()));

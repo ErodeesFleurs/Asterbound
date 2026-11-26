@@ -1170,7 +1170,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
       return std::unexpected(std::move(result61.error()));
     if ((std::move(*result61))) {
       {
-        auto result62 = m_mainPlayer->bestInteractionEntity(false);
+        auto result62 = m_mainPlayer->best_interaction_entity(false);
         if (!result62)
           return std::unexpected(std::move(result62.error()));
         if (auto entity = (std::move(*result62))) {
@@ -1269,7 +1269,7 @@ std::expected<void, StarException> WorldClient::render(WorldRenderData& render_d
         }
       } else if (inspecting) {
         if (auto inspectable = as<InspectableEntity>(entity)) {
-          auto result71 = self.m_mainPlayer->inspectionHighlight(inspectable);
+          auto result71 = self.m_mainPlayer->inspection_highlight(inspectable);
           if (!result71)
             return std::unexpected(std::move(result71.error()));
           ed.highlight_effect = (std::move(*result71));
@@ -1870,7 +1870,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
 
       if (view.size() >= full_size && view.starts_with(secret_broadcast_prefix)) {
         if (auto player = m_entityMap->get<Player>(damage->remote_damage_notification.source_entity_id)) {
-          auto public_key = player->getSecretPropertyView(secret_broadcast_public_key);
+          auto public_key = player->get_secret_property_view(secret_broadcast_public_key);
           auto signature = view.substr(secret_broadcast_prefix.size(), Curve25519::signature_size);
           auto raw_broadcast = view.substr(full_size);
           if (verify_broadcast_signature(player, false,
@@ -1884,7 +1884,7 @@ std::expected<void, StarException> WorldClient::handleIncomingPackets(List<std::
       } else if (view.size() > legacy_full_size && view.starts_with(legacy_voice_prefix)) {
         // Preserve StarExtensions' signed voice framing on vanilla servers.
         if (auto player = m_entityMap->get<Player>(damage->remote_damage_notification.source_entity_id)) {
-          auto public_key = player->effectsAnimator()->global_tag(legacy_voice_public_key);
+          auto public_key = player->effects_animator()->global_tag(legacy_voice_public_key);
           auto signature = view.substr(legacy_voice_prefix.size(), Curve25519::signature_size);
           auto raw = view.substr(legacy_full_size);
           if (verify_broadcast_signature(player, true,
@@ -2106,15 +2106,15 @@ std::expected<void, StarException> WorldClient::update(float dt) {
   if (!m_headless) {
     // Compare actual tags, not a published-once flag: scripts may replace or
     // remove either tag, and the main player may be rebound on world entry.
-    auto public_key = m_mainPlayer->getSecretPropertyView(secret_broadcast_public_key);
+    auto public_key = m_mainPlayer->get_secret_property_view(secret_broadcast_public_key);
     if (!public_key || public_key->utf8() != m_broadcast_public_key.utf8()) {
-      auto published = m_mainPlayer->setSecretProperty(secret_broadcast_public_key, m_broadcast_public_key);
+      auto published = m_mainPlayer->set_secret_property(secret_broadcast_public_key, m_broadcast_public_key);
       if (!published)
         return std::unexpected(std::move(published.error()));
     }
-    auto legacy_key = m_mainPlayer->effectsAnimator()->global_tag(legacy_voice_public_key);
+    auto legacy_key = m_mainPlayer->effects_animator()->global_tag(legacy_voice_public_key);
     if (!legacy_key || legacy_key->get() != m_broadcast_public_key)
-      m_mainPlayer->effectsAnimator()->set_global_tag(legacy_voice_public_key, m_broadcast_public_key);
+      m_mainPlayer->effects_animator()->set_global_tag(legacy_voice_public_key, m_broadcast_public_key);
   }
   
   ++m_currentStep;
@@ -2260,7 +2260,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
       return std::unexpected(std::move(weather_domain.error()));
     bool const weather_in_domain = weather_domain->get() == m_weather_domain;
     m_parallax_wind_time.update(parallax_epoch, weather_in_domain ? m_weather->wind() : 0.0f);
-    if (!m_mainPlayer->isDead()) {
+    if (!m_mainPlayer->is_dead()) {
       // Clear m_requestedDrops every so often in case of entity id reuse or
       // desyncs etc
       {
@@ -2282,7 +2282,7 @@ std::expected<void, StarException> WorldClient::update(float dt) {
             || !(m_geometry.diff(drop->position(), player_position).magnitude_squared() < square(DropDist)))
           continue;
 
-        auto capacity = m_mainPlayer->itemsCanHold(drop->item());
+        auto capacity = m_mainPlayer->items_can_hold(drop->item());
         if (!capacity)
           return std::unexpected(std::move(capacity.error()));
         if (*capacity == 0) {
@@ -3360,7 +3360,7 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
     
     m_inWorld = true;
     if (!m_headless) {
-      if (!m_mainPlayer->isDead()) {
+      if (!m_mainPlayer->is_dead()) {
         auto result273 = m_entityMap->reserve_entity_id();
         if (!result273)
           return std::unexpected(std::move(result273.error()));
@@ -3375,15 +3375,15 @@ std::expected<void, StarException> WorldClient::initializeWorld(WorldStartPacket
           return std::unexpected(std::move(result275.error()));
         }
       }
-      auto result276 = m_mainPlayer->moveTo(startPacket.player_start);
+      auto result276 = m_mainPlayer->move_to(startPacket.player_start);
       if (!result276)
         return std::unexpected(std::move(result276.error()));
       if (const auto& parameters = m_worldTemplate->worldParameters()) {
-        auto result277 = m_mainPlayer->overrideTech(parameters->overrideTech);
+        auto result277 = m_mainPlayer->override_tech(parameters->overrideTech);
         if (!result277)
           return std::unexpected(std::move(result277.error()));
       } else {
-        auto result278 = m_mainPlayer->overrideTech({});
+        auto result278 = m_mainPlayer->override_tech({});
         if (!result278)
           return std::unexpected(std::move(result278.error()));
       }
@@ -3574,7 +3574,7 @@ std::expected<void, StarException> WorldClient::clearWorld() {
 
 std::expected<void, StarException> WorldClient::tryGiveMainPlayerItem(std::shared_ptr<Item> item, bool silent) {
   {
-    auto result290 = m_mainPlayer->pickupItems(item, silent);
+    auto result290 = m_mainPlayer->pickup_items(item, silent);
     if (!result290)
       return std::unexpected(std::move(result290.error()));
     if (auto spill = (std::move(*result290))) {
@@ -3910,7 +3910,7 @@ void WorldClient::connectWire(WireConnection const& output, WireConnection const
 }
 
 bool WorldClient::sendSecretBroadcast(StringView broadcast, bool raw, bool compress) {
-  if (!inWorld() || !m_mainPlayer || !m_mainPlayer->getSecretPropertyView(secret_broadcast_public_key))
+  if (!inWorld() || !m_mainPlayer || !m_mainPlayer->get_secret_property_view(secret_broadcast_public_key))
     return false;
 
   auto damageNotification = std::make_shared<DamageNotificationPacket>();

@@ -74,18 +74,18 @@ public:
 
   [[nodiscard]] static std::expected<std::shared_ptr<TechController>, StarException> create(Root& root);
 
-  [[nodiscard]] std::expected<Json, StarException> diskStore();
-  [[nodiscard]] std::expected<void, StarException> diskLoad(Json const& store);
+  [[nodiscard]] std::expected<Json, StarException> disk_store();
+  [[nodiscard]] std::expected<void, StarException> disk_load(Json const& store);
 
-  [[nodiscard]] std::expected<void, StarException> init(Entity& parentEntity, ActorMovementController& movementController, StatusController& statusController);
+  [[nodiscard]] std::expected<void, StarException> init(Entity& parent_entity, ActorMovementController& movement_controller, StatusController& status_controller);
   [[nodiscard]] std::expected<void, StarException> uninit();
 
   [[nodiscard]] std::expected<void, StarException> sync_equipped_tech(HashMap<TechType, String> const& equipped);
   [[nodiscard]] std::expected<void, StarException> reload_tech();
 
-  bool techOverridden() const;
-  [[nodiscard]] std::expected<void, StarException> setOverrideTech(StringList const& techModules);
-  [[nodiscard]] std::expected<void, StarException> clearOverrideTech();
+  bool tech_overridden() const;
+  [[nodiscard]] std::expected<void, StarException> set_override_tech(StringList const& tech_modules);
+  [[nodiscard]] std::expected<void, StarException> clear_override_tech();
 
   void setShouldRun(bool shouldRun);
 
@@ -158,41 +158,41 @@ private:
   using TechAnimatorGroup = NetElementDynamicGroup<TechAnimator>;
 
   struct TechModule {
-    explicit TechModule(Root& root) : scriptComponent(root) {}
+    explicit TechModule(Root& root) : script_component(root) {}
 
     TechConfig config;
 
     LuaActorScript
-        scriptComponent;
+        script_component;
     bool visible;
-    bool toolUsageSuppressed;
+    bool tool_usage_suppressed;
     Directives parentDirectives;
-    TechAnimatorGroup::ElementId animatorId;
+    TechAnimatorGroup::ElementId animator_id;
   };
 
   template <std::ranges::input_range Names>
   [[nodiscard]] std::expected<void, StarException> load_tech_names(Names&& names);
 
   // Name of module, any existing module script data.
-  [[nodiscard]] std::expected<void, StarException> setupTechModules(List<std::tuple<String, JsonObject>> const& moduleInits);
+  [[nodiscard]] std::expected<void, StarException> setup_tech_modules(List<std::tuple<String, JsonObject>> const& module_inits);
 
-  [[nodiscard]] std::expected<void, StarException> unloadModule(TechModule& techModule);
+  [[nodiscard]] std::expected<void, StarException> unload_module(TechModule& tech_module);
 
-  [[nodiscard]] std::expected<void, StarException> initializeModules();
+  [[nodiscard]] std::expected<void, StarException> initialize_modules();
 
   void resetMoves();
   [[nodiscard]] std::expected<void, StarException> updateAnimators(float dt);
 
-  [[nodiscard]] std::expected<LuaCallbacks, StarException> makeTechCallbacks(TechModule& techModule);
+  [[nodiscard]] std::expected<LuaCallbacks, StarException> make_tech_callbacks(TechModule& tech_module);
 
-  std::optional<StringList> m_overriddenTech;
+  std::optional<StringList> m_overridden_tech;
   bool m_tech_sync_pending = false;
-  LinkedList<TechModule> m_techModules;
-  TechAnimatorGroup m_techAnimators;
+  LinkedList<TechModule> m_tech_modules;
+  TechAnimatorGroup m_tech_animators;
 
-  std::optional<std::reference_wrapper<Entity>> m_parentEntity;
+  std::optional<std::reference_wrapper<Entity>> m_parent_entity;
   std::optional<std::reference_wrapper<ActorMovementController>> m_movement_controller;
-  std::optional<std::reference_wrapper<StatusController>> m_statusController;
+  std::optional<std::reference_wrapper<StatusController>> m_status_controller;
 
   bool m_moveRun;
   bool m_movePrimaryFire;

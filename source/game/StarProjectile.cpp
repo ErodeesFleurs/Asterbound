@@ -497,7 +497,7 @@ if (!result925) return std::unexpected(std::move(result925.error()));
   return res;
 }
 
-std::expected<void, StarException> Projectile::hitOther(EntityId entity, DamageRequest const&) {
+std::expected<void, StarException> Projectile::hit_other(EntityId entity, DamageRequest const&) {
   auto result916 = m_parameters.get_bool("piercing", m_config->piercing);
 if (!result916) return std::unexpected(std::move(result916.error()));
 if (!std::move(*result916)) {

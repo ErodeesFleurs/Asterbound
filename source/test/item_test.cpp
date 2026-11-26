@@ -1378,7 +1378,7 @@ const GameTestRegistration filtered_lua_consumption("ItemTest", "FilteredLuaCons
   if (!fixture.check(bool(lua), "create Lua root")) return;
   auto context = (*lua)->create_context(StringList{});
   if (!fixture.check(bool(context), "create Lua context")) return;
-  auto callbacks = LuaBindings::makePlayerCallbacks(root, **player);
+  auto callbacks = LuaBindings::make_player_callbacks(root, **player);
   if (!fixture.check(bool(callbacks), "create real player callbacks")) return;
   if (!fixture.check(bool(context->set_callbacks("player", *callbacks)), "register player callbacks")) return;
 
@@ -1468,7 +1468,7 @@ const GameTestRegistration object_placement_transaction("ItemTest", "ObjectPlace
   ASSERT_TRUE(factory);
   auto player = (*factory)->create();
   ASSERT_TRUE(player);
-  ASSERT_TRUE((*player)->finalizeCreation());
+  ASSERT_TRUE((*player)->finalize_creation());
   auto uuid = (*player)->uuid();
   ASSERT_TRUE(uuid);
   auto context = ClientContext::create((*root)->logger(), Uuid((*root)->random()), *uuid, 1, {});
@@ -1477,7 +1477,7 @@ const GameTestRegistration object_placement_transaction("ItemTest", "ObjectPlace
   Entity& owner = **player;
   ASSERT_TRUE(owner.init(**world, 100, EntityMode::Master));
   auto uninit_owner = make_scope_exit([&] { EXPECT_TRUE(owner.uninit()); });
-  ASSERT_TRUE((*player)->moveTo(Vec2F(1024, 1024)));
+  ASSERT_TRUE((*player)->move_to(Vec2F(1024, 1024)));
 
   auto materials = (*root)->material_database();
   auto objects = (*root)->object_database();
@@ -1686,8 +1686,8 @@ const GameTestRegistration crafting_batch_accounting("ItemTest", "CraftingBatchA
   auto made = (*factory)->create();
   ASSERT_TRUE(made);
   auto& player = **made;
-  player.setStatistics(*statistics);
-  ASSERT_TRUE(player.finalizeCreation());
+  player.set_statistics(*statistics);
+  ASSERT_TRUE(player.finalize_creation());
   auto storage = File::ephemeral_file(root.random());
   ASSERT_TRUE(storage);
   auto world = WorldServer::create(root, Vec2U(2048, 2048), *storage);
@@ -2199,7 +2199,7 @@ const GameTestRegistration inventory_delta_visibility(
   ASSERT_TRUE(factory);
   auto player = (*factory)->create();
   ASSERT_TRUE(player);
-  ASSERT_TRUE((*player)->finalizeCreation());
+  ASSERT_TRUE((*player)->finalize_creation());
   Entity& entity = **player;
   ASSERT_TRUE(entity.init(**world, 100, EntityMode::Slave));
   auto uninit = make_scope_exit([&] { EXPECT_TRUE(entity.uninit()); });
@@ -2618,7 +2618,7 @@ const GameTestRegistration
     auto made = (*factory)->create();
     ASSERT_TRUE(made);
     auto& player = **made;
-    ASSERT_TRUE(player.finalizeCreation());
+    ASSERT_TRUE(player.finalize_creation());
     auto uuid = player.uuid();
     ASSERT_TRUE(uuid);
     auto context = ClientContext::create(root.logger(), Uuid(root.random()), *uuid, 1, {});
@@ -2629,7 +2629,7 @@ const GameTestRegistration
     auto uninitPlayer = make_scope_exit([&] { EXPECT_TRUE(entity.uninit()); });
     ASSERT_TRUE(player.refresh_humanoid());
     Vec2F const origin(1024, 1024);
-    ASSERT_TRUE(player.moveTo(origin));
+    ASSERT_TRUE(player.move_to(origin));
     auto tools = ToolUser::create(root);
     ASSERT_TRUE(tools);
     ASSERT_TRUE((*tools)->init(player));
@@ -2815,7 +2815,7 @@ void with_scripted_item_owner(GameTest& fixture, String const& script, std::invo
   auto made = (*factory)->create();
   ASSERT_TRUE(made);
   auto& player = **made;
-  ASSERT_TRUE(player.finalizeCreation());
+  ASSERT_TRUE(player.finalize_creation());
   auto uuid = player.uuid();
   ASSERT_TRUE(uuid);
   auto context = ClientContext::create(root.logger(), Uuid(root.random()), *uuid, 1, {});
@@ -2825,7 +2825,7 @@ void with_scripted_item_owner(GameTest& fixture, String const& script, std::invo
   ASSERT_TRUE(entity.init(**world, 100, EntityMode::Master));
   auto uninit_player = make_scope_exit([&] { EXPECT_TRUE(entity.uninit()); });
   ASSERT_TRUE(player.refresh_humanoid());
-  ASSERT_TRUE(player.moveTo(Vec2F(1024, 1024)));
+  ASSERT_TRUE(player.move_to(Vec2F(1024, 1024)));
   test(root, player);
 }
 }
@@ -3065,11 +3065,11 @@ const GameTestRegistration collection_resolution("CollectionTest", "UnlockRetryL
     ASSERT_FALSE(bad);
     EXPECT_NE(std::string_view(bad.error().what()).find("/probes/entries.collection"), std::string_view::npos);
   }
-  (*player)->pullQueuedMessages();
+  (*player)->pull_queued_messages();
   EXPECT_FALSE((*player)->add_collectable("probeitems", "missing"));
   EXPECT_FALSE((*player)->add_collectable("probeitems", "tool"));
   EXPECT_FALSE((*player)->log()->has_collectable("probeitems", "tool"));
-  EXPECT_TRUE((*player)->pullQueuedMessages().empty());
+  EXPECT_TRUE((*player)->pull_queued_messages().empty());
   ASSERT_TRUE(put("player.config.patch", R"([{"op":"replace","path":"/collectableUnlock","value":"<collectable> in <collection>"}])"));
   auto assets = root.assets();
   ASSERT_TRUE(assets);
@@ -3080,7 +3080,7 @@ const GameTestRegistration collection_resolution("CollectionTest", "UnlockRetryL
   auto duplicate = (*player)->add_collectable("probeitems", "tool");
   ASSERT_TRUE(duplicate);
   EXPECT_FALSE(*duplicate);
-  EXPECT_EQ((*player)->pullQueuedMessages(), List<String>({"Tool in Items"}));
+  EXPECT_EQ((*player)->pull_queued_messages(), List<String>({"Tool in Items"}));
 });
 
 const GameTestRegistration codex_item_messages(
@@ -3118,7 +3118,7 @@ const GameTestRegistration codex_item_messages(
     auto created_player = (*factory)->create();
     ASSERT_TRUE(created_player);
     auto& player = **created_player;
-    ASSERT_TRUE(player.finalizeCreation());
+    ASSERT_TRUE(player.finalize_creation());
     auto uuid = player.uuid();
     ASSERT_TRUE(uuid);
     auto context = ClientContext::create(root.logger(), Uuid(root.random()), *uuid, 1, {});
@@ -3138,12 +3138,12 @@ const GameTestRegistration codex_item_messages(
     auto books = player.codexes();
     String const id = "codexhintfixture";
     ASSERT_FALSE(books->contains(id));
-    player.pullQueuedMessages();
+    player.pull_queued_messages();
     auto initial = books->revision();
     EXPECT_FALSE(book->get().fire_triggered());
     EXPECT_FALSE(books->contains(id));
     EXPECT_EQ(books->revision(), initial);
-    EXPECT_TRUE(player.pullQueuedMessages().empty());
+    EXPECT_TRUE(player.pull_queued_messages().empty());
 
     auto assets = root.assets();
     ASSERT_TRUE(assets);
@@ -3155,13 +3155,13 @@ const GameTestRegistration codex_item_messages(
     ASSERT_TRUE(book->get().fire_triggered());
     EXPECT_TRUE(books->contains(id));
     EXPECT_FALSE(books->is_read(id));
-    EXPECT_EQ(player.pullQueuedMessages(), List<String>({"Learned fixture"}));
+    EXPECT_EQ(player.pull_queued_messages(), List<String>({"Learned fixture"}));
     ASSERT_TRUE(books->set_read(id, true));
     auto read_revision = books->revision();
     EXPECT_FALSE(book->get().fire_triggered());
     EXPECT_TRUE(books->is_read(id));
     EXPECT_EQ(books->revision(), read_revision);
-    EXPECT_TRUE(player.pullQueuedMessages().empty());
+    EXPECT_TRUE(player.pull_queued_messages().empty());
 
     ASSERT_TRUE(File::write_file(String(R"([
       {"op":"replace","path":"/messages/learned","value":"Learned fixture"},
@@ -3170,7 +3170,7 @@ const GameTestRegistration codex_item_messages(
     (*assets)->hot_reload();
     ASSERT_TRUE(book->get().fire_triggered());
     EXPECT_FALSE(books->is_read(id));
-    EXPECT_EQ(player.pullQueuedMessages(), List<String>({"Known fixture"}));
+    EXPECT_EQ(player.pull_queued_messages(), List<String>({"Known fixture"}));
     auto missing_item = inventory_test_item(**database, "codexhintfixture-codex", 1,
         JsonObject{{"codexId", "missing-codex-hint-fixture"}});
     ASSERT_TRUE(missing_item && *missing_item);
@@ -3182,7 +3182,7 @@ const GameTestRegistration codex_item_messages(
     ASSERT_TRUE(missing->get().fire_triggered());
     EXPECT_FALSE(books->contains("missing-codex-hint-fixture"));
     EXPECT_EQ(books->revision(), before_missing);
-    EXPECT_TRUE(player.pullQueuedMessages().empty());
+    EXPECT_TRUE(player.pull_queued_messages().empty());
   });
 
 const GameTestRegistration blueprintLearning(
@@ -3212,29 +3212,29 @@ const GameTestRegistration blueprintLearning(
     auto created = (*factory)->create();
     ASSERT_TRUE(created) << created.error().what();
     auto& player = **created;
-    EXPECT_TRUE(player.pullQueuedMessages().empty());
+    EXPECT_TRUE(player.pull_queued_messages().empty());
     auto descriptor = ItemDescriptor::create(
       "perfectlygenericitem", 1, JsonObject{{"shortdescription", "Blueprint Fixture"}, {"blueprintFixture", true}});
     ASSERT_TRUE(descriptor);
-    ASSERT_FALSE(player.blueprintKnown(*descriptor));
-    auto learned = player.addBlueprint(*descriptor);
+    ASSERT_FALSE(player.blueprint_known(*descriptor));
+    auto learned = player.add_blueprint(*descriptor);
     ASSERT_TRUE(learned) << learned.error().what();
     EXPECT_TRUE(*learned);
-    EXPECT_TRUE(player.blueprintKnown(*descriptor));
+    EXPECT_TRUE(player.blueprint_known(*descriptor));
     EXPECT_TRUE(player.blueprints()->isNew(*descriptor));
-    EXPECT_EQ(player.pullQueuedMessages(), List<String>({"Learned: Blueprint Fixture"}));
+    EXPECT_EQ(player.pull_queued_messages(), List<String>({"Learned: Blueprint Fixture"}));
 
     player.blueprints()->markAsRead(*descriptor);
     auto knownState = player.blueprints()->toJson();
-    auto repeated = player.addBlueprint(*descriptor);
+    auto repeated = player.add_blueprint(*descriptor);
     ASSERT_TRUE(repeated) << repeated.error().what();
     EXPECT_FALSE(*repeated);
-    EXPECT_TRUE(player.pullQueuedMessages().empty());
+    EXPECT_TRUE(player.pull_queued_messages().empty());
     EXPECT_EQ(player.blueprints()->toJson(), knownState);
-    auto shown = player.addBlueprint(*descriptor, true);
+    auto shown = player.add_blueprint(*descriptor, true);
     ASSERT_TRUE(shown) << shown.error().what();
     EXPECT_FALSE(*shown);
-    EXPECT_EQ(player.pullQueuedMessages(), List<String>({"Known: Blueprint Fixture"}));
+    EXPECT_EQ(player.pull_queued_messages(), List<String>({"Known: Blueprint Fixture"}));
     EXPECT_EQ(player.blueprints()->toJson(), knownState);
 
     // A registered item with invalid instance parameters cannot be constructed,
@@ -3248,11 +3248,11 @@ const GameTestRegistration blueprintLearning(
     ASSERT_TRUE(broken);
     for (bool showFailure : {false, true}) {
       auto before = player.blueprints()->toJson();
-      ASSERT_FALSE(player.blueprintKnown(*broken));
-      auto failed = player.addBlueprint(*broken, showFailure);
+      ASSERT_FALSE(player.blueprint_known(*broken));
+      auto failed = player.add_blueprint(*broken, showFailure);
       ASSERT_FALSE(failed);
       EXPECT_EQ(player.blueprints()->toJson(), before);
-      EXPECT_TRUE(player.pullQueuedMessages().empty());
+      EXPECT_TRUE(player.pull_queued_messages().empty());
     }
 
     // A stored blueprint may outlive its item's ability to instantiate. The
@@ -3261,15 +3261,15 @@ const GameTestRegistration blueprintLearning(
     player.blueprints()->add(*broken);
     player.blueprints()->markAsRead(*broken);
     auto brokenKnownState = player.blueprints()->toJson();
-    auto silentBroken = player.addBlueprint(*broken);
+    auto silentBroken = player.add_blueprint(*broken);
     ASSERT_TRUE(silentBroken) << silentBroken.error().what();
     EXPECT_FALSE(*silentBroken);
     EXPECT_EQ(player.blueprints()->toJson(), brokenKnownState);
-    EXPECT_TRUE(player.pullQueuedMessages().empty());
-    auto shownBroken = player.addBlueprint(*broken, true);
+    EXPECT_TRUE(player.pull_queued_messages().empty());
+    auto shownBroken = player.add_blueprint(*broken, true);
     EXPECT_FALSE(shownBroken);
     EXPECT_EQ(player.blueprints()->toJson(), brokenKnownState);
-    EXPECT_TRUE(player.pullQueuedMessages().empty());
+    EXPECT_TRUE(player.pull_queued_messages().empty());
 
     // Invalid notification values are real asset errors, not a counter around
     // json(). The silent known path must not read either notification resource.
@@ -3281,15 +3281,15 @@ const GameTestRegistration blueprintLearning(
     auto assets = (*root)->assets();
     ASSERT_TRUE(assets);
     (*assets)->hot_reload();
-    auto silent = player.addBlueprint(*descriptor);
+    auto silent = player.add_blueprint(*descriptor);
     ASSERT_TRUE(silent) << silent.error().what();
     EXPECT_FALSE(*silent);
-    EXPECT_TRUE(player.pullQueuedMessages().empty());
+    EXPECT_TRUE(player.pull_queued_messages().empty());
     EXPECT_EQ(player.blueprints()->toJson(), brokenKnownState);
-    EXPECT_FALSE(player.addBlueprint(*descriptor, true));
-    EXPECT_TRUE(player.pullQueuedMessages().empty());
+    EXPECT_FALSE(player.add_blueprint(*descriptor, true));
+    EXPECT_TRUE(player.pull_queued_messages().empty());
     EXPECT_EQ(player.blueprints()->toJson(), brokenKnownState);
-    auto nullBlueprint = player.addBlueprint(ItemDescriptor(), true);
+    auto nullBlueprint = player.add_blueprint(ItemDescriptor(), true);
     ASSERT_TRUE(nullBlueprint);
     EXPECT_FALSE(*nullBlueprint);
     EXPECT_EQ(player.blueprints()->toJson(), brokenKnownState);

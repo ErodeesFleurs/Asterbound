@@ -544,7 +544,7 @@ std::expected<void, StarException> CraftingPane::unlock_configured_recipes(Strin
     auto descriptor = ItemDescriptor::create(item_name);
     if (!descriptor)
       return std::unexpected(std::move(descriptor.error()));
-    if (auto result = m_player->addBlueprint(std::move(*descriptor)); !result)
+    if (auto result = m_player->add_blueprint(std::move(*descriptor)); !result)
       return std::unexpected(std::move(result.error()));
   }
   return {};
@@ -590,7 +590,7 @@ std::expected<void, StarException> CraftingPane::update(float dt) {
   }
 
   // similarly if the player is dead
-  if (m_player->isDead()) {
+  if (m_player->is_dead()) {
     dismiss();
     return {};
   }

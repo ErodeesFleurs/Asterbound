@@ -83,7 +83,7 @@ void QuestManager::setUniverseClient(std::optional<std::reference_wrapper<Univer
 std::expected<void, StarException> QuestManager::init(Player& player, World& world) {
   m_player = player;
   m_world = world;
-  m_client = player.universeClient();
+  m_client = player.universe_client();
   for (auto const& quest : m_quests.values()) {
     if (!questValidOnServer(quest)) continue;
     auto initialized = quest->init(player, world, m_client);
@@ -347,7 +347,7 @@ void sortQuests(List<std::shared_ptr<Quest>>& quests) {
     return std::tuple(left->lastUpdatedOn(), left->templateId()) < std::tuple(right->lastUpdatedOn(), right->templateId());
   });
 }
-List<std::shared_ptr<Quest>> QuestManager::listActiveQuests() const {
+List<std::shared_ptr<Quest>> QuestManager::list_active_quests() const {
   List<std::shared_ptr<Quest>> result;
   for (auto const& [id, quest] : m_quests)
     if (quest->state() == QuestState::Active && quest->showInLog() && questValidOnServer(quest))
@@ -502,7 +502,7 @@ std::expected<void, StarException> QuestManager::update(float dt) {
     auto playerWorld = m_client->get().client_context()->player_world_id();
     auto trackedWorld = currentQuest().and_then([](std::shared_ptr<Quest> const& quest) { return quest->worldId(); });
     if (!trackedWorld || playerWorld != *trackedWorld) {
-      for (auto const& quest : listActiveQuests()) {
+      for (auto const& quest : list_active_quests()) {
         if (auto world = quest->worldId()) if (playerWorld == *world) m_onWorldQuestId = quest->questId();
       }
     }
@@ -548,7 +548,7 @@ std::expected<void, StarException> QuestManager::startInitialQuests() {
   return {};
 }
 void QuestManager::setMostRecentQuestCurrent() {
-  auto active = listActiveQuests();
+  auto active = list_active_quests();
   if (!active.empty()) setAsTracked(active[active.size() - 1]->questId());
 }
 bool QuestManager::questValidOnServer(std::shared_ptr<Quest> const& q) const {

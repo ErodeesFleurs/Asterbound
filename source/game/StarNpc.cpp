@@ -868,9 +868,9 @@ std::expected<void, StarException> Npc::update(float dt, std::uint64_t) {
         if (auto dance = set_dance(lounge.dance); !dance)
           return dance;
       }
-      if (auto effects = m_status_controller->setPersistentEffects("lounging", lounge.statusEffects); !effects)
+      if (auto effects = m_status_controller->setPersistentEffects("lounging", lounge.status_effects); !effects)
         return effects;
-      m_effect_emitter->add_effect_sources("normal", lounge.effectEmitters);
+      m_effect_emitter->add_effect_sources("normal", lounge.effect_emitters);
 
       auto state = Humanoid::Idle;
       switch (lounge.orientation) {

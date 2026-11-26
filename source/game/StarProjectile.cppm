@@ -115,7 +115,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> destroy(std::optional<std::reference_wrapper<RenderCallback>> render_callback) override;
 
   [[nodiscard]] std::expected<List<DamageSource>, StarException> damage_sources() const override;
-  [[nodiscard]] std::expected<void, StarException> hitOther(EntityId targetEntityId, DamageRequest const& dr) override;
+  [[nodiscard]] std::expected<void, StarException> hit_other(EntityId targetEntityId, DamageRequest const& dr) override;
 
   [[nodiscard]] std::expected<void, StarException> update(float dt, std::uint64_t currentStep) override;
   std::uint64_t presentation_epoch() const override;

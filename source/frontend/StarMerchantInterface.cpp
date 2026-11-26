@@ -439,7 +439,7 @@ std::expected<void, StarException> MerchantPane::dismissed() {
 
   for (auto unsold : m_itemBag->take_all())
     {
-      auto giveItemResult613 = m_player->giveItem(unsold);
+      auto giveItemResult613 = m_player->give_item(unsold);
       if (!giveItemResult613)
         return std::unexpected(std::move(giveItemResult613.error()));
       
@@ -639,7 +639,7 @@ std::expected<void, StarException> MerchantPane::buildItemList() {
         if (!optStringResult644)
           return std::unexpected(std::move(optStringResult644.error()));
         if (auto prerequisite = std::move(*optStringResult644)) {
-          if (!m_player->questManager()->hasCompleted(*prerequisite))
+          if (!m_player->quest_manager()->hasCompleted(*prerequisite))
             return false;
         }
       }
@@ -654,7 +654,7 @@ std::expected<void, StarException> MerchantPane::buildItemList() {
               auto toStringResult646 = quest.to_string();
               if (!toStringResult646)
                 return std::unexpected(std::move(toStringResult646.error()));
-              if (m_player->questManager()->hasQuest(std::move(*toStringResult646)))
+              if (m_player->quest_manager()->hasQuest(std::move(*toStringResult646)))
                 return false;
             }
           }
@@ -865,7 +865,7 @@ std::expected<void, StarException> MerchantPane::buy() {
     auto overflow = (*stack)->set_count(remaining_items);
     if (overflow == remaining_items)
       return std::unexpected(ItemException("Merchant purchase item has no stack capacity"));
-    if (auto given = m_player->giveItem(*stack); !given)
+    if (auto given = m_player->give_item(*stack); !given)
       return std::unexpected(std::move(given.error()));
     remaining_items = overflow;
   }

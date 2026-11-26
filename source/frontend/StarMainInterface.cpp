@@ -464,7 +464,7 @@ std::expected<void, StarException> MainInterface::initialize(std::shared_ptr<Wor
 
 std::expected<void, StarException> MainInterface::handleInventoryDismissed() {
   if (auto player = m_client->mainPlayer()) {
-    if (auto cleared = player->clearSwap(); !cleared)
+    if (auto cleared = player->clear_swap(); !cleared)
       return std::unexpected(std::move(cleared.error()));
   }
   if (m_containerPane) {
@@ -554,7 +554,7 @@ std::expected<void, StarException> MainInterface::initScriptAndHudPanes(std::sha
                     m_wireInterface);
       !result)
     return std::unexpected(std::move(result.error()));
-  m_client->mainPlayer()->setWireConnector(std::ref(*m_wireInterface));
+  m_client->mainPlayer()->set_wire_connector(std::ref(*m_wireInterface));
 
   return {};
 }
@@ -757,7 +757,7 @@ std::expected<void, StarException> MainInterface::synchronizeUiSession() {
   m_uiCapabilities.set("team", LuaCallbacks{});
   m_uiCapabilities.set("songbook", LuaCallbacks{});
   if (m_uiPlayer) {
-    auto callbacks = LuaBindings::makePlayerCallbacks(context().root(), *m_uiPlayer);
+    auto callbacks = LuaBindings::make_player_callbacks(context().root(), *m_uiPlayer);
     if (!callbacks) return std::unexpected(std::move(callbacks.error()));
     m_uiCapabilities.set("player", std::move(*callbacks));
     auto status = LuaBindings::makeStatusControllerCallbacks(m_uiPlayer->status_controller());
@@ -959,7 +959,7 @@ std::expected<void, StarException> MainInterface::close() {
   auto dismissed = m_paneManager.dismissAllPanes();
   (void)m_callbackStopSource.request_stop();
   if (auto player = m_client->mainPlayer())
-    player->setWireConnector(std::nullopt);
+    player->set_wire_connector(std::nullopt);
   if (m_inventoryWindow)
     m_inventoryWindow->detachInterface();
   if (m_optionsMenu)
@@ -1071,7 +1071,7 @@ std::expected<void, StarException> MainInterface::openCraftingWindow(Json const&
   m_craftingWindow = std::move(*window);
   auto displayed = m_paneManager.displayPane(PaneLayer::Window, m_craftingWindow, [this](std::shared_ptr<Pane> const&) -> std::expected<void, StarException> {
     if (auto player = m_client->mainPlayer())
-      return player->clearSwap();
+      return player->clear_swap();
     return {};
   });
   if (!displayed)
@@ -1153,7 +1153,7 @@ std::shared_ptr<MerchantPane> MainInterface::activeMerchantPane() const {
     return {};
 }
 
-std::expected<bool, StarException> MainInterface::handleInputEvent(InputEvent const& event) {
+std::expected<bool, StarException> MainInterface::handle_input_event(InputEvent const& event) {
   auto player = m_client->mainPlayer();
   auto& root = context().root();
   if (std::holds_alternative<MouseMoveEvent>(event)) {
@@ -1302,21 +1302,21 @@ std::expected<bool, StarException> MainInterface::handleInputEvent(InputEvent co
       context().setShiftHeld(false);
     return false;
   } else if (std::holds_alternative<MouseButtonDownEvent>(event)) {
-    auto const& mouseDown = std::get<MouseButtonDownEvent>(event);
-    auto button = mouseDown.mouse_button;
+    auto const& mouse_down = std::get<MouseButtonDownEvent>(event);
+    auto button = mouse_down.mouse_button;
     if (button == MouseButton::Left)
-      player->beginPrimaryFire();
+      player->begin_primary_fire();
     if (button == MouseButton::Right)
-      player->beginAltFire();
+      player->begin_alt_fire();
     if (button == MouseButton::Middle)
       player->begin_trigger();
   } else if (std::holds_alternative<MouseButtonUpEvent>(event)) {
-    auto const& mouseUp = std::get<MouseButtonUpEvent>(event);
-    if (mouseUp.mouse_button == MouseButton::Left)
-      player->endPrimaryFire();
-    if (mouseUp.mouse_button == MouseButton::Right)
-      player->endAltFire();
-    if (mouseUp.mouse_button == MouseButton::Middle)
+    auto const& mouse_up = std::get<MouseButtonUpEvent>(event);
+    if (mouse_up.mouse_button == MouseButton::Left)
+      player->end_primary_fire();
+    if (mouse_up.mouse_button == MouseButton::Right)
+      player->end_alt_fire();
+    if (mouse_up.mouse_button == MouseButton::Middle)
       player->end_trigger();
   }
   bool captured = false;
@@ -1469,7 +1469,7 @@ std::expected<void, StarException> MainInterface::handle_interact_action(Interac
                                              .targetName = std::move(planet_name),
                                              .bookmarkName = std::move(request->bookmarkName),
                                              .icon = std::move(icon)};
-          auto bookmarks = m_client->mainPlayer()->universeMap()->teleportBookmarks();
+          auto bookmarks = m_client->mainPlayer()->universe_map()->teleportBookmarks();
           if (!bookmarks)
             return std::unexpected(std::move(bookmarks.error()));
           if (!bookmarks->contains(current_location) || !request->canTeleport) {
@@ -1572,11 +1572,11 @@ std::expected<void, StarException> MainInterface::preUpdate(float) {
   if (!m_client->paused())
     player->aim(cursorWorldPosition());
   if (m_paneManager.topPane({PaneLayer::Window, PaneLayer::ModalWindow}))
-    return player->setBusyState(PlayerBusyState::Menu);
+    return player->set_busy_state(PlayerBusyState::Menu);
   auto focused = inputFocus();
   if (!focused)
     return std::unexpected(std::move(focused.error()));
-  return player->setBusyState(*focused ? PlayerBusyState::Chatting : PlayerBusyState::None);
+  return player->set_busy_state(*focused ? PlayerBusyState::Chatting : PlayerBusyState::None);
 }
 
 std::expected<void, StarException> MainInterface::update(float dt) {
@@ -1585,12 +1585,12 @@ std::expected<void, StarException> MainInterface::update(float dt) {
   if (auto synchronized = synchronizeUiSession(); !synchronized)
     return std::unexpected(std::move(synchronized.error()));
 
-  for (auto const& message : m_client->mainPlayer()->pullQueuedMessages()) {
+  for (auto const& message : m_client->mainPlayer()->pull_queued_messages()) {
     auto queued = queueMessage(message);
     if (!queued)
       return std::unexpected(std::move(queued.error()));
   }
-  for (auto const& drop : m_client->mainPlayer()->pullQueuedItemDrops()) {
+  for (auto const& drop : m_client->mainPlayer()->pull_queued_item_drops()) {
     auto queued = queueItemPickupText(drop);
     if (!queued)
       return std::unexpected(std::move(queued.error()));
@@ -1606,11 +1606,11 @@ std::expected<void, StarException> MainInterface::update(float dt) {
 
 
   auto player = m_client->mainPlayer();
-  if (player->wireToolInUse()) {
+  if (player->wire_tool_in_use()) {
     auto displayed = m_paneManager.displayRegisteredPane(MainInterfacePanes::WireInterface);
     if (!displayed)
       return std::unexpected(std::move(displayed.error()));
-    player->setWireConnector(std::ref(*m_wireInterface));
+    player->set_wire_connector(std::ref(*m_wireInterface));
   } else {
     auto dismissed = m_paneManager.dismissRegisteredPane(MainInterfacePanes::WireInterface);
     if (!dismissed)
@@ -1625,11 +1625,11 @@ std::expected<void, StarException> MainInterface::update(float dt) {
 
 
   if (!m_cinematicOverlay || m_cinematicOverlay->completed()) {
-    auto cinematicState = m_client->mainPlayer()->setInCinematic(false);
+    auto cinematicState = m_client->mainPlayer()->set_in_cinematic(false);
     if (!cinematicState)
       return std::unexpected(std::move(cinematicState.error()));
   } else {
-    auto cinematicState = m_client->mainPlayer()->setInCinematic(true);
+    auto cinematicState = m_client->mainPlayer()->set_in_cinematic(true);
     if (!cinematicState)
       return std::unexpected(std::move(cinematicState.error()));
   }
@@ -1650,7 +1650,7 @@ std::expected<void, StarException> MainInterface::update(float dt) {
 
   if (auto worldClient = m_client->worldClient()) {
     if (worldClient->inWorld()) {
-      auto pendingCinematic = m_client->mainPlayer()->pullPendingCinematic();
+      auto pendingCinematic = m_client->mainPlayer()->pull_pending_cinematic();
       if (!pendingCinematic)
         return std::unexpected(std::move(pendingCinematic.error()));
       if (auto& cinematic = *pendingCinematic) {
@@ -1669,7 +1669,7 @@ std::expected<void, StarException> MainInterface::update(float dt) {
   }
 
   if (!m_confirmationDialog->isDisplayed()) {
-    auto pendingConfirmation = m_client->mainPlayer()->pullPendingConfirmation();
+    auto pendingConfirmation = m_client->mainPlayer()->pull_pending_confirmation();
     if (!pendingConfirmation)
       return std::unexpected(std::move(pendingConfirmation.error()));
     if (auto& confirmation = *pendingConfirmation) {
@@ -1730,14 +1730,14 @@ std::expected<void, StarException> MainInterface::update(float dt) {
       if (!*given) {
         for (auto const& item : containerResult) {
           if (m_containerInteractor->containerOpen()) {
-            auto remaining = m_client->mainPlayer()->pickupItems(item);
+            auto remaining = m_client->mainPlayer()->pickup_items(item);
             if (!remaining)
               return std::unexpected(std::move(remaining.error()));
             auto returned = m_containerInteractor->addToContainer(*remaining);
             if (!returned)
               return std::unexpected(std::move(returned.error()));
           } else {
-            auto givenToPlayer = m_client->mainPlayer()->giveItem(item);
+            auto givenToPlayer = m_client->mainPlayer()->give_item(item);
             if (!givenToPlayer)
               return std::unexpected(std::move(givenToPlayer.error()));
           }
@@ -2176,7 +2176,7 @@ std::expected<void, StarException> MainInterface::updateCursor() {
         }
       }
       if (!cursorOverride) {
-        for (auto const& item : {player->primaryHandItem(), player->altHandItem()}) {
+        for (auto const& item : {player->primary_hand_item(), player->alt_hand_item()}) {
           if (auto activeItem = as<ActiveItem>(item)) {
             if (auto cursor = activeItem->cursor()) {
               cursorOverride = cursor;

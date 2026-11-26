@@ -163,7 +163,7 @@ public:
   std::shared_ptr<MerchantPane> activeMerchantPane() const;
 
   // Return true if this event was consumed or should be handled elsewhere.
-  [[nodiscard]] std::expected<bool, StarException> handleInputEvent(InputEvent const& event);
+  [[nodiscard]] std::expected<bool, StarException> handle_input_event(InputEvent const& event);
   // Return true if mouse / keyboard events are currently locked here
   [[nodiscard]] std::expected<bool, StarException> inputFocus() const;
   // If input is focused, should MainInterface also accept text input events?

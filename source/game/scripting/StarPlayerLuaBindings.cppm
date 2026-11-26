@@ -11,5 +11,5 @@ class Player;
 export module star.player_lua_bindings;
 
 export namespace Star::LuaBindings {
-  [[nodiscard]] std::expected<LuaCallbacks, StarException> makePlayerCallbacks(Root& root, Player& player);
+  [[nodiscard]] std::expected<LuaCallbacks, StarException> make_player_callbacks(Root& root, Player& player);
 }

@@ -145,7 +145,7 @@ const GameTestRegistration weather_retry_and_transition_snapshots(
   ASSERT_TRUE(players) << players.error().what();
   auto player = (*players)->create();
   ASSERT_TRUE(player) << player.error().what();
-  ASSERT_TRUE((*player)->finalizeCreation());
+  ASSERT_TRUE((*player)->finalize_creation());
   auto uuid = (*player)->uuid();
   ASSERT_TRUE(uuid) << uuid.error().what();
   auto context = ClientContext::create(root.logger(), Uuid::nil(), *uuid, min_client_connection_id, {});

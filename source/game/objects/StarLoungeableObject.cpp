@@ -174,11 +174,11 @@ std::expected<std::shared_ptr<LoungeAnchor const>, StarException> LoungeableObje
   // order based on the anchor index.
   loungeAnchor->loungeRenderLayer = render_layer_object + m_sitPositions.size() - positionIndex;
 
-  loungeAnchor->statusEffects = m_sitStatusEffects;
-  loungeAnchor->effectEmitters = m_sitEffectEmitters;
+  loungeAnchor->status_effects = m_sit_status_effects;
+  loungeAnchor->effect_emitters = m_sit_effect_emitters;
   loungeAnchor->emote = m_sitEmote;
   loungeAnchor->dance = m_sitDance;
-  loungeAnchor->armorCosmeticOverrides = m_sitArmorCosmeticOverrides;
+  loungeAnchor->armor_cosmetic_overrides = m_sit_armor_cosmetic_overrides;
   loungeAnchor->cursorOverride = m_sitCursorOverride;
 
   return loungeAnchor;
@@ -273,15 +273,15 @@ std::expected<void, StarException> LoungeableObject::set_orientation_index(std::
       return std::unexpected(std::move(sitDanceResult.error()));
     auto sitDance = std::move(*sitDanceResult);
     m_sitDance = std::move(sitDance);
-    auto sitArmorCosmeticOverridesConfigResult = config_value("sitArmorCosmeticOverrides", JsonObject());
-    if (!sitArmorCosmeticOverridesConfigResult)
-      return std::unexpected(std::move(sitArmorCosmeticOverridesConfigResult.error()));
-    auto sitArmorCosmeticOverridesConfig = std::move(*sitArmorCosmeticOverridesConfigResult);
-    auto sitArmorCosmeticOverridesResult = sitArmorCosmeticOverridesConfig.to_object();
-    if (!sitArmorCosmeticOverridesResult)
-      return std::unexpected(std::move(sitArmorCosmeticOverridesResult.error()));
-    auto sitArmorCosmeticOverrides = std::move(*sitArmorCosmeticOverridesResult);
-    m_sitArmorCosmeticOverrides = std::move(sitArmorCosmeticOverrides);
+    auto sit_armor_cosmetic_overrides_config_result = config_value("sitArmorCosmeticOverrides", JsonObject());
+    if (!sit_armor_cosmetic_overrides_config_result)
+      return std::unexpected(std::move(sit_armor_cosmetic_overrides_config_result.error()));
+    auto sit_armor_cosmetic_overrides_config = std::move(*sit_armor_cosmetic_overrides_config_result);
+    auto sit_armor_cosmetic_overrides_result = sit_armor_cosmetic_overrides_config.to_object();
+    if (!sit_armor_cosmetic_overrides_result)
+      return std::unexpected(std::move(sit_armor_cosmetic_overrides_result.error()));
+    auto sit_armor_cosmetic_overrides = std::move(*sit_armor_cosmetic_overrides_result);
+    m_sit_armor_cosmetic_overrides = std::move(sit_armor_cosmetic_overrides);
     auto sitCursorOverrideConfigResult = config_value("sitCursorOverride");
     if (!sitCursorOverrideConfigResult)
       return std::unexpected(std::move(sitCursorOverrideConfigResult.error()));
@@ -314,15 +314,15 @@ std::expected<void, StarException> LoungeableObject::set_orientation_index(std::
     if (!effectsResult)
       return std::unexpected(std::move(effectsResult.error()));
     auto effects = std::move(*effectsResult);
-    List<PersistentStatusEffect> parsedEffects;
+    List<PersistentStatusEffect> parsed_effects;
     for (auto const& effect : effects) {
       auto parsedResult = jsonToPersistentStatusEffect(effect);
       if (!parsedResult)
         return std::unexpected(std::move(parsedResult.error()));
       auto parsed = std::move(*parsedResult);
-      parsedEffects.push_back(std::move(parsed));
+      parsed_effects.push_back(std::move(parsed));
     }
-    m_sitStatusEffects = std::move(parsedEffects);
+    m_sit_status_effects = std::move(parsed_effects);
     auto emittersConfigResult = config_value("sitEffectEmitters", JsonArray());
     if (!emittersConfigResult)
       return std::unexpected(std::move(emittersConfigResult.error()));
@@ -331,7 +331,7 @@ std::expected<void, StarException> LoungeableObject::set_orientation_index(std::
     if (!emittersResult)
       return std::unexpected(std::move(emittersResult.error()));
     auto emitters = std::move(*emittersResult);
-    m_sitEffectEmitters = std::move(emitters);
+    m_sit_effect_emitters = std::move(emitters);
   }
   return {};
 }

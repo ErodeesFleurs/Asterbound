@@ -157,7 +157,7 @@ public:
   // Called on master entities when a DamageRequest has been generated due to a
   // DamageSource from this entity being applied to another entity.  Will be
   // called on the *causing* entity of the damage.
-  [[nodiscard]] virtual std::expected<void, StarException> hitOther(EntityId targetEntityId, DamageRequest const& damageRequest);
+  [[nodiscard]] virtual std::expected<void, StarException> hit_other(EntityId targetEntityId, DamageRequest const& damageRequest);
 
   // Called on master entities when this entity has damaged another entity.
   // Only called on the *source entity* of the damage, which may be different

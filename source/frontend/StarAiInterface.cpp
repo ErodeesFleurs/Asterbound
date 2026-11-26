@@ -47,7 +47,7 @@ std::expected<std::shared_ptr<AiInterface>, StarException> AiInterface::create(G
   auto database = gui_context.root().ai_database();
   if (!database)
     return std::unexpected(std::move(database.error()));
-  auto static_animation = (*database)->static_animation(client->mainPlayer()->shipSpecies());
+  auto static_animation = (*database)->static_animation(client->mainPlayer()->ship_species());
   if (!static_animation)
     return std::unexpected(std::move(static_animation.error()));
   auto face_animation = Animation::create(gui_context.root());
@@ -156,7 +156,7 @@ std::expected<void, StarException> AiInterface::initialize() {
   m_recruit_icon = std::move(*recruit_icon);
   auto dismiss_recruit = findChild<ButtonWidget>("dismissRecruit");
   if (!dismiss_recruit) return std::unexpected(std::move(dismiss_recruit.error()));
-  m_species = m_client->mainPlayer()->shipSpecies();
+  m_species = m_client->mainPlayer()->ship_species();
   auto mission_breadcrumb = config->get_string("missionBreadcrumbText");
   if (!mission_breadcrumb) return std::unexpected(std::move(mission_breadcrumb.error()));
   m_mission_breadcrumb_text = std::move(*mission_breadcrumb);

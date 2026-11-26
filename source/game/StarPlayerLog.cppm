@@ -31,7 +31,7 @@ public:
 
   bool has_radio_message(String const& message_name) const;
   bool add_radio_message(String const& message_name);
-  void clearRadioMessages();
+  void clear_radio_messages();
 
   StringSet cinematics() const;
   bool addCinematic(String const& cinematic);
@@ -48,7 +48,7 @@ private:
   double m_playTime;
   bool m_introComplete;
   StringSet m_scannedObjects;
-  StringSet m_radioMessages;
+  StringSet m_radio_messages;
   StringSet m_cinematics;
   StringMap<StringSet> m_collections;
 };

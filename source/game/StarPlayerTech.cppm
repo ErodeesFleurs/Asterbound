@@ -42,14 +42,14 @@ public:
 
   StringSet const& availableTechs() const;
   StringSet const& enabledTechs() const;
-  HashMap<TechType, String> const& equippedTechs() const;
+  HashMap<TechType, String> const& equipped_techs() const;
   StringList techModules() const;
 
 private:
   Root& m_root;
   StringSet m_availableTechs;
   StringSet m_enabledTechs;
-  HashMap<TechType, String> m_equippedTechs;
+  HashMap<TechType, String> m_equipped_techs;
 };
 
 }

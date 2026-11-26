@@ -245,7 +245,7 @@ std::expected<void, StarException> CharSelectionPane::selectCharacter(unsigned b
       // this click as selecting the next character (or creating a new one).
       return updateCharacterPlates();
     }
-    if ((*player)->isPermaDead() && !(*player)->is_admin()) {
+    if ((*player)->is_perma_dead() && !(*player)->is_admin()) {
       auto rejected = [&]() -> std::expected<void, StarException> {
         auto assets = context().root().assets();
         if (!assets) return std::unexpected(std::move(assets.error()));

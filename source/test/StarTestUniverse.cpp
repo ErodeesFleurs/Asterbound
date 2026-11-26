@@ -197,7 +197,7 @@ std::expected<std::unique_ptr<TestUniverse>, StarException> TestUniverse::create
   if (!player)
     return std::unexpected(std::move(player.error()));
   fixture->m_mainPlayer = std::move(*player);
-  auto finalized = fixture->m_mainPlayer->finalizeCreation();
+  auto finalized = fixture->m_mainPlayer->finalize_creation();
   if (!finalized)
     return std::unexpected(std::move(finalized.error()));
   // A player only carries a ship species once it has been saved and loaded
@@ -207,9 +207,9 @@ std::expected<std::unique_ptr<TestUniverse>, StarException> TestUniverse::create
   // species and the server builds the ship world from it, so a player that was
   // only created in memory cannot connect: the server fails to create its ship
   // world and drops the connection.
-  fixture->m_mainPlayer->setShipSpecies(fixture->m_mainPlayer->species());
-  fixture->m_mainPlayer->setAdmin(true);
-  auto mode = fixture->m_mainPlayer->setModeType(PlayerMode::Survival);
+  fixture->m_mainPlayer->set_ship_species(fixture->m_mainPlayer->species());
+  fixture->m_mainPlayer->set_admin(true);
+  auto mode = fixture->m_mainPlayer->set_mode_type(PlayerMode::Survival);
   if (!mode)
     return std::unexpected(std::move(mode.error()));
   auto mainPlayer = fixture->m_client->setMainPlayer(fixture->m_mainPlayer);
@@ -374,11 +374,11 @@ std::expected<void, StarException> TestUniverse::warpPlayer(WorldId worldId) {
   // build several times that, so the runner's per-case timeout
   // (ASTERBOUND_TEST_TIMEOUT) is the practical limit.
   auto startTime = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500));
-  while (m_mainPlayer->isTeleporting() || std::holds_alternative<std::monostate>(m_client->player_world())) {
+  while (m_mainPlayer->is_teleporting() || std::holds_alternative<std::monostate>(m_client->player_world())) {
     auto updated = m_client->update(0.016f);
     if (!updated)
       return std::unexpected(std::move(updated.error()));
-    if (!m_mainPlayer->isTeleporting() && !std::holds_alternative<std::monostate>(m_client->player_world()))
+    if (!m_mainPlayer->is_teleporting() && !std::holds_alternative<std::monostate>(m_client->player_world()))
       break;
     if (std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() + std::chrono::microseconds(500)) - startTime > std::chrono::milliseconds(300000))
       return std::unexpected(StarException("Timed out waiting for the test player to finish warping"));

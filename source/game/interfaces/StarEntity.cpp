@@ -110,7 +110,7 @@ std::expected<List<DamageSource>, StarException> Entity::damage_sources() const 
   return List<DamageSource>{};
 }
 
-std::expected<void, StarException> Entity::hitOther(EntityId, DamageRequest const&) { return {}; }
+std::expected<void, StarException> Entity::hit_other(EntityId, DamageRequest const&) { return {}; }
 
 std::expected<void, StarException> Entity::damaged_other(DamageNotification const&) { return {}; }
 

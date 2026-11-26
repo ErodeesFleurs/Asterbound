@@ -161,7 +161,7 @@ public:
   [[nodiscard]] std::expected<std::optional<HitType>, StarException> query_hit(DamageSource const& source) const override;
   [[nodiscard]] std::expected<std::optional<PolyF>, StarException> hit_poly() const override;
 
-  [[nodiscard]] std::expected<void, StarException> hitOther(EntityId targetEntityId, DamageRequest const& damageRequest) override;
+  [[nodiscard]] std::expected<void, StarException> hit_other(EntityId targetEntityId, DamageRequest const& damageRequest) override;
   [[nodiscard]] std::expected<void, StarException> damaged_other(DamageNotification const& damage) override;
 
   [[nodiscard]] std::expected<List<DamageNotification>, StarException> apply_damage(DamageRequest const& damage) override;

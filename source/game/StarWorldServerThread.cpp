@@ -380,7 +380,7 @@ std::expected<std::optional<Vec2F>, StarException> WorldServerThread::playerRevi
   std::unique_lock locker(m_mutex, std::defer_lock);
   lock_with_diagnostics(locker);
   if (auto player = m_worldServer->clientPlayer(clientId)) {
-    auto feetOffset = player->feetOffset();
+    auto feetOffset = player->feet_offset();
     if (!feetOffset) {
       auto logged = recordError(feetOffset.error());
       if (!logged)

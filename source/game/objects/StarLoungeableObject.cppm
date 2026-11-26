@@ -100,11 +100,11 @@ private:
   float m_sitAngle;
   String m_sitCoverImage;
   bool m_flipImages;
-  List<PersistentStatusEffect> m_sitStatusEffects;
-  StringSet m_sitEffectEmitters;
+  List<PersistentStatusEffect> m_sit_status_effects;
+  StringSet m_sit_effect_emitters;
   std::optional<String> m_sitEmote;
   std::optional<String> m_sitDance;
-  JsonObject m_sitArmorCosmeticOverrides;
+  JsonObject m_sit_armor_cosmetic_overrides;
   std::optional<String> m_sitCursorOverride;
 };
 

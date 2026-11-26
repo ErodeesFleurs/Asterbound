@@ -208,7 +208,7 @@ std::expected<std::shared_ptr<ScriptPane>, StarException> ScriptPane::create(Gui
   auto initialized = pane->init(std::move(config));
   if (!initialized)
     return std::unexpected(std::move(initialized.error()));
-  auto player = LuaBindings::makePlayerCallbacks(guiContext.root(), *pane->m_client->mainPlayer());
+  auto player = LuaBindings::make_player_callbacks(guiContext.root(), *pane->m_client->mainPlayer());
   if (!player)
     return std::unexpected(std::move(player.error()));
   auto playerAdded = pane->m_script.add_callbacks("player", std::move(*player));

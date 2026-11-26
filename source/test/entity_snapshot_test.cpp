@@ -166,10 +166,10 @@ const GameTestRegistration replicaPlayerSnapshot("EntitySnapshot", "RemotePlayer
   ASSERT_TRUE(factory) << factory.error().what();
   auto player = (*factory)->create();
   ASSERT_TRUE(player) << player.error().what();
-  ASSERT_TRUE((*player)->setName("Snapshot remote player"));
-  ASSERT_TRUE((*player)->finalizeCreation());
-  (*player)->setGenericProperty("snapshotUnsentSecret", Json("not transmitted"));
-  auto originalDisk = (*player)->diskStore();
+  ASSERT_TRUE((*player)->set_name("Snapshot remote player"));
+  ASSERT_TRUE((*player)->finalize_creation());
+  (*player)->set_generic_property("snapshotUnsentSecret", Json("not transmitted"));
+  auto originalDisk = (*player)->disk_store();
   ASSERT_TRUE(originalDisk) << originalDisk.error().what();
   NetCompatibilityRules rules;
   auto store = (*player)->net_store(rules);
@@ -188,10 +188,10 @@ const GameTestRegistration replicaPlayerSnapshot("EntitySnapshot", "RemotePlayer
   auto remote = as<Player>(setup.world->entity(id));
   ASSERT_TRUE(remote) << "real EntityCreate must publish a slave player";
   ASSERT_TRUE(remote->isSlave());
-  EXPECT_EQ(remote->getGenericProperty("snapshotUnsentSecret"), Json());
+  EXPECT_EQ(remote->get_generic_property("snapshotUnsentSecret"), Json());
   // Locally present replica-only data must still use the full disk dispatcher.
-  remote->setGenericProperty("snapshotLocalReplicaMarker", Json("retained"));
-  auto localDisk = remote->diskStore();
+  remote->set_generic_property("snapshotLocalReplicaMarker", Json("retained"));
+  auto localDisk = remote->disk_store();
   ASSERT_TRUE(localDisk) << localDisk.error().what();
   auto result = snapshot(setup, id);
   ASSERT_TRUE(result) << result.error().what();
@@ -227,7 +227,7 @@ const GameTestRegistration replicaPlayerSnapshot("EntitySnapshot", "RemotePlayer
     unsynchronizedWarning |= *contains;
   }
   EXPECT_TRUE(unsynchronizedWarning);
-  EXPECT_EQ(remote->diskStore(), *localDisk);
+  EXPECT_EQ(remote->disk_store(), *localDisk);
 });
 
 const GameTestRegistration transient_snapshots("EntitySnapshot", "TransientStateRestoresWithoutConsumingReplication", [](GameTest& fixture) {

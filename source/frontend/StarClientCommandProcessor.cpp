@@ -232,8 +232,8 @@ std::expected<CaseInsensitiveStringMap<ClientCommandProcessor::BuiltinCommand>, 
     {"resetGravity", invoke_builtin<&ClientCommandProcessor::resetGravity>},
     {"fixedCamera", invoke_builtin<&ClientCommandProcessor::fixedCamera>},
     {"monochromeLighting", invoke_builtin<&ClientCommandProcessor::monochromeLighting>},
-    {"radioMessage", invoke_builtin<&ClientCommandProcessor::radioMessage>},
-    {"clearRadioMessages", invoke_builtin<&ClientCommandProcessor::clearRadioMessages>},
+    {"radioMessage", invoke_builtin<&ClientCommandProcessor::radio_message>},
+    {"clearRadioMessages", invoke_builtin<&ClientCommandProcessor::clear_radio_messages>},
     {"clearCinematics", invoke_builtin<&ClientCommandProcessor::clearCinematics>},
     {"startQuest", invoke_builtin<&ClientCommandProcessor::startQuest>},
     {"completeQuest", invoke_builtin<&ClientCommandProcessor::completeQuest>},
@@ -537,8 +537,8 @@ std::expected<String, StarException> ClientCommandProcessor::monochromeLighting(
   return Star::format("Monochrome lighting {}", monochrome ? std::string_view("enabled") : std::string_view("disabled"));
 }
 
-std::expected<String, StarException> ClientCommandProcessor::radioMessage(String const& argumentsString) {
-  auto arguments = split_shell_words(argumentsString);
+std::expected<String, StarException> ClientCommandProcessor::radio_message(String const& arguments_string) {
+  auto arguments = split_shell_words(arguments_string);
   if (!arguments) return std::unexpected(std::move(arguments.error()));
   auto allowed = adminCommandAllowed();
   if (!allowed) return std::unexpected(std::move(allowed.error()));
@@ -549,11 +549,11 @@ std::expected<String, StarException> ClientCommandProcessor::radioMessage(String
   return "Queued radio message";
 }
 
-std::expected<String, StarException> ClientCommandProcessor::clearRadioMessages() {
+std::expected<String, StarException> ClientCommandProcessor::clear_radio_messages() {
   auto allowed = adminCommandAllowed();
   if (!allowed) return std::unexpected(std::move(allowed.error()));
   if (!*allowed) return "You must be an admin to use this command.";
-  m_universeClient->mainPlayer()->log()->clearRadioMessages();
+  m_universeClient->mainPlayer()->log()->clear_radio_messages();
   return "Player radio message records cleared!";
 }
 

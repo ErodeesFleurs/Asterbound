@@ -659,7 +659,7 @@ std::expected<String, StarException> CommandProcessor::set_dungeon_id(Connection
 
 std::expected<String, StarException> CommandProcessor::set_player_start(ConnectionId connection_id, String const&) {
   auto executed = m_universe.executeForClient(connection_id, [](WorldServer& world, std::shared_ptr<Player> const& player) -> std::expected<void, StarException> {
-      auto feet_offset = player->feetOffset();
+      auto feet_offset = player->feet_offset();
       if (!feet_offset) return std::unexpected(std::move(feet_offset.error()));
       world.setPlayerStart(player->position() + *feet_offset);
       return {};

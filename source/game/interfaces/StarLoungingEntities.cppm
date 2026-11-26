@@ -54,12 +54,12 @@ struct LoungeAnchor : EntityAnchor {
   LoungeOrientation orientation;
   EntityRenderLayer loungeRenderLayer;
   bool controllable;
-  List<PersistentStatusEffect> statusEffects;
-  StringSet effectEmitters;
+  List<PersistentStatusEffect> status_effects;
+  StringSet effect_emitters;
   std::optional<String> emote;
   std::optional<String> dance;
   std::optional<Directives> directives;
-  JsonObject armorCosmeticOverrides;
+  JsonObject armor_cosmetic_overrides;
   std::optional<String> cursorOverride;
   std::optional<bool> suppressTools;
   bool cameraFocus;

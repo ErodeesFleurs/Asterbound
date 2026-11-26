@@ -419,7 +419,7 @@ std::expected<Json, StarException> PlayerStorage::savePlayer(std::shared_ptr<Pla
   if (!playerUuid)
     return std::unexpected(std::move(playerUuid.error()));
   auto uuid = *playerUuid;
-  auto newPlayerData = player->diskStore();
+  auto newPlayerData = player->disk_store();
   if (!newPlayerData)
     return std::unexpected(std::move(newPlayerData.error()));
   auto cached = m_savedPlayersCache.find_ref(uuid);

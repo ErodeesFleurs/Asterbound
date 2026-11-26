@@ -14,7 +14,7 @@ PlayerLog::PlayerLog() {
   m_playTime = 0;
   m_introComplete = false;
   m_scannedObjects = StringSet();
-  m_radioMessages = StringSet();
+  m_radio_messages = StringSet();
   m_cinematics = StringSet();
 }
 
@@ -34,7 +34,7 @@ std::expected<PlayerLog, StarException> PlayerLog::create(Json const& json) {
   log.m_introComplete = *introComplete;
   for (auto const& field : {
       std::pair{std::string_view{"scannedObjects"}, std::ref(log.m_scannedObjects)},
-      std::pair{std::string_view{"radioMessages"}, std::ref(log.m_radioMessages)},
+      std::pair{std::string_view{"radioMessages"}, std::ref(log.m_radio_messages)},
       std::pair{std::string_view{"cinematics"}, std::ref(log.m_cinematics)}}) {
     auto value = json.get(field.first);
     if (!value)
@@ -65,7 +65,7 @@ Json PlayerLog::toJson() const {
       {"playTime", m_playTime},
       {"introComplete", m_introComplete},
       {"scannedObjects", json_from_string_set(m_scannedObjects)},
-      {"radioMessages", json_from_string_set(m_radioMessages)},
+      {"radioMessages", json_from_string_set(m_radio_messages)},
       {"cinematics", json_from_string_set(m_cinematics)},
       {"collections", std::move(collections)}};
 }
@@ -111,15 +111,15 @@ void PlayerLog::clearScannedObjects() {
 }
 
 bool PlayerLog::has_radio_message(String const& message_name) const {
-  return m_radioMessages.contains(message_name);
+  return m_radio_messages.contains(message_name);
 }
 
 bool PlayerLog::add_radio_message(String const& message_name) {
-  return m_radioMessages.add(message_name);
+  return m_radio_messages.add(message_name);
 }
 
-void PlayerLog::clearRadioMessages() {
-  m_radioMessages.clear();
+void PlayerLog::clear_radio_messages() {
+  m_radio_messages.clear();
 }
 
 StringSet PlayerLog::cinematics() const {

@@ -352,7 +352,10 @@ editing one edge or its nested nodes must not mutate another edge, a later
 result, or the native path. A node without velocity is distinct from one
 with velocity `{0, 0}`.
 
-### Player quest highlights
+### Player interfaces and quest highlights
+
+Native C++ calls use `Player::set_render_layer`; Lua mods continue to call
+`player.setRenderLayer`. Native symbol names are not serialized field names.
 
 The master player asks quests for `interestingObjects` each update. The quest
 list is snapshotted before the first script runs: changing the active quests

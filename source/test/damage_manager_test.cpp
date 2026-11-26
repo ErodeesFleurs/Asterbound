@@ -50,7 +50,7 @@ public:
     return HitType::StrongHit;
   }
 
-  std::expected<void, StarException> hitOther(EntityId target_id, DamageRequest const& request) override {
+  std::expected<void, StarException> hit_other(EntityId target_id, DamageRequest const& request) override {
     trace.emplace_back(Phase::Hit, entityId(), target_id);
     EXPECT_EQ(request.hit_type, HitType::StrongHit);
     if (on_hit)

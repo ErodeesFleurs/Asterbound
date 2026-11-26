@@ -55,43 +55,43 @@ using PlayerException = StarError<PlayerExceptionTag, StarException>;
 struct PlayerConfig {
   [[nodiscard]] static std::expected<std::shared_ptr<PlayerConfig>, StarException> create(Root& root, JsonObject const& cfg);
 
-  HumanoidIdentity defaultIdentity;
-  Humanoid::HumanoidTiming humanoidTiming;
+  HumanoidIdentity default_identity;
+  Humanoid::HumanoidTiming humanoid_timing;
 
-  List<ItemDescriptor> defaultItems;
-  List<ItemDescriptor> defaultBlueprints;
+  List<ItemDescriptor> default_items;
+  List<ItemDescriptor> default_blueprints;
 
   RectF meta_bound_box;
 
-  Json movementParameters;
-  Json zeroGMovementParameters;
-  Json statusControllerSettings;
+  Json movement_parameters;
+  Json zero_g_movement_parameters;
+  Json status_controller_settings;
 
-  float footstepTiming;
-  Vec2F footstepSensor;
+  float footstep_timing;
+  Vec2F footstep_sensor;
 
-  Vec2F underwaterSensor;
-  float underwaterMinWaterLevel;
+  Vec2F underwater_sensor;
+  float underwater_min_water_level;
 
-  String effectsAnimator;
+  String effects_animator;
 
-  float teleportInTime;
-  float teleportOutTime;
+  float teleport_in_time;
+  float teleport_out_time;
 
-  float deployInTime;
-  float deployOutTime;
+  float deploy_in_time;
+  float deploy_out_time;
 
-  String bodyMaterialKind;
+  String body_material_kind;
 
   EntitySplashConfig splash_config;
 
-  Json companionsConfig;
+  Json companions_config;
 
-  Json deploymentConfig;
+  Json deployment_config;
 
-  StringMap<String> genericScriptContexts;
+  StringMap<String> generic_script_contexts;
 private:
-  explicit PlayerConfig(Humanoid::HumanoidTiming timing) : humanoidTiming(std::move(timing)) {}
+  explicit PlayerConfig(Humanoid::HumanoidTiming timing) : humanoid_timing(std::move(timing)) {}
 };
 
 class PlayerFactory {

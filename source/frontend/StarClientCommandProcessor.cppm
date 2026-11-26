@@ -111,8 +111,8 @@ private:
   [[nodiscard]] std::expected<String, StarException> resetGravity();
   [[nodiscard]] std::expected<String, StarException> fixedCamera();
   [[nodiscard]] std::expected<String, StarException> monochromeLighting();
-  [[nodiscard]] std::expected<String, StarException> radioMessage(String const& argumentsString);
-  [[nodiscard]] std::expected<String, StarException> clearRadioMessages();
+  [[nodiscard]] std::expected<String, StarException> radio_message(String const& argumentsString);
+  [[nodiscard]] std::expected<String, StarException> clear_radio_messages();
   [[nodiscard]] std::expected<String, StarException> clearCinematics();
   [[nodiscard]] std::expected<String, StarException> startQuest(String const& argumentsString);
   [[nodiscard]] std::expected<String, StarException> completeQuest(String const& argumentsString);

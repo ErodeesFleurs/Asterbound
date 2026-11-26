@@ -79,7 +79,7 @@ public:
   [[nodiscard]] std::expected<Json, StarException> dialogCinema(std::uint64_t token) const;
   [[nodiscard]] std::expected<bool, StarException> finishDialog(std::uint64_t token, String const& decision);
 
-  List<std::shared_ptr<Quest>> listActiveQuests() const;
+  List<std::shared_ptr<Quest>> list_active_quests() const;
   List<std::shared_ptr<Quest>> listCompletedQuests() const;
   List<std::shared_ptr<Quest>> listFailedQuests() const;
 

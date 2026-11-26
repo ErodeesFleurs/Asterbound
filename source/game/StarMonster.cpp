@@ -982,7 +982,7 @@ std::expected<List<LightSource>, StarException> Monster::light_sources() const {
   return lights;
 }
 
-std::expected<void, StarException> Monster::hitOther(EntityId targetEntityId, DamageRequest const& damageRequest) {
+std::expected<void, StarException> Monster::hit_other(EntityId targetEntityId, DamageRequest const& damageRequest) {
   if (inWorld() && isMaster())
     m_status_controller->hit_other(targetEntityId, damageRequest);
   return {};

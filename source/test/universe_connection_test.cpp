@@ -2260,7 +2260,7 @@ std::expected<EntityId, StarException> add_route_replica(Root& root, WorldServer
   auto player = (*factory)->create();
   if (!player)
     return std::unexpected(std::move(player.error()));
-  if (auto ready = (*player)->finalizeCreation(); !ready)
+  if (auto ready = (*player)->finalize_creation(); !ready)
     return std::unexpected(std::move(ready.error()));
 
   NetCompatibilityRules rules;

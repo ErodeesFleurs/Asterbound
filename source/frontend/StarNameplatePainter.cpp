@@ -235,7 +235,7 @@ std::expected<void, StarException> NameplatePainter::update(float dt, std::share
   for (auto const& entity : *entities) {
     if ((entity->isMaster() && !m_showMasterNames) || !entity->display_nametag()) continue;
     if (auto player = as<Player>(entity)) {
-      if (player->isTeleporting()) continue;
+      if (player->is_teleporting()) continue;
     }
     foundEntities.insert(entity->entityId());
     if (!m_entitiesWithNametags.contains(entity->entityId())) {

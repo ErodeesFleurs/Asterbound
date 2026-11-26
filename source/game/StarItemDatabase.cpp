@@ -229,7 +229,7 @@ std::expected<bool, StarException> ItemDatabase::craft_recipe(Player& player, It
     if (!*product || !(*product)->count() || (*product)->count() > remaining)
       return std::unexpected(RecipeException("Invalid crafted stack size"));
     remaining -= (*product)->count();
-    if (auto given = player.giveItem(*product); !given)
+    if (auto given = player.give_item(*product); !given)
       return std::unexpected(std::move(given.error()));
     for (auto const& [collection, name] : recipe.collectables) {
       if (auto added = player.add_collectable(collection, name); !added)

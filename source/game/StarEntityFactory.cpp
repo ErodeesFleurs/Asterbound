@@ -264,8 +264,11 @@ std::expected<Json, StarException> EntityFactory::disk_store_entity_locked(std::
     return typed->get().diskStore();
   };
   switch (type) {
-    case EntityType::Player:
-      return store.template operator()<Player>();
+    case EntityType::Player: {
+      auto player = convert_ref<Player>(*entity);
+      if (!player) return std::unexpected(std::move(player.error()));
+      return player->get().disk_store();
+    }
     case EntityType::Monster:
       return store.template operator()<Monster>();
     case EntityType::Object: {

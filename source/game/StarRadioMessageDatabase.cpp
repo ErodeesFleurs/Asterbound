@@ -26,7 +26,7 @@ import star.radio_message_database;
 
 namespace Star {
 
-extern std::expected<EnumMap<RadioMessageType>, StarException> const RadioMessageTypeNames = EnumMap<RadioMessageType>::create({
+extern std::expected<EnumMap<RadioMessageType>, StarException> const radio_message_type_names = EnumMap<RadioMessageType>::create({
     {RadioMessageType::Generic, "generic"},
     {RadioMessageType::Mission, "mission"},
     {RadioMessageType::Quest, "quest"},
@@ -39,8 +39,8 @@ std::expected<std::shared_ptr<RadioMessageDatabase>, StarException> RadioMessage
   auto assets = root.assets();
   if (!assets)
     return std::unexpected(std::move(assets.error()));
-  if (!RadioMessageTypeNames)
-    return std::unexpected(RadioMessageTypeNames.error());
+  if (!radio_message_type_names)
+    return std::unexpected(radio_message_type_names.error());
   auto defaults = (*assets)->json("/radiomessages.config:messageDefaults");
   if (!defaults)
     return std::unexpected((*assets)->with_asset_context(std::move(defaults.error()), "/radiomessages.config", "Loading radio message defaults"));
@@ -48,8 +48,8 @@ std::expected<std::shared_ptr<RadioMessageDatabase>, StarException> RadioMessage
   auto files = (*assets)->scan_extension("radiomessages");
   if (!files)
     return std::unexpected(std::move(files.error()));
-  for (auto const& assetFile : files->get()) {
-    auto const& file = assetFile.string();
+  for (auto const& asset_file : files->get()) {
+    auto const& file = asset_file.string();
     auto loaded = [&]() -> std::expected<void, StarException> {
       auto messages = (*assets)->json(file);
       if (!messages)
@@ -58,12 +58,12 @@ std::expected<std::shared_ptr<RadioMessageDatabase>, StarException> RadioMessage
       if (!entries)
         return std::unexpected(std::move(entries.error()));
       for (auto const& pair : *entries) {
-        if (result->m_radioMessages.contains(pair.first))
+        if (result->m_radio_messages.contains(pair.first))
           return std::unexpected(RadioMessageDatabaseException(Star::format("Duplicate radiomessage {} in file {}", pair.first, file)));
-        auto message = result->createRadioMessage(pair.second, pair.first);
+        auto message = result->create_radio_message(pair.second, pair.first);
         if (!message)
           return std::unexpected(std::move(message.error()));
-        result->m_radioMessages[pair.first] = std::move(*message);
+        result->m_radio_messages[pair.first] = std::move(*message);
       }
       return {};
     }();
@@ -73,100 +73,100 @@ std::expected<std::shared_ptr<RadioMessageDatabase>, StarException> RadioMessage
   return result;
 }
 
-std::expected<RadioMessage, StarException> RadioMessageDatabase::radioMessage(String const& messageName) const {
-  if (auto message = m_radioMessages.find_ref(messageName))
+std::expected<RadioMessage, StarException> RadioMessageDatabase::radio_message(String const& message_name) const {
+  if (auto message = m_radio_messages.find_ref(message_name))
     return message->get();
-  return std::unexpected(RadioMessageDatabaseException(Star::format("Unknown radio message {}", messageName)));
+  return std::unexpected(RadioMessageDatabaseException(Star::format("Unknown radio message {}", message_name)));
 }
 
-std::expected<RadioMessage, StarException> RadioMessageDatabase::createRadioMessage(Json const& config, std::optional<String> const& messageId) const {
+std::expected<RadioMessage, StarException> RadioMessageDatabase::create_radio_message(Json const& config, std::optional<String> const& message_id) const {
   if (config.is_type(Json::Type::String)) {
     auto name = config.to_string();
     if (!name)
       return std::unexpected(std::move(name.error()));
-    return radioMessage(*name);
+    return radio_message(*name);
   }
   if (!config.is_type(Json::Type::Object))
     return std::unexpected(RadioMessageDatabaseException("Invalid radio message specification; expected message name or configuration."));
-  auto mergedConfig = json_merge(m_defaults, config);
+  auto merged_config = json_merge(m_defaults, config);
   RadioMessage message;
-  auto configuredId = mergedConfig.get_string("messageId", "");
-  if (!configuredId)
-    return std::unexpected(std::move(configuredId.error()));
-  message.messageId = messageId.value_or(*configuredId);
-  if (message.messageId.empty())
+  auto configured_id = merged_config.get_string("messageId", "");
+  if (!configured_id)
+    return std::unexpected(std::move(configured_id.error()));
+  message.message_id = message_id.value_or(*configured_id);
+  if (message.message_id.empty())
     return std::unexpected(RadioMessageDatabaseException("Custom radio messages must specify a messageId!"));
-  auto typeName = mergedConfig.get_string("type");
-  if (!typeName)
-    return std::unexpected(std::move(typeName.error()));
-  auto type = RadioMessageTypeNames->find_left_ref(*typeName);
+  auto type_name = merged_config.get_string("type");
+  if (!type_name)
+    return std::unexpected(std::move(type_name.error()));
+  auto type = radio_message_type_names->find_left_ref(*type_name);
   if (!type)
     return std::unexpected(std::move(type.error()));
   if (!*type)
-    return std::unexpected(RadioMessageDatabaseException(Star::format("Unknown radio message type '{}'", *typeName)));
+    return std::unexpected(RadioMessageDatabaseException(Star::format("Unknown radio message type '{}'", *type_name)));
   message.type = (*type)->get();
   // Mission messages may repeat when the mission is replayed.
-  auto unique = message.type == RadioMessageType::Mission ? config.get_bool("unique", false) : mergedConfig.get_bool("unique");
+  auto unique = message.type == RadioMessageType::Mission ? config.get_bool("unique", false) : merged_config.get_bool("unique");
   if (!unique)
     return std::unexpected(std::move(unique.error()));
   message.unique = *unique;
-  auto important = mergedConfig.get_bool("important");
+  auto important = merged_config.get_bool("important");
   if (!important)
     return std::unexpected(std::move(important.error()));
   message.important = *important;
-  auto text = mergedConfig.get_string("text");
+  auto text = merged_config.get_string("text");
   if (!text)
     return std::unexpected(std::move(text.error()));
   message.text = std::move(*text);
-  auto senderName = mergedConfig.get_string("senderName");
-  if (!senderName)
-    return std::unexpected(std::move(senderName.error()));
-  message.senderName = std::move(*senderName);
-  auto portraitImage = mergedConfig.get_string("portraitImage");
-  if (!portraitImage)
-    return std::unexpected(std::move(portraitImage.error()));
-  message.portraitImage = std::move(*portraitImage);
-  auto portraitFrames = mergedConfig.get_int("portraitFrames");
-  if (!portraitFrames)
-    return std::unexpected(std::move(portraitFrames.error()));
-  message.portraitFrames = *portraitFrames;
-  auto portraitSpeed = mergedConfig.get_float("portraitSpeed");
-  if (!portraitSpeed)
-    return std::unexpected(std::move(portraitSpeed.error()));
-  message.portraitSpeed = *portraitSpeed;
-  auto textSpeed = mergedConfig.get_float("textSpeed");
-  if (!textSpeed)
-    return std::unexpected(std::move(textSpeed.error()));
-  message.textSpeed = *textSpeed;
-  auto persistTime = mergedConfig.get_float("persistTime");
-  if (!persistTime)
-    return std::unexpected(std::move(persistTime.error()));
-  message.persistTime = *persistTime;
-  auto chatterSound = mergedConfig.get_string("chatterSound");
-  if (!chatterSound)
-    return std::unexpected(std::move(chatterSound.error()));
-  message.chatterSound = std::move(*chatterSound);
-  auto withoutAi = config.erase("speciesAiMessage");
-  if (!withoutAi)
-    return std::unexpected(std::move(withoutAi.error()));
-  auto merger = withoutAi->erase("speciesMessage");
+  auto sender_name = merged_config.get_string("senderName");
+  if (!sender_name)
+    return std::unexpected(std::move(sender_name.error()));
+  message.sender_name = std::move(*sender_name);
+  auto portrait_image = merged_config.get_string("portraitImage");
+  if (!portrait_image)
+    return std::unexpected(std::move(portrait_image.error()));
+  message.portrait_image = std::move(*portrait_image);
+  auto portrait_frames = merged_config.get_int("portraitFrames");
+  if (!portrait_frames)
+    return std::unexpected(std::move(portrait_frames.error()));
+  message.portrait_frames = *portrait_frames;
+  auto portrait_speed = merged_config.get_float("portraitSpeed");
+  if (!portrait_speed)
+    return std::unexpected(std::move(portrait_speed.error()));
+  message.portrait_speed = *portrait_speed;
+  auto text_speed = merged_config.get_float("textSpeed");
+  if (!text_speed)
+    return std::unexpected(std::move(text_speed.error()));
+  message.text_speed = *text_speed;
+  auto persist_time = merged_config.get_float("persistTime");
+  if (!persist_time)
+    return std::unexpected(std::move(persist_time.error()));
+  message.persist_time = *persist_time;
+  auto chatter_sound = merged_config.get_string("chatterSound");
+  if (!chatter_sound)
+    return std::unexpected(std::move(chatter_sound.error()));
+  message.chatter_sound = std::move(*chatter_sound);
+  auto without_ai = config.erase("speciesAiMessage");
+  if (!without_ai)
+    return std::unexpected(std::move(without_ai.error()));
+  auto merger = without_ai->erase("speciesMessage");
   if (!merger)
     return std::unexpected(std::move(merger.error()));
   for (auto const& [key, overrides] : {
-           std::pair{std::string_view{"speciesAiMessage"}, std::ref(message.speciesAiMessage)},
-           std::pair{std::string_view{"speciesMessage"}, std::ref(message.speciesMessage)}}) {
-    auto variants = mergedConfig.get(key, JsonObject()).and_then([](Json const& value) { return value.iterate_object(); });
+           std::pair{std::string_view{"speciesAiMessage"}, std::ref(message.species_ai_message)},
+           std::pair{std::string_view{"speciesMessage"}, std::ref(message.species_message)}}) {
+    auto variants = merged_config.get(key, JsonObject()).and_then([](Json const& value) { return value.iterate_object(); });
     if (!variants)
       return std::unexpected(std::move(variants.error()));
     for (auto const& pair : *variants) {
-      auto nested = createRadioMessage(json_merge(*merger, pair.second), messageId);
+      auto nested = create_radio_message(json_merge(*merger, pair.second), message_id);
       if (!nested)
         return std::unexpected(std::move(nested.error()));
       overrides.get().try_emplace(pair.first, std::move(*nested));
     }
   }
-  if (message.portraitFrames <= 0)
-    return std::unexpected(RadioMessageDatabaseException(Star::format("Invalid portraitFrames {} in radio message config!", message.portraitFrames)));
+  if (message.portrait_frames <= 0)
+    return std::unexpected(RadioMessageDatabaseException(Star::format("Invalid portraitFrames {} in radio message config!", message.portrait_frames)));
   return message;
 }
 

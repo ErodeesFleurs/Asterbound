@@ -198,7 +198,7 @@ std::expected<void, StarException> BlueprintItem::fire_triggered() {
     if (!itemOwner)
       return std::unexpected(std::move(itemOwner.error()));
     if (auto player = as_ref<Player>(itemOwner->get())) {
-      auto learned = player->get().addBlueprint(m_recipe, true);
+      auto learned = player->get().add_blueprint(m_recipe, true);
       if (!learned)
         return std::unexpected(std::move(learned.error()));
       if (*learned)

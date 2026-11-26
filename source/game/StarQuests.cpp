@@ -241,7 +241,7 @@ std::expected<std::shared_ptr<Quest>, StarException> Quest::create(Root& root, Q
   quest->m_parameters = quest->questDescriptor().parameters;
   quest->m_displayParameters = DisplayParameters{qt.ephemeral, qt.showInLog, qt.showAcceptDialog,
       qt.showCompleteDialog, qt.showFailDialog, qt.mainQuest, qt.hideCrossServer};
-  auto parameter = quest->setEntityParameter("player", player);
+  auto parameter = quest->set_entity_parameter("player", player);
   if (!parameter) return std::unexpected(std::move(parameter.error()));
   auto money = root.random().uniform_uint(qt.moneyRange[0], qt.moneyRange[1]);
   if (!money) return std::unexpected(std::move(money.error()));
@@ -541,8 +541,8 @@ std::expected<void, StarException> Quest::start() {
   setState(QuestState::Active);
   auto initialized = initScript();
   if (!initialized) return std::unexpected(std::move(initialized.error()));
-  auto current = m_player->get().questManager()->trackedQuest();
-  if (mainQuest() || !current) m_player->get().questManager()->setAsTracked(questId());
+  auto current = m_player->get().quest_manager()->trackedQuest();
+  if (mainQuest() || !current) m_player->get().quest_manager()->setAsTracked(questId());
   auto result = recover_lua_script_error(m_scriptComponent.invoke("questStart"));
   if (!result) return std::unexpected(std::move(result.error()));
   return {};
@@ -559,12 +559,12 @@ std::expected<void, StarException> Quest::complete(std::optional<std::size_t> fo
   for (auto const& item : rewards()) {
     auto clone = item->clone();
     if (!clone) return std::unexpected(std::move(clone.error()));
-    auto given = m_player->get().giveItem(*clone);
+    auto given = m_player->get().give_item(*clone);
     if (!given) return std::unexpected(std::move(given.error()));
   }
   auto currency = m_player->get().inventory()->addCurrency("money", money());
   if (!currency) return std::unexpected(std::move(currency.error()));
-  bool track = m_player->get().questManager()->isTracked(questId());
+  bool track = m_player->get().quest_manager()->isTracked(questId());
   std::size_t next = followupIndex.value_or(questArcPosition() + 1);
   if (next < m_arc.quests.size()) {
     auto followup = Quest::create(m_root, m_arc, next, m_player->get());
@@ -572,12 +572,12 @@ std::expected<void, StarException> Quest::complete(std::optional<std::size_t> fo
     (*followup)->setWorldId(worldId());
     (*followup)->setLocation(location());
     (*followup)->setServerUuid(serverUuid());
-    auto offered = m_player->get().questManager()->offer(*followup);
+    auto offered = m_player->get().quest_manager()->offer(*followup);
     if (!offered) return std::unexpected(std::move(offered.error()));
-    if (track) m_player->get().questManager()->setAsTracked((*followup)->questId());
+    if (track) m_player->get().quest_manager()->setAsTracked((*followup)->questId());
   } else if (track) {
-    if (auto main = m_player->get().questManager()->getFirstMainQuest()) m_player->get().questManager()->setAsTracked((*main)->questId());
-    else m_player->get().questManager()->setAsTracked({});
+    if (auto main = m_player->get().quest_manager()->getFirstMainQuest()) m_player->get().quest_manager()->setAsTracked((*main)->questId());
+    else m_player->get().quest_manager()->setAsTracked({});
   }
   return {};
 }
@@ -595,7 +595,7 @@ std::expected<void, StarException> Quest::abandon() {
   if (!result) return std::unexpected(std::move(result.error()));
   return uninitScript();
 }
-std::expected<bool, StarException> Quest::interactWithEntity(EntityId entity) {
+std::expected<bool, StarException> Quest::interact_with_entity(EntityId entity) {
   auto result = recover_lua_script_error(m_scriptComponent.invoke<bool>("questInteract", entity));
   if (!result) return std::unexpected(std::move(result.error()));
   return result->value_or(false);
@@ -625,8 +625,8 @@ void Quest::setDialogShown() {
   m_showDialog = false;
 }
 
-std::expected<void, StarException> Quest::setEntityParameter(String const& paramName, std::shared_ptr<Entity const> const& entity) {
-  return setEntityParameter(paramName, *entity);
+std::expected<void, StarException> Quest::set_entity_parameter(String const& param_name, std::shared_ptr<Entity const> const& entity) {
+  return set_entity_parameter(param_name, *entity);
 }
 
 void Quest::setParameter(String const& paramName, QuestParam const& paramValue) {
@@ -888,7 +888,7 @@ std::expected<void, StarException> Quest::initScriptBindings() {
     auto addedCelestial = m_scriptComponent.add_callbacks("celestial", std::move(*celestial));
     if (!addedCelestial) return std::unexpected(std::move(addedCelestial.error()));
   }
-  auto player = LuaBindings::makePlayerCallbacks(m_root, m_player->get());
+  auto player = LuaBindings::make_player_callbacks(m_root, m_player->get());
   if (!player) return std::unexpected(std::move(player.error()));
   auto addedPlayer = m_scriptComponent.add_callbacks("player", std::move(*player));
   if (!addedPlayer) return std::unexpected(std::move(addedPlayer.error()));
@@ -983,7 +983,7 @@ std::expected<LuaCallbacks, StarException> Quest::makeQuestCallbacks(Player& pla
     quest.setServerUuid(std::move(*uuid));
     return {};
   }); !r) return std::unexpected(std::move(r.error()));
-  if (auto r = callbacks.register_callback("isCurrent", [&quest = *this, &player]() { return player.questManager()->isCurrent(quest.questId()); }); !r)
+  if (auto r = callbacks.register_callback("isCurrent", [&quest = *this, &player]() { return player.quest_manager()->isCurrent(quest.questId()); }); !r)
     return std::unexpected(std::move(r.error()));
   if (auto r = callbacks.register_callback("location", [&quest = *this]() -> std::expected<Json, StarException> {
     if (auto loc = quest.location()) {
@@ -1077,20 +1077,20 @@ std::expected<LuaCallbacks, StarException> Quest::makeQuestCallbacks(Player& pla
   return callbacks;
 }
 
-std::expected<void, StarException> Quest::setEntityParameter(String const& paramName, Entity const& entity) {
+std::expected<void, StarException> Quest::set_entity_parameter(String const& param_name, Entity const& entity) {
   std::optional<Json> portrait;
   std::optional<String> name;
   std::optional<String> species;
   std::optional<Gender> gender;
-  if (auto portraitEntity = as_ref<PortraitEntity>(entity)) {
-    auto drawables = portraitEntity->get().portrait(PortraitMode::Full);
+  if (auto portrait_entity = as_ref<PortraitEntity>(entity)) {
+    auto drawables = portrait_entity->get().portrait(PortraitMode::Full);
     if (!drawables) return std::unexpected(std::move(drawables.error()));
     auto json = json_from_list(*drawables, [](Drawable const& drawable) { return drawable.to_json(); });
     if (!json) return std::unexpected(std::move(json.error()));
     portrait = std::move(*json);
-    auto entityName = portraitEntity->get().name();
-    if (!entityName) return std::unexpected(std::move(entityName.error()));
-    name = std::move(*entityName);
+    auto entity_name = portrait_entity->get().name();
+    if (!entity_name) return std::unexpected(std::move(entity_name.error()));
+    name = std::move(*entity_name);
   }
   if (auto npc = as_ref<Npc>(entity)) {
     species = npc->get().species();
@@ -1099,7 +1099,7 @@ std::expected<void, StarException> Quest::setEntityParameter(String const& param
     species = player->get().species();
     gender = player->get().gender();
   }
-  m_parameters[paramName] = QuestParam{QuestEntity{entity.uniqueId(), species, gender}, name, portrait, {}};
+  m_parameters[param_name] = QuestParam{QuestEntity{entity.uniqueId(), species, gender}, name, portrait, {}};
   return {};
 }
 std::expected<void, StarException> Quest::addReward(ItemDescriptor const& reward) {
@@ -1114,7 +1114,7 @@ std::expected<void, StarException> Quest::addReward(ItemDescriptor const& reward
 }
 
 String const& Quest::defaultCustomIndicator() const {
-  return m_player->get().questManager()->isCurrent(questId()) ? m_trackedIndicator : m_untrackedIndicator;
+  return m_player->get().quest_manager()->isCurrent(questId()) ? m_trackedIndicator : m_untrackedIndicator;
 }
 
 std::expected<std::shared_ptr<Quest>, StarException> createPreviewQuest(

@@ -446,7 +446,7 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
           auto name = enum_name<TileCollisionOverrideNames>(m_collisionOverride);
           if (!name)
             return std::unexpected(std::move(name.error()));
-          auto stored = player->get().setSecretProperty(CollisionOverridePropertyKey, *name);
+          auto stored = player->get().set_secret_property(CollisionOverridePropertyKey, *name);
           if (!stored)
             return std::unexpected(std::move(stored.error()));
         }
@@ -460,7 +460,7 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
 
       if (auto presses = input->get().bind_down("opensb", "buildingRadiusGrow")) {
         m_blockRadius = std::min(BlockRadiusLimit, int(m_blockRadius + *presses));
-        auto stored = player->get().setSecretProperty(BlockRadiusPropertyKey, m_blockRadius);
+        auto stored = player->get().set_secret_property(BlockRadiusPropertyKey, m_blockRadius);
         if (!stored)
           return std::unexpected(std::move(stored.error()));
         auto sound = itemOwner->get().add_sound("/sfx/tools/buildradiusgrow.wav", 1.0f, 1.0f + m_blockRadius / BlockRadiusLimit);
@@ -470,7 +470,7 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
 
       if (auto presses = input->get().bind_down("opensb", "buildingRadiusShrink")) {
         m_blockRadius = std::max(1, int(m_blockRadius - *presses));
-        auto stored = player->get().setSecretProperty(BlockRadiusPropertyKey, m_blockRadius);
+        auto stored = player->get().set_secret_property(BlockRadiusPropertyKey, m_blockRadius);
         if (!stored)
           return std::unexpected(std::move(stored.error()));
         auto sound = itemOwner->get().add_sound("/sfx/tools/buildradiusshrink.wav", 1.0f, 1.0f + m_blockRadius / BlockRadiusLimit);
@@ -481,7 +481,7 @@ std::expected<void, StarException> MaterialItem::update(float dt, FireMode fireM
       if (auto presses = input->get().bind_down("opensb", "blockSwapToggle")) {
         if (*presses % 2 != 0)
           m_blockSwap = !m_blockSwap;
-        auto stored = player->get().setSecretProperty(BlockSwapPropertyKey, m_blockSwap);
+        auto stored = player->get().set_secret_property(BlockSwapPropertyKey, m_blockSwap);
         if (!stored)
           return std::unexpected(std::move(stored.error()));
         auto pitch = root().random().uniform_float(0.9f, 1.1f);
@@ -705,7 +705,7 @@ std::expected<std::size_t, StarException> MaterialItem::block_swap(float radius,
   if (!player)
     return 0;
   
-  std::shared_ptr<Item> beamAxePtr = player->get().essentialItem(EssentialItem::BeamAxe);
+  std::shared_ptr<Item> beamAxePtr = player->get().essential_item(EssentialItem::BeamAxe);
   if (!beamAxePtr)
     return 0;
   
@@ -934,7 +934,7 @@ std::expected<std::reference_wrapper<List<Drawable> const>, StarException> Mater
 }
 
 std::expected<void, StarException> MaterialItem::updatePropertiesFromPlayer(Player& player) {
-  auto blockRadius = player.getSecretProperty(BlockRadiusPropertyKey);
+  auto blockRadius = player.get_secret_property(BlockRadiusPropertyKey);
   if (!blockRadius)
     return std::unexpected(std::move(blockRadius.error()));
   if (blockRadius->is_type(Json::Type::Float)) {
@@ -943,7 +943,7 @@ std::expected<void, StarException> MaterialItem::updatePropertiesFromPlayer(Play
       return std::unexpected(std::move(value.error()));
     m_blockRadius = *value;
   }
-  auto altRadius = player.getSecretProperty(AltBlockRadiusPropertyKey);
+  auto altRadius = player.get_secret_property(AltBlockRadiusPropertyKey);
   if (!altRadius)
     return std::unexpected(std::move(altRadius.error()));
   if (altRadius->is_type(Json::Type::Float)) {
@@ -952,7 +952,7 @@ std::expected<void, StarException> MaterialItem::updatePropertiesFromPlayer(Play
       return std::unexpected(std::move(value.error()));
     m_altBlockRadius = *value;
   }
-  auto collision = player.getSecretProperty(CollisionOverridePropertyKey);
+  auto collision = player.get_secret_property(CollisionOverridePropertyKey);
   if (!collision)
     return std::unexpected(std::move(collision.error()));
   if (collision->is_type(Json::Type::String)) {
@@ -964,7 +964,7 @@ std::expected<void, StarException> MaterialItem::updatePropertiesFromPlayer(Play
       return std::unexpected(std::move(value.error()));
     m_collisionOverride = value->value_or(TileCollisionOverride::None);
   }
-  auto blockSwap = player.getSecretProperty(BlockSwapPropertyKey);
+  auto blockSwap = player.get_secret_property(BlockSwapPropertyKey);
   if (!blockSwap)
     return std::unexpected(std::move(blockSwap.error()));
   if (blockSwap->is_type(Json::Type::Bool)) {

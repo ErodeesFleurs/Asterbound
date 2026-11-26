@@ -280,7 +280,7 @@ std::expected<void, StarException> LargeCharPlateWidget::setPlayer(std::shared_p
   if (!modesJson) return std::unexpected(std::move(modesJson.error()));
   auto modes = modesJson->to_array();
   if (!modes) return std::unexpected(std::move(modes.error()));
-  auto modeJson = modes->at(m_player ? 1 + static_cast<int>(m_player->modeType()) : 0);
+  auto modeJson = modes->at(m_player ? 1 + static_cast<int>(m_player->mode_type()) : 0);
   if (!modeJson) return std::unexpected(std::move(modeJson.error()));
   auto mode = modeJson->get().to_array();
   if (!mode) return std::unexpected(std::move(mode.error()));

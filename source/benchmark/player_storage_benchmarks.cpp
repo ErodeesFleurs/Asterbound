@@ -25,9 +25,9 @@ std::expected<std::shared_ptr<Player>, StarException> create_benchmark_player(Ro
   auto player = (*factory)->create();
   if (!player)
     return std::unexpected(std::move(player.error()));
-  if (auto named = (*player)->setName(name); !named)
+  if (auto named = (*player)->set_name(name); !named)
     return std::unexpected(std::move(named.error()));
-  if (auto finalized = (*player)->finalizeCreation(); !finalized)
+  if (auto finalized = (*player)->finalize_creation(); !finalized)
     return std::unexpected(std::move(finalized.error()));
   return std::move(*player);
 }
@@ -165,7 +165,7 @@ void register_player_storage_benchmarks(Star::Root& root, bool& failed) {
             return;
           }
           for (auto _ : state) {
-            auto refreshed = appearance ? (*player)->refresh_humanoid() : (*player)->refreshArmor();
+            auto refreshed = appearance ? (*player)->refresh_humanoid() : (*player)->refresh_armor();
             if (!refreshed) {
               failed = true;
               state.SkipWithError(refreshed.error().what());

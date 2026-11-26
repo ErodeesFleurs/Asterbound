@@ -825,7 +825,7 @@ void exercise_teleport_replacement(GameTest& fixture, Application const& applica
     EXPECT_EQ((*label)->text(), name);
   };
   expectDestination(*previous, "Ship");
-  auto saved = player->universeMap()->toJson();
+  auto saved = player->universe_map()->toJson();
   ASSERT_TRUE(saved);
   auto world = client->player_world();
   // Validate even a filtered-out row, before a bookmark editor or replacement
@@ -849,11 +849,11 @@ void exercise_teleport_replacement(GameTest& fixture, Application const& applica
   EXPECT_TRUE(previous->isDismissed());
   EXPECT_FALSE(next->isDismissed());
   expectDestination(*next, "Return trip");
-  auto after = player->universeMap()->toJson();
+  auto after = player->universe_map()->toJson();
   ASSERT_TRUE(after);
   EXPECT_EQ(*after, *saved);
   EXPECT_EQ(client->player_world(), world);
-  EXPECT_FALSE(player->isTeleporting());
+  EXPECT_FALSE(player->is_teleporting());
   interface->reset();
   ASSERT_TRUE((*universe)->close());
 }
@@ -967,7 +967,7 @@ void exercise_crafting_inventory_refresh(GameTest& fixture, Application const& a
   player->log()->setIntroComplete(true);
   if (!succeeded((*universe)->warpPlayer(InstanceWorldId("outpost")), "enter test world"))
     return;
-  player->setAdmin(false);
+  player->set_admin(false);
 
   auto inventory = player->inventory();
   auto database = root.itemDatabase();
@@ -1423,7 +1423,7 @@ void exercise_stale_character_selection(GameTest& fixture, Application const& ap
   auto remaining = (*factory)->create();
   ASSERT_TRUE(removed && remaining);
   for (auto const& player : {*removed, *remaining}) {
-    ASSERT_TRUE(player->finalizeCreation());
+    ASSERT_TRUE(player->finalize_creation());
     ASSERT_TRUE((*storage)->savePlayer(player));
   }
   auto removedId = (*removed)->uuid();
@@ -4606,8 +4606,8 @@ const GameTestRegistration
     auto first_book = domain->find("zzcodex-one");
     ASSERT_TRUE(first_book);
     EXPECT_EQ(first_book->icon(), String("/interface/codex/iconBook.png"));
-    auto playerCallbacks = LuaBindings::makePlayerCallbacks(root, **player);
-    ASSERT_TRUE(playerCallbacks) << playerCallbacks.error().what();
+    auto player_callbacks = LuaBindings::make_player_callbacks(root, **player);
+    ASSERT_TRUE(player_callbacks) << player_callbacks.error().what();
     auto assets = root.assets();
     ASSERT_TRUE(assets) << assets.error().what();
     auto config = (*assets)->json("/interface/asterbound/codex/codex.config");
@@ -4621,7 +4621,7 @@ const GameTestRegistration
     auto pane = std::move(*createdPane);
     pane->setAnchor(PaneAnchor::BottomLeft);
     ASSERT_TRUE(pane->set_lua_root(*luaRoot));
-    ASSERT_TRUE(pane->add_callbacks("player", *playerCallbacks));
+    ASSERT_TRUE(pane->add_callbacks("player", *player_callbacks));
     // Actual native controls and domain callbacks; only renderer-dependent label
     // drawing is replaced by the same widget.setText-capable native TextBox.
     for (auto const& name :
@@ -4678,7 +4678,7 @@ const GameTestRegistration
     auto rootCallbacks = LuaBindings::makeRootCallbacks(root);
     ASSERT_TRUE(rootCallbacks) << rootCallbacks.error().what();
     ASSERT_TRUE(controller->set_callbacks("root", *rootCallbacks));
-    ASSERT_TRUE(controller->set_callbacks("player", *playerCallbacks));
+    ASSERT_TRUE(controller->set_callbacks("player", *player_callbacks));
     auto compact = controller->eval<bool>(R"LUA(
       local summaries, legacy = player.getCodexSummaries(), player.getCodexList()
       if #summaries ~= #legacy then return false end
@@ -4823,7 +4823,7 @@ const GameTestRegistration
     ASSERT_TRUE(pane->call("showCodex", {"zzcodex-one"}));
     ASSERT_TRUE(pane->call("nextButton"));
     EXPECT_EQ((*text)->getText(), String("Second β"));
-    auto save = (*player)->diskStore();
+    auto save = (*player)->disk_store();
     ASSERT_TRUE(save) << save.error().what();
     auto flags = save->get("codexes");
     ASSERT_TRUE(flags);
@@ -4831,7 +4831,7 @@ const GameTestRegistration
     ASSERT_TRUE(without_empty);
     auto first_save = save->set("codexes", std::move(*without_empty));
     ASSERT_TRUE(first_save);
-    auto loaded = (*player)->diskLoad(*first_save);
+    auto loaded = (*player)->disk_load(*first_save);
     ASSERT_TRUE(loaded) << loaded.error().what();
     ASSERT_TRUE(pane->call("update"));
     EXPECT_EQ((*text)->getText(), String("Reloaded only page"));
@@ -4845,7 +4845,7 @@ const GameTestRegistration
     ASSERT_TRUE(without_book);
     auto other_save = save->set("codexes", std::move(*without_book));
     ASSERT_TRUE(other_save);
-    loaded = (*player)->diskLoad(*other_save);
+    loaded = (*player)->disk_load(*other_save);
     ASSERT_TRUE(loaded) << loaded.error().what();
     EXPECT_NE(replacement->domain_id(), (*player)->codexes()->domain_id());
     EXPECT_EQ(replacement->revision(), (*player)->codexes()->revision());
@@ -4913,7 +4913,7 @@ const GameTestRegistration questTrackerPresentation(
       ASSERT_TRUE(storedQuest) << storedQuest.error().what();
       quests.set(templateId, storedQuest->toJson());
     }
-    auto manager = (*player)->questManager();
+    auto manager = (*player)->quest_manager();
     ASSERT_TRUE(manager->diskLoad(JsonObject{{"quests", quests}, {"currentQuest", "zztracker"}}));
     auto quest = manager->getQuest("zztracker");
     ASSERT_TRUE(quest) << quest.error().what();
@@ -4922,11 +4922,11 @@ const GameTestRegistration questTrackerPresentation(
     (*quest)->setObjectiveList(objectives);
     (*quest)->setProgress(0.0f);
     (*quest)->setCompassDirection(0.0f);
-    auto playerCallbacks = LuaBindings::makePlayerCallbacks(root, **player);
-    ASSERT_TRUE(playerCallbacks) << playerCallbacks.error().what();
+    auto player_callbacks = LuaBindings::make_player_callbacks(root, **player);
+    ASSERT_TRUE(player_callbacks) << player_callbacks.error().what();
     auto probe = (*luaRoot)->create_context(StringList{});
     ASSERT_TRUE(probe) << probe.error().what();
-    ASSERT_TRUE(probe->set_callbacks("player", *playerCallbacks));
+    ASSERT_TRUE(probe->set_callbacks("player", *player_callbacks));
     auto compact = probe->eval<Json>("return player.currentQuestView()");
     ASSERT_TRUE(compact) << compact.error().what();
     EXPECT_EQ(
@@ -4964,7 +4964,7 @@ const GameTestRegistration questTrackerPresentation(
     auto pane = std::move(*createdPane);
     pane->setAnchor(PaneAnchor::BottomLeft);
     ASSERT_TRUE(pane->set_lua_root(*luaRoot));
-    ASSERT_TRUE(pane->add_callbacks("player", *playerCallbacks));
+    ASSERT_TRUE(pane->add_callbacks("player", *player_callbacks));
     LuaCallbacks interface;
     bool hasPlayer = true;
     ASSERT_TRUE(interface.register_callback("session", [&] { return JsonObject{{"hasPlayer", hasPlayer}}; }));
@@ -5100,11 +5100,11 @@ const GameTestRegistration questTrackerPresentation(
     // rebind, no-quest interval and script reload, as session overlays require.
     auto replacement = (*factory)->create();
     ASSERT_TRUE(replacement) << replacement.error().what();
-    auto replacementCallbacks = LuaBindings::makePlayerCallbacks(root, **replacement);
-    ASSERT_TRUE(replacementCallbacks) << replacementCallbacks.error().what();
+    auto replacement_callbacks = LuaBindings::make_player_callbacks(root, **replacement);
+    ASSERT_TRUE(replacement_callbacks) << replacement_callbacks.error().what();
     ASSERT_TRUE(pane->dismissed());
     ASSERT_TRUE(pane->remove_callbacks("player"));
-    ASSERT_TRUE(pane->add_callbacks("player", *replacementCallbacks));
+    ASSERT_TRUE(pane->add_callbacks("player", *replacement_callbacks));
     hasPlayer = true;
     ASSERT_TRUE(pane->displayed());
     ASSERT_TRUE(root.reload());
@@ -5119,7 +5119,7 @@ const GameTestRegistration questTrackerPresentation(
     EXPECT_EQ(*retainedPublicHandle, (Json(JsonArray{true, false, false})));
     ASSERT_TRUE(pane->dismissed());
     ASSERT_TRUE(pane->remove_callbacks("player"));
-    ASSERT_TRUE(pane->add_callbacks("player", *playerCallbacks));
+    ASSERT_TRUE(pane->add_callbacks("player", *player_callbacks));
     ASSERT_TRUE(pane->displayed());
     ASSERT_TRUE(pane->tick(1.0f / 60));
     EXPECT_TRUE(pane->visibility());
@@ -5310,13 +5310,13 @@ const GameTestRegistration questLogPresentation(
       ASSERT_TRUE(stored) << stored.error().what();
       storedQuests.set(id, stored->toJson());
     }
-    auto domain = (*player)->questManager();
+    auto domain = (*player)->quest_manager();
     ASSERT_TRUE(domain->diskLoad(JsonObject{{"quests", storedQuests}, {"currentQuest", "zzlog-b"}}));
-    auto playerCallbacks = LuaBindings::makePlayerCallbacks(root, **player);
-    ASSERT_TRUE(playerCallbacks) << playerCallbacks.error().what();
+    auto player_callbacks = LuaBindings::make_player_callbacks(root, **player);
+    ASSERT_TRUE(player_callbacks) << player_callbacks.error().what();
     auto probe = (*luaRoot)->create_context(StringList{});
     ASSERT_TRUE(probe) << probe.error().what();
-    ASSERT_TRUE(probe->set_callbacks("player", *playerCallbacks));
+    ASSERT_TRUE(probe->set_callbacks("player", *player_callbacks));
     auto entries = probe->eval<Json>("local s = player.questLogEntries(false); return "
                                      "{s.entries[1].id,s.entries[2].id,s.entries[3].id,#s.entries,s.current}");
     ASSERT_TRUE(entries) << entries.error().what();
@@ -5338,7 +5338,7 @@ const GameTestRegistration questLogPresentation(
     auto pane = std::move(*createdPane);
     pane->setAnchor(PaneAnchor::BottomLeft);
     ASSERT_TRUE(pane->set_lua_root(*luaRoot));
-    ASSERT_TRUE(pane->add_callbacks("player", *playerCallbacks));
+    ASSERT_TRUE(pane->add_callbacks("player", *player_callbacks));
     for (auto const& name : {String("lblQuestTitle"), String("lblQuestBody"), String("lblPortraitTitle")}) {
       auto text = textEditor(**context, "");
       ASSERT_TRUE(text);
@@ -5747,7 +5747,7 @@ const GameTestRegistration
       ASSERT_TRUE(stored);
       initial.set(entry.first, *stored);
     }
-    auto domain = (*player)->questManager();
+    auto domain = (*player)->quest_manager();
     ASSERT_TRUE(domain->diskLoad(JsonObject{{"quests", initial}}));
     auto storage = File::ephemeral_file(root.random());
     ASSERT_TRUE(storage);
@@ -5774,8 +5774,8 @@ const GameTestRegistration
     ASSERT_TRUE(root.reload());
     auto luaRoot = LuaRoot::create(root);
     ASSERT_TRUE(luaRoot);
-    auto playerCallbacks = LuaBindings::makePlayerCallbacks(root, **player);
-    ASSERT_TRUE(playerCallbacks);
+    auto player_callbacks = LuaBindings::make_player_callbacks(root, **player);
+    ASSERT_TRUE(player_callbacks);
     auto rootCallbacks = LuaBindings::makeRootCallbacks(root);
     ASSERT_TRUE(rootCallbacks);
     auto cinematic = Cinematic::create(**context);
@@ -5817,7 +5817,7 @@ const GameTestRegistration
           return std::unexpected(std::move(added.error()));
         if (auto bound = pane->set_lua_root(*luaRoot); !bound)
           return std::unexpected(std::move(bound.error()));
-        if (auto bound = pane->add_callbacks("player", *playerCallbacks); !bound)
+        if (auto bound = pane->add_callbacks("player", *player_callbacks); !bound)
           return std::unexpected(std::move(bound.error()));
         return pane->add_callbacks("interface", interface);
       }));
@@ -5842,7 +5842,7 @@ const GameTestRegistration
     auto controller = (*luaRoot)->create_context("/interface/asterbound/ui/manager.lua");
     ASSERT_TRUE(controller);
     ASSERT_TRUE(controller->set_callbacks("root", *rootCallbacks));
-    ASSERT_TRUE(controller->set_callbacks("player", *playerCallbacks));
+    ASSERT_TRUE(controller->set_callbacks("player", *player_callbacks));
     ASSERT_TRUE(controller->set_callbacks("interface", interface));
     ASSERT_TRUE(controller->eval<LuaValue>(R"LUA(
     require "/interface/asterbound/questdialogs/pending.lua"
@@ -5916,7 +5916,7 @@ const GameTestRegistration
     EXPECT_TRUE(panes.isDisplayed(pane));
     EXPECT_EQ((*offered)->state(), QuestState::Offer);
     ASSERT_TRUE(pane->remove_callbacks("player"));
-    ASSERT_TRUE(pane->add_callbacks("player", *playerCallbacks));
+    ASSERT_TRUE(pane->add_callbacks("player", *player_callbacks));
     ASSERT_TRUE(controller->eval<LuaValue>("manager:open('QuestDialog')"));
     ASSERT_TRUE(pane->tick(0));
     ASSERT_TRUE(root.reload());
@@ -6149,9 +6149,9 @@ const GameTestRegistration
     ASSERT_TRUE(factory);
     auto player = (*factory)->create();
     ASSERT_TRUE(player);
-    auto playerCallbacks = LuaBindings::makePlayerCallbacks(root, **player);
-    ASSERT_TRUE(playerCallbacks);
-    ASSERT_TRUE(pane->add_callbacks("player", *playerCallbacks));
+    auto player_callbacks = LuaBindings::make_player_callbacks(root, **player);
+    ASSERT_TRUE(player_callbacks);
+    ASSERT_TRUE(pane->add_callbacks("player", *player_callbacks));
     auto rootCallbacks = LuaBindings::makeRootCallbacks(root);
     ASSERT_TRUE(rootCallbacks);
     ASSERT_TRUE(pane->add_callbacks("root", *rootCallbacks));
@@ -6312,10 +6312,10 @@ const GameTestRegistration
     ASSERT_TRUE(pane->stopScripts());
     auto replacement = (*factory)->create();
     ASSERT_TRUE(replacement);
-    auto replacementCallbacks = LuaBindings::makePlayerCallbacks(root, **replacement);
-    ASSERT_TRUE(replacementCallbacks);
+    auto replacement_callbacks = LuaBindings::make_player_callbacks(root, **replacement);
+    ASSERT_TRUE(replacement_callbacks);
     ASSERT_TRUE(pane->remove_callbacks("player"));
-    ASSERT_TRUE(pane->add_callbacks("player", *replacementCallbacks));
+    ASSERT_TRUE(pane->add_callbacks("player", *replacement_callbacks));
     activePlayer = *replacement;
     ASSERT_TRUE(pane->resumeScripts());
     ASSERT_TRUE(step(0.01f));// Off-world without a cinematic continues, never resets.
@@ -6326,7 +6326,7 @@ const GameTestRegistration
     ASSERT_TRUE(step(0.1f));// Replacement actor is off-world: reset and hide.
     ASSERT_TRUE(pane->stopScripts());
     ASSERT_TRUE(pane->remove_callbacks("player"));
-    ASSERT_TRUE(pane->add_callbacks("player", *playerCallbacks));
+    ASSERT_TRUE(pane->add_callbacks("player", *player_callbacks));
     activePlayer = *player;
     ASSERT_TRUE(pane->resumeScripts());
     worldAvailable = true;
@@ -6362,7 +6362,7 @@ const GameTestRegistration
           return (*assets)->json(path);
         }));
       ASSERT_TRUE((*boundaryPane)->add_callbacks("root", std::move(styleInputs)));
-      ASSERT_TRUE((*boundaryPane)->add_callbacks("player", *playerCallbacks));
+      ASSERT_TRUE((*boundaryPane)->add_callbacks("player", *player_callbacks));
       ASSERT_TRUE((*boundaryPane)->add_callbacks("interface", interface));
       ASSERT_TRUE((*boundaryPane)->displayed());
       GameTimer boundary_timer(duration);

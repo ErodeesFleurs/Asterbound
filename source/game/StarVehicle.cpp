@@ -245,7 +245,7 @@ if (!result1045) return std::unexpected(std::move(result1045.error()));
 loungePosition.exitBottomOffset = std::move(*result1045);
     auto result1046 = pair.second.get_object("armorCosmeticOverrides", JsonObject());
 if (!result1046) return std::unexpected(std::move(result1046.error()));
-loungePosition.armorCosmeticOverrides = std::move(*result1046);
+loungePosition.armor_cosmetic_overrides = std::move(*result1046);
     auto result1047 = pair.second.opt_string("cursorOverride");
 if (!result1047) return std::unexpected(std::move(result1047.error()));
 loungePosition.cursorOverride = std::move(*result1047);
@@ -277,7 +277,7 @@ loungePosition.directives.set(std::move(*result1054));
 if (!result1055) return std::unexpected(std::move(result1055.error()));
 auto result1056 = json_to_list<PersistentStatusEffect>(std::move(*result1055),jsonToPersistentStatusEffect);
 if (!result1056) return std::unexpected(std::move(result1056.error()));
-loungePosition.statusEffects.set(std::move(*result1056));
+loungePosition.status_effects.set(std::move(*result1056));
     auto result1057 = pair.second.opt_bool("suppressTools");
 if (!result1057) return std::unexpected(std::move(result1057.error()));
 loungePosition.suppressTools = std::move(*result1057);
@@ -413,7 +413,7 @@ for (auto& p : m_loungePositions) {
   auto result1097 = m_netGroup.add_net_element(p.second.directives);
   if (!result1097)
     return std::unexpected(std::move(result1097.error()));
-  auto result1098 = m_netGroup.add_net_element(p.second.statusEffects);
+  auto result1098 = m_netGroup.add_net_element(p.second.status_effects);
   if (!result1098)
     return std::unexpected(std::move(result1098.error()));
 }
@@ -1057,8 +1057,8 @@ Vec2F partAnchor = std::move(*result1133);
   loungePosition->emote = positionConfig.emote.get();
   loungePosition->dance = positionConfig.dance.get();
   loungePosition->directives = positionConfig.directives.get();
-  loungePosition->statusEffects = positionConfig.statusEffects.get();
-  loungePosition->armorCosmeticOverrides = positionConfig.armorCosmeticOverrides;
+  loungePosition->status_effects = positionConfig.status_effects.get();
+  loungePosition->armor_cosmetic_overrides = positionConfig.armor_cosmetic_overrides;
   loungePosition->cursorOverride = positionConfig.cursorOverride;
   loungePosition->cameraFocus = positionConfig.cameraFocus;
   loungePosition->suppressTools = positionConfig.suppressTools;
@@ -1292,12 +1292,12 @@ result990->get().directives.set(std::move(directives));
 });
 if (!result1112) return std::unexpected(std::move(result1112.error()));
 
-  auto result1113 = callbacks.register_callback("setLoungeStatusEffects", [this](String const& name, JsonArray const& statusEffects)  -> std::expected<void, StarException> {
+  auto result1113 = callbacks.register_callback("setLoungeStatusEffects", [this](String const& name, JsonArray const& status_effects)  -> std::expected<void, StarException> {
       auto result988 = m_loungePositions.get(name);
 if (!result988) return std::unexpected(std::move(result988.error()));
-auto result989 = json_to_list<PersistentStatusEffect>(Json(statusEffects),jsonToPersistentStatusEffect);
+auto result989 = json_to_list<PersistentStatusEffect>(Json(status_effects),jsonToPersistentStatusEffect);
 if (!result989) return std::unexpected(std::move(result989.error()));
-result988->get().statusEffects.set(std::move(*result989));
+result988->get().status_effects.set(std::move(*result989));
       return {};
 });
 if (!result1113) return std::unexpected(std::move(result1113.error()));

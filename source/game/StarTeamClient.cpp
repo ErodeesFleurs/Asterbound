@@ -528,7 +528,7 @@ std::expected<void, StarException> TeamClient::writePlayerData(JsonObject& reque
   auto maximumHealth = player->max_health();
   if (!maximumHealth) return std::unexpected(std::move(maximumHealth.error()));
   request["health"] = player->health() / *maximumHealth;
-  auto maximumEnergy = player->maxEnergy();
+  auto maximumEnergy = player->max_energy();
   if (!maximumEnergy) return std::unexpected(std::move(maximumEnergy.error()));
   auto energy = player->energy();
   if (!energy) return std::unexpected(std::move(energy.error()));
@@ -544,7 +544,7 @@ std::expected<void, StarException> TeamClient::writePlayerData(JsonObject& reque
     if (std::holds_alternative<CelestialWorldId>(m_client_context->player_world_id()))
       mode = WarpMode::BeamOnly;
     else
-      mode = player->isDeployed() ? WarpMode::DeployOnly : WarpMode::BeamOnly;
+      mode = player->is_deployed() ? WarpMode::DeployOnly : WarpMode::BeamOnly;
   }
   if (!WarpModeNames) return std::unexpected(WarpModeNames.error());
   auto warp = WarpModeNames->get_right(mode);

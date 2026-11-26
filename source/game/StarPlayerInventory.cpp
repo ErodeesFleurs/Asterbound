@@ -157,18 +157,18 @@ constexpr std::array<std::pair<EssentialItem, std::string_view>, essential_item_
   return checkInventoryFilter(items, bagType);
 }
 
-bool PlayerInventory::itemAllowedAsEquipment(std::shared_ptr<Item> const& item, EquipmentSlot equipmentSlot) {
+bool PlayerInventory::item_allowed_as_equipment(std::shared_ptr<Item> const& item, EquipmentSlot equipment_slot) {
   // any equipment slot can be empty
   if (!item || item->empty())
     return true;
 
-  if (equipmentSlot == EquipmentSlot::Head || equipmentSlot == EquipmentSlot::HeadCosmetic)
+  if (equipment_slot == EquipmentSlot::Head || equipment_slot == EquipmentSlot::HeadCosmetic)
     return is<HeadArmor>(item);
-  else if (equipmentSlot == EquipmentSlot::Chest || equipmentSlot == EquipmentSlot::ChestCosmetic)
+  else if (equipment_slot == EquipmentSlot::Chest || equipment_slot == EquipmentSlot::ChestCosmetic)
     return is<ChestArmor>(item);
-  else if (equipmentSlot == EquipmentSlot::Legs || equipmentSlot == EquipmentSlot::LegsCosmetic)
+  else if (equipment_slot == EquipmentSlot::Legs || equipment_slot == EquipmentSlot::LegsCosmetic)
     return is<LegsArmor>(item);
-  else if (equipmentSlot == EquipmentSlot::Back || equipmentSlot == EquipmentSlot::BackCosmetic)
+  else if (equipment_slot == EquipmentSlot::Back || equipment_slot == EquipmentSlot::BackCosmetic)
     return is<BackArmor>(item);
   else
     return is<ArmorItem>(item);
@@ -291,7 +291,7 @@ PlayerInventory::PlayerInventory(Root& root, Json inventoryConfig, Json currenci
   if (!destination) return std::unexpected(std::move(destination.error()));
   auto& dest = destination->get();
   if (std::holds_alternative<EquipmentSlot>(slot)) {
-    if (!dest && itemAllowedAsEquipment(items, std::get<EquipmentSlot>(slot))) {
+    if (!dest && item_allowed_as_equipment(items, std::get<EquipmentSlot>(slot))) {
       auto taken = items->take(1);
       if (!taken) return std::unexpected(std::move(taken.error()));
       dest = std::move(*taken);
@@ -338,9 +338,9 @@ PlayerInventory::PlayerInventory(Root& root, Json inventoryConfig, Json currenci
     if (!allowed) return std::unexpected(std::move(allowed.error()));
     if (!*allowed) return false;
   }
-  if (std::holds_alternative<EquipmentSlot>(first) && (item_safe_count(secondItems) > 1 || !itemAllowedAsEquipment(secondItems, std::get<EquipmentSlot>(first))))
+  if (std::holds_alternative<EquipmentSlot>(first) && (item_safe_count(secondItems) > 1 || !item_allowed_as_equipment(secondItems, std::get<EquipmentSlot>(first))))
     return false;
-  if (std::holds_alternative<EquipmentSlot>(second) && (item_safe_count(firstItems) > 1 || !itemAllowedAsEquipment(firstItems, std::get<EquipmentSlot>(second))))
+  if (std::holds_alternative<EquipmentSlot>(second) && (item_safe_count(firstItems) > 1 || !item_allowed_as_equipment(firstItems, std::get<EquipmentSlot>(second))))
     return false;
 
   std::swap(firstItems, secondItems);
@@ -357,7 +357,7 @@ PlayerInventory::PlayerInventory(Root& root, Json inventoryConfig, Json currenci
     m_currencies[currencyItem->currencyType()] += currencyItem->totalValue();
     return true;
   } else if (std::holds_alternative<EquipmentSlot>(slot)) {
-    if (itemAllowedAsEquipment(item, std::get<EquipmentSlot>(slot))) {
+    if (item_allowed_as_equipment(item, std::get<EquipmentSlot>(slot))) {
       m_equipment[std::get<EquipmentSlot>(slot)] = item;
       return true;
     }
@@ -423,7 +423,7 @@ bool PlayerInventory::slot_valid(InventorySlot const& slot) const {
 
   // Then, try adding equipment to the equipment slots.
   for (auto slot : {EquipmentSlot::Head, EquipmentSlot::Chest, EquipmentSlot::Legs, EquipmentSlot::Back}) {
-    if (!items->empty() && itemAllowedAsEquipment(items, slot) && !equipment(slot)) {
+    if (!items->empty() && item_allowed_as_equipment(items, slot) && !equipment(slot)) {
       auto taken = items->take(1);
       if (!taken) return std::unexpected(std::move(taken.error()));
       m_equipment[slot] = std::move(*taken);
@@ -723,7 +723,7 @@ std::shared_ptr<ItemBag const> PlayerInventory::bagContents(String const& type) 
 [[nodiscard]] std::expected<void, StarException> PlayerInventory::shiftSwap(InventorySlot const& slot) {
   normalizeItem(m_swapSlot);
   if (std::holds_alternative<EquipmentSlot>(slot)) {
-    if (itemAllowedAsEquipment(m_swapSlot, std::get<EquipmentSlot>(slot))) {
+    if (item_allowed_as_equipment(m_swapSlot, std::get<EquipmentSlot>(slot))) {
       auto result = retrieveForMutation(slot);
       if (!result) return std::unexpected(std::move(result.error()));
       auto& equipSlot = result->get();

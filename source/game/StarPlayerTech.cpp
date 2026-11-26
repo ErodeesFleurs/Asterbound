@@ -65,7 +65,7 @@ std::expected<std::shared_ptr<PlayerTech>, StarException> PlayerTech::create(Roo
       auto type = TechTypeNames->get_left(entry.first);
       if (!type)
         return std::unexpected(std::move(type.error()));
-      playerTech->m_equippedTechs[type->get()] = std::move(*techName);
+      playerTech->m_equipped_techs[type->get()] = std::move(*techName);
     } else {
       auto logged = root.logger().warn("Unequipping unknown tech '{}' from slot '{}'", *techName, entry.first);
       if (!logged)
@@ -79,7 +79,7 @@ std::expected<Json, StarException> PlayerTech::toJson() const {
   if (!TechTypeNames)
     return std::unexpected(TechTypeNames.error());
   JsonObject equipped;
-  for (auto const& entry : m_equippedTechs) {
+  for (auto const& entry : m_equipped_techs) {
     auto type = TechTypeNames->get_right(entry.first);
     if (!type)
       return std::unexpected(std::move(type.error()));
@@ -121,7 +121,7 @@ void PlayerTech::disable(String const& techModule) {
 }
 
 bool PlayerTech::isEquipped(String const& techModule) const {
-  for (auto const& entry : m_equippedTechs) {
+  for (auto const& entry : m_equipped_techs) {
     if (entry.second == techModule)
       return true;
   }
@@ -137,14 +137,14 @@ std::expected<void, StarException> PlayerTech::equip(String const& techModule) {
   auto tech = (*techDatabase)->tech(techModule);
   if (!tech)
     return std::unexpected(std::move(tech.error()));
-  m_equippedTechs[tech->type] = techModule;
+  m_equipped_techs[tech->type] = techModule;
   return {};
 }
 
 void PlayerTech::unequip(String const& techModule) {
-  for (auto entry = m_equippedTechs.begin(); entry != m_equippedTechs.end();) {
+  for (auto entry = m_equipped_techs.begin(); entry != m_equipped_techs.end();) {
     if (entry->second == techModule)
-      entry = m_equippedTechs.erase(entry);
+      entry = m_equipped_techs.erase(entry);
     else
       ++entry;
   }
@@ -158,12 +158,12 @@ StringSet const& PlayerTech::enabledTechs() const {
   return m_enabledTechs;
 }
 
-HashMap<TechType, String> const& PlayerTech::equippedTechs() const {
-  return m_equippedTechs;
+HashMap<TechType, String> const& PlayerTech::equipped_techs() const {
+  return m_equipped_techs;
 }
 
 StringList PlayerTech::techModules() const {
-  return m_equippedTechs.values();
+  return m_equipped_techs.values();
 }
 
 }

@@ -62,7 +62,7 @@ const GameTestRegistration teamStatusSynchronization(
     ASSERT_TRUE(factory);
     auto player = (*factory)->create();
     ASSERT_TRUE(player);
-    ASSERT_TRUE((*player)->finalizeCreation());
+    ASSERT_TRUE((*player)->finalize_creation());
     auto uuid = (*player)->uuid();
     ASSERT_TRUE(uuid);
     auto name = (*player)->name();

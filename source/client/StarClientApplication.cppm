@@ -128,7 +128,7 @@ private:
   [[nodiscard]] std::expected<void, StarException> updateSplash(float dt);
   [[nodiscard]] std::expected<void, StarException> updateError(float dt);
   [[nodiscard]] std::expected<void, StarException> updateTitle(float dt);
-  [[nodiscard]] std::expected<void, StarException> updateRunning(float dt);
+  [[nodiscard]] std::expected<void, StarException> update_running(float dt);
 
   bool isHeldActionTaken(InterfaceAction action) const;
 

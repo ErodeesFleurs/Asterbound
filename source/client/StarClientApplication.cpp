@@ -429,7 +429,7 @@ std::expected<void, StarException> ClientApplication::shutdown() {
   if (http_session)
     remember(http_session->stop());
   if (m_player)
-    m_player->setInput(std::nullopt);
+    m_player->set_input(std::nullopt);
   // Lua uninit may still invoke the interface and camera callbacks.
   if (m_universeClient)
     remember(m_universeClient->disconnect());
@@ -792,10 +792,10 @@ std::expected<void, StarException> ClientApplication::processInput(InputEvent co
         return std::unexpected(std::move(title.error()));
       processed = *title;
     } else if (!processed && m_state > MainAppState::Title) {
-      auto interfaceInput = m_mainInterface->handleInputEvent(event);
-      if (!interfaceInput)
-        return std::unexpected(std::move(interfaceInput.error()));
-      processed = *interfaceInput;
+      auto interface_input = m_mainInterface->handle_input_event(event);
+      if (!interface_input)
+        return std::unexpected(std::move(interface_input.error()));
+      processed = *interface_input;
     }
   }
   m_input->handle_input(event, processed);
@@ -885,7 +885,7 @@ std::expected<void, StarException> ClientApplication::update() {
   else if (m_state == MainAppState::Title)
     stateUpdate = updateTitle(dt);
   else if (m_state > MainAppState::Title) {
-    stateUpdate = updateRunning(dt);
+    stateUpdate = update_running(dt);
     if (!stateUpdate)
       stateUpdate = setError("Exception caught in client main-loop", ExceptionDiagnostic(stateUpdate.error()));
   }
@@ -1406,7 +1406,7 @@ std::expected<void, StarException> ClientApplication::teardownTransition(MainApp
       remember(http_session->set_approval_available(false));
     displayed_approval.reset();
     if (m_player)
-      m_player->setInput(std::nullopt);
+      m_player->set_input(std::nullopt);
     if (m_mainInterface)
       remember(m_mainInterface->close());
     m_mainInterface.reset();
@@ -1607,7 +1607,7 @@ std::expected<void, StarException> ClientApplication::startSession(MainAppState 
     else if (auto warned = m_root->logger().warn_exception("Skipping unavailable intro cinematic", ExceptionDiagnostic(intro.error())); !warned)
       return warned;
   }
-  if (auto pending = m_player->setPendingCinematic(pendingIntro); !pending)
+  if (auto pending = m_player->set_pending_cinematic(pendingIntro); !pending)
     return pending;
   auto connected = newState == MainAppState::MultiPlayer ? connectMultiPlayer() : connectSinglePlayer();
   if (!connected)
@@ -1630,7 +1630,7 @@ std::expected<bool, StarException> ClientApplication::activateSessionPlayer() {
     if (!m_player)
       return setError("Error loading player!").transform([] { return false; });
   }
-  m_player->setInput(optional_ref(m_input));
+  m_player->set_input(optional_ref(m_input));
   m_mainMixer->set_universe_client(m_universeClient);
   if (auto activated = m_universeClient->setMainPlayer(m_player); !activated)
     return std::unexpected(std::move(activated.error()));
@@ -2069,7 +2069,7 @@ std::expected<void, StarException> ClientApplication::updateTitle(float dt) {
   return {};
 }
 
-std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
+std::expected<void, StarException> ClientApplication::update_running(float dt) {
     auto& app = appController();
     auto worldClient = m_universeClient->worldClient();
     auto p2pNetworkingService = app->p2pNetworkingService();
@@ -2120,11 +2120,11 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
         if (tag == "playerEnergy")
           return m_player->energy().transform([](float value) { return Star::to_string(value); });
         if (tag == "playerMaxEnergy")
-          return m_player->maxEnergy().transform([](float value) { return Star::to_string(value); });
+          return m_player->max_energy().transform([](float value) { return Star::to_string(value); });
         if (tag == "playerBreath")
           return Star::to_string(m_player->breath());
         if (tag == "playerMaxBreath")
-          return m_player->maxBreath().transform([](float value) { return Star::to_string(value); });
+          return m_player->max_breath().transform([](float value) { return Star::to_string(value); });
         if (tag == "playerXPos")
           return Star::to_string(std::round(m_player->position().x()));
         if (tag == "playerYPos")
@@ -2207,75 +2207,75 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
       };
       auto heldActions = resolveActions(m_heldKeyEvents);
       auto edgeActions = resolveActions(m_edgeKeyEvents);
-      auto isActionTaken = [&](InterfaceAction action) {
+      auto is_action_taken = [&](InterfaceAction action) {
         return heldActions[std::to_underlying(action)];
       };
-      auto isActionTakenEdge = [&](InterfaceAction action) {
+      auto is_action_taken_edge = [&](InterfaceAction action) {
         return edgeActions[std::to_underlying(action)];
       };
 
-      m_player->setShifting(isActionTaken(InterfaceAction::PlayerShifting));
+      m_player->set_shifting(is_action_taken(InterfaceAction::PlayerShifting));
 
-      if (isActionTaken(InterfaceAction::PlayerRight))
-        m_player->moveRight();
-      if (isActionTaken(InterfaceAction::PlayerLeft))
-        m_player->moveLeft();
-      if (isActionTaken(InterfaceAction::PlayerUp))
-        m_player->moveUp();
-      if (isActionTaken(InterfaceAction::PlayerDown))
-        m_player->moveDown();
-      if (isActionTaken(InterfaceAction::PlayerJump))
+      if (is_action_taken(InterfaceAction::PlayerRight))
+        m_player->move_right();
+      if (is_action_taken(InterfaceAction::PlayerLeft))
+        m_player->move_left();
+      if (is_action_taken(InterfaceAction::PlayerUp))
+        m_player->move_up();
+      if (is_action_taken(InterfaceAction::PlayerDown))
+        m_player->move_down();
+      if (is_action_taken(InterfaceAction::PlayerJump))
         m_player->jump();
 
-      if (isActionTaken(InterfaceAction::PlayerTechAction1)) {
+      if (is_action_taken(InterfaceAction::PlayerTechAction1)) {
         if (auto special = m_player->special(1); !special)
           return std::unexpected(std::move(special.error()));
       }
-      if (isActionTaken(InterfaceAction::PlayerTechAction2)) {
+      if (is_action_taken(InterfaceAction::PlayerTechAction2)) {
         if (auto special = m_player->special(2); !special)
           return std::unexpected(std::move(special.error()));
       }
-      if (isActionTaken(InterfaceAction::PlayerTechAction3)) {
+      if (is_action_taken(InterfaceAction::PlayerTechAction3)) {
         if (auto special = m_player->special(3); !special)
           return std::unexpected(std::move(special.error()));
       }
 
-      if (isActionTakenEdge(InterfaceAction::PlayerInteract))
+      if (is_action_taken_edge(InterfaceAction::PlayerInteract))
         m_player->begin_trigger();
-      else if (!isActionTaken(InterfaceAction::PlayerInteract))
+      else if (!is_action_taken(InterfaceAction::PlayerInteract))
         m_player->end_trigger();
 
-      if (isActionTakenEdge(InterfaceAction::PlayerDropItem)) {
-        if (auto dropped = m_player->dropItem(); !dropped)
+      if (is_action_taken_edge(InterfaceAction::PlayerDropItem)) {
+        if (auto dropped = m_player->drop_item(); !dropped)
           return std::unexpected(std::move(dropped.error()));
       }
 
-      if (isActionTakenEdge(InterfaceAction::EmoteBlabbering))
-        m_player->addEmote(HumanoidEmote::Blabbering);
-      if (isActionTakenEdge(InterfaceAction::EmoteShouting))
-        m_player->addEmote(HumanoidEmote::Shouting);
-      if (isActionTakenEdge(InterfaceAction::EmoteHappy))
-        m_player->addEmote(HumanoidEmote::Happy);
-      if (isActionTakenEdge(InterfaceAction::EmoteSad))
-        m_player->addEmote(HumanoidEmote::Sad);
-      if (isActionTakenEdge(InterfaceAction::EmoteNeutral))
-        m_player->addEmote(HumanoidEmote::Neutral);
-      if (isActionTakenEdge(InterfaceAction::EmoteLaugh))
-        m_player->addEmote(HumanoidEmote::Laugh);
-      if (isActionTakenEdge(InterfaceAction::EmoteAnnoyed))
-        m_player->addEmote(HumanoidEmote::Annoyed);
-      if (isActionTakenEdge(InterfaceAction::EmoteOh))
-        m_player->addEmote(HumanoidEmote::Oh);
-      if (isActionTakenEdge(InterfaceAction::EmoteOooh))
-        m_player->addEmote(HumanoidEmote::Oooh);
-      if (isActionTakenEdge(InterfaceAction::EmoteBlink))
-        m_player->addEmote(HumanoidEmote::Blink);
-      if (isActionTakenEdge(InterfaceAction::EmoteWink))
-        m_player->addEmote(HumanoidEmote::Wink);
-      if (isActionTakenEdge(InterfaceAction::EmoteEat))
-        m_player->addEmote(HumanoidEmote::Eat);
-      if (isActionTakenEdge(InterfaceAction::EmoteSleep))
-        m_player->addEmote(HumanoidEmote::Sleep);
+      if (is_action_taken_edge(InterfaceAction::EmoteBlabbering))
+        m_player->add_emote(HumanoidEmote::Blabbering);
+      if (is_action_taken_edge(InterfaceAction::EmoteShouting))
+        m_player->add_emote(HumanoidEmote::Shouting);
+      if (is_action_taken_edge(InterfaceAction::EmoteHappy))
+        m_player->add_emote(HumanoidEmote::Happy);
+      if (is_action_taken_edge(InterfaceAction::EmoteSad))
+        m_player->add_emote(HumanoidEmote::Sad);
+      if (is_action_taken_edge(InterfaceAction::EmoteNeutral))
+        m_player->add_emote(HumanoidEmote::Neutral);
+      if (is_action_taken_edge(InterfaceAction::EmoteLaugh))
+        m_player->add_emote(HumanoidEmote::Laugh);
+      if (is_action_taken_edge(InterfaceAction::EmoteAnnoyed))
+        m_player->add_emote(HumanoidEmote::Annoyed);
+      if (is_action_taken_edge(InterfaceAction::EmoteOh))
+        m_player->add_emote(HumanoidEmote::Oh);
+      if (is_action_taken_edge(InterfaceAction::EmoteOooh))
+        m_player->add_emote(HumanoidEmote::Oooh);
+      if (is_action_taken_edge(InterfaceAction::EmoteBlink))
+        m_player->add_emote(HumanoidEmote::Blink);
+      if (is_action_taken_edge(InterfaceAction::EmoteWink))
+        m_player->add_emote(HumanoidEmote::Wink);
+      if (is_action_taken_edge(InterfaceAction::EmoteEat))
+        m_player->add_emote(HumanoidEmote::Eat);
+      if (is_action_taken_edge(InterfaceAction::EmoteSleep))
+        m_player->add_emote(HumanoidEmote::Sleep);
 
       if (int newZoomDirection = static_cast<int>(m_input->bind_held("opensb", "zoomIn"))
             - static_cast<int>(m_input->bind_held("opensb", "zoomOut")))
@@ -2303,9 +2303,9 @@ std::expected<void, StarException> ClientApplication::updateRunning(float dt) {
     }
 
     if (m_controllerInput && m_controllerLeftStick.magnitude_squared() > 0.01f)
-      m_player->setMoveVector(m_controllerLeftStick);
+      m_player->set_move_vector(m_controllerLeftStick);
     else
-      m_player->setMoveVector(Vec2F());
+      m_player->set_move_vector(Vec2F());
 
     m_voice->setInput(m_input->bind_held("opensb", "pushToTalk"));
     DataStreamBuffer voiceData;
@@ -2522,7 +2522,7 @@ std::expected<void, StarException> ClientApplication::updateCamera(float dt) {
   float cameraSpeedFactor = 30.0f / m_guiContext->renderPreferences().cameraSpeedFactor;
   cameraSpeedFactor /= (dt * 60.f);
 
-  auto cameraPosition = m_player->cameraPosition();
+  auto cameraPosition = m_player->camera_position();
   if (!cameraPosition)
     return std::unexpected(std::move(cameraPosition.error()));
   auto playerCameraPosition = *cameraPosition;

@@ -16,40 +16,40 @@ struct RadioMessageDatabaseExceptionTag {
 using RadioMessageDatabaseException = StarError<RadioMessageDatabaseExceptionTag, StarException>;
 
 enum class RadioMessageType { Generic, Mission, Quest, Tutorial };
-extern std::expected<EnumMap<RadioMessageType>, StarException> const RadioMessageTypeNames;
+extern std::expected<EnumMap<RadioMessageType>, StarException> const radio_message_type_names;
 
 struct RadioMessage {
   // Break the default-construction trait cycle in the recursive StringMap members.
   RadioMessage() = default;
 
-  String messageId;
+  String message_id;
   RadioMessageType type;
   bool unique;
   bool important;
   String text;
-  String senderName;
-  String portraitImage;
-  int portraitFrames;
-  float portraitSpeed;
-  float textSpeed;
-  float persistTime;
-  String chatterSound;
+  String sender_name;
+  String portrait_image;
+  int portrait_frames;
+  float portrait_speed;
+  float text_speed;
+  float persist_time;
+  String chatter_sound;
 
-  StringMap<RadioMessage> speciesAiMessage;
-  StringMap<RadioMessage> speciesMessage;
+  StringMap<RadioMessage> species_ai_message;
+  StringMap<RadioMessage> species_message;
 };
 
 class RadioMessageDatabase {
 public:
   [[nodiscard]] static std::expected<std::shared_ptr<RadioMessageDatabase>, StarException> create(Root& root);
 
-  [[nodiscard]] std::expected<RadioMessage, StarException> radioMessage(String const& messageName) const;
-  [[nodiscard]] std::expected<RadioMessage, StarException> createRadioMessage(Json const& config, std::optional<String> const& uniqueId = {}) const;
+  [[nodiscard]] std::expected<RadioMessage, StarException> radio_message(String const& message_name) const;
+  [[nodiscard]] std::expected<RadioMessage, StarException> create_radio_message(Json const& config, std::optional<String> const& unique_id = {}) const;
 
 private:
   explicit RadioMessageDatabase(Json defaults);
   Json m_defaults;
-  StringMap<RadioMessage> m_radioMessages;
+  StringMap<RadioMessage> m_radio_messages;
 };
 
 }
@@ -60,7 +60,7 @@ export namespace Star {
   using ::Star::RadioMessageDatabaseExceptionTag;
   using ::Star::RadioMessageDatabaseException;
   using ::Star::RadioMessageType;
-  using ::Star::RadioMessageTypeNames;
+  using ::Star::radio_message_type_names;
   using ::Star::RadioMessage;
   using ::Star::RadioMessageDatabase;
 }

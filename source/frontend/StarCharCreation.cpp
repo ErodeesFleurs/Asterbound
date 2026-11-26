@@ -357,7 +357,7 @@ std::expected<void, StarException> CharCreationPane::tick(float dt) {
     return std::unexpected(std::move(result.error()));
   if (!active() || !m_previewPlayer)
     return {};
-  return m_previewPlayer->animatePortrait(dt);
+  return m_previewPlayer->animate_portrait(dt);
 }
 
 std::expected<bool, StarException> CharCreationPane::sendEvent(InputEvent const& event) {
@@ -365,31 +365,31 @@ std::expected<bool, StarException> CharCreationPane::sendEvent(InputEvent const&
     if (std::holds_alternative<KeyDownEvent>(event)) {
       auto actions = context().actions(event);
       if (actions.contains(InterfaceAction::EmoteBlabbering))
-        m_previewPlayer->addEmote(HumanoidEmote::Blabbering);
+        m_previewPlayer->add_emote(HumanoidEmote::Blabbering);
       if (actions.contains(InterfaceAction::EmoteShouting))
-        m_previewPlayer->addEmote(HumanoidEmote::Shouting);
+        m_previewPlayer->add_emote(HumanoidEmote::Shouting);
       if (actions.contains(InterfaceAction::EmoteHappy))
-        m_previewPlayer->addEmote(HumanoidEmote::Happy);
+        m_previewPlayer->add_emote(HumanoidEmote::Happy);
       if (actions.contains(InterfaceAction::EmoteSad))
-        m_previewPlayer->addEmote(HumanoidEmote::Sad);
+        m_previewPlayer->add_emote(HumanoidEmote::Sad);
       if (actions.contains(InterfaceAction::EmoteNeutral))
-        m_previewPlayer->addEmote(HumanoidEmote::Neutral);
+        m_previewPlayer->add_emote(HumanoidEmote::Neutral);
       if (actions.contains(InterfaceAction::EmoteLaugh))
-        m_previewPlayer->addEmote(HumanoidEmote::Laugh);
+        m_previewPlayer->add_emote(HumanoidEmote::Laugh);
       if (actions.contains(InterfaceAction::EmoteAnnoyed))
-        m_previewPlayer->addEmote(HumanoidEmote::Annoyed);
+        m_previewPlayer->add_emote(HumanoidEmote::Annoyed);
       if (actions.contains(InterfaceAction::EmoteOh))
-        m_previewPlayer->addEmote(HumanoidEmote::Oh);
+        m_previewPlayer->add_emote(HumanoidEmote::Oh);
       if (actions.contains(InterfaceAction::EmoteOooh))
-        m_previewPlayer->addEmote(HumanoidEmote::Oooh);
+        m_previewPlayer->add_emote(HumanoidEmote::Oooh);
       if (actions.contains(InterfaceAction::EmoteBlink))
-        m_previewPlayer->addEmote(HumanoidEmote::Blink);
+        m_previewPlayer->add_emote(HumanoidEmote::Blink);
       if (actions.contains(InterfaceAction::EmoteWink))
-        m_previewPlayer->addEmote(HumanoidEmote::Wink);
+        m_previewPlayer->add_emote(HumanoidEmote::Wink);
       if (actions.contains(InterfaceAction::EmoteEat))
-        m_previewPlayer->addEmote(HumanoidEmote::Eat);
+        m_previewPlayer->add_emote(HumanoidEmote::Eat);
       if (actions.contains(InterfaceAction::EmoteSleep))
-        m_previewPlayer->addEmote(HumanoidEmote::Sleep);
+        m_previewPlayer->add_emote(HumanoidEmote::Sleep);
     }
   }
   return Pane::sendEvent(event);
@@ -531,11 +531,11 @@ std::expected<void, StarException> CharCreationPane::changed() {
       m_alty, m_hairChoice, m_heady, m_shirtChoice, m_shirtColor, m_pantsChoice, m_pantsColor, m_personality);
   if (!results)
     return std::unexpected(std::move(results.error()));
-  if (auto result = m_previewPlayer->setModeType(static_cast<PlayerMode>(m_modeChoice)); !result)
+  if (auto result = m_previewPlayer->set_mode_type(static_cast<PlayerMode>(m_modeChoice)); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = m_previewPlayer->set_humanoid_parameters(std::move(results->humanoid_parameters)); !result)
     return std::unexpected(std::move(result.error()));
-  if (auto result = m_previewPlayer->setIdentity(std::move(results->identity)); !result)
+  if (auto result = m_previewPlayer->set_identity(std::move(results->identity)); !result)
     return std::unexpected(std::move(result.error()));
   if (auto result = m_previewPlayer->refresh_humanoid_parameters(); !result)
     return std::unexpected(std::move(result.error()));
@@ -556,9 +556,9 @@ std::expected<void, StarException> CharCreationPane::changed() {
       return std::unexpected(std::move(result.error()));
     }
   }
-  if (auto result = m_previewPlayer->refreshEquipment(); !result)
+  if (auto result = m_previewPlayer->refresh_equipment(); !result)
     return std::unexpected(std::move(result.error()));
-  return m_previewPlayer->finalizeCreation();
+  return m_previewPlayer->finalize_creation();
 }
 
 std::expected<void, StarException> CharCreationPane::nameBoxCallback(Widget& object) {

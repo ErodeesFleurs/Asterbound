@@ -80,7 +80,7 @@ public:
   [[nodiscard]] std::expected<void, StarException> fail();
   [[nodiscard]] std::expected<void, StarException> abandon();
 
-  [[nodiscard]] std::expected<bool, StarException> interactWithEntity(EntityId entity);
+  [[nodiscard]] std::expected<bool, StarException> interact_with_entity(EntityId entity);
 
   // The generated ID for this instance of the quest with these specific
   // parameters. Multiple players iin a universe may have quests with the same
@@ -98,7 +98,7 @@ public:
   bool showDialog() const;
   void setDialogShown();
 
-  [[nodiscard]] std::expected<void, StarException> setEntityParameter(String const& paramName, std::shared_ptr<Entity const> const& entity);
+  [[nodiscard]] std::expected<void, StarException> set_entity_parameter(String const& param_name, std::shared_ptr<Entity const> const& entity);
   void setParameter(String const& paramName, QuestParam const& paramValue);
 
   std::optional<List<Drawable>> portrait(String const& portraitName) const;
@@ -178,7 +178,7 @@ private:
   [[nodiscard]] std::expected<void, StarException> uninitScript();
   [[nodiscard]] std::expected<LuaCallbacks, StarException> makeQuestCallbacks(Player& player);
 
-  [[nodiscard]] std::expected<void, StarException> setEntityParameter(String const& paramName, Entity const& entity);
+  [[nodiscard]] std::expected<void, StarException> set_entity_parameter(String const& param_name, Entity const& entity);
   [[nodiscard]] std::expected<void, StarException> addReward(ItemDescriptor const& reward);
 
   String const& defaultCustomIndicator() const;

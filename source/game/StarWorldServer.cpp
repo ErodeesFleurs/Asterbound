@@ -1265,12 +1265,12 @@ std::expected<void, StarException> WorldServer::handleIncomingPackets(Connection
           messageRejected = true;
       } else if (entityMessagePacket->message == "queueRadioMessage" && !entityMessagePacket->args.empty()) {
         Json const& configArg = entityMessagePacket->args[0];
-        auto radioDatabase = this->root().radioMessageDatabase();
-        if (!radioDatabase)
-          return std::unexpected(std::move(radioDatabase.error()));
-        auto radioMessage = (*radioDatabase)->createRadioMessage(configArg);
-        if (!radioMessage) {
-          auto rejected = rejectMessage(Star::format("invalid radio message: {}", radioMessage.error().what()));
+        auto radio_database = this->root().radio_message_database();
+        if (!radio_database)
+          return std::unexpected(std::move(radio_database.error()));
+        auto radio_message = (*radio_database)->create_radio_message(configArg);
+        if (!radio_message) {
+          auto rejected = rejectMessage(Star::format("invalid radio message: {}", radio_message.error().what()));
           if (!rejected)
             return std::unexpected(std::move(rejected.error()));
           continue;
@@ -4611,7 +4611,7 @@ std::expected<void, StarException> WorldServer::setTemplate(std::shared_ptr<Worl
     auto subWorldId = info->subWorldId;
     SpawnTarget spawnTarget;
     if (auto player = clientPlayer(client)) {
-      auto feetOffset = player->feetOffset();
+      auto feetOffset = player->feet_offset();
       if (!feetOffset)
         return std::unexpected(std::move(feetOffset.error()));
       spawnTarget = SpawnTargetPosition(player->position() + *feetOffset);

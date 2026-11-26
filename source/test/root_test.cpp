@@ -642,14 +642,14 @@ const GameTestRegistration codex_catalog("CodexCatalog", "EmptyDefaultsRelativeI
                           File::relative_to(overlay, "root-isolation.lua"));
 }
 
-[[nodiscard]] std::expected<Root::Settings, StarException> isolationSettings(
+[[nodiscard]] std::expected<Root::Settings, StarException> isolation_settings(
     Root::Settings const& base, String const& directory, String const& owner) {
   auto settings = base;
   auto overlay = File::relative_to(directory, "assets");
-  auto makeOverlay = File::create_directory(overlay);
-  if (!makeOverlay) return std::unexpected(std::move(makeOverlay.error()));
-  auto writeAssets = writeIsolationAssets(overlay, owner);
-  if (!writeAssets) return std::unexpected(std::move(writeAssets.error()));
+  auto make_overlay = File::create_directory(overlay);
+  if (!make_overlay) return std::unexpected(std::move(make_overlay.error()));
+  auto write_assets = writeIsolationAssets(overlay, owner);
+  if (!write_assets) return std::unexpected(std::move(write_assets.error()));
   // Keep the fixture's legal base pak and production mod sources; only the
   // test-owned overlay, runtime configuration, storage, and logs are private.
   settings.assetSources.push_back(overlay);
@@ -671,7 +671,7 @@ const GameTestRegistration tech_sync("TechControllerRegression", "StableEquipmen
   auto directory = File::temporary_directory(fixture.root().random());
   if (!fixture.check(bool(directory), "create tech test directory")) return;
   auto cleanup = make_scope_exit([&] { (void)File::remove_all(*directory); });
-  auto settings = isolationSettings(fixture.rootSettings(), *directory, "tech-sync");
+  auto settings = isolation_settings(fixture.rootSettings(), *directory, "tech-sync");
   if (!fixture.check(bool(settings), "prepare isolated tech assets")) return;
   auto body_path = File::relative_to(*directory, "assets/tech-sync-body.tech");
   auto body_asset = File::write_file(String(R"({"name":"tech-sync-body","type":"Body","scripts":[],
@@ -692,21 +692,21 @@ const GameTestRegistration tech_sync("TechControllerRegression", "StableEquipmen
   };
   auto expected_order = equipped.values();
   auto saved = make_save(expected_order, JsonObject{{"sentinel", 42}});
-  if (!fixture.check(bool(controller.diskLoad(saved)), "restore tech storage")) return;
+  if (!fixture.check(bool(controller.disk_load(saved)), "restore tech storage")) return;
   if (!fixture.check(bool(controller.sync_equipped_tech(equipped)), "synchronize unchanged equipment")) return;
-  fixture.check(controller.diskStore() == saved, "stable synchronization preserves order and script storage");
+  fixture.check(controller.disk_store() == saved, "stable synchronization preserves order and script storage");
 
   auto restored = make_save(expected_order, {});
   if (!fixture.check(bool(controller.reload_tech()), "force reload unchanged equipment")) return;
-  fixture.check(controller.diskStore() == restored, "forced reload clears script storage");
-  if (!fixture.check(bool(controller.setOverrideTech({"root-isolation"})), "activate tech override")) return;
-  if (!fixture.check(bool(controller.setOverrideTech({"tech-sync-body"})), "replace tech override")) return;
+  fixture.check(controller.disk_store() == restored, "forced reload clears script storage");
+  if (!fixture.check(bool(controller.set_override_tech({"root-isolation"})), "activate tech override")) return;
+  if (!fixture.check(bool(controller.set_override_tech({"tech-sync-body"})), "replace tech override")) return;
   equipped.clear();
   if (!fixture.check(bool(controller.sync_equipped_tech(equipped)), "ignore equipment changes under override")) return;
-  if (!fixture.check(bool(controller.clearOverrideTech()), "clear tech override")) return;
-  fixture.check(!controller.techOverridden() && controller.diskStore() == restored, "clear restores original ordered equipment");
+  if (!fixture.check(bool(controller.clear_override_tech()), "clear tech override")) return;
+  fixture.check(!controller.tech_overridden() && controller.disk_store() == restored, "clear restores original ordered equipment");
   if (!fixture.check(bool(controller.sync_equipped_tech(equipped)), "apply equipment changes after restoration")) return;
-  fixture.check(controller.diskStore() == make_save({}, {}), "synchronization resumes after clearing override");
+  fixture.check(controller.disk_store() == make_save({}, {}), "synchronization resumes after clearing override");
 });
 
 [[nodiscard]] std::expected<void, StarException> expectIsolationConsumers(Root& root, LuaContext& context,
@@ -768,7 +768,7 @@ const GameTestRegistration lua_name_seed("NameGeneratorConsumerTest", "LuaSeedOn
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
   auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-  auto settings = isolationSettings(fixture.rootSettings(), *directory, "lua-name-seed");
+  auto settings = isolation_settings(fixture.rootSettings(), *directory, "lua-name-seed");
   ASSERT_TRUE(settings) << settings.error().what();
   auto created = Root::create(std::move(*settings));
   ASSERT_TRUE(created) << created.error().what();
@@ -843,7 +843,7 @@ const GameTestRegistration statistics_achievement_index(
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory);
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-    auto settings = isolationSettings(fixture.rootSettings(), *directory, "statistics");
+    auto settings = isolation_settings(fixture.rootSettings(), *directory, "statistics");
     ASSERT_TRUE(settings) << settings.error().what();
     auto overlay = File::relative_to(*directory, "assets");
     settings->assetSources = {overlay};
@@ -901,7 +901,7 @@ const GameTestRegistration timed_dance("DanceTest", "RefreshAndFailedReplacement
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
   auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-  auto settings = isolationSettings(fixture.rootSettings(), *directory, "dance");
+  auto settings = isolation_settings(fixture.rootSettings(), *directory, "dance");
   ASSERT_TRUE(settings) << settings.error().what();
   auto overlay = File::relative_to(*directory, "assets");
   settings->assetSources = {overlay}; // No assetmissing fallback: exercise a real lookup failure.
@@ -927,7 +927,7 @@ const GameTestRegistration secure_identity("RootTest", "SecureIdentityStability"
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
   auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-  auto settings = isolationSettings(fixture.rootSettings(), *directory, "identity");
+  auto settings = isolation_settings(fixture.rootSettings(), *directory, "identity");
   ASSERT_TRUE(settings) << settings.error().what();
   auto created = Root::create(std::move(*settings));
   ASSERT_TRUE(created) << created.error().what();
@@ -1086,7 +1086,7 @@ const GameTestRegistration presentation_message_failures("WorldClientTest", "Pre
   EXPECT_TRUE((**radio_response).is_null());
   auto queued = player->pull_pending_radio_message();
   ASSERT_TRUE(queued && *queued);
-  EXPECT_EQ((**queued).messageId, "radio-after-errors");
+  EXPECT_EQ((**queued).message_id, "radio-after-errors");
   auto accepted = from_server.back().result();
   ASSERT_TRUE(accepted && *accepted);
   EXPECT_TRUE((**accepted).is_null());
@@ -1124,10 +1124,10 @@ const GameTestRegistration missing_death_burst("WorldClientTest", "MissingPlayer
   auto player = std::move(*created);
   auto const& client = (*universe)->client();
   player->set_client_context(client->client_context());
-  player->setStatistics(client->statistics());
-  player->setUniverseClient(std::ref(*client));
-  ASSERT_TRUE(player->finalizeCreation());
-  ASSERT_TRUE(player->setModeType(PlayerMode::Hardcore));
+  player->set_statistics(client->statistics());
+  player->set_universe_client(std::ref(*client));
+  ASSERT_TRUE(player->finalize_creation());
+  ASSERT_TRUE(player->set_mode_type(PlayerMode::Hardcore));
   auto items = root.itemDatabase();
   ASSERT_TRUE(items);
   auto descriptor = ItemDescriptor::create("dirtmaterial", 1);
@@ -1376,20 +1376,20 @@ const GameTestRegistration signed_broadcast_lifecycle("RootTest", "SignedBroadca
   ASSERT_TRUE(encoded_key.write(Json(expected_key)));
   String const expected_property(std::string(encoded_key.data().span().begin(), encoded_key.data().span().end()));
   auto expect_published = [&] {
-    auto published = player->getSecretPropertyRef(property);
+    auto published = player->get_secret_property_ref(property);
     ASSERT_TRUE(published);
     EXPECT_EQ(published->get(), expected_property);
-    auto legacy = player->effectsAnimator()->global_tag(legacy_tag);
+    auto legacy = player->effects_animator()->global_tag(legacy_tag);
     ASSERT_TRUE(legacy);
     EXPECT_EQ(legacy->get(), expected_key);
   };
   ASSERT_NO_FATAL_FAILURE(expect_published());
-  ASSERT_TRUE(player->setSecretProperty(property, Json()));
-  player->effectsAnimator()->remove_global_tag(legacy_tag);
+  ASSERT_TRUE(player->set_secret_property(property, Json()));
+  player->effects_animator()->remove_global_tag(legacy_tag);
   ASSERT_TRUE(world->update(1.0f / 60.0f));
   ASSERT_NO_FATAL_FAILURE(expect_published());
-  ASSERT_TRUE(player->setSecretProperty(property, 17));
-  player->effectsAnimator()->set_global_tag(legacy_tag, "replaced");
+  ASSERT_TRUE(player->set_secret_property(property, 17));
+  player->effects_animator()->set_global_tag(legacy_tag, "replaced");
   ASSERT_TRUE(world->update(1.0f / 60.0f));
   ASSERT_NO_FATAL_FAILURE(expect_published());
 
@@ -1441,10 +1441,10 @@ const GameTestRegistration signed_broadcast_lifecycle("RootTest", "SignedBroadca
     SCOPED_TRACE(legacy ? "StarExtensions" : "secret broadcast");
     auto publish = [&](String const& public_key) -> std::expected<void, StarException> {
       if (legacy) {
-        player->effectsAnimator()->set_global_tag(legacy_tag, public_key);
+        player->effects_animator()->set_global_tag(legacy_tag, public_key);
         return {};
       }
-      return player->setSecretProperty(property, public_key);
+      return player->set_secret_property(property, public_key);
     };
     ASSERT_TRUE(publish(expected_key));
     auto original_packet = make_packet(root.identity(), legacy);
@@ -1459,9 +1459,9 @@ const GameTestRegistration signed_broadcast_lifecycle("RootTest", "SignedBroadca
       EXPECT_EQ(received.size(), before + 1);
     }
     if (legacy) {
-      player->effectsAnimator()->remove_global_tag(legacy_tag);
+      player->effects_animator()->remove_global_tag(legacy_tag);
     } else {
-      ASSERT_TRUE(player->setSecretProperty(property, Json()));
+      ASSERT_TRUE(player->set_secret_property(property, Json()));
     }
     ASSERT_TRUE(world->handleIncomingPackets({original_packet}));
     EXPECT_EQ(received.size(), before + 1);
@@ -1481,7 +1481,7 @@ const GameTestRegistration lua_configuration_paths("RootTest", "LuaConfiguration
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
   auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-  auto settings = isolationSettings(fixture.rootSettings(), *directory, "lua-paths");
+  auto settings = isolation_settings(fixture.rootSettings(), *directory, "lua-paths");
   ASSERT_TRUE(settings) << settings.error().what();
   auto root = Root::create(std::move(*settings));
   ASSERT_TRUE(root) << root.error().what();
@@ -1608,7 +1608,7 @@ const GameTestRegistration lua_http_cancellation("RootTest", "LuaHttpCancellatio
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
   auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-  auto settings = isolationSettings(fixture.rootSettings(), *directory, "http");
+  auto settings = isolation_settings(fixture.rootSettings(), *directory, "http");
   ASSERT_TRUE(settings) << settings.error().what();
   auto root = Root::create(std::move(*settings));
   ASSERT_TRUE(root) << root.error().what();
@@ -1917,7 +1917,7 @@ const GameTestRegistration status_lifecycle("StatusControllerTest", "ReentrantLu
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
   auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-  auto settings = isolationSettings(fixture.rootSettings(), *directory, "status-lifecycle");
+  auto settings = isolation_settings(fixture.rootSettings(), *directory, "status-lifecycle");
   ASSERT_TRUE(settings) << settings.error().what();
   auto overlay = File::relative_to(*directory, "assets");
   ASSERT_TRUE(writeIsolationModules(overlay, {
@@ -2093,7 +2093,7 @@ const GameTestRegistration status_generation("StatusControllerTest", "ExistingDe
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
   auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-  auto settings = isolationSettings(fixture.rootSettings(), *directory, "status-generation");
+  auto settings = isolation_settings(fixture.rootSettings(), *directory, "status-generation");
   ASSERT_TRUE(settings) << settings.error().what();
   auto overlay = File::relative_to(*directory, "assets");
   settings->assetSources = {overlay};
@@ -2126,7 +2126,7 @@ const GameTestRegistration versioning_migrations("VersioningDatabase", "RunsLuaA
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
   auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-  auto settings = isolationSettings(fixture.rootSettings(), *directory, "versioning");
+  auto settings = isolation_settings(fixture.rootSettings(), *directory, "versioning");
   ASSERT_TRUE(settings) << settings.error().what();
   auto overlay = File::relative_to(*directory, "assets");
   settings->assetSources = {overlay};
@@ -2243,7 +2243,7 @@ const GameTestRegistration bushShapeBoundaries("RootTest", "BushShapeBoundaries"
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
   auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-  auto settings = isolationSettings(fixture.rootSettings(), *directory, "bush-shapes");
+  auto settings = isolation_settings(fixture.rootSettings(), *directory, "bush-shapes");
   ASSERT_TRUE(settings) << settings.error().what();
   auto overlay = File::relative_to(*directory, "assets");
   ASSERT_TRUE(writeIsolationModules(
@@ -2296,7 +2296,7 @@ const GameTestRegistration plant_catalog_variants("PlantCatalogTest", "TreeIdent
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
   auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-  auto settings = isolationSettings(fixture.rootSettings(), *directory, "plant-catalog");
+  auto settings = isolation_settings(fixture.rootSettings(), *directory, "plant-catalog");
   ASSERT_TRUE(settings) << settings.error().what();
   auto overlay = File::relative_to(*directory, "assets");
   ASSERT_TRUE(File::create_directory(File::relative_to(overlay, "catalog-a")));
@@ -2425,7 +2425,7 @@ const GameTestRegistration gender_name_rules("NameGeneratorConsumerTest", "Speci
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
   auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-  auto settings = isolationSettings(fixture.rootSettings(), *directory, "gender-name-rules");
+  auto settings = isolation_settings(fixture.rootSettings(), *directory, "gender-name-rules");
   ASSERT_TRUE(settings) << settings.error().what();
   auto overlay = File::relative_to(*directory, "assets");
   ASSERT_TRUE(File::create_directory(File::relative_to(overlay, "species")));
@@ -2551,7 +2551,7 @@ const GameTestRegistration npc_inheritance_and_legacy_variant("RootTest", "NpcIn
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
   auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-  auto settings = isolationSettings(fixture.rootSettings(), *directory, "npc-inheritance");
+  auto settings = isolation_settings(fixture.rootSettings(), *directory, "npc-inheritance");
   ASSERT_TRUE(settings) << settings.error().what();
   auto written = writeIsolationModules(File::relative_to(*directory, "assets"), {
     {"npc-fixture-base.npctype", R"JSON({"type":"npc-fixture-base","baseType":"villager",
@@ -2655,7 +2655,7 @@ const GameTestRegistration monster_part_merge("RootTest", "MonsterPartShallowMer
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
   auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-  auto settings = isolationSettings(fixture.rootSettings(), *directory, "monster-part-merge");
+  auto settings = isolation_settings(fixture.rootSettings(), *directory, "monster-part-merge");
   ASSERT_TRUE(settings) << settings.error().what();
   auto overlay = File::relative_to(*directory, "assets");
   ASSERT_TRUE(writeIsolationModules(overlay, {
@@ -2758,7 +2758,7 @@ const GameTestRegistration monster_generation_rng("RootTest", "MonsterGeneration
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
   auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-  auto settings = isolationSettings(fixture.rootSettings(), *directory, "monster-generation");
+  auto settings = isolation_settings(fixture.rootSettings(), *directory, "monster-generation");
   ASSERT_TRUE(settings) << settings.error().what();
   auto overlay = File::relative_to(*directory, "assets");
   ASSERT_TRUE(writeIsolationModules(overlay, {
@@ -2894,7 +2894,7 @@ const GameTestRegistration monster_part_pool_duplicate("RootTest", "MonsterPartP
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
   auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-  auto settings = isolationSettings(fixture.rootSettings(), *directory, "monster-part-pool-duplicate");
+  auto settings = isolation_settings(fixture.rootSettings(), *directory, "monster-part-pool-duplicate");
   ASSERT_TRUE(settings) << settings.error().what();
   auto overlay = File::relative_to(*directory, "assets");
   String part = R"({"name":"repeated","category":"part-pool-probe","type":"body","frames":{}})";
@@ -2931,7 +2931,7 @@ const GameTestRegistration
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory) << directory.error().what();
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-    auto settings = isolationSettings(fixture.rootSettings(), *directory, "modules");
+    auto settings = isolation_settings(fixture.rootSettings(), *directory, "modules");
     ASSERT_TRUE(settings) << settings.error().what();
     auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(writeIsolationModules(overlay,
@@ -2989,7 +2989,7 @@ const GameTestRegistration
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory) << directory.error().what();
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-    auto settings = isolationSettings(fixture.rootSettings(), *directory, "module-retries");
+    auto settings = isolation_settings(fixture.rootSettings(), *directory, "module-retries");
     ASSERT_TRUE(settings) << settings.error().what();
     auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(writeIsolationModules(overlay,
@@ -3130,7 +3130,7 @@ const GameTestRegistration
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory) << directory.error().what();
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-    auto settings = isolationSettings(fixture.rootSettings(), *directory, "module-revisions");
+    auto settings = isolation_settings(fixture.rootSettings(), *directory, "module-revisions");
     ASSERT_TRUE(settings) << settings.error().what();
     auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(writeIsolationModules(
@@ -3204,7 +3204,7 @@ const GameTestRegistration
     auto directory = File::temporary_directory(fixture.root().random());
     ASSERT_TRUE(directory) << directory.error().what();
     auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-    auto settings = isolationSettings(fixture.rootSettings(), *directory, "module-reentrancy");
+    auto settings = isolation_settings(fixture.rootSettings(), *directory, "module-reentrancy");
     ASSERT_TRUE(settings) << settings.error().what();
     auto overlay = File::relative_to(*directory, "assets");
     ASSERT_TRUE(writeIsolationModules(overlay, {{"p5-reentrant.lua", R"LUA(
@@ -3265,10 +3265,10 @@ const GameTestRegistration simultaneousRoots("RootTest", "SimultaneousRoots", []
   auto directoryB = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directoryB) << directoryB.error().what();
   auto cleanupB = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directoryB)); });
-  auto settingsResultA = isolationSettings(fixture.rootSettings(), *directoryA, "A");
+  auto settingsResultA = isolation_settings(fixture.rootSettings(), *directoryA, "A");
   ASSERT_TRUE(settingsResultA) << settingsResultA.error().what();
   auto settingsA = std::move(*settingsResultA);
-  auto settingsResultB = isolationSettings(fixture.rootSettings(), *directoryB, "B");
+  auto settingsResultB = isolation_settings(fixture.rootSettings(), *directoryB, "B");
   ASSERT_TRUE(settingsResultB) << settingsResultB.error().what();
   auto settingsB = std::move(*settingsResultB);
   auto overlayA = File::relative_to(*directoryA, "assets");
@@ -3706,7 +3706,7 @@ const GameTestRegistration monster_appearance("RootTest", "MonsterAppearanceScal
   auto directory = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directory) << directory.error().what();
   auto cleanup = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directory)); });
-  auto settings = isolationSettings(fixture.rootSettings(), *directory, "monster-appearance");
+  auto settings = isolation_settings(fixture.rootSettings(), *directory, "monster-appearance");
   ASSERT_TRUE(settings) << settings.error().what();
   auto overlay = File::relative_to(*directory, "assets");
   ASSERT_TRUE(writeIsolationModules(overlay, {
@@ -3885,9 +3885,9 @@ const GameTestRegistration simultaneousWorldMaterials("RootTest", "SimultaneousW
   auto directoryB = File::temporary_directory(fixture.root().random());
   ASSERT_TRUE(directoryB) << directoryB.error().what();
   auto cleanupB = make_scope_exit([&] { EXPECT_TRUE(File::remove_all(*directoryB)); });
-  auto settingsA = isolationSettings(fixture.rootSettings(), *directoryA, "A");
+  auto settingsA = isolation_settings(fixture.rootSettings(), *directoryA, "A");
   ASSERT_TRUE(settingsA) << settingsA.error().what();
-  auto settingsB = isolationSettings(fixture.rootSettings(), *directoryB, "B");
+  auto settingsB = isolation_settings(fixture.rootSettings(), *directoryB, "B");
   ASSERT_TRUE(settingsB) << settingsB.error().what();
   auto overlayA = File::relative_to(*directoryA, "assets");
   auto overlayB = File::relative_to(*directoryB, "assets");
@@ -3948,7 +3948,7 @@ const GameTestRegistration item_shared_builder_seeds("ItemDatabaseTest", "Shared
   auto cleanup = make_scope_exit([&] {
     GameTest::check(bool(File::remove_all(*directory)), "removing the builder fixture directory");
   });
-  auto settings = isolationSettings(fixture.rootSettings(), *directory, "item-seed-probe");
+  auto settings = isolation_settings(fixture.rootSettings(), *directory, "item-seed-probe");
   if (!GameTest::check(settings.has_value(), "configuring the builder fixture"))
     return;
   auto written = writeIsolationModules(File::relative_to(*directory, "assets"), {
@@ -4360,7 +4360,7 @@ const GameTestRegistration hud_radio_dequeue("HudDomainTest", "RadioUniqueAccoun
     auto next = player.pull_pending_radio_message();
     ASSERT_TRUE(next) << next.error().what();
     ASSERT_TRUE(*next);
-    EXPECT_EQ((**next).messageId, id);
+    EXPECT_EQ((**next).message_id, id);
     EXPECT_EQ(player.log()->has_radio_message(id), id != "hud-domain-normal");
   }
   auto empty = player.pull_pending_radio_message();
@@ -4374,7 +4374,7 @@ const GameTestRegistration hud_radio_dequeue("HudDomainTest", "RadioUniqueAccoun
     ASSERT_TRUE(player.queue_radio_message(message("hud-domain-normal", false)));
     auto next = player.pull_pending_radio_message();
     ASSERT_TRUE(next && *next);
-    EXPECT_EQ((**next).messageId, String("hud-domain-normal"));
+    EXPECT_EQ((**next).message_id, String("hud-domain-normal"));
     EXPECT_FALSE(player.log()->has_radio_message("hud-domain-normal"));
   }
   // The consumed unique set is player-owned, not a shared queue/database cache.
@@ -4383,7 +4383,7 @@ const GameTestRegistration hud_radio_dequeue("HudDomainTest", "RadioUniqueAccoun
   ASSERT_TRUE((*other)->queue_radio_message(unique));
   auto next = (*other)->pull_pending_radio_message();
   ASSERT_TRUE(next && *next);
-  EXPECT_EQ((**next).messageId, String("hud-domain-unique"));
+  EXPECT_EQ((**next).message_id, String("hud-domain-unique"));
 });
 
 const GameTestRegistration hud_radio_delayed("HudDomainTest", "RadioDelayedDispatchPreservesEventOrder", [](GameTest& fixture) {
@@ -4406,7 +4406,7 @@ const GameTestRegistration hud_radio_delayed("HudDomainTest", "RadioDelayedDispa
       auto next = player->pull_pending_radio_message();
       ASSERT_TRUE(next) << next.error().what();
       ASSERT_TRUE(*next) << id.utf8();
-      EXPECT_EQ((**next).messageId, id);
+      EXPECT_EQ((**next).message_id, id);
       EXPECT_EQ((**next).text, id); // Re-requests must not replace the original payload.
     }
     auto empty = player->pull_pending_radio_message();
@@ -4459,7 +4459,7 @@ const GameTestRegistration hud_radio_species("HudDomainTest", "RadioSpeciesOverr
   auto& player = **created;
   auto const player_species = player.species();
   String const ship_species = player_species == "avian" ? String("human") : String("avian");
-  player.setShipSpecies(ship_species);
+  player.set_ship_species(ship_species);
   Json const nested_override = JsonObject{{"text", "nested"}, {"senderName", "nested sender"}};
   Json const ship_override = JsonObject{{"text", "ship"},
       {"speciesMessage", JsonObject{{player_species, nested_override}}}};
@@ -4471,15 +4471,15 @@ const GameTestRegistration hud_radio_species("HudDomainTest", "RadioSpeciesOverr
   ASSERT_TRUE(player.queue_radio_message(config));
   auto next = player.pull_pending_radio_message();
   ASSERT_TRUE(next && *next);
-  EXPECT_EQ((**next).messageId, "radio-override");
+  EXPECT_EQ((**next).message_id, "radio-override");
   EXPECT_EQ((**next).text, "nested");
-  EXPECT_EQ((**next).senderName, "nested sender");
+  EXPECT_EQ((**next).sender_name, "nested sender");
 
-  player.setShipSpecies(player_species);
+  player.set_ship_species(player_species);
   ASSERT_TRUE(player.queue_radio_message(config));
   next = player.pull_pending_radio_message();
   ASSERT_TRUE(next && *next);
-  EXPECT_EQ((**next).messageId, "radio-override");
+  EXPECT_EQ((**next).message_id, "radio-override");
   EXPECT_EQ((**next).text, "player");
 });
 

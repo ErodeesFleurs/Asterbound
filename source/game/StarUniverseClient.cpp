@@ -228,14 +228,14 @@ std::expected<void, StarException> UniverseClient::setMainPlayer(std::shared_ptr
     if (!saved)
       return std::unexpected(std::move(saved.error()));
     m_mainPlayer->set_client_context({});
-    m_mainPlayer->setStatistics({});
-    m_mainPlayer->setUniverseClient(std::nullopt);
+    m_mainPlayer->set_statistics({});
+    m_mainPlayer->set_universe_client(std::nullopt);
   }
   m_mainPlayer = std::move(player);
   if (m_mainPlayer) {
     m_mainPlayer->set_client_context(m_client_context);
-    m_mainPlayer->setStatistics(m_statistics);
-    m_mainPlayer->setUniverseClient(std::ref(*this));
+    m_mainPlayer->set_statistics(m_statistics);
+    m_mainPlayer->set_universe_client(std::ref(*this));
     auto uuidResult = m_mainPlayer->uuid();
     if (!uuidResult)
       return std::unexpected(std::move(uuidResult.error()));
@@ -365,7 +365,7 @@ std::expected<std::optional<String>, StarException> UniverseClient::connect(Univ
       return std::unexpected(std::move(shipDataResult.error()));
     auto shipData = std::move(*shipDataResult);
     auto request = std::make_shared<ClientConnectPacket>(assets->digest(), allowAssetsMismatch, uuid, name,
-        m_mainPlayer->shipSpecies(), std::move(shipData), m_mainPlayer->ship_upgrades(), m_mainPlayer->log()->introComplete(), account);
+        m_mainPlayer->ship_species(), std::move(shipData), m_mainPlayer->ship_upgrades(), m_mainPlayer->log()->introComplete(), account);
     if (!legacyServer)
       request->info = JsonObject{{"brand", "Asterbound"}, {"openProtocolVersion", open_protocol_version}};
     auto operation8 = connection.pushSingle(std::move(request));
@@ -409,7 +409,7 @@ std::expected<std::optional<String>, StarException> UniverseClient::connect(Univ
       m_client_context = std::move(*context);
       m_teamClient = std::make_shared<TeamClient>(m_root, m_mainPlayer, m_client_context);
       m_mainPlayer->set_client_context(m_client_context);
-      m_mainPlayer->setStatistics(m_statistics);
+      m_mainPlayer->set_statistics(m_statistics);
       auto worldResult = WorldClient::create(m_root, m_mainPlayer, m_luaRoot, *this);
       if (!worldResult)
         return std::unexpected(std::move(worldResult.error()));
@@ -423,7 +423,7 @@ std::expected<std::optional<String>, StarException> UniverseClient::connect(Univ
         return std::unexpected(std::move(celestialResult.error()));
       auto celestial = std::move(*celestialResult);
       m_celestial_database = std::move(celestial);
-      auto systemResult = SystemWorldClient::create(m_root, m_universeClock, m_celestial_database, m_mainPlayer->universeMap());
+      auto systemResult = SystemWorldClient::create(m_root, m_universeClock, m_celestial_database, m_mainPlayer->universe_map());
       if (!systemResult)
         return std::unexpected(std::move(systemResult.error()));
       auto system = std::move(*systemResult);
@@ -504,7 +504,7 @@ std::expected<void, StarException> UniverseClient::disconnect() {
   m_root.timing().time_scale = 1.0f;
   auto cleared = reset();
   if (m_mainPlayer)
-    m_mainPlayer->setUniverseClient(std::nullopt);
+    m_mainPlayer->set_universe_client(std::nullopt);
   m_mainPlayer.reset();
   if (!drained) {
     if (!cleared)
@@ -544,7 +544,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
   if (!isConnected())
     return {};
   if (!m_warping && std::holds_alternative<std::monostate>(m_pendingWarp)) {
-    if (auto request = m_mainPlayer->pullPendingWarp()) {
+    if (auto request = m_mainPlayer->pull_pending_warp()) {
       auto actionResult = parseWarpAction(request->action);
       if (!actionResult)
         return std::unexpected(std::move(actionResult.error()));
@@ -574,9 +574,9 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
     }
   }
   if (!std::holds_alternative<std::monostate>(m_pendingWarp) &&
-      ((m_warping && !m_mainPlayer->isTeleportingOut()) || (!m_warping && m_warp_delay.tick(dt)))) {
+      ((m_warping && !m_mainPlayer->is_teleporting_out()) || (!m_warping && m_warp_delay.tick(dt)))) {
     auto operation44 = m_connection->pushSingle(
-      std::make_shared<PlayerWarpPacket>(std::exchange(m_pendingWarp, {}), m_mainPlayer->isDeploying()));
+      std::make_shared<PlayerWarpPacket>(std::exchange(m_pendingWarp, {}), m_mainPlayer->is_deploying()));
     if (!operation44)
       return std::unexpected(std::move(operation44.error()));
     m_warp_delay.reset();
@@ -590,7 +590,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
         return std::unexpected(std::move(minimumResult.error()));
       auto minimum = std::move(*minimumResult);
       m_warp_cinema_cancel_timer = GameTimer(minimum);
-      String path = m_mainPlayer->isDeploying() ? std::string_view("/client.config:deployCinematic") : std::string_view("/client.config:warpCinematic");
+      String path = m_mainPlayer->is_deploying() ? std::string_view("/client.config:deployCinematic") : std::string_view("/client.config:warpCinematic");
       auto cinematicPathJsonResult = assets->json(path);
       if (!cinematicPathJsonResult)
         return std::unexpected(std::move(cinematicPathJsonResult.error()));
@@ -609,7 +609,7 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
         return std::unexpected(std::move(cinematicResult.error()));
       auto cinematic = std::move(*cinematicResult);
       auto merged = json_merge(base, cinematic);
-      auto operation45 = m_mainPlayer->setPendingCinematic(merged);
+      auto operation45 = m_mainPlayer->set_pending_cinematic(merged);
       if (!operation45)
         return std::unexpected(std::move(operation45.error()));
     }
@@ -618,10 +618,10 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
     m_warp_cinema_cancel_timer->tick(m_root.timing().time_step);
     if (m_warp_cinema_cancel_timer->ready() && !m_warping) {
       m_warp_cinema_cancel_timer.reset();
-      auto operation46 = m_mainPlayer->setPendingCinematic(Json());
+      auto operation46 = m_mainPlayer->set_pending_cinematic(Json());
       if (!operation46)
         return std::unexpected(std::move(operation46.error()));
-      auto operation47 = m_mainPlayer->teleportIn();
+      auto operation47 = m_mainPlayer->teleport_in();
       if (!operation47)
         return std::unexpected(std::move(operation47.error()));
     }
@@ -880,12 +880,12 @@ std::expected<void, StarException> UniverseClient::update(float dt) {
           auto cinematic = std::move(*cinematicResult);
           if (!PlayerModeNames)
             return std::unexpected(PlayerModeNames.error());
-          auto modeResult = PlayerModeNames->get_right(m_mainPlayer->modeType());
+          auto modeResult = PlayerModeNames->get_right(m_mainPlayer->mode_type());
           if (!modeResult)
             return std::unexpected(std::move(modeResult.error()));
           auto mode = std::move(*modeResult);
           cinematic = cinematic.replace_tags(StringMap<String>{{"species", m_mainPlayer->species()}, {"mode", mode.get()}});
-          auto operation70 = m_mainPlayer->setPendingCinematic(Json(std::move(cinematic)));
+          auto operation70 = m_mainPlayer->set_pending_cinematic(Json(std::move(cinematic)));
           if (!operation70)
             return std::unexpected(std::move(operation70.error()));
         }
@@ -938,7 +938,7 @@ std::expected<bool, StarException> UniverseClient::canBeamUp() const {
     return false;
   if (m_mainPlayer->is_admin())
     return true;
-  if (m_mainPlayer->isDead() || m_mainPlayer->isTeleporting())
+  if (m_mainPlayer->is_dead() || m_mainPlayer->is_teleporting())
     return false;
   auto rule = beamUpRule();
   if (rule == BeamUpRule::Anywhere || rule == BeamUpRule::AnywhereWithWarning)
@@ -946,7 +946,7 @@ std::expected<bool, StarException> UniverseClient::canBeamUp() const {
   if (rule == BeamUpRule::Surface) {
     if (m_mainPlayer->mode_config().allowBeamUpUnderground)
       return true;
-    return m_mainPlayer->isOutside();
+    return m_mainPlayer->is_outside();
   }
   return false;
 }
@@ -960,7 +960,7 @@ std::expected<bool, StarException> UniverseClient::canBeamDown(bool deploy) cons
   if (deploy) {
     if (orbit->second == WarpMode::BeamOnly)
       return false;
-    auto canDeployResult = m_mainPlayer->canDeploy();
+    auto canDeployResult = m_mainPlayer->can_deploy();
     if (!canDeployResult)
       return std::unexpected(std::move(canDeployResult.error()));
     auto canDeploy = std::move(*canDeployResult);
@@ -969,7 +969,7 @@ std::expected<bool, StarException> UniverseClient::canBeamDown(bool deploy) cons
   }
   if (m_mainPlayer->is_admin())
     return true;
-  return !m_mainPlayer->isDead() && !m_mainPlayer->isTeleporting() && m_client_context->has_ship_capability("teleport");
+  return !m_mainPlayer->is_dead() && !m_mainPlayer->is_teleporting() && m_client_context->has_ship_capability("teleport");
 }
 
 std::expected<bool, StarException> UniverseClient::canBeamToTeamShip() const {
@@ -992,24 +992,24 @@ std::expected<bool, StarException> UniverseClient::canTeleport() const {
     return true;
   if (std::holds_alternative<ClientShipWorldId>(m_client_context->player_world_id()))
     return !flying() && m_client_context->has_ship_capability("teleport");
-  return m_mainPlayer->canUseTool();
+  return m_mainPlayer->can_use_tool();
 }
 
 std::expected<void, StarException> UniverseClient::warpPlayer(WarpAction const& warpAction, bool animate, String const& animationType, bool deploy) {
   if (m_warping || m_respawning)
     return {};
-  auto operation21 = m_mainPlayer->stopLounging();
+  auto operation21 = m_mainPlayer->stop_lounging();
   if (!operation21)
     return std::unexpected(std::move(operation21.error()));
   if (std::holds_alternative<WarpToWorld>(warpAction)) {
     auto const& world = std::get<WarpToWorld>(warpAction);
     if (std::holds_alternative<std::monostate>(world.world) || world.world == player_world()) {
       if (std::holds_alternative<SpawnTargetPosition>(world.target))
-        return m_mainPlayer->moveTo(std::get<SpawnTargetPosition>(world.target));
+        return m_mainPlayer->move_to(std::get<SpawnTargetPosition>(world.target));
     }
   }
   if (animate) {
-    auto operation22 = m_mainPlayer->teleportOut(animationType, deploy);
+    auto operation22 = m_mainPlayer->teleport_out(animationType, deploy);
     if (!operation22)
       return std::unexpected(std::move(operation22.error()));
     m_warping = warpAction;
@@ -1305,10 +1305,10 @@ std::expected<bool, StarException> UniverseClient::reloadPlayer(Json const& data
       if (!newDataResult)
         return std::unexpected(std::move(newDataResult.error()));
       auto newData = std::move(*newDataResult);
-      return player->diskLoad(newData);
+      return player->disk_load(newData);
     }();
     if (!changed) {
-      auto restored = player->diskLoad(originalData);
+      auto restored = player->disk_load(originalData);
       if (!restored)
         return std::unexpected(changed.error().with_context(Star::format("Error restoring original player data: {}", restored.error().what())));
     }
@@ -1320,8 +1320,8 @@ std::expected<bool, StarException> UniverseClient::reloadPlayer(Json const& data
   if (indicator && indicator->inWorld())
     remember(world->get().removeEntity(indicator->entityId(), false));
   CelestialCoordinate coordinate(m_systemWorldClient->location());
-  remember(player->universeMap()->addMappedCoordinate(coordinate));
-  remember(player->universeMap()->filterMappedObjects(coordinate, m_systemWorldClient->objectKeys()));
+  remember(player->universe_map()->addMappedCoordinate(coordinate));
+  remember(player->universe_map()->filterMappedObjects(coordinate, m_systemWorldClient->objectKeys()));
   if (m_playerReloadCallback)
     remember(m_playerReloadCallback(resetInterfaces));
   if (error)
@@ -1417,7 +1417,7 @@ std::shared_ptr<TeamClient> UniverseClient::teamClient() const {
 }
 
 std::shared_ptr<QuestManager> UniverseClient::questManager() const {
-  return m_mainPlayer->questManager();
+  return m_mainPlayer->quest_manager();
 }
 
 std::shared_ptr<PlayerStorage> UniverseClient::playerStorage() const {
@@ -1666,11 +1666,11 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
               if (!speciesResult)
                 return std::unexpected(std::move(speciesResult.error()));
               auto species = std::move(*speciesResult);
-              m_mainPlayer->setShipSpecies(std::move(species));
+              m_mainPlayer->set_ship_species(std::move(species));
             }
           }
         }
-        m_mainPlayer->setAdmin(m_client_context->is_admin());
+        m_mainPlayer->set_admin(m_client_context->is_admin());
         m_mainPlayer->setTeam(m_client_context->team());
       } else if (auto chat = as<ChatReceivePacket>(packet)) {
         m_pending_messages.push_back(std::move(chat->received_message));
@@ -1687,23 +1687,23 @@ std::expected<void, StarException> UniverseClient::handlePackets(List<std::share
         if (!operation77)
           return std::unexpected(std::move(operation77.error()));
       } else if (auto warp = as<PlayerWarpResultPacket>(packet)) {
-        if (m_mainPlayer->isDeploying() && m_warping && std::holds_alternative<WarpToPlayer>(*m_warping)) {
+        if (m_mainPlayer->is_deploying() && m_warping && std::holds_alternative<WarpToPlayer>(*m_warping)) {
           Uuid target = std::get<WarpToPlayer>(*m_warping);
           for (auto const& member : m_teamClient->members()) {
             if (member.uuid == target) {
               if (member.warpMode != WarpMode::DeployOnly && member.warpMode != WarpMode::BeamOrDeploy)
-                m_mainPlayer->deployAbort();
+                m_mainPlayer->deploy_abort();
               break;
             }
           }
         }
         m_warping.reset();
         if (!warp->success) {
-          auto operation78 = m_mainPlayer->teleportAbort();
+          auto operation78 = m_mainPlayer->teleport_abort();
           if (!operation78)
             return std::unexpected(std::move(operation78.error()));
           if (warp->warp_action_invalid) {
-            auto operation79 = m_mainPlayer->universeMap()->invalidateWarpAction(warp->warp_action);
+            auto operation79 = m_mainPlayer->universe_map()->invalidateWarpAction(warp->warp_action);
             if (!operation79)
               return std::unexpected(std::move(operation79.error()));
           }

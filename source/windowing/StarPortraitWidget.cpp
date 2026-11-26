@@ -147,7 +147,7 @@ std::expected<void, StarException> PortraitWidget::renderImpl() {
     std::shared_ptr<Humanoid> humanoid;
     if (m_renderHumanoid)
       if (auto player = as<Player>(m_entity))
-        if (!player->isPermaDead()) humanoid = player->humanoid();
+        if (!player->is_perma_dead()) humanoid = player->humanoid();
     auto portrait = humanoid ? humanoid->render(false, false) : m_entity->portrait(m_portraitMode);
     if (!portrait) return std::unexpected(std::move(portrait.error()));
     for (auto& drawable : *portrait) {

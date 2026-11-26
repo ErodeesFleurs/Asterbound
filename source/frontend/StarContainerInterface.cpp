@@ -262,10 +262,10 @@ std::expected<void, StarException> ContainerPane::initialize(std::shared_ptr<Wor
     auto addCallbacksResult234 = m_script->add_callbacks("config", std::move(*makeConfigCallbacksResult233));
     if (!addCallbacksResult234)
       return std::unexpected(std::move(addCallbacksResult234.error()));
-    auto makePlayerCallbacksResult235 = LuaBindings::makePlayerCallbacks(context().root(), *m_player);
-    if (!makePlayerCallbacksResult235)
-      return std::unexpected(std::move(makePlayerCallbacksResult235.error()));
-    auto addCallbacksResult236 = m_script->add_callbacks("player", std::move(*makePlayerCallbacksResult235));
+    auto player_callbacks_result = LuaBindings::make_player_callbacks(context().root(), *m_player);
+    if (!player_callbacks_result)
+      return std::unexpected(std::move(player_callbacks_result.error()));
+    auto addCallbacksResult236 = m_script->add_callbacks("player", std::move(*player_callbacks_result));
     if (!addCallbacksResult236)
       return std::unexpected(std::move(addCallbacksResult236.error()));
     auto makeStatusControllerCallbacksResult237 = LuaBindings::makeStatusControllerCallbacks(m_player->status_controller());
@@ -617,12 +617,12 @@ std::expected<bool, StarException> ContainerPane::giveContainerResult(ContainerR
 
   for (auto item : result) {
     auto inv = m_player->inventory();
-    auto triggerPickupEventsResult292 = m_player->triggerPickupEvents(item);
+    auto triggerPickupEventsResult292 = m_player->trigger_pickup_events(item);
     if (!triggerPickupEventsResult292)
       return std::unexpected(std::move(triggerPickupEventsResult292.error()));
 
     if (m_expectingSwap == ExpectingSwap::SwapSlot) {
-      auto clearSwapResult293 = m_player->clearSwap();
+      auto clearSwapResult293 = m_player->clear_swap();
       if (!clearSwapResult293)
         return std::unexpected(std::move(clearSwapResult293.error()));
       auto setSwapSlotItemResult294 = inv->setSwapSlotItem(item);

@@ -180,7 +180,7 @@ private:
     String part;
     String partAnchor;
     std::optional<Vec2F> exitBottomOffset;
-    JsonObject armorCosmeticOverrides;
+    JsonObject armor_cosmetic_overrides;
     std::optional<String> cursorOverride;
     std::optional<bool> suppressTools;
     bool cameraFocus;
@@ -190,7 +190,7 @@ private:
     NetElementData<std::optional<String>> emote;
     NetElementData<std::optional<String>> dance;
     NetElementData<std::optional<String>> directives;
-    NetElementData<List<PersistentStatusEffect>> statusEffects;
+    NetElementData<List<PersistentStatusEffect>> status_effects;
 
     Map<LoungeControl, MasterControlState> masterControlState;
     Vec2F masterAimPosition;

@@ -243,7 +243,7 @@ std::expected<void, StarException> UnlockItem::fire_triggered() {
         blueprints.push_back(std::move(*blueprint));
       }
       for (auto const& blueprint : blueprints) {
-        auto added = player->get().addBlueprint(blueprint);
+        auto added = player->get().add_blueprint(blueprint);
         if (!added)
           return std::unexpected(std::move(added.error()));
       }

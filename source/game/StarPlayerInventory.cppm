@@ -58,7 +58,7 @@ class PlayerInventory : public NetElementSyncGroup {
 public:
   // Whether the given item is allowed to go in the given slot type
   [[nodiscard]] std::expected<bool, StarException> itemAllowedInBag(std::shared_ptr<Item> const& item, String const& bagType) const;
-  static bool itemAllowedAsEquipment(std::shared_ptr<Item> const& item, EquipmentSlot equipmentSlot);
+  static bool item_allowed_as_equipment(std::shared_ptr<Item> const& item, EquipmentSlot equipment_slot);
 
   [[nodiscard]] static std::expected<std::shared_ptr<PlayerInventory>, StarException> create(Root& root);
 

@@ -102,74 +102,74 @@ namespace Star {
 
 std::expected<std::shared_ptr<PlayerConfig>, StarException> PlayerConfig::create(Root& root, JsonObject const& cfg) {
   Json json(cfg);
-  auto timingConfig = json.get("humanoidTiming", {});
-  if (!timingConfig)
-    return std::unexpected(std::move(timingConfig.error()));
-  auto timing = Humanoid::HumanoidTiming::create(root, *timingConfig);
+  auto timing_config = json.get("humanoidTiming", {});
+  if (!timing_config)
+    return std::unexpected(std::move(timing_config.error()));
+  auto timing = Humanoid::HumanoidTiming::create(root, *timing_config);
   if (!timing)
     return std::unexpected(std::move(timing.error()));
   auto config = std::shared_ptr<PlayerConfig>(new PlayerConfig(std::move(*timing)));
-  auto identityConfig = json.get("defaultHumanoidIdentity", {});
-  if (!identityConfig)
-    return std::unexpected(std::move(identityConfig.error()));
-  auto identity = HumanoidIdentity::create(*identityConfig);
+  auto identity_config = json.get("defaultHumanoidIdentity", {});
+  if (!identity_config)
+    return std::unexpected(std::move(identity_config.error()));
+  auto identity = HumanoidIdentity::create(*identity_config);
   if (!identity)
     return std::unexpected(std::move(identity.error()));
-  config->defaultIdentity = std::move(*identity);
+  config->default_identity = std::move(*identity);
   auto items = json.get_array("defaultItems", JsonArray());
   if (!items)
     return std::unexpected(std::move(items.error()));
-  for (auto const& itemJson : *items) {
-    auto item = ItemDescriptor::create(itemJson);
+  for (auto const& item_json : *items) {
+    auto item = ItemDescriptor::create(item_json);
     if (!item)
       return std::unexpected(std::move(item.error()));
-    config->defaultItems.push_back(std::move(*item));
+    config->default_items.push_back(std::move(*item));
   }
-  auto blueprintConfig = json.get("defaultBlueprints", JsonObject());
-  if (!blueprintConfig)
-    return std::unexpected(std::move(blueprintConfig.error()));
-  auto blueprints = blueprintConfig->get_array("tier1", JsonArray());
+  auto blueprint_config = json.get("defaultBlueprints", JsonObject());
+  if (!blueprint_config)
+    return std::unexpected(std::move(blueprint_config.error()));
+  auto blueprints = blueprint_config->get_array("tier1", JsonArray());
   if (!blueprints)
     return std::unexpected(std::move(blueprints.error()));
-  for (auto const& itemJson : *blueprints) {
-    auto item = ItemDescriptor::create(itemJson);
+  for (auto const& item_json : *blueprints) {
+    auto item = ItemDescriptor::create(item_json);
     if (!item)
       return std::unexpected(std::move(item.error()));
-    config->defaultBlueprints.push_back(std::move(*item));
+    config->default_blueprints.push_back(std::move(*item));
   }
-  auto boundsConfig = json.get("metaBoundBox");
-  if (!boundsConfig)
-    return std::unexpected(std::move(boundsConfig.error()));
-  auto bounds = json_to_rectf(*boundsConfig);
+  auto bounds_config = json.get("metaBoundBox");
+  if (!bounds_config)
+    return std::unexpected(std::move(bounds_config.error()));
+  auto bounds = json_to_rectf(*bounds_config);
   if (!bounds)
     return std::unexpected(std::move(bounds.error()));
   config->meta_bound_box = *bounds;
   for (auto const& field : {
-      std::pair{std::string_view{"movementParameters"}, std::ref(config->movementParameters)},
-      std::pair{std::string_view{"zeroGMovementParameters"}, std::ref(config->zeroGMovementParameters)},
-      std::pair{std::string_view{"statusControllerSettings"}, std::ref(config->statusControllerSettings)},
-      std::pair{std::string_view{"companionsConfig"}, std::ref(config->companionsConfig)},
-      std::pair{std::string_view{"deploymentConfig"}, std::ref(config->deploymentConfig)}}) {
+      std::pair{std::string_view{"movementParameters"}, std::ref(config->movement_parameters)},
+      std::pair{std::string_view{"zeroGMovementParameters"}, std::ref(config->zero_g_movement_parameters)},
+      std::pair{std::string_view{"statusControllerSettings"}, std::ref(config->status_controller_settings)},
+      std::pair{std::string_view{"companionsConfig"}, std::ref(config->companions_config)},
+      std::pair{std::string_view{"deploymentConfig"}, std::ref(config->deployment_config)}}) {
     auto value = json.get(field.first);
     if (!value)
       return std::unexpected(std::move(value.error()));
     field.second.get() = std::move(*value);
   }
   for (auto const& field : {
-      std::pair{std::string_view{"footstepTiming"}, std::ref(config->footstepTiming)},
-      std::pair{std::string_view{"underwaterMinWaterLevel"}, std::ref(config->underwaterMinWaterLevel)},
-      std::pair{std::string_view{"teleportInTime"}, std::ref(config->teleportInTime)},
-      std::pair{std::string_view{"teleportOutTime"}, std::ref(config->teleportOutTime)},
-      std::pair{std::string_view{"deployInTime"}, std::ref(config->deployInTime)},
-      std::pair{std::string_view{"deployOutTime"}, std::ref(config->deployOutTime)}}) {
+      std::pair{std::string_view{"footstepTiming"}, std::ref(config->footstep_timing)},
+      std::pair{std::string_view{"underwaterMinWaterLevel"}, std::ref(config->underwater_min_water_level)},
+      std::pair{std::string_view{"teleportInTime"}, std::ref(config->teleport_in_time)},
+      std::pair{std::string_view{"teleportOutTime"}, std::ref(config->teleport_out_time)},
+      std::pair{std::string_view{"deployInTime"}, std::ref(config->deploy_in_time)},
+      std::pair{std::string_view{"deployOutTime"}, std::ref(config->deploy_out_time)}}) {
     auto value = json.get_float(field.first);
     if (!value)
       return std::unexpected(std::move(value.error()));
     field.second.get() = *value;
   }
   for (auto const& field : {
-      std::pair{std::string_view{"footstepSensor"}, std::ref(config->footstepSensor)},
-      std::pair{std::string_view{"underwaterSensor"}, std::ref(config->underwaterSensor)}}) {
+      std::pair{std::string_view{"footstepSensor"}, std::ref(config->footstep_sensor)},
+      std::pair{std::string_view{"underwaterSensor"}, std::ref(config->underwater_sensor)}}) {
     auto value = json.get(field.first);
     if (!value)
       return std::unexpected(std::move(value.error()));
@@ -186,17 +186,17 @@ std::expected<std::shared_ptr<PlayerConfig>, StarException> PlayerConfig::create
     return std::unexpected(std::move(splash.error()));
   config->splash_config = std::move(*splash);
   for (auto const& field : {
-      std::pair{std::string_view{"effectsAnimator"}, std::ref(config->effectsAnimator)},
-      std::pair{std::string_view{"bodyMaterialKind"}, std::ref(config->bodyMaterialKind)}}) {
+      std::pair{std::string_view{"effectsAnimator"}, std::ref(config->effects_animator)},
+      std::pair{std::string_view{"bodyMaterialKind"}, std::ref(config->body_material_kind)}}) {
     auto value = json.get_string(field.first);
     if (!value)
       return std::unexpected(std::move(value.error()));
     field.second.get() = std::move(*value);
   }
-  auto contextConfig = json.get("genericScriptContexts");
-  if (!contextConfig)
-    return std::unexpected(std::move(contextConfig.error()));
-  auto contexts = contextConfig->opt_object();
+  auto context_config = json.get("genericScriptContexts");
+  if (!context_config)
+    return std::unexpected(std::move(context_config.error()));
+  auto contexts = context_config->opt_object();
   if (!contexts)
     return std::unexpected(std::move(contexts.error()));
   if (*contexts) {
@@ -204,7 +204,7 @@ std::expected<std::shared_ptr<PlayerConfig>, StarException> PlayerConfig::create
       auto name = entry.second.to_string();
       if (!name)
         return std::unexpected(std::move(name.error()));
-      config->genericScriptContexts[entry.first] = std::move(*name);
+      config->generic_script_contexts[entry.first] = std::move(*name);
     }
   }
   return config;

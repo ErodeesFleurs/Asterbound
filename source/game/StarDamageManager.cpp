@@ -198,7 +198,7 @@ std::expected<void, StarException> DamageManager::push_remote_hit_request(Remote
   if (auto entity = m_world.get().entity(request.causing_entity_id)) {
     if constexpr (Star::debug_enabled)
       Star::star_assert_failed(entity->isMaster());
-    return entity->hitOther(request.target_entity_id, request.damage_request);
+    return entity->hit_other(request.target_entity_id, request.damage_request);
   }
   return {};
 }
@@ -360,7 +360,7 @@ std::expected<void, StarException> DamageManager::dispatch_hit(Entity& causing_e
   if (*hit_owner == m_connection_id) {
     if constexpr (Star::debug_enabled)
       Star::star_assert_failed(causing_entity.isMaster());
-    auto result = causing_entity.hitOther(target_id, request);
+    auto result = causing_entity.hit_other(target_id, request);
     if (!result) return result;
     if (!hit_only && !still_in_world(target_entity, target_id, m_world.get()))
       return {};
